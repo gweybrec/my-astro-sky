@@ -497,7 +497,7 @@ export const rules = [
   },
   // The clear button of a search field is centred on the field.
   { id: 'search-clear', type: 'rowCentre', rows: '.mob-search-wrap', items: '.mob-search-clear' },
-  // A card's label and value start on one line; the toggles of the map's column start on one line.
+  // A card's label and value start on one line; the buttons of a photo's column start on one line.
   {
     id: 'fact-edge',
     type: 'sameStart',
@@ -531,8 +531,7 @@ export const rules = [
     within: '.mob-photo-card',
     lefts: '.mob-photo-card-name, .mob-tags > :first-child',
   },
-  // On the map, the layers button and the column of toggles end on the same line, and the toggles are equally spaced
-  // (the last one, set apart, is the only exception: it is measured against its own margin).
+  // On the map, the top row's last button and a photo's column of buttons end on the same line.
   {
     id: 'map-edges',
     type: 'edges',
@@ -562,12 +561,12 @@ export const rules = [
     minimum: true,
   },
   // The first column's titles, headers and helper lines start on one line (not the second field of a pair); a row that
-  // starts with a picture placeholder starts with it.
+  // starts with a picture placeholder, or a switch row that starts with its icon, starts with it.
   {
     id: 'left-edge',
     type: 'leadingEdge',
     items:
-      '.mob-section-header, .mob-sheet-title, .mob-stepper-label, .mob-form-label:not(.mob-form-row--pair > :not(:first-child) *), .mob-helper, ion-item.mob-row:not(:has(.mob-row-lead, .mob-row-thumb)):not(.mob-entry .mob-row) .mob-row-title, ion-item.mob-row:not(.mob-entry .mob-row) .mob-row-thumb, ion-toggle.mob-row .mob-row-title',
+      '.mob-section-header, .mob-sheet-title, .mob-stepper-label, .mob-form-label:not(.mob-form-row--pair > :not(:first-child) *), .mob-helper, ion-item.mob-row:not(:has(.mob-row-lead, .mob-row-thumb)):not(.mob-entry .mob-row) .mob-row-title, ion-item.mob-row:not(.mob-entry .mob-row) .mob-row-thumb, ion-toggle.mob-row:not(:has(.mob-row-lead)) .mob-row-title, ion-toggle.mob-row .mob-row-lead',
   },
   // The chevron (else the switch) of each row ends on one line.
   {
@@ -687,11 +686,13 @@ export const views = [
     name: 'sky-layers',
     path: '/tabs/sky',
     ready: '.mob-map-top',
-    // The calendar button puts the map in the date mode: the time bar and the toggles appear.
+    // The calendar button opens the layers sheet; its first switch puts the map in the date mode (the time bar appears).
     open: [
       { click: '.mob-map-top ion-button:nth-of-type(3)' },
-      { wait: '.mob-map-ribbon' },
+      { wait: '.mob-map-sheet' },
+      { click: '.mob-map-sheet ion-toggle' },
       { wait: '.mob-timebar' },
+      { pause: 600 },
     ],
   },
   {

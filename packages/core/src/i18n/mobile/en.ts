@@ -185,6 +185,30 @@ const en: Translations['mobile'] = {
   },
   sky: {
     layers: 'Map layers',
+    dateMode: 'Sky of the day',
+    dateModeInfo:
+      'Stops the live sky and shows the sky at the date and time chosen in the bottom bar. The layers below show only in this mode.',
+    layersSection: 'Layers',
+    localSky: 'Local projection',
+    localSkyInfo:
+      'Shows the sky as you see it from your observing location: the zenith in the middle, the horizon at the edge. The observing location must be set first (Settings).',
+    azimuthGrid: 'Azimuth grid',
+    azimuthGridInfo:
+      'Draws the circles of altitude above the horizon and the directions (north, east, south, west) around your observing location.',
+    cardinalPoints: 'Cardinal points',
+    cardinalPointsInfo:
+      'Writes N, E, S and W on the horizon, so you know which way to look from your observing location.',
+    trajectoryInfo:
+      'Draws the path the selected object follows across the sky during the night. Available in the local projection only.',
+    relief: 'Terrain horizon',
+    reliefInfo:
+      'Draws the line of the mountains and obstacles around your observing location. The terrain horizon must be computed or imported first (Settings).',
+    moon: 'Moon',
+    moonInfo: 'Places the Moon at its position, with its phase, at the chosen date and time.',
+    sun: 'Sun',
+    sunInfo: 'Places the Sun at its position at the chosen date and time.',
+    planets: 'Planets',
+    planetsInfo: 'Places the planets at their positions at the chosen date and time.',
     searchShort: 'Search…',
     photoCountOne: '1 photo',
     photoCountMany: '{n} photos',
@@ -198,9 +222,6 @@ const en: Translations['mobile'] = {
     pageOf: 'Page {n} of {total}',
     photoActions: 'Photo actions',
     sectionMap: 'Map',
-    needsLocation: 'Set the observing location first (Settings)',
-    needsLocalSky: 'Turn on the local sky first',
-    needsHorizon: 'Compute or import the terrain horizon first (Settings)',
     frameSet: 'Frames',
     planSetup: 'Setup',
     framePin: 'Pin',

@@ -7,7 +7,7 @@ import { ionicStubs } from './helpers';
 
 import SkyTopBar from '../src/pages/sky/SkyTopBar.vue';
 
-/** "Ciel": the top row of the map, whose date button is the desktop's live / date switch. */
+/** "Ciel": the top row of the map, whose calendar button opens the layers sheet. */
 
 const mountBar = () => mount(SkyTopBar, { global: { stubs: ionicStubs } });
 const button = (w: ReturnType<typeof mount>, name: string) =>
@@ -20,13 +20,13 @@ describe('the top row of the map', () => {
     setActivePinia(createPinia());
   });
 
-  it('has the search field, then the display, frames and date buttons', () => {
+  it('has the search field, then the display, frames and calendar buttons', () => {
     const w = mountBar();
     expect(w.find('input[type=search]').exists()).toBe(true);
     expect(w.findAll('button').map((b) => b.attributes('aria-label'))).toEqual([
       'Affichage',
       'Contours de champ',
-      'Voir le ciel à une date donnée',
+      'Calques de la carte',
     ]);
   });
 
@@ -46,20 +46,18 @@ describe('the top row of the map', () => {
     expect(w.emitted('frames')).toHaveLength(1);
   });
 
-  it('switches to the date mode with the date button, without opening any picker', async () => {
+  it('asks for the layers sheet with the calendar button, without changing the mode', async () => {
     const w = mountBar();
-    const time = useSkyTimeStore();
-    await button(w, 'Voir le ciel à une date donnée').trigger('click');
-    expect(time.mode).toBe('date');
-    expect(w.emitted()).not.toHaveProperty('dateMode');
-    expect(button(w, 'Revenir au ciel en direct')).toBeTruthy();
+    await button(w, 'Calques de la carte').trigger('click');
+    expect(w.emitted('layers')).toHaveLength(1);
+    expect(useSkyTimeStore().mode).toBe('live');
   });
 
-  it('goes back to the live sky with the same button', async () => {
+  it('draws the calendar button pressed while the map shows the sky at a date', async () => {
     const w = mountBar();
-    const time = useSkyTimeStore();
-    await button(w, 'Voir le ciel à une date donnée').trigger('click');
-    await button(w, 'Revenir au ciel en direct').trigger('click');
-    expect(time.mode).toBe('live');
+    expect(button(w, 'Calques de la carte').attributes('aria-pressed')).toBe('false');
+    useSkyTimeStore().setMode('date');
+    await w.vm.$nextTick();
+    expect(button(w, 'Calques de la carte').attributes('aria-pressed')).toBe('true');
   });
 });

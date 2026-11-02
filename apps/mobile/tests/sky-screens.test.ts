@@ -6,11 +6,12 @@ import { writeObserverLocation } from '@myastrosky/core/observer-location';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
-import { ionicStubs } from './helpers';
+import { ionicStubs, mapSheetHost } from './helpers';
 
 vi.mock('../src/composables/useConfirm', () => ({ useConfirm: () => ({}), showInfo: vi.fn() }));
 
-import SkyLayerButtons from '../src/pages/sky/SkyLayerButtons.vue';
+import SkyLayersSheet from '../src/pages/sky/SkyLayersSheet.vue';
+import { showInfo } from '../src/composables/useConfirm';
 import SkyDisplaySheet from '../src/pages/sky/SkyDisplaySheet.vue';
 import PhoneToggleRow from '../src/components/PhoneToggleRow.vue';
 import PhoneSliderRow from '../src/components/PhoneSliderRow.vue';
@@ -18,93 +19,132 @@ import SkyCheckSheet from '../src/pages/sky/SkyCheckSheet.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import { useFisheyeStore } from '@myastrosky/app-state/stores/fisheye';
 
-/** The map's layer buttons and display sheet, driving the shared stores. */
+/** The map's layers sheet and display sheet, driving the shared stores. */
 
 const buttonNamed = (w: ReturnType<typeof mount>, name: string) =>
   w.findAll('button').find((b) => b.attributes('aria-label') === name)!;
 
-describe('the layer buttons ("Ciel, calques de la carte")', () => {
+describe('the layers sheet ("Ciel, calques de la carte")', () => {
   beforeEach(() => {
     localStorage.setItem('lang', 'fr');
     configureStorage(createMemoryStore());
     setActivePinia(createPinia());
+    vi.mocked(showInfo).mockClear();
   });
-  const mountButtons = () => mount(SkyLayerButtons, { global: { stubs: ionicStubs } });
+  const mountSheet = () =>
+    mount(SkyLayersSheet, { global: { stubs: ionicStubs, provide: mapSheetHost } });
+  const row = (w: ReturnType<typeof mount>, title: string) =>
+    w.findAllComponents(PhoneToggleRow).find((r) => r.props('title') === title)!;
+  const LAYERS = [
+    'Projection locale',
+    'Grille azimutale',
+    'Points cardinaux',
+    "Trajectoire de l'objet sélectionné",
+    'Horizon du relief',
+    'Lune',
+    'Soleil',
+    'Planètes',
+  ];
+  // A location and the sky at a date: what most layers need.
+  function located() {
+    writeObserverLocation(48.58, 7.75);
+    setActivePinia(createPinia());
+    useSkyTimeStore().setMode('date');
+  }
 
-  it('shows the seven toggles of the map, in the board order', () => {
-    const labels = mountButtons()
-      .findAll('button')
-      .map((b) => b.attributes('aria-label'));
-    expect(labels).toEqual([
-      'Ciel local (vue horizon)',
-      'Grille azimutale (alt-az)',
-      "Trajectoire de l'objet sélectionné",
-      "Afficher/masquer l'horizon du relief",
-      'Afficher/masquer la Lune',
-      'Afficher/masquer le Soleil',
-      'Afficher/masquer les planètes',
-    ]);
-  });
-
-  it('toggles the moon, the sun, the planets and the azimuth grid in the sky-time store', async () => {
-    const w = mountButtons();
-    const time = useSkyTimeStore();
-    for (const [name, key] of [
-      ['Afficher/masquer la Lune', 'showMoon'],
-      ['Afficher/masquer le Soleil', 'showSun'],
-      ['Afficher/masquer les planètes', 'showPlanets'],
-      ['Grille azimutale (alt-az)', 'showAzimuthGrid'],
-    ] as const) {
-      expect(time[key]).toBe(false);
-      await buttonNamed(w, name).trigger('click');
-      expect(time[key]).toBe(true);
-      expect(buttonNamed(w, name).attributes('aria-pressed')).toBe('true');
+  it('shows the date switch, then the layers, each with its icon and its explanation', () => {
+    const rows = mountSheet().findAllComponents(PhoneToggleRow);
+    expect(rows.map((r) => r.props('title'))).toEqual(['Ciel du jour', ...LAYERS]);
+    for (const r of rows) {
+      expect(r.props('icon')).toContain('<svg');
+      expect(r.props('info')).toBeTruthy();
     }
   });
 
-  it('draws the local sky unavailable without a location, with its reason, and ignores the tap', async () => {
-    const w = mountButtons();
-    const button = buttonNamed(w, 'Ciel local (vue horizon)');
-    expect(button.attributes('aria-disabled')).toBe('true');
-    await button.trigger('click');
-    expect(useSkyTimeStore().localSkyMode).toBe(false);
+  it('puts the map on the sky at a date with its first switch, and back on the live sky', () => {
+    const w = mountSheet();
+    const time = useSkyTimeStore();
+    row(w, 'Ciel du jour').vm.$emit('update:modelValue', true);
+    expect(time.mode).toBe('date');
+    row(w, 'Ciel du jour').vm.$emit('update:modelValue', false);
+    expect(time.mode).toBe('live');
   });
 
-  it('turns the local sky on once there is a location and the map shows a date', async () => {
+  it('greys out every layer while the map shows the live sky', () => {
     writeObserverLocation(48.58, 7.75);
     setActivePinia(createPinia());
-    const time = useSkyTimeStore();
-    time.setMode('date');
-    const w = mountButtons();
-    const button = buttonNamed(w, 'Ciel local (vue horizon)');
-    expect(button.attributes('aria-disabled')).toBeUndefined();
-    await button.trigger('click');
-    expect(time.localSkyMode).toBe(true);
+    const w = mountSheet();
+    expect(row(w, 'Ciel du jour').props('disabled')).toBeFalsy();
+    for (const title of LAYERS) expect(row(w, title).props('disabled')).toBe(true);
   });
 
-  it('keeps the trajectory unavailable until the local sky is on', async () => {
-    writeObserverLocation(48.58, 7.75);
-    setActivePinia(createPinia());
+  it('turns the moon, the sun, the planets, the azimuth grid and the cardinal points on in the sky-time store', () => {
+    located();
+    const w = mountSheet();
     const time = useSkyTimeStore();
-    time.setMode('date');
-    const w = mountButtons();
-    const trajectory = buttonNamed(w, "Trajectoire de l'objet sélectionné");
-    expect(trajectory.attributes('aria-disabled')).toBe('true');
-    time.setLocalSkyMode(true);
+    for (const [title, key] of [
+      ['Lune', 'showMoon'],
+      ['Soleil', 'showSun'],
+      ['Planètes', 'showPlanets'],
+      ['Grille azimutale', 'showAzimuthGrid'],
+      ['Points cardinaux', 'showCardinalPoints'],
+    ] as const) {
+      expect(row(w, title).props('disabled')).toBe(false);
+      row(w, title).vm.$emit('update:modelValue', true);
+      expect(time[key]).toBe(true);
+    }
+  });
+
+  it('greys out the local projection without a location', () => {
+    useSkyTimeStore().setMode('date');
+    expect(row(mountSheet(), 'Projection locale').props('disabled')).toBe(true);
+  });
+
+  it('turns the local projection on once there is a location and the map shows a date', () => {
+    located();
+    const w = mountSheet();
+    expect(row(w, 'Projection locale').props('disabled')).toBe(false);
+    row(w, 'Projection locale').vm.$emit('update:modelValue', true);
+    expect(useSkyTimeStore().localSkyMode).toBe(true);
+  });
+
+  it('keeps the trajectory greyed out until the local projection is on', async () => {
+    located();
+    const w = mountSheet();
+    const trajectory = () => row(w, "Trajectoire de l'objet sélectionné");
+    expect(trajectory().props('disabled')).toBe(true);
+    useSkyTimeStore().setLocalSkyMode(true);
     await w.vm.$nextTick();
-    expect(trajectory.attributes('aria-disabled')).toBeUndefined();
+    expect(trajectory().props('disabled')).toBe(false);
   });
 
-  it('keeps the relief horizon unavailable until there is a profile', async () => {
-    const w = mountButtons();
-    const relief = buttonNamed(w, "Afficher/masquer l'horizon du relief");
-    expect(relief.attributes('aria-disabled')).toBe('true');
+  it('keeps the terrain horizon greyed out until there is a profile', async () => {
+    located();
+    const w = mountSheet();
+    expect(row(w, 'Horizon du relief').props('disabled')).toBe(true);
     useHorizonProfileStore().applyProfile(
       { lat: 48, lon: 7, obsHeightM: null, azStepDeg: 1, alts: [1, 2, 3], summits: [] } as never,
       false,
     );
     await w.vm.$nextTick();
-    expect(relief.attributes('aria-disabled')).toBeUndefined();
+    expect(row(w, 'Horizon du relief').props('disabled')).toBe(false);
+  });
+
+  it('opens the explanation of a greyed-out layer from its "i"', async () => {
+    const w = mountSheet();
+    const trajectory = row(w, "Trajectoire de l'objet sélectionné");
+    expect(trajectory.props('disabled')).toBe(true);
+    await trajectory.find('.mob-toggle-info button').trigger('click');
+    expect(showInfo).toHaveBeenCalledWith(
+      "Trajectoire de l'objet sélectionné",
+      expect.stringContaining('projection locale'),
+    );
+  });
+
+  it('asks to be closed by its handle', async () => {
+    const w = mountSheet();
+    await w.find('.mob-sheet-grab').trigger('click');
+    expect(w.emitted('close')).toHaveLength(1);
   });
 });
 

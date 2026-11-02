@@ -10,12 +10,10 @@ import calendarIcon from '@icons/calendar.svg?raw';
 import telescopeIcon from '@icons/telescope.svg?raw';
 
 // The top row of the map ("Ciel"): the search field, the display settings, the frames ("Contours de champ", the desktop's
-// telescope button) and the date button. The date button is the
-// desktop's: it switches the map between the live sky and the sky at a date (pressed in the date mode), and the
-// time bar and the toggles of the map appear while it is on; switching to the date mode picks nothing by itself.
-const emit = defineEmits<{ search: []; display: []; frames: [] }>();
-const time = useSkyTimeStore();
-const { mode } = storeToRefs(time);
+// telescope button) and the calendar button. The calendar button opens the layers sheet ("Ciel, calques de la carte"),
+// whose first switch puts the map on the sky at a date; it is pressed while the map shows one.
+const emit = defineEmits<{ search: []; display: []; frames: []; layers: [] }>();
+const { mode } = storeToRefs(useSkyTimeStore());
 </script>
 
 <template>
@@ -35,9 +33,9 @@ const { mode } = storeToRefs(time);
     </PhoneIconButton>
     <PhoneIconButton
       float
-      :label="mode === 'date' ? t('skyTime.liveModeButton') : t('skyTime.dateModeButton')"
+      :label="t('mobile.sky.layers')"
       :pressed="mode === 'date'"
-      @click="time.toggleMode()"
+      @click="emit('layers')"
     >
       <AppIcon :svg="calendarIcon" />
     </PhoneIconButton>

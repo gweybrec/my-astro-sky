@@ -184,6 +184,30 @@ const fr = {
   },
   sky: {
     layers: 'Calques de la carte',
+    dateMode: 'Ciel du jour',
+    dateModeInfo:
+      "Arrête le ciel en direct et montre le ciel à la date et à l'heure choisies dans la barre du bas. Les calques ci-dessous ne s'affichent que dans ce mode.",
+    layersSection: 'Calques',
+    localSky: 'Projection locale',
+    localSkyInfo:
+      "Montre le ciel tel que vous le voyez depuis votre lieu d'observation : le zénith au centre, l'horizon sur le bord. Il faut avoir choisi le lieu d'observation (Réglages).",
+    azimuthGrid: 'Grille azimutale',
+    azimuthGridInfo:
+      "Trace les cercles de hauteur au-dessus de l'horizon et les directions (nord, est, sud, ouest) autour de votre lieu d'observation.",
+    cardinalPoints: 'Points cardinaux',
+    cardinalPointsInfo:
+      "Écrit N, E, S et O sur l'horizon, pour savoir de quel côté regarder depuis votre lieu d'observation.",
+    trajectoryInfo:
+      "Trace le chemin que suit l'objet sélectionné dans le ciel au cours de la nuit. Disponible en projection locale seulement.",
+    relief: 'Horizon du relief',
+    reliefInfo:
+      "Dessine la ligne des montagnes et des obstacles autour de votre lieu d'observation. Il faut d'abord calculer ou importer l'horizon du relief (Réglages).",
+    moon: 'Lune',
+    moonInfo: "Place la Lune à sa position et avec sa phase à la date et à l'heure choisies.",
+    sun: 'Soleil',
+    sunInfo: "Place le Soleil à sa position à la date et à l'heure choisies.",
+    planets: 'Planètes',
+    planetsInfo: "Place les planètes à leur position à la date et à l'heure choisies.",
     searchShort: 'Rechercher…',
     photoCountOne: '1 photo',
     photoCountMany: '{n} photos',
@@ -197,9 +221,6 @@ const fr = {
     pageOf: 'Page {n} sur {total}',
     photoActions: 'Actions sur la photo',
     sectionMap: 'Carte',
-    needsLocation: "Définissez d'abord le lieu d'observation (Réglages)",
-    needsLocalSky: "Activez d'abord le ciel local",
-    needsHorizon: "Calculez ou importez d'abord l'horizon du relief (Réglages)",
     frameSet: 'Cadres',
     planSetup: 'Setup',
     framePin: 'Épingler',

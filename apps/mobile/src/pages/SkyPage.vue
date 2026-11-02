@@ -17,6 +17,7 @@ import { photoMediumsMade, photoSizesRepaired } from '../photo-sizes';
 import {
   clearSkySelection,
   skyFocus,
+  skyLayersOpen,
   skyPhotoFocus,
   skySelection,
 } from '../composables/useSkySelection';
@@ -40,7 +41,7 @@ import type { SkyMap } from '@myastrosky/render/sky-map';
 import type { Photo, Star } from '@myastrosky/core/types';
 import type { PhotoLayer } from '@myastrosky/render/photo-layer';
 import AppIcon from '../components/AppIcon.vue';
-import SkyLayerButtons from './sky/SkyLayerButtons.vue';
+import SkyLayersSheet from './sky/SkyLayersSheet.vue';
 import SkyDisplaySheet from './sky/SkyDisplaySheet.vue';
 import SkyObjectSheet from './sky/SkyObjectSheet.vue';
 import SkyPhotoSheet from './sky/SkyPhotoSheet.vue';
@@ -61,8 +62,9 @@ import PhoneIconButton from '../components/PhoneIconButton.vue';
 import mapPinIcon from '@icons/map-pin.svg?raw';
 import telescopeIcon from '@icons/telescope.svg?raw';
 
-// The boards "Ciel" and "Ciel, calques de la carte": the sky map with the search field, the display button and the date
-// button over it; the date button switches the map to the sky at a date and brings the column of the map's toggles.
+// The boards "Ciel" and "Ciel, calques de la carte": the sky map with the search field, the display button and the
+// calendar button over it; the calendar button opens the layers sheet, whose first switch puts the map on the sky at a
+// date (the time bar then shows).
 const canvas = ref<HTMLCanvasElement | null>(null);
 const mapEl = ref<HTMLElement | null>(null);
 const placement = ref<InstanceType<typeof SkyPlacement> | null>(null);
@@ -163,6 +165,14 @@ onIonViewDidEnter(() => {
 
 // The selected object has its sheet; the back button closes it before anything else.
 useBackClose(() => skySelection.value !== null, clearSkySelection);
+// The layers sheet gives way to a selection's sheet, and closes with the back button.
+watch(skySelection, (selection) => {
+  if (selection) skyLayersOpen.value = false;
+});
+useBackClose(
+  () => skyLayersOpen.value,
+  () => (skyLayersOpen.value = false),
+);
 
 // Placing a waiting photo by hand (board "Placer la photo"): the map takes the whole screen with the photo over it and
 // its settings under it. Annuler and the back button go back to where the placement was asked; a placed photo stays on
@@ -382,6 +392,10 @@ watch(skySelection, (selection) => {
   if (selection && activeFrame.value) sky?.map.selectFrame(null);
 });
 const releaseFrame = () => sky?.map.selectFrame(null);
+// A selected frame's sheet and a mode taking the whole screen close the layers sheet too.
+watch([() => activeFrame.value !== null, inMode], ([frame, mode]) => {
+  if (frame || mode) skyLayersOpen.value = false;
+});
 // Showing a target or a plan, the back button leaves the mode at once, sheet and all.
 useBackClose(
   () => activeFrame.value !== null && !targetShown.value && !planShown.value,
@@ -517,6 +531,7 @@ onBeforeUnmount(() => {
             @search="openSearch"
             @display="displayOpen = true"
             @frames="framesSheetOpen = true"
+            @layers="skyLayersOpen = true"
           />
           <!-- First start: no observing location yet, the time and place of the sky cannot be shown. -->
           <div v-if="!located && !inMode" class="mob-map-prompt">
@@ -525,11 +540,8 @@ onBeforeUnmount(() => {
               <AppIcon :svg="mapPinIcon" />{{ t('targets.location.label') }}
             </PhoneButton>
           </div>
-          <!-- The time bar and the toggles of the map belong to the date mode: the live sky has neither. -->
-          <template v-if="time.mode === 'date' && !inMode">
-            <SkyTimeBar />
-            <SkyLayerButtons />
-          </template>
+          <!-- The time bar belongs to the date mode: the live sky has none. -->
+          <SkyTimeBar v-if="time.mode === 'date' && !inMode" />
           <PhoneMapSheetHost :shown="mapShown">
             <SkyPhotoSheet
               v-if="skySelection?.kind === 'photo' && photoLayer"
@@ -561,6 +573,7 @@ onBeforeUnmount(() => {
               @close="releaseFrame"
               @edit-mosaic="openMosaicEdit"
             />
+            <SkyLayersSheet v-else-if="skyLayersOpen && !inMode" @close="skyLayersOpen = false" />
           </PhoneMapSheetHost>
         </main>
         <SkyPlacement

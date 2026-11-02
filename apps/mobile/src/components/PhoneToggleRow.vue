@@ -1,15 +1,20 @@
 <script setup lang="ts">
 import { IonToggle } from '@ionic/vue';
 import PhoneInfoButton from './PhoneInfoButton.vue';
+import AppIcon from './AppIcon.vue';
 
 // A settings row with a switch: the whole row is the tap target and the change applies at once. With `info` the title
-// is followed by the "i" button (its explanation opens in the small dialog), the switch keeps the right end.
+// is followed by the "i" button (its explanation opens in the small dialog), the switch keeps the right end. With
+// `icon` the title follows the icon (`.mob-row-lead`, board "Ciel, calques de la carte"). The "i" of a disabled row
+// still opens: it says why the row is disabled.
 defineProps<{
   title: string;
   /** A line under the title (the board's switch row with a helper). */
   sub?: string;
   disabled?: boolean;
   info?: string;
+  /** The SVG source of the icon before the title. */
+  icon?: string;
 }>();
 const model = defineModel<boolean>({ default: false });
 </script>
@@ -17,17 +22,18 @@ const model = defineModel<boolean>({ default: false });
 <template>
   <IonToggle
     class="mob-row mob-toggle-row"
-    :class="{ 'mob-toggle-row--info': info }"
+    :class="{ 'mob-toggle-row--info': info || icon }"
     justify="space-between"
     label-placement="start"
     :checked="model"
     :disabled="disabled"
     @ion-change="model = $event.detail.checked"
   >
-    <span v-if="info" class="mob-toggle-info-line">
+    <span v-if="info || icon" class="mob-toggle-info-line">
+      <span v-if="icon" class="mob-row-lead" aria-hidden="true"><AppIcon :svg="icon" /></span>
       <span class="mob-row-title mob-row-title--wrap m-body">{{ title }}</span>
       <!-- The "i" lies inside the switch's label: its tap must not flip the switch. -->
-      <span class="mob-toggle-info" @click.stop.prevent
+      <span v-if="info" class="mob-toggle-info" @click.stop.prevent
         ><PhoneInfoButton :title="title" :message="info"
       /></span>
     </span>

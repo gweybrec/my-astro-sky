@@ -42,6 +42,7 @@ import { DEFAULT_SETTINGS as DISPLAY_DEFAULTS } from '@myastrosky/core/display-s
 import { useMapPortStore } from '@myastrosky/app-state/stores/map-port';
 import { PhotoLayer } from '@myastrosky/render/photo-layer';
 import { createPhoneSkyMap, MAX_PIXEL_RATIO, PHOTOS_FROZEN_MS } from '../src/sky-map-setup';
+import { skyLayersOpen, skySelection } from '../src/composables/useSkySelection';
 
 describe('the Ciel tab sky map', () => {
   beforeEach(() => {
@@ -187,6 +188,17 @@ describe('the Ciel tab sky map', () => {
     viewChanged('skyClock');
     expect(place.mock.calls[11]).toEqual([false]);
     place.mockRestore();
+  });
+
+  it('clears the selection and closes the layers sheet on a tap on an empty spot', () => {
+    make();
+    const map = created[0] as unknown as { calls: Record<string, unknown[][]> };
+    const onClear = map.calls.setOnClearSelection[0][0] as () => void;
+    skySelection.value = { kind: 'star', star: { hip: 1 } as never };
+    skyLayersOpen.value = true;
+    onClear();
+    expect(skySelection.value).toBeNull();
+    expect(skyLayersOpen.value).toBe(false);
   });
 
   it('draws photo outlines off by default', () => {

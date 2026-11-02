@@ -27,6 +27,9 @@ export const skyFocus = shallowRef<SkyFocus | null>(null);
 /** A request to frame a placed photo on the map (its id), set by the photo's screen and taken by the Ciel page. */
 export const skyPhotoFocus = shallowRef<string | null>(null);
 
+/** The layers sheet is open (the calendar button); a tap on an empty spot of the map closes it, as a selection's sheet. */
+export const skyLayersOpen = shallowRef(false);
+
 /** Selects a search result and asks the map to go to it. */
 export function selectSearchResult(result: UnifiedSearchResult) {
   if (result.type === 'dso' && result.dso) {

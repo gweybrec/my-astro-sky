@@ -15,6 +15,7 @@ import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
 import {
   clearSkySelection,
+  skyLayersOpen,
   skySelection,
   type SkyFocus,
   type SkySelection,
@@ -173,10 +174,11 @@ export function createPhoneSkyMap(
   // A tap on an object or a star selects it; a tap on an empty spot clears the selection.
   map.setOnDSOClick((dso) => (skySelection.value = { kind: 'dso', dso }));
   map.setOnStarTap((star) => (skySelection.value = { kind: 'star', star }));
-  // A tap on an empty spot also lets go of the selected frame (its sheet closes).
+  // A tap on an empty spot also lets go of the selected frame and closes the layers sheet.
   map.setOnClearSelection(() => {
     clearSkySelection();
     map.selectFrame(null);
+    skyLayersOpen.value = false;
   });
   const disconnectFrames = connectFrames(map);
   // A tap on a photo selects it, by the name the map hit-tests.

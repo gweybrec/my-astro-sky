@@ -25,6 +25,13 @@ import {
   underLastRow,
 } from '../src/composables/useSheetStops';
 import PhoneFacts from '../src/components/PhoneFacts.vue';
+import PhoneToggleRow from '../src/components/PhoneToggleRow.vue';
+import { showInfo } from '../src/composables/useConfirm';
+
+vi.mock('../src/composables/useConfirm', async (original) => ({
+  ...(await original<object>()),
+  showInfo: vi.fn(),
+}));
 
 const global = { stubs: ionicStubs };
 
@@ -82,6 +89,19 @@ describe('the shared phone components', () => {
     expect(w.find('button').attributes('aria-label')).toBe('Ajouter');
     await w.find('button').trigger('click');
     expect(w.emitted('click')).toHaveLength(1);
+  });
+
+  it('PhoneToggleRow puts its icon before the title, and keeps the "i" of a disabled row tappable', async () => {
+    const w = mount(PhoneToggleRow, {
+      props: { title: 'Lune', info: 'La Lune.', icon: '<svg></svg>', disabled: true },
+      global,
+    });
+    const line = w.find('.mob-toggle-info-line');
+    expect(line.element.firstElementChild?.classList.contains('mob-row-lead')).toBe(true);
+    expect(line.find('.mob-row-lead').html()).toContain('<svg');
+    expect(line.find('.mob-row-title').text()).toBe('Lune');
+    await line.find('.mob-toggle-info button').trigger('click');
+    expect(showInfo).toHaveBeenCalledWith('Lune', 'La Lune.');
   });
 
   describe('long press on an icon button', () => {

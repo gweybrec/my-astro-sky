@@ -921,6 +921,14 @@ ion-toggle.mob-toggle-row--info::part(label) {
   justify-content: space-between;
   gap: var(--space-4);
 }
+/* With its icon first, the title takes the room between the icon and the "i". */
+.mob-toggle-info-line > .mob-row-lead + .mob-row-title {
+  flex: 1;
+}
+/* Ionic takes the taps off a disabled switch; its "i" still opens, to say why. */
+ion-toggle.toggle-disabled .mob-toggle-info {
+  pointer-events: auto;
+}
 
 /* The choose button of a saved-region row (`ion-button.mob-row-main`, board "Cibles, régions du ciel"): the host is the
    box the design system sizes, the native button fills it and keeps its content on the left. */

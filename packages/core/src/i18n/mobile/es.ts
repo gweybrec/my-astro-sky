@@ -185,6 +185,30 @@ const es: Translations['mobile'] = {
   },
   sky: {
     layers: 'Capas del mapa',
+    dateMode: 'Cielo del día',
+    dateModeInfo:
+      'Detiene el cielo en directo y muestra el cielo en la fecha y la hora elegidas en la barra inferior. Las capas de abajo solo se muestran en este modo.',
+    layersSection: 'Capas',
+    localSky: 'Proyección local',
+    localSkyInfo:
+      'Muestra el cielo tal como lo ves desde tu lugar de observación: el cenit en el centro, el horizonte en el borde. Primero hay que definir el lugar de observación (Ajustes).',
+    azimuthGrid: 'Cuadrícula azimutal',
+    azimuthGridInfo:
+      'Traza los círculos de altura sobre el horizonte y las direcciones (norte, este, sur, oeste) alrededor de tu lugar de observación.',
+    cardinalPoints: 'Puntos cardinales',
+    cardinalPointsInfo:
+      'Escribe N, E, S y O en el horizonte, para saber hacia dónde mirar desde tu lugar de observación.',
+    trajectoryInfo:
+      'Traza el camino que sigue el objeto seleccionado en el cielo durante la noche. Disponible solo en la proyección local.',
+    relief: 'Horizonte del relieve',
+    reliefInfo:
+      'Dibuja la línea de las montañas y los obstáculos alrededor de tu lugar de observación. Primero hay que calcular o importar el horizonte del relieve (Ajustes).',
+    moon: 'Luna',
+    moonInfo: 'Coloca la Luna en su posición, con su fase, en la fecha y la hora elegidas.',
+    sun: 'Sol',
+    sunInfo: 'Coloca el Sol en su posición en la fecha y la hora elegidas.',
+    planets: 'Planetas',
+    planetsInfo: 'Coloca los planetas en su posición en la fecha y la hora elegidas.',
     searchShort: 'Buscar…',
     photoCountOne: '1 foto',
     photoCountMany: '{n} fotos',
@@ -198,9 +222,6 @@ const es: Translations['mobile'] = {
     pageOf: 'Página {n} de {total}',
     photoActions: 'Acciones sobre la foto',
     sectionMap: 'Mapa',
-    needsLocation: 'Define primero el lugar de observación (Ajustes)',
-    needsLocalSky: 'Activa primero el cielo local',
-    needsHorizon: 'Calcula o importa primero el horizonte del relieve (Ajustes)',
     frameSet: 'Marcos',
     planSetup: 'Configuración',
     framePin: 'Fijar',

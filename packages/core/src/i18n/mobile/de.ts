@@ -186,6 +186,32 @@ const de: Translations['mobile'] = {
   },
   sky: {
     layers: 'Kartenebenen',
+    dateMode: 'Himmel des Tages',
+    dateModeInfo:
+      'Hält den Live-Himmel an und zeigt den Himmel zu Datum und Uhrzeit aus der unteren Leiste. Die Ebenen darunter erscheinen nur in diesem Modus.',
+    layersSection: 'Ebenen',
+    localSky: 'Lokale Projektion',
+    localSkyInfo:
+      'Zeigt den Himmel so, wie du ihn von deinem Beobachtungsort aus siehst: der Zenit in der Mitte, der Horizont am Rand. Zuerst muss der Beobachtungsort festgelegt sein (Einstellungen).',
+    azimuthGrid: 'Azimutgitter',
+    azimuthGridInfo:
+      'Zeichnet die Höhenkreise über dem Horizont und die Richtungen (Norden, Osten, Süden, Westen) um deinen Beobachtungsort.',
+    cardinalPoints: 'Himmelsrichtungen',
+    cardinalPointsInfo:
+      'Schreibt N, O, S und W an den Horizont, damit du weißt, wohin du von deinem Beobachtungsort aus schauen musst.',
+    trajectoryInfo:
+      'Zeichnet den Weg, den das ausgewählte Objekt im Lauf der Nacht am Himmel nimmt. Nur in der lokalen Projektion verfügbar.',
+    relief: 'Geländehorizont',
+    reliefInfo:
+      'Zeichnet die Linie der Berge und Hindernisse um deinen Beobachtungsort. Zuerst muss der Geländehorizont berechnet oder importiert werden (Einstellungen).',
+    moon: 'Mond',
+    moonInfo:
+      'Zeigt den Mond an seiner Position, mit seiner Phase, zum gewählten Datum und zur gewählten Uhrzeit.',
+    sun: 'Sonne',
+    sunInfo: 'Zeigt die Sonne an ihrer Position zum gewählten Datum und zur gewählten Uhrzeit.',
+    planets: 'Planeten',
+    planetsInfo:
+      'Zeigt die Planeten an ihren Positionen zum gewählten Datum und zur gewählten Uhrzeit.',
     searchShort: 'Suchen…',
     photoCountOne: '1 Foto',
     photoCountMany: '{n} Fotos',
@@ -199,9 +225,6 @@ const de: Translations['mobile'] = {
     pageOf: 'Seite {n} von {total}',
     photoActions: 'Aktionen für das Foto',
     sectionMap: 'Karte',
-    needsLocation: 'Lege zuerst den Beobachtungsort fest (Einstellungen)',
-    needsLocalSky: 'Schalte zuerst den lokalen Himmel ein',
-    needsHorizon: 'Berechne oder importiere zuerst den Geländehorizont (Einstellungen)',
     frameSet: 'Rahmen',
     planSetup: 'Setup',
     framePin: 'Anheften',

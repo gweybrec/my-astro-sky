@@ -48,6 +48,7 @@ import trashIcon from '@icons/trash.svg?raw';
 import eyeIcon from '@icons/eye.svg?raw';
 import telescopeIcon from '@icons/telescope.svg?raw';
 import checkIcon from '@icons/check.svg?raw';
+import moonIcon from '@icons/moon.svg?raw';
 
 const search = ref('');
 const color = ref('#4ea1ff');
@@ -209,6 +210,19 @@ function raiseError() {
             v-model="switchOn"
             title="Interrupteur avec explication"
             info="Le texte long d'explication."
+          />
+          <PhoneToggleRow
+            v-model="switchOn"
+            title="Interrupteur avec icône"
+            info="Le texte long d'explication."
+            :icon="moonIcon"
+          />
+          <PhoneToggleRow
+            :model-value="false"
+            title="Interrupteur avec icône, bloqué"
+            info="Pourquoi il est bloqué."
+            :icon="moonIcon"
+            disabled
           />
           <PhoneTargetRow
             title="Nébuleuse de l'Amérique du Nord"

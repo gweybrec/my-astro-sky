@@ -46,6 +46,9 @@ import SkyPage from '../src/pages/SkyPage.vue';
 import { skyPlanView, skyRegionDraw, skyRegionView, skyTargetView } from '../src/sky-modes';
 import { framesSheetOpen } from '../src/sky-frames';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
+import { skyLayersOpen, skySelection } from '../src/composables/useSkySelection';
+import SkyLayersSheet from '../src/pages/sky/SkyLayersSheet.vue';
+import PhoneToggleRow from '../src/components/PhoneToggleRow.vue';
 
 /** The map's own controls: what shows with the live sky and what shows with the sky at a date. */
 describe('the Ciel page', () => {
@@ -53,6 +56,8 @@ describe('the Ciel page', () => {
     localStorage.setItem('lang', 'fr');
     configureStorage(createMemoryStore());
     setActivePinia(createPinia());
+    skyLayersOpen.value = false;
+    skySelection.value = null;
   });
   const mountPage = () => mount(SkyPage, { global: { stubs: ionicStubs } });
 
@@ -88,27 +93,41 @@ describe('the Ciel page', () => {
     expect(reloadPhotos).toHaveBeenCalledOnce();
   });
 
-  it('shows neither the time bar nor the toggles of the map with the live sky', async () => {
+  it('shows no time bar with the live sky', async () => {
     const w = mountPage();
     await flushPromises();
     expect(useSkyTimeStore().mode).toBe('live');
     expect(w.find('.mob-timebar').exists()).toBe(false);
-    expect(w.find('.mob-map-ribbon').exists()).toBe(false);
   });
 
-  it('shows both once the date button has put the map in the date mode, and hides them again', async () => {
+  it('opens the layers sheet with the calendar button; its first switch brings the time bar and takes it away', async () => {
     const w = mountPage();
     await flushPromises();
-    const dateButton = () =>
-      w
-        .findAll('button')
-        .find((b) => /ciel (en direct|à une date)/i.test(b.attributes('aria-label') ?? ''))!;
-    await dateButton().trigger('click');
+    await w.find('button[aria-label="Calques de la carte"]').trigger('click');
+    await flushPromises();
+    expect(skyLayersOpen.value).toBe(true);
+    const dateRow = w
+      .findAllComponents(PhoneToggleRow)
+      .find((r) => r.props('title') === 'Ciel du jour')!;
+    dateRow.vm.$emit('update:modelValue', true);
+    await flushPromises();
     expect(useSkyTimeStore().mode).toBe('date');
     expect(w.find('.mob-timebar').exists()).toBe(true);
-    expect(w.find('.mob-map-ribbon').exists()).toBe(true);
-    await dateButton().trigger('click');
+    dateRow.vm.$emit('update:modelValue', false);
+    await flushPromises();
     expect(w.find('.mob-timebar').exists()).toBe(false);
+  });
+
+  it('closes the layers sheet when an object is selected', async () => {
+    const w = mountPage();
+    await flushPromises();
+    skyLayersOpen.value = true;
+    await flushPromises();
+    expect(w.findComponent(SkyLayersSheet).exists()).toBe(true);
+    skySelection.value = { kind: 'star', star: { hip: 1, ra: 0, dec: 0, mag: 1 } as never };
+    await flushPromises();
+    expect(skyLayersOpen.value).toBe(false);
+    expect(w.findComponent(SkyLayersSheet).exists()).toBe(false);
   });
 
   it('gives a sky region being drawn or shown its own title bar, whose back arrow opens the regions page again', async () => {
