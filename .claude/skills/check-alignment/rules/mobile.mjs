@@ -1074,7 +1074,7 @@ export const views = [
   },
   { name: 'poi-types', path: '/gallery/poi-types', ready: '.mob-type-row' },
   { name: 'plans', path: '/tabs/plans', ready: 'ion-item.mob-row' },
-  { name: 'plan', path: (ids) => `/plans/${ids.plan}`, ready: '.mob-entry' },
+  { name: 'plan', path: (ids) => `/plans/${ids.plan}`, ready: '.mob-list .mob-row' },
   { name: 'plan-target', path: (ids) => `/plans/${ids.plan}/${ids.entry}`, ready: '.mob-meta' },
   {
     name: 'plan-target-long-name',

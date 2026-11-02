@@ -229,7 +229,6 @@ const setupChoice = computed({
   get: () => draft.gearSetupId ?? '',
   set: (id: string | undefined) => {
     draft.gearSetupId = id || null;
-    setupOpen.value = false;
   },
 });
 const setupOptions = computed(() => [
@@ -252,7 +251,6 @@ const fieldChoice = computed({
   get: () => fieldToAdd.value,
   set: (id: string | undefined) => {
     fieldToAdd.value = id;
-    fieldListOpen.value = false;
   },
 });
 const fieldOptions = computed(() =>

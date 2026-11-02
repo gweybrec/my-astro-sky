@@ -52,7 +52,6 @@ const typeChoice = computed({
   get: () => categoryId.value,
   set: (id: string | undefined) => {
     categoryId.value = id;
-    typeOpen.value = false;
   },
 });
 

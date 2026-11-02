@@ -57,7 +57,6 @@ const choiceValue = computed({
   get: () => (choosing.value ? values.value[choosing.value.key] : ''),
   set: (v: string) => {
     if (choosing.value) values.value[choosing.value.key] = v;
-    choiceOpen.value = false;
   },
 });
 

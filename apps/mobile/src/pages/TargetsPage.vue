@@ -101,7 +101,6 @@ const chosenSetupId = computed<string | undefined>({
   set: (id) => {
     if (!id) return;
     updateTargetsPrefs({ setupId: id });
-    setupsOpen.value = false;
   },
 });
 

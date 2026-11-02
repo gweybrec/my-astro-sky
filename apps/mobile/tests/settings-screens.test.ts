@@ -355,11 +355,13 @@ describe('the language', () => {
     const w = mount(SettingsPage, { global });
     await flushPromises();
     langSheet(w).vm.$emit('update:open', true);
-    langSheet(w).vm.$emit('update:value', 'fr');
+    await flushPromises();
+    // a tap on the current language (Français), then on Deutsch
+    await langSheet(w).findAll('[role="radio"]')[0].trigger('click');
     await flushPromises();
     expect(reload).not.toHaveBeenCalled();
     expect(langProps(w).open).toBe(false);
-    langSheet(w).vm.$emit('update:value', 'de');
+    await langSheet(w).findAll('[role="radio"]')[3].trigger('click');
     await flushPromises();
     expect(localStorage.getItem('lang')).toBe('de');
     expect(reload).toHaveBeenCalledTimes(1);
@@ -406,7 +408,8 @@ describe('the theme', () => {
     const w = mount(SettingsPage, { global });
     await flushPromises();
     await themeRow(w).trigger('click');
-    themeSheet(w).vm.$emit('update:value', 'warm');
+    // a tap on Chaud
+    await themeSheet(w).findAll('[role="radio"]')[1].trigger('click');
     await flushPromises();
     expect(document.documentElement.dataset.theme).toBe('warm');
     expect(storage().get('app-theme')).toBe('warm');

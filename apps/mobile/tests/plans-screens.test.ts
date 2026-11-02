@@ -53,7 +53,6 @@ import PlansPage from '../src/pages/PlansPage.vue';
 import PlanDetailPage from '../src/pages/PlanDetailPage.vue';
 import PlanEntryPage from '../src/pages/PlanEntryPage.vue';
 import TargetDetailPage from '../src/pages/TargetDetailPage.vue';
-import PhoneReorderList from '../src/components/PhoneReorderList.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 import ObsWindowSheet from '../src/pages/plans/ObsWindowSheet.vue';
@@ -170,7 +169,6 @@ const backend = {
     create: vi.fn(),
     remove: vi.fn(),
     update: vi.fn(),
-    reorderEntries: vi.fn(),
     removeEntry: vi.fn(),
     updateEntry: vi.fn(),
     addEntry: vi.fn(),
@@ -252,7 +250,6 @@ beforeEach(() => {
   backend.plans.create.mockResolvedValue({ id: 'p3' });
   backend.plans.remove.mockResolvedValue(undefined);
   backend.plans.update.mockResolvedValue(undefined);
-  backend.plans.reorderEntries.mockResolvedValue(undefined);
   backend.plans.removeEntry.mockResolvedValue(undefined);
   backend.plans.updateEntry.mockResolvedValue(undefined);
   backend.plans.addEntry.mockResolvedValue({ id: 'e9' });
@@ -322,7 +319,7 @@ describe('the plan detail page', () => {
     expect(text).toContain('Lune');
     expect(text).toMatch(/\d+ %/);
     expect(text).toContain('2 objets');
-    const rows = w.findAll('.mob-entry .mob-row');
+    const rows = w.findAll('.mob-list .mob-row');
     expect(rows).toHaveLength(2);
     const names = rows.map((r) => r.text());
     expect(names.some((n) => n.includes("Nébuleuse de l'Amérique du Nord"))).toBe(true);
@@ -345,7 +342,7 @@ describe('the plan detail page', () => {
 
   it('opens a target on a tap', async () => {
     const { w, router } = await show(PlanDetailPage, '/plans/p1');
-    await w.find('.mob-entry .mob-row').trigger('click');
+    await w.find('.mob-list .mob-row').trigger('click');
     await flushPromises();
     expect(router.currentRoute.value.path).toMatch(/^\/plans\/p1\/e[12]$/);
   });
@@ -378,21 +375,17 @@ describe('the plan detail page', () => {
   };
   const mosaicRow = (w: ReturnType<typeof mount>) =>
     w
-      .findAll('.mob-entry .mob-row')
+      .findAll('.mob-list .mob-row')
       .find((r) => r.text().includes("Nébuleuse de l'Amérique du Nord · Mosaïque"))!;
 
-  it('lists a mosaic as an item with a handle like the targets, and shows a tapped one on the map zoomed to fit it', async () => {
+  it('lists a mosaic as an item like the targets, and shows a tapped one on the map zoomed to fit it', async () => {
     withMosaic();
     const { w, router } = await show(PlanDetailPage, '/plans/p1');
     vi.spyOn(router, 'replace').mockResolvedValue(undefined);
     expect(w.text()).toContain('2 objets');
     expect(mosaicRow(w).text()).toContain('2 tuiles');
-    // one item for the mosaic, none for its tiles, each with its handle
-    expect(w.findAll('.mob-entry')).toHaveLength(2);
-    const handles = (
-      w.findComponent(PhoneReorderList).props('items') as { handleLabel: string }[]
-    ).map((i) => i.handleLabel);
-    expect(handles).toContain("Déplacer Nébuleuse de l'Amérique du Nord");
+    // one item for the mosaic, none for its tiles
+    expect(w.findAll('.mob-list .mob-row')).toHaveLength(2);
     await mosaicRow(w).trigger('click');
     await settle();
     expect(skyPlanView.value?.planId).toBe('p1');
@@ -402,40 +395,6 @@ describe('the plan detail page', () => {
     skyPlanView.value = null;
     skyFocus.value = null;
     framesSheetOpen.value = false;
-  });
-
-  it('moves a dragged mosaic, and stores the order of the targets only', async () => {
-    withMosaic();
-    const { w } = await show(PlanDetailPage, '/plans/p1');
-    const ids = (w.findComponent(PhoneReorderList).props('items') as { id: string }[]).map(
-      (i) => i.id,
-    );
-    expect(ids.sort()).toEqual(['e1', 'm1']);
-    w.findComponent(PhoneReorderList).vm.$emit('reorder', ['m1', 'e1']);
-    await settle();
-    expect(backend.plans.reorderEntries).toHaveBeenCalledWith('p1', ['e1']);
-    expect(w.findAll('.mob-entry .mob-row')[0].text()).toContain('Mosaïque');
-    w.findComponent(PhoneReorderList).vm.$emit('reorder', ['e1', 'm1']);
-    await settle();
-    expect(w.findAll('.mob-entry .mob-row')[1].text()).toContain('Mosaïque');
-  });
-
-  it('sends one request with the new order after a drag', async () => {
-    const { w } = await show(PlanDetailPage, '/plans/p1');
-    w.findComponent(PhoneReorderList).vm.$emit('reorder', ['e2', 'e1']);
-    await settle();
-    expect(backend.plans.reorderEntries).toHaveBeenCalledTimes(1);
-    expect(backend.plans.reorderEntries).toHaveBeenCalledWith('p1', ['e2', 'e1']);
-    const first = w.findAll('.mob-entry .mob-row')[0].text();
-    expect(first).toContain("Galaxie d'Andromède");
-  });
-
-  it('shows the error toast when the drag cannot be saved', async () => {
-    backend.plans.reorderEntries.mockRejectedValue(new Error('boom'));
-    const { w } = await show(PlanDetailPage, '/plans/p1');
-    w.findComponent(PhoneReorderList).vm.$emit('reorder', ['e2', 'e1']);
-    await settle();
-    expect(showError).toHaveBeenCalled();
   });
 
   it('opens the Cibles list for the plan from its plus', async () => {
@@ -493,29 +452,54 @@ describe('the plan detail page', () => {
     expect(showError).toHaveBeenCalled();
   });
 
-  it("offers the desktop's eight sorts of a plan and stores the chosen one", async () => {
+  it("offers the desktop's eight sorts of a plan from the top bar, the most used first, and stores the chosen one", async () => {
     const { w } = await show(PlanDetailPage, '/plans/p1');
-    const sortRow = () => w.findAll('.mob-row').find((r) => r.text().includes('Trier par'))!;
-    expect(sortRow().text()).toContain('Heure de transit');
-    await sortRow().trigger('click');
+    // the sort is a button of its own, no longer a row of the actions
+    expect(w.findAll('.mob-row').some((r) => r.text().includes('Trier par'))).toBe(false);
+    await w.find('button[aria-label="Trier par"]').trigger('click');
     await settle();
     const sheet = w.findAllComponents(PhoneRadioSheet as Component)[0];
     const sheetProps = sheet.props() as { open: boolean; options: { label: string }[] };
     expect(sheetProps.open).toBe(true);
+    // the most used first, the observation window at the top and the difficulty last
     expect(sheetProps.options.map((o) => o.label)).toEqual([
+      "Fenêtre d'observation",
       'Heure de transit',
       'Altitude max.',
       'Intérêt photo',
-      'Luminosité',
       'Taille',
       'Nom',
+      'Luminosité',
       'Difficulté',
-      "Fenêtre d'observation",
     ]);
     sheet.vm.$emit('update:value', 'name');
     await settle();
     expect(backend.plans.update).toHaveBeenCalledWith('p1', { sortBy: 'name' });
-    expect(sortRow().text()).toContain('Nom');
+  });
+
+  it('sorts the targets again by their window when the page is entered after a window changed', async () => {
+    const byWindow = (e2Start: number) => [
+      plan(
+        'p1',
+        'Nuit du 2026-10-03',
+        [
+          entry('e1', 'NGC7000', { observationWindows: [window1] }),
+          entry('e2', 'M31', {
+            observationWindows: [{ ...window1, id: 'w2', startFrac: e2Start, endFrac: 0.9 }],
+          }),
+        ],
+        { sortBy: 'window' },
+      ),
+    ];
+    backend.plans.list.mockResolvedValue(byWindow(0.5));
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    const first = () => w.findAll('.mob-list .mob-row')[0].text();
+    expect(first()).toContain("Nébuleuse de l'Amérique du Nord");
+    // the window of M31 moved before NGC 7000's on its own page, then back here
+    backend.plans.list.mockResolvedValue(byWindow(0.05));
+    await enters.at(-1)!();
+    await settle();
+    expect(first()).toContain("Galaxie d'Andromède");
   });
 
   it("shows the plan's frames on the map in its own mode, with the frames' sheet, and comes back here", async () => {
@@ -641,7 +625,7 @@ describe('the plan detail page', () => {
     backend.plans.list.mockResolvedValue([{ ...PLANS[0], lat: null, lon: null }]);
     const { w } = await show(PlanDetailPage, '/plans/p1');
     expect(w.text()).not.toContain('Début de nuit');
-    expect(w.findAll('.mob-entry .mob-row')).toHaveLength(2);
+    expect(w.findAll('.mob-list .mob-row')).toHaveLength(2);
   });
 });
 

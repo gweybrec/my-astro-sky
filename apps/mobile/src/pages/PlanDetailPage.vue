@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
+import { IonPage, IonContent, IonList, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { fracToClock } from '@myastrosky/core/observation-windows';
-import { PLAN_SORT_KEYS, type PlanSortKey } from '@myastrosky/core/domain/plans';
+import type { PlanSortKey } from '@myastrosky/core/domain/plans';
 import { formatClock24 } from '@myastrosky/core/targets/format';
 import {
   customLocationLabelOr,
@@ -18,7 +18,6 @@ import { presetForSetupId, resolveSetupById } from '@myastrosky/core/targets/pla
 import {
   deletePlanAPI,
   renamePlanAPI,
-  reorderPlanEntriesAPI,
   type Plan,
   type PlanMosaic,
 } from '@myastrosky/app-state/api';
@@ -43,22 +42,22 @@ import PhoneIconButton from '../components/PhoneIconButton.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PlanSetupField from './plans/PlanSetupField.vue';
 import PhoneFacts from '../components/PhoneFacts.vue';
-import PhoneReorderList from '../components/PhoneReorderList.vue';
+import PhoneRow from '../components/PhoneRow.vue';
 import PhoneFab from '../components/PhoneFab.vue';
 import PhoneRadioSheet from '../components/PhoneRadioSheet.vue';
 import PlanActionsSheet from './plans/PlanActionsSheet.vue';
 import PlanRenameSheet from './plans/PlanRenameSheet.vue';
 import moreIcon from '../icons/more-vertical.svg?raw';
-import chevronIcon from '../icons/chevron-right.svg?raw';
+import sortIcon from '../icons/arrow-up-down.svg?raw';
 
 // The boards "Détail du plan", "Plan, actions" and "Plan, confirmer la suppression": the night of the plan, then its
 // plan's equipment (a field: choosing another may ask about its mosaics, board "Ciel, changer d'équipement"), then its
-// targets in the plan's order, each with its first observation window. A tap opens the target; a drag
-// by its handle puts it elsewhere (one request). The actions rename the plan, choose how its targets are sorted (the
-// desktop's sorts), export it as a PDF (the desktop's, through the share sheet) and delete it; "Afficher sur la carte" opens the map in a mode of its own on the plan's frames (the
+// targets in the plan's sort, each with its first observation window. A tap opens the target. The button beside the
+// actions chooses the sort (the desktop's sorts; as there, no order by hand): the list is sorted again when this page
+// is entered, after a target's windows were changed on its page. The actions rename the plan, export it as a PDF (the desktop's, through the share sheet) and delete it; "Afficher sur la carte" opens the map in a mode of its own on the plan's frames (the
 // desktop selects the plan's frames and opens its frame manager), its back arrow returning here. The plus opens the Cibles list for this plan (boards "Plan, ajouter une cible"), as the
 // desktop's "Trouver des cibles" of a plan; the targets added there show when this page is entered again. A mosaic is
-// an item of the plan like a target (its name · Mosaïque, its number of tiles): sorted and dragged with them, a tap
+// an item of the plan like a target (its name · Mosaïque, its number of tiles): sorted with them, a tap
 // shows the plan on the map zoomed to fit it, as the desktop's "Afficher sur la carte" of a mosaic.
 const route = useRoute();
 const router = useRouter();
@@ -72,8 +71,6 @@ const plan = computed<Plan | undefined>(() => store.plans.find((p) => p.id === p
 const actionsOpen = ref(false);
 const renameOpen = ref(false);
 const sortOpen = ref(false);
-/** The order a hand drag gave, until the page is entered again. */
-const handOrder = ref<string[] | null>(null);
 
 const night = computed(() =>
   plan.value ? resolvePlanNight(plan.value, targetsPrefs, planLookups) : null,
@@ -95,7 +92,7 @@ const summary = computed(() => {
   return facts;
 });
 
-/** The plan's items (targets and mosaics) in its order: the night's when a location is known, else as stored. */
+/** The plan's items (targets and mosaics) in its sort when a location is known, else as stored. */
 const rows = computed(() => {
   const p = plan.value;
   if (!p) return [];
@@ -121,15 +118,12 @@ const rows = computed(() => {
       items.push({ id: m.id, name, mosaic: m });
     }
   }
-  const order = handOrder.value;
-  if (order) items.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   const win = night.value?.win;
   return items.map(({ id, name, mosaic }) => {
     if (mosaic) {
       const tiles = p.entries.filter((e) => e.mosaicId === mosaic.id).length;
       return {
         id,
-        name,
         title: `${name} · ${t('targets.plan.mosaicLabel')}`,
         sub: `${tiles} ${t('fovOverlay.mosaicPanels')}`,
         mono: false,
@@ -144,7 +138,7 @@ const rows = computed(() => {
       first && win
         ? `${fracToClock(first.startFrac, win)} – ${fracToClock(first.endFrac, win)}`
         : '';
-    return { id, name, title: name, sub: range, mono: true, mosaic: undefined };
+    return { id, title: name, sub: range, mono: true, mosaic: undefined };
   });
 });
 
@@ -159,7 +153,6 @@ async function load() {
     reloadTargetsPrefs();
     await catalogsReady();
     await store.load();
-    handOrder.value = null;
   } catch (error) {
     void showError(error);
   }
@@ -167,42 +160,26 @@ async function load() {
 void load();
 onIonViewWillEnter(load);
 
-async function onReorder(ids: string[]) {
-  const previous = handOrder.value;
-  handOrder.value = ids;
-  // The stored order is the entries'; a mosaic keeps its place in the hand order.
-  const entryIds = new Set(plan.value?.entries.map((e) => e.id));
-  try {
-    await reorderPlanEntriesAPI(
-      planId.value,
-      ids.filter((id) => entryIds.has(id)),
-    );
-    await store.load();
-  } catch (error) {
-    handOrder.value = previous;
-    void showError(error);
-  }
-}
-
-/** The desktop's sorts of a plan's targets, in its order. */
+/** The desktop's sorts of a plan's targets, the most used first: the phone's list does not show them all at once. */
 const SORT_LABELS: Record<PlanSortKey, string> = {
+  window: 'targets.sort.window',
   transit: 'targets.sort.transit',
   altitude: 'targets.sort.altitude',
   rating: 'targets.sort.rating',
-  magnitude: 'targets.sort.magnitude',
   size: 'targets.sort.size',
   name: 'targets.sort.name',
+  magnitude: 'targets.sort.magnitude',
   difficulty: 'targets.sort.difficulty',
-  window: 'targets.sort.window',
 };
 const sortOptions = computed(() =>
-  PLAN_SORT_KEYS.map((key) => ({ value: key, label: t(SORT_LABELS[key]) })),
+  (Object.keys(SORT_LABELS) as PlanSortKey[]).map((key) => ({
+    value: key,
+    label: t(SORT_LABELS[key]),
+  })),
 );
 const sortKey = computed<PlanSortKey>({
   get: () => plan.value?.sortBy ?? 'transit',
   set: (key) => {
-    // A hand order no longer applies once a sort is chosen.
-    handOrder.value = null;
     if (plan.value) store.setPlanSort(plan.value.id, key);
   },
 });
@@ -296,11 +273,6 @@ function openRename() {
   renameOpen.value = true;
 }
 
-function openSort() {
-  actionsOpen.value = false;
-  sortOpen.value = true;
-}
-
 async function rename(name: string) {
   try {
     await renamePlanAPI(planId.value, name);
@@ -337,6 +309,9 @@ async function remove() {
     <PhoneTopBar>
       <PhoneBackButton fallback="/tabs/plans" />
       <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ plan?.name }}</h1>
+      <PhoneIconButton :label="t('targets.sort.label')" @click="sortOpen = true"
+        ><AppIcon :svg="sortIcon"
+      /></PhoneIconButton>
       <PhoneIconButton :label="t('mobile.plans.actions')" @click="actionsOpen = true"
         ><AppIcon :svg="moreIcon"
       /></PhoneIconButton>
@@ -351,32 +326,18 @@ async function remove() {
         <PhoneSectionHeader>{{
           t('targets.plan.itemCount', { n: planItemCount(plan) })
         }}</PhoneSectionHeader>
-        <div style="background: var(--bg-panel)">
-          <PhoneReorderList
-            :items="
-              rows.map((r) => ({ id: r.id, handleLabel: t('mobile.plans.drag', { name: r.name }) }))
-            "
-            openable
-            @reorder="onReorder"
-            @open="openRow"
-          >
-            <template #default="{ id }">
-              <template v-for="row in rows.filter((r) => r.id === id)" :key="row.id">
-                <span class="mob-row-body">
-                  <span class="mob-row-title m-body">{{ row.title }}</span>
-                  <span v-if="row.sub" class="mob-row-sub m-secondary">
-                    <span :class="{ 'm-mono': row.mono }">{{ row.sub }}</span>
-                  </span>
-                </span>
-                <span class="mob-row-trail">
-                  <span class="mob-row-chevron" aria-hidden="true"
-                    ><AppIcon :svg="chevronIcon"
-                  /></span>
-                </span>
-              </template>
-            </template>
-          </PhoneReorderList>
-        </div>
+        <IonList class="mob-list" lines="none">
+          <PhoneRow
+            v-for="row in rows"
+            :key="row.id"
+            :title="row.title"
+            :subs="row.sub ? [row.sub] : []"
+            :mono="row.mono"
+            button
+            chevron
+            @click="openRow(row.id)"
+          />
+        </IonList>
       </div>
       <PhoneFab
         :label="t('mobile.plans.addTarget')"
@@ -388,10 +349,8 @@ async function remove() {
       v-if="plan"
       v-model:open="actionsOpen"
       :name="plan.name"
-      :sort-label="t(SORT_LABELS[sortKey])"
       @show-on-map="showOnMap"
       @rename="openRename"
-      @sort="openSort"
       @export-pdf="exportPdf"
       @delete="remove"
     />

@@ -9,6 +9,7 @@ import PhoneEmptyState from '../src/components/PhoneEmptyState.vue';
 import PhoneChip from '../src/components/PhoneChip.vue';
 import PhoneBadge from '../src/components/PhoneBadge.vue';
 import PhoneSheet from '../src/components/PhoneSheet.vue';
+import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import PhoneMapSheet from '../src/components/PhoneMapSheet.vue';
 import PhoneMapSheetHost from '../src/components/PhoneMapSheetHost.vue';
 import PhoneSearch from '../src/components/PhoneSearch.vue';
@@ -209,6 +210,31 @@ describe('the shared phone components', () => {
     expect(w.find('.mob-sheet-footer #ok').exists()).toBe(true);
     await w.find('.mob-sheet-grab').trigger('click');
     expect(w.emitted('update:open')?.[0]).toEqual([false]);
+  });
+
+  it('PhoneRadioSheet applies a tapped choice and closes, as every list of one choice does', async () => {
+    const sheet = (value: string) =>
+      mount(PhoneRadioSheet, {
+        props: {
+          open: true,
+          value,
+          title: 'Trier par',
+          options: [
+            { value: 'a', label: 'Nom' },
+            { value: 'b', label: 'Taille' },
+          ],
+        },
+        global,
+      });
+    const w = sheet('a');
+    await w.findAll('[role="radio"]')[1].trigger('click');
+    expect(w.emitted('update:value')?.[0]).toEqual(['b']);
+    expect(w.emitted('update:open')?.[0]).toEqual([false]);
+    // the row already chosen closes the sheet too, though nothing changes
+    const same = sheet('b');
+    await same.findAll('[role="radio"]')[1].trigger('click');
+    expect(same.emitted('update:value')).toBeUndefined();
+    expect(same.emitted('update:open')?.[0]).toEqual([false]);
   });
 
   it('PhoneSheet is Ionic sheet with breakpoints 0 and 1, whose drag down nothing holds back', async () => {

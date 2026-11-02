@@ -16,7 +16,8 @@ import backIcon from '../icons/arrow-left.svg?raw';
 // sheet replaced another, which the arrow opens again (board "Photo, choisir une identification"). With `third`, its
 // stops are measured before it opens (board "Photo, informations"): where its content marks them (`data-sheet-stop`,
 // under a line or above a row) it opens at the first mark, stops at each, then shows everything the screen under the
-// top bar holds; without marks, in portrait, it opens at most a third of that room and goes up to two thirds.
+// top bar holds; without marks, in portrait, it opens at most a third of that room and goes up to two thirds. With
+// `full` (a list of choices), it takes the height of its content up to the whole screen under the status bar.
 const props = defineProps<{
   open: boolean;
   title: string;
@@ -27,6 +28,7 @@ const props = defineProps<{
   footerHidden?: boolean;
   back?: boolean;
   third?: boolean;
+  full?: boolean;
 }>();
 const emit = defineEmits<{ 'update:open': [open: boolean]; back: [] }>();
 const titleId = useId();
@@ -70,7 +72,7 @@ function dismissed() {
 <template>
   <IonModal
     class="mob-sheet-modal"
-    :class="{ 'mob-sheet-modal--third': third }"
+    :class="{ 'mob-sheet-modal--third': third, 'mob-sheet-modal--full': full }"
     :is-open="shown"
     :breakpoints="(third && stops?.breakpoints) || [0, 1]"
     :initial-breakpoint="(third && stops?.initial) || 1"

@@ -65,6 +65,8 @@
   --spinner-size-page: 36px;
   --sheet-max-height: 60dvh;
   --sheet-max-height-tall: 70dvh;
+  /* A list of choices: the whole screen under the status bar, as a sheet over a scrim in landscape. */
+  --sheet-max-height-full: calc(100dvh - var(--safe-top, 0px) - var(--space-7));
   --alert-title-line: 26px;
   --alert-text-line: 24px;
 }

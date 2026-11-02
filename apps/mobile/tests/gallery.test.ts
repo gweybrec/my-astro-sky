@@ -470,7 +470,8 @@ describe('the gallery page', () => {
         "Date d'observation (récentes d'abord)",
         "Date d'observation (anciennes d'abord)",
       ]);
-      sheet.vm.$emit('update:value', 'date-desc');
+      // a tap on "Date d'observation (récentes d'abord)"
+      await sheet.findAll('[role="radio"]')[2].trigger('click');
       await flushPromises();
       expect(names(wrapper)).toEqual(['M2', 'M100', 'Andromeda']);
       expect(sheet.props('open')).toBe(false);

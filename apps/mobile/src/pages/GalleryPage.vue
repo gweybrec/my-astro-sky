@@ -113,7 +113,6 @@ const sort = computed({
   get: () => gallerySort.value,
   set: (value: GallerySort | undefined) => {
     if (value) setGallerySort(value);
-    sortOpen.value = false;
   },
 });
 

@@ -114,21 +114,19 @@ const langOptions = languages.map((l) => ({ value: l.code, label: t(l.name) }));
 const lang = computed({
   get: () => current,
   set: (value: Lang | undefined) => {
-    langOpen.value = false;
     if (!value || value === current) return;
     document.documentElement.lang = value;
     setLang(value);
   },
 });
 
-// The theme: a choice of one in a sheet; choosing applies it at once and closes the sheet.
+// The theme: a choice of one in a sheet; choosing applies it at once.
 const themeOpen = ref(false);
 const themeOptions = THEMES.map((value) => ({ value, label: t(THEME_LABEL_KEYS[value]) }));
 const theme = computed({
   get: () => currentTheme.value,
   set: (value: Theme | undefined) => {
     if (value && value !== currentTheme.value) chooseTheme(value);
-    themeOpen.value = false;
   },
 });
 
