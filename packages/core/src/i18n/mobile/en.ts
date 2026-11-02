@@ -94,6 +94,7 @@ const en: Translations['mobile'] = {
     windowStart: 'Start',
     windowEnd: 'End',
     colorFromFilter: "the filter's",
+    noFilter: 'No filter',
     frame: 'Single exposure',
     snap: 'Whole number of frames',
     durationLine: 'Window duration: {duration}',

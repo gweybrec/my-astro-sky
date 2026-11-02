@@ -10,6 +10,22 @@ import type { ObservationWindow } from './domain/plans';
 import { filterCssKey } from './filter-keys';
 import { cssColorToHex, hexToRgba } from './color-utils';
 
+/**
+ * Generic band names offered first by a window's filter picker, above the real
+ * filter catalog, for planning a session without committing to a product.
+ */
+export const OBS_WINDOW_FILTERS: readonly string[] = [
+  'L',
+  'R',
+  'G',
+  'B',
+  'RGB',
+  'Ha',
+  'OIII',
+  'SII',
+  'Dual-Band',
+];
+
 /** Minimum window width as a fraction of the night window (keeps edges grabbable). */
 export const MIN_WINDOW_FRAC = 0.02;
 

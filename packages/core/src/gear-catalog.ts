@@ -329,7 +329,7 @@ export function getVisibleFilters(): FilterData[] {
 
 /**
  * `getVisibleFilters()` flattened into the shape the autocomplete works with.
- * Keeps `autocomplete-utils` free of any catalog import.
+ * Keeps `filter-candidates` free of any catalog import.
  */
 export function getVisibleFilterEntries(): FilterCatalogEntry[] {
   return getVisibleFilters().map((f) => ({

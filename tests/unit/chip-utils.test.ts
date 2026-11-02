@@ -5,7 +5,7 @@ import {
   buildIntegrationFilterField,
 } from '../../src/chip-utils';
 import { resolveCatalogFilter } from '@myastrosky/core/gear-catalog';
-import type { FilterCatalogEntry } from '../../src/autocomplete-utils';
+import type { FilterCatalogEntry } from '@myastrosky/core/filter-candidates';
 
 vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));
 

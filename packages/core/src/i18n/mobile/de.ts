@@ -95,6 +95,7 @@ const de: Translations['mobile'] = {
     windowStart: 'Beginn',
     windowEnd: 'Ende',
     colorFromFilter: 'die des Filters',
+    noFilter: 'Kein Filter',
     frame: 'Einzelbelichtung',
     snap: 'Ganze Anzahl Einzelbelichtungen',
     durationLine: 'Dauer des Fensters: {duration}',

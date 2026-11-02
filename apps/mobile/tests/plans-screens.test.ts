@@ -21,6 +21,14 @@ vi.mock('../src/composables/useConfirm', () => ({
   showInfo: (...a: unknown[]) => showInfo(...a),
 }));
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => Promise.resolve() }));
+// Ionic calls a page's "will enter" each time it shows again; here a test calls the last one to come back to a page.
+const enters: Array<() => unknown> = [];
+vi.mock('@ionic/vue', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@ionic/vue')>()),
+  onIonViewWillEnter: (fn: () => unknown) => {
+    enters.push(fn);
+  },
+}));
 const renderPlanPdf = vi.hoisted(() => vi.fn());
 vi.mock('@myastrosky/render/plan-pdf', () => ({ renderPlanPdf }));
 const saveFile = vi.hoisted(() => vi.fn());
@@ -48,12 +56,15 @@ import TargetDetailPage from '../src/pages/TargetDetailPage.vue';
 import PhoneReorderList from '../src/components/PhoneReorderList.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
+import ObsWindowSheet from '../src/pages/plans/ObsWindowSheet.vue';
 import { reloadTargetsPrefs } from '../src/composables/useTargets';
 import { skyFocus } from '../src/composables/useSkySelection';
 import { skyPlanView, skyTargetView } from '../src/sky-modes';
 import { framesSheetOpen } from '../src/sky-frames';
 import { currentSkyMap } from '../src/sky-map-setup';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
+import { invalidateGearCache } from '@myastrosky/core/gear-catalog';
+import { gearAdded } from '../src/pages/gear/gear-added';
 
 const GEAR = {
   telescope: [
@@ -84,6 +95,9 @@ const GEAR = {
   accessory: [],
   filter: [],
 } as const;
+
+/** Filters the user saved during a test (the catalogue's are not loaded here). */
+let customFilters: object[] = [];
 
 const setups = [
   { id: 's1', name: 'Équipement 1', telescopeId: 't1', cameraId: 'c1', accessoryId: null },
@@ -194,6 +208,8 @@ async function show(component: unknown, path: string) {
   return { w, router };
 }
 
+const bandsOrNone = ['Aucun filtre', 'L', 'R', 'G', 'B', 'RGB', 'Ha', 'OIII', 'SII', 'Dual-Band'];
+
 const PLANS = [
   plan('p1', 'Nuit du 2026-10-03', [
     entry('e1', 'NGC7000', { observationWindows: [window1], paDeg: 24 }),
@@ -212,7 +228,11 @@ beforeEach(() => {
   );
   reloadTargetsPrefs();
   setActivePinia(createPinia());
-  configureGearCatalogLoader(async (type) => [...GEAR[type]] as object[]);
+  customFilters = [];
+  invalidateGearCache('filter');
+  configureGearCatalogLoader(async (type) =>
+    type === 'filter' ? customFilters : ([...GEAR[type]] as object[]),
+  );
   vi.clearAllMocks();
   DSOS.NGC7000 = dso({});
   DSOS.M31 = dso({
@@ -786,6 +806,132 @@ describe('the plan entry page', () => {
       frameSeconds: 300,
       snap: true,
     });
+  });
+
+  const openWindow1 = async () => {
+    const shown = await show(PlanEntryPage, '/plans/p1/e1');
+    await shown.w
+      .findAll('.mob-row')
+      .find((r) => r.text().includes('Ha'))!
+      .trigger('click');
+    await settle();
+    return shown;
+  };
+  type Page = Awaited<ReturnType<typeof show>>['w'];
+  const tapRow = async (w: Page, title: string) => {
+    await w
+      .findAll('.mob-row')
+      .find((r) => r.text().trim() === title)!
+      .trigger('click');
+    await settle();
+  };
+  const tapButton = async (w: Page, start: string) => {
+    await w
+      .findAll('button')
+      .find((b) => b.text().startsWith(start))!
+      .trigger('click');
+    await settle();
+  };
+  const fieldLabel = (w: Page, start: string) =>
+    w
+      .findAll('button')
+      .find((b) => b.text().startsWith(start))!
+      .attributes('aria-label');
+  const savedWindow = () => backend.plans.updateEntry.mock.calls[0][1].observationWindows[0];
+
+  it("chooses the window's filter in its list, ticked, and stores it only with Enregistrer", async () => {
+    const { w } = await openWindow1();
+    expect(fieldLabel(w, 'Filtre')).toBe('Filtre : Ha');
+    await tapButton(w, 'Filtre');
+    // the add row, "Aucun filtre", then the desktop's generic bands; the window's filter is ticked
+    // the filter list's rows: those after its add row
+    const listed = () => {
+      const titles = w.findAll('.mob-row .mob-row-title').map((r) => r.text());
+      return titles.slice(titles.indexOf('Ajouter un filtre'));
+    };
+    expect(listed()).toEqual(['Ajouter un filtre', ...bandsOrNone]);
+    // the last row named Ha: the page's own window row comes first
+    const ha = w
+      .findAll('.mob-row')
+      .filter((r) => r.find('.mob-row-title').text() === 'Ha')
+      .at(-1)!;
+    expect(ha.find('.mob-status--success').exists()).toBe(true);
+    await w.find('input[type="search"]').setValue('ii');
+    await settle();
+    expect(listed()).toEqual(['Ajouter un filtre', 'Aucun filtre', 'OIII', 'SII']);
+    await tapRow(w, 'OIII');
+    expect(fieldLabel(w, 'Filtre')).toBe('Filtre : OIII');
+    expect(backend.plans.updateEntry).not.toHaveBeenCalled();
+    await tapButton(w, 'Enregistrer');
+    // no colour of its own: the window keeps following its filter
+    expect(savedWindow()).toMatchObject({ id: 'w1', filter: 'OIII', color: null });
+  });
+
+  it('takes the filter off with "Aucun filtre"', async () => {
+    const { w } = await openWindow1();
+    await tapButton(w, 'Filtre');
+    await tapRow(w, 'Aucun filtre');
+    await tapButton(w, 'Enregistrer');
+    expect(savedWindow().filter).toBeNull();
+  });
+
+  it("gives the window a colour of its own with the phone's colour picker", async () => {
+    const { w } = await openWindow1();
+    expect(fieldLabel(w, 'Couleur')).toBe('Couleur de la fenêtre : celle du filtre');
+    await w.find('input[type="color"]').setValue('#123456');
+    await tapButton(w, 'Enregistrer');
+    expect(savedWindow()).toMatchObject({ filter: 'Ha', color: '#123456' });
+  });
+
+  it('adds a filter from the list and comes back to the window as edited, the new filter chosen', async () => {
+    const { w, router } = await openWindow1();
+    await w.find('#obs-frame').setValue('420');
+    await tapButton(w, 'Filtre');
+    await tapRow(w, 'Ajouter un filtre');
+    expect(router.currentRoute.value.path).toBe('/settings/gear/filter/new');
+    expect(w.findComponent(ObsWindowSheet).props('open')).toBe(false);
+    // the add page saves a filter, then goes back
+    customFilters = [
+      {
+        id: 'custom-f1',
+        brand: 'Perso',
+        model: 'Ha 5nm maison',
+        subtype: 'Ha',
+        center_nm: 656.3,
+        fwhm_nm: 5,
+        color: '#aa0000',
+      },
+    ];
+    invalidateGearCache('filter');
+    gearAdded('filter', 'custom-f1');
+    await router.push('/plans/p1/e1');
+    await enters.at(-1)!();
+    await settle();
+    expect(w.findComponent(ObsWindowSheet).props('open')).toBe(true);
+    expect((w.find('#obs-frame').element as HTMLInputElement).value).toBe('420');
+    expect(fieldLabel(w, 'Filtre')).toBe('Filtre : Ha 5nm maison');
+    await tapButton(w, 'Enregistrer');
+    expect(backend.plans.updateEntry).toHaveBeenCalledTimes(1);
+    expect(savedWindow()).toMatchObject({
+      id: 'w1',
+      filter: 'Ha 5nm maison',
+      frameSeconds: 420,
+    });
+  });
+
+  it('keeps a new window unsaved while a filter is added, and adds it once on Enregistrer', async () => {
+    const { w, router } = await show(PlanEntryPage, '/plans/p1/e1');
+    await tapRow(w, "Fenêtre d'observation");
+    await tapButton(w, 'Filtre');
+    await tapRow(w, 'Ajouter un filtre');
+    // nothing saved on the add page: the window comes back as it was, still new
+    await router.push('/plans/p1/e1');
+    await enters.at(-1)!();
+    await settle();
+    expect(w.findAll('button').some((b) => b.text() === 'Annuler')).toBe(true);
+    expect(backend.plans.updateEntry).not.toHaveBeenCalled();
+    await tapButton(w, 'Enregistrer');
+    expect(backend.plans.updateEntry.mock.calls[0][1].observationWindows).toHaveLength(2);
   });
 
   it("changes the start and the end of a window with the phone's time picker, keeping a minimum length", async () => {

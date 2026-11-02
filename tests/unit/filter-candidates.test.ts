@@ -3,7 +3,7 @@ import {
   filterFilterCandidates,
   filterCandidatesWithCatalog,
   type FilterCatalogEntry,
-} from '../../src/autocomplete-utils';
+} from '@myastrosky/core/filter-candidates';
 
 function makeFilterMap(labels: string[]): Map<string, string> {
   const m = new Map<string, string>();

@@ -1,4 +1,4 @@
-import type { FilterCatalogEntry } from '@myastrosky/core/filter-catalog-entry';
+import type { FilterCatalogEntry } from './filter-catalog-entry';
 
 export type { FilterCatalogEntry };
 

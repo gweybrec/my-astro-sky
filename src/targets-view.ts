@@ -79,6 +79,7 @@ import {
   toBandFill,
   cssColorToHex,
   MIN_WINDOW_FRAC,
+  OBS_WINDOW_FILTERS,
 } from '@myastrosky/core/observation-windows';
 import type { ObservationWindow } from './api';
 import exportSvg from './icons/export.svg?raw';
@@ -4188,23 +4189,6 @@ export class TargetsView {
     return { row, applyPreset };
   }
 
-  /**
-   * Generic band names seeded into the observation-window filter picker. They sit
-   * above the real filter catalog in the dropdown, for planning a session without
-   * committing to a specific product.
-   */
-  private static readonly OBS_WINDOW_FILTERS = [
-    'L',
-    'R',
-    'G',
-    'B',
-    'RGB',
-    'Ha',
-    'OIII',
-    'SII',
-    'Dual-Band',
-  ];
-
   /** Chain-link icon (like the width/height "link" constraint in photo editors),
    * used for the observation-window "snap dragging to whole frames" toggle. */
   private static readonly LINK_ICON_SVG =
@@ -4327,7 +4311,7 @@ export class TargetsView {
     const windows: ObservationWindow[] = (entry()?.observationWindows ?? []).map((w) => ({ ...w }));
 
     const knownFilterMap = new Map<string, string>();
-    for (const name of TargetsView.OBS_WINDOW_FILTERS) knownFilterMap.set(name.toLowerCase(), name);
+    for (const name of OBS_WINDOW_FILTERS) knownFilterMap.set(name.toLowerCase(), name);
 
     const persist = () => {
       this.plansStore.setEntryObservationWindows(

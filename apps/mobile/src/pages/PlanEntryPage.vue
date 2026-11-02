@@ -10,6 +10,7 @@ import {
   newObservationWindow,
 } from '@myastrosky/core/observation-windows';
 import { resolvePlanNight, scorePlanEntry } from '@myastrosky/core/targets/plan';
+import { filterLabel, getFilters } from '@myastrosky/core/gear-catalog';
 import {
   presetForSetupId,
   resolveSetupById,
@@ -32,7 +33,8 @@ import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
-import ObsWindowSheet from './plans/ObsWindowSheet.vue';
+import ObsWindowSheet, { type WindowChanges } from './plans/ObsWindowSheet.vue';
+import { takeGearAdded } from './gear/gear-added';
 import TargetSummary from './targets/TargetSummary.vue';
 import { filterColor } from '../filter-color';
 import mapPinIcon from '@icons/map-pin.svg?raw';
@@ -42,7 +44,9 @@ import trashIcon from '@icons/trash.svg?raw';
 // The boards "Plan, détail d'une cible" and "Plan, fenêtre d'observation": the target's figures for the plan's night
 // and setup, its suggested filters (board "Plan, cible, filtres suggérés": the desktop's recipe, a sheet), its
 // observation windows (a tap opens one; the plus adds one), showing it on the map (as the desktop: a free frame of the
-// setup on the target, the map zoomed on that frame) and the removal of the target from the plan.
+// setup on the target, the map zoomed on that frame) and the removal of the target from the plan. A window's "Ajouter un
+// filtre" leaves for the filter's add page with the window as edited, and opens it again on the way back, the filter
+// saved there chosen.
 const route = useRoute();
 const router = useRouter();
 const store = usePlansStore();
@@ -56,10 +60,16 @@ const entry = computed(() => plan.value?.entries.find((e) => e.id === entryId.va
 const gear = shallowRef<GearLists | null>(null);
 const editingId = ref<string | null>(null);
 const editorOpen = ref(false);
-/** A window being added: stored only when its sheet's "Enregistrer" is tapped. */
+/** The window shown instead of the stored one: a window being added, or one edited before leaving to add a filter. */
 const draft = ref<ObservationWindow | null>(null);
+/** The draft is a window being added: stored only when its sheet's "Enregistrer" is tapped. */
+const isNew = ref(false);
+/** The editor closed to add a filter: its draft waits for the way back. */
+const addingFilter = ref(false);
 watch(editorOpen, (isOpen) => {
-  if (!isOpen) draft.value = null;
+  if (isOpen || addingFilter.value) return;
+  draft.value = null;
+  isNew.value = false;
 });
 
 const night = computed(() =>
@@ -120,6 +130,7 @@ const editing = computed(() =>
 
 async function load() {
   try {
+    if (addingFilter.value) await resumeAfterFilter();
     reloadTargetsPrefs();
     await catalogsReady();
     await store.load();
@@ -144,23 +155,39 @@ function openWindow(id: string) {
 
 function addWindow() {
   draft.value = newObservationWindow();
+  isNew.value = true;
   openWindow(draft.value.id);
 }
 
-async function saveWindow(changes: {
-  startFrac: number;
-  endFrac: number;
-  frameSeconds: number | null;
-  snap: boolean;
-}) {
+function addFilter(changes: WindowChanges) {
+  const shown = editing.value;
+  if (!shown) return;
+  draft.value = { ...shown, ...changes };
+  addingFilter.value = true;
+  editorOpen.value = false;
+  void router.push('/settings/gear/filter/new');
+}
+
+/** Back from the filter's add page: the window opens again as it was, with the filter saved there (if any). */
+async function resumeAfterFilter() {
+  addingFilter.value = false;
+  const id = takeGearAdded('filter');
+  if (id && draft.value) {
+    const added = (await getFilters()).find((f) => f.id === id);
+    if (added) draft.value = { ...draft.value, filter: filterLabel(added) };
+  }
+  if (draft.value) openWindow(draft.value.id);
+}
+
+async function saveWindow(changes: WindowChanges) {
   const id = editingId.value;
-  const added = draft.value;
+  const added = isNew.value ? draft.value : null;
   editorOpen.value = false;
   if (!id) return;
   const stored = entry.value?.observationWindows ?? [];
   try {
     await saveWindows(
-      added?.id === id
+      added
         ? [...stored, { ...added, ...changes }]
         : stored.map((w) => (w.id === id ? { ...w, ...changes } : w)),
     );
@@ -278,10 +305,10 @@ async function removeFromPlan() {
       :window="editing"
       :subtitle="setup ? `${name} · ${setup.name}` : name"
       :night="night?.win ?? null"
-      :swatch="editing ? colorOf(editing) : ''"
-      :is-new="draft !== null"
+      :is-new="isNew"
       @save="saveWindow"
       @delete="deleteWindow"
+      @add-filter="addFilter"
     />
   </IonPage>
 </template>

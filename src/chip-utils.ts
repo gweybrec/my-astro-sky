@@ -2,7 +2,7 @@ import {
   filterCandidatesWithCatalog,
   type FilterCandidate,
   type FilterCatalogEntry,
-} from './autocomplete-utils';
+} from '@myastrosky/core/filter-candidates';
 import { filterBadgeColors } from '@myastrosky/core/color-utils';
 import { filterCssKey } from '@myastrosky/core/filter-keys';
 import {

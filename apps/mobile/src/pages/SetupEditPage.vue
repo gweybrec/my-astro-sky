@@ -475,8 +475,8 @@ async function remove() {
         @click="pick(null)"
       >
         <template v-if="!choice.accessoryId" #trail
-          ><span class="mob-status--success"><AppIcon :svg="checkIcon" /></span
-        ></template>
+          ><AppIcon :svg="checkIcon" cls="mob-status--success"
+        /></template>
       </PhoneRow>
       <PhoneRow
         v-for="item in items"
@@ -487,8 +487,8 @@ async function remove() {
         @click="pick(item.id)"
       >
         <template v-if="item.id === pickedId" #trail
-          ><span class="mob-status--success"><AppIcon :svg="checkIcon" /></span
-        ></template>
+          ><AppIcon :svg="checkIcon" cls="mob-status--success"
+        /></template>
       </PhoneRow>
     </PhoneSheet>
   </IonPage>

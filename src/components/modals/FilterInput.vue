@@ -56,7 +56,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
-import { filterCandidatesWithCatalog } from '../../autocomplete-utils';
+import { filterCandidatesWithCatalog } from '@myastrosky/core/filter-candidates';
 import { filterBadgeAttrs, catalogBadgeTitle } from '../../chip-utils';
 import { getVisibleFilterEntries } from '@myastrosky/core/gear-catalog';
 

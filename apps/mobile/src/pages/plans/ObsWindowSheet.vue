@@ -5,6 +5,7 @@ import { t } from '@myastrosky/core/i18n/index';
 import {
   MIN_WINDOW_FRAC,
   clockToFrac,
+  cssColorToHex,
   fracToClock,
   parseFrameSeconds,
   windowDurationMs,
@@ -16,39 +17,50 @@ import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneHelper from '../../components/PhoneHelper.vue';
 import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 import PhoneNativePicker from '../../components/PhoneNativePicker.vue';
+import PhoneColorButton from '../../components/PhoneColorButton.vue';
 import AppIcon from '../../components/AppIcon.vue';
+import ObsWindowFilterSheet from './ObsWindowFilterSheet.vue';
 import { formatLongDuration } from '../../composables/usePlans';
+import { filterColor } from '../../filter-color';
 import caretIcon from '../../icons/chevron-down.svg?raw';
+
+/** What the sheet edits of a window, stored by "Enregistrer". */
+export type WindowChanges = Pick<
+  ObservationWindow,
+  'startFrac' | 'endFrac' | 'frameSeconds' | 'snap' | 'filter' | 'color'
+>;
 
 // The board "Plan, fenêtre d'observation": the window's start and end, its duration and number of exposures, its
 // filter and colour, the single exposure and the switch that aligns the window on it. A tap on the start or the end
 // opens the phone's time picker; as on the desktop, a window keeps a minimum length. "Enregistrer" stores the times,
 // the exposure and the switch; "Supprimer" removes the window (the page asks first). A new window (board "Plan, nouvelle
-// fenêtre d'observation", `isNew`) is not stored yet: it has "Annuler" instead, which leaves it unsaved. The filter and the colour open
-// pickers that are not built yet: they show their value and do nothing.
+// fenêtre d'observation", `isNew`) is not stored yet: it has "Annuler" instead, which leaves it unsaved. The filter opens
+// its list (board "Plan, fenêtre d'observation, filtre"); its "Ajouter un filtre" gives the page the window as edited,
+// which leaves for the filter's add page and opens the window again on its return. The colour opens the phone's colour
+// picker; as on the desktop, a window without a colour of its own takes its filter's, and follows a new filter.
 const props = defineProps<{
   window: ObservationWindow | null;
   /** What the window belongs to: the target and the setup. */
   subtitle: string;
   /** The night the window's fractions are read in; null when the plan has no location. */
   night: { start: Date; end: Date } | null;
-  /** The colour dot of the window (the filter's, or the one chosen). */
-  swatch: string;
   /** A window being added, stored only by "Enregistrer". */
   isNew?: boolean;
 }>();
 const open = defineModel<boolean>('open', { required: true });
 const emit = defineEmits<{
-  save: [
-    changes: { startFrac: number; endFrac: number; frameSeconds: number | null; snap: boolean },
-  ];
+  save: [changes: WindowChanges];
   delete: [];
+  addFilter: [changes: WindowChanges];
 }>();
 
 const frameText = ref('');
 const snap = ref(false);
 const startFrac = ref(0);
 const endFrac = ref(1);
+const filter = ref<string | null>(null);
+const color = ref<string | null>(null);
+const filterOpen = ref(false);
 const startPicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
 const endPicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
 
@@ -60,6 +72,8 @@ watch(
     snap.value = props.window?.snap ?? false;
     startFrac.value = props.window?.startFrac ?? 0;
     endFrac.value = props.window?.endFrac ?? 1;
+    filter.value = props.window?.filter ?? null;
+    color.value = props.window?.color ?? null;
   },
   { immediate: true },
 );
@@ -98,9 +112,16 @@ const durationText = computed(() => {
     ? t('mobile.plans.durationFrames', { duration, n: frames.value, s: frameSeconds.value ?? 0 })
     : t('mobile.plans.durationLine', { duration });
 });
-const filterName = computed(() => props.window?.filter ?? '');
+const filterName = computed(() => filter.value ?? '');
+// The colour picker takes a hex colour: the window's own, else its filter's.
+const colorValue = computed({
+  get: () => color.value || cssColorToHex(filterColor(filter.value)),
+  set: (hex: string) => {
+    color.value = hex;
+  },
+});
 const colorAria = computed(() =>
-  props.window?.color
+  color.value
     ? t('targets.plan.obsWindowColor')
     : t('mobile.format.labelValue', {
         label: t('targets.plan.obsWindowColor'),
@@ -108,13 +129,18 @@ const colorAria = computed(() =>
       }),
 );
 
-function save() {
-  emit('save', {
-    startFrac: startFrac.value,
-    endFrac: endFrac.value,
-    frameSeconds: frameSeconds.value,
-    snap: snap.value,
-  });
+const changes = (): WindowChanges => ({
+  startFrac: startFrac.value,
+  endFrac: endFrac.value,
+  frameSeconds: frameSeconds.value,
+  snap: snap.value,
+  filter: filter.value,
+  color: color.value,
+});
+
+function addFilter() {
+  filterOpen.value = false;
+  emit('addFilter', changes());
 }
 </script>
 
@@ -149,13 +175,13 @@ function save() {
         variant="field"
         text-style="body"
         block
-        waiting
         :aria-label="
           t('mobile.format.labelValue', {
             label: t('targets.plan.obsWindowFilter'),
             value: filterName,
           })
         "
+        @click="filterOpen = true"
       >
         <span class="mob-btn-key">{{ t('targets.plan.obsWindowFilter') }}</span>
         <span class="mob-btn-value mob-btn-value--swatch">{{ filterName }}</span>
@@ -163,13 +189,11 @@ function save() {
       </PhoneButton>
     </div>
     <div class="mob-form-row" style="padding-bottom: var(--space-4)">
-      <PhoneButton variant="field" text-style="body" block waiting :aria-label="colorAria">
-        <span class="mob-btn-key">{{ t('targets.plan.obsWindowColor') }}</span>
-        <span class="mob-btn-value mob-btn-value--swatch"
-          ><span class="mob-swatch" :style="{ background: swatch }"
-        /></span>
-        <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
-      </PhoneButton>
+      <PhoneColorButton
+        v-model="colorValue"
+        :field="t('targets.plan.obsWindowColor')"
+        :label="colorAria"
+      />
     </div>
     <div class="mob-input-row">
       <label class="m-body" for="obs-frame">{{ t('mobile.plans.frame') }}</label>
@@ -198,9 +222,10 @@ function save() {
       <PhoneButton v-else variant="danger" size="lg" @click="emit('delete')">{{
         t('mobile.plans.delete')
       }}</PhoneButton>
-      <PhoneButton variant="confirm" size="lg" @click="save">{{
+      <PhoneButton variant="confirm" size="lg" @click="emit('save', changes())">{{
         t('mobile.plans.save')
       }}</PhoneButton>
     </template>
   </PhoneSheet>
+  <ObsWindowFilterSheet v-model:open="filterOpen" v-model:value="filter" @add="addFilter" />
 </template>

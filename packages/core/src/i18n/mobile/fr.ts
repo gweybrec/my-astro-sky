@@ -93,6 +93,7 @@ const fr = {
     windowStart: 'Début',
     windowEnd: 'Fin',
     colorFromFilter: 'celle du filtre',
+    noFilter: 'Aucun filtre',
     frame: 'Pose unitaire',
     snap: 'Nombre entier de poses',
     durationLine: 'Durée de la fenêtre : {duration}',
