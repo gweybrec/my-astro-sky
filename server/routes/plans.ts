@@ -92,7 +92,7 @@ plansRouter.get('/api/plans', async (_req, res) => {
  */
 plansRouter.post('/api/plans', async (req, res) => {
   try {
-    const { name } = req.body as PlanInput;
+    const { name } = (req.body ?? {}) as PlanInput;
     res.json(await plans.create({ name }));
   } catch (err) {
     if (!isDomainError(err)) console.error('[Plans] Failed to create plan', err);
@@ -139,7 +139,7 @@ plansRouter.post('/api/plans', async (req, res) => {
  */
 plansRouter.put('/api/plans/order', async (req, res) => {
   try {
-    const { ids } = req.body as { ids: string[] };
+    const { ids } = (req.body ?? {}) as { ids: string[] };
     await plans.reorder(ids);
     res.json({ ok: true });
   } catch (err) {
@@ -316,7 +316,7 @@ plansRouter.delete('/api/plans/:id', async (req, res) => {
  */
 plansRouter.post('/api/plans/:id/entries', async (req, res) => {
   try {
-    const { dsoId, ra, dec, paDeg } = req.body as PlanEntryInput;
+    const { dsoId, ra, dec, paDeg } = (req.body ?? {}) as PlanEntryInput;
     res.json(await plans.addEntry(req.params.id, { dsoId, ra, dec, paDeg }));
   } catch (err) {
     if (!isDomainError(err)) console.error('[Plans] Failed to add entry', err);
@@ -369,7 +369,7 @@ plansRouter.post('/api/plans/:id/entries', async (req, res) => {
  */
 plansRouter.put('/api/plans/:id/entries/order', async (req, res) => {
   try {
-    const { ids } = req.body as { ids: string[] };
+    const { ids } = (req.body ?? {}) as { ids: string[] };
     await plans.reorderEntries(req.params.id, ids);
     res.json({ ok: true });
   } catch (err) {
@@ -404,7 +404,7 @@ plansRouter.put('/api/plans/:id/entries/order', async (req, res) => {
  *               properties:
  *                 ok: { type: boolean }
  *       404:
- *         description: Entry not found
+ *         description: Entry not found in this plan
  *         content:
  *           application/json:
  *             schema:
@@ -416,7 +416,7 @@ plansRouter.put('/api/plans/:id/entries/order', async (req, res) => {
  */
 plansRouter.delete('/api/plans/:id/entries/:entryId', async (req, res) => {
   try {
-    await plans.removeEntry(req.params.entryId);
+    await plans.removeEntry(req.params.entryId, req.params.id);
     res.json({ ok: true });
   } catch (err) {
     if (!isDomainError(err)) console.error('[Plans] Failed to remove entry', err);
@@ -493,7 +493,7 @@ plansRouter.delete('/api/plans/:id/entries/:entryId', async (req, res) => {
  *               properties:
  *                 error: { type: string }
  *       404:
- *         description: Entry not found
+ *         description: Entry not found in this plan
  *         content:
  *           application/json:
  *             schema:
@@ -505,7 +505,11 @@ plansRouter.delete('/api/plans/:id/entries/:entryId', async (req, res) => {
  */
 plansRouter.patch('/api/plans/:id/entries/:entryId', async (req, res) => {
   try {
-    await plans.updateEntry(req.params.entryId, req.body as PlanEntryChanges);
+    await plans.updateEntry(
+      req.params.entryId,
+      (req.body ?? {}) as PlanEntryChanges,
+      req.params.id,
+    );
     res.json({ ok: true });
   } catch (err) {
     if (!isDomainError(err)) console.error('[Plans] Failed to update entry PA', err);

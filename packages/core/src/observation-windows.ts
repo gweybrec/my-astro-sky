@@ -38,6 +38,9 @@ function genWindowId(): string {
 }
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
+/** A window bound: a number or a numeric string; null, '' and anything else give NaN (not 0, as `Number` would). */
+const windowBound = (v: unknown): number =>
+  typeof v === 'number' || (typeof v === 'string' && v.trim() !== '') ? Number(v) : NaN;
 
 /**
  * Validate/coerce a raw value into a well-formed ObservationWindow array:
@@ -51,8 +54,8 @@ export function sanitizeObservationWindows(raw: unknown): ObservationWindow[] {
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
     const r = item as Record<string, unknown>;
-    const rawStart = Number(r.startFrac);
-    const rawEnd = Number(r.endFrac);
+    const rawStart = windowBound(r.startFrac);
+    const rawEnd = windowBound(r.endFrac);
     if (!Number.isFinite(rawStart) || !Number.isFinite(rawEnd)) continue;
     let start = clamp01(rawStart);
     let end = clamp01(rawEnd);

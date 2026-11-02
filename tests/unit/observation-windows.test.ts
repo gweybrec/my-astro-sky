@@ -26,6 +26,18 @@ describe('sanitizeObservationWindows', () => {
     );
   });
 
+  it('drops a window whose bound is null or empty instead of reading it as 0', () => {
+    expect(
+      sanitizeObservationWindows([
+        { startFrac: null, endFrac: 0.5 },
+        { startFrac: 0.1, endFrac: '' },
+      ]),
+    ).toEqual([]);
+    expect(sanitizeObservationWindows([{ startFrac: '0.1', endFrac: 0.5 }])).toMatchObject([
+      { startFrac: 0.1, endFrac: 0.5 },
+    ]);
+  });
+
   it('clamps fractions into [0,1]', () => {
     const [w] = sanitizeObservationWindows([{ startFrac: -0.5, endFrac: 2, filter: null }]);
     expect(w.startFrac).toBe(0);

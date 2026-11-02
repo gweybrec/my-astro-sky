@@ -51,13 +51,10 @@ export interface PlanService {
   addEntry(planId: string, input: PlanEntryInput): Promise<{ id: string }>;
   /** Gives every listed entry of the plan the position of its index. Throws `invalid` (`PLAN_IDS_NOT_ARRAY`). */
   reorderEntries(planId: string, ids: readonly string[]): Promise<void>;
-  /**
-   * Removes an entry. Throws `notFound` (`ENTRY_NOT_FOUND`). `planId` is not used here: the HTTP route is
-   * addressed by plan and entry, so a caller that knows the plan passes it.
-   */
-  removeEntry(entryId: string, planId?: string): Promise<void>;
-  /** Changes the framing fields present in `changes`. Throws `invalid`, `notFound` (`ENTRY_NOT_FOUND`). `planId` is not used (see `removeEntry`). */
-  updateEntry(entryId: string, changes: PlanEntryChanges, planId?: string): Promise<void>;
+  /** Removes an entry of the plan. Throws `notFound` (`ENTRY_NOT_FOUND`), also when the entry is in another plan. */
+  removeEntry(entryId: string, planId: string): Promise<void>;
+  /** Changes the framing fields present in `changes`. Throws `invalid`, `notFound` (`ENTRY_NOT_FOUND`, as `removeEntry`). */
+  updateEntry(entryId: string, changes: PlanEntryChanges, planId: string): Promise<void>;
   /** Creates a mosaic and its tile entries in one transaction. Throws `notFound` (`PLAN_NOT_FOUND`), `invalid`. */
   createMosaic(planId: string, params: MosaicParams): Promise<{ id: string }>;
   /** Replaces a mosaic's parameters and its tiles in one transaction. Throws `notFound` (`MOSAIC_NOT_FOUND`), `invalid`. */
@@ -138,7 +135,6 @@ const INSERT_ENTRY =
 // The same insert, with the position taken from the end of the plan by the statement itself.
 const INSERT_ENTRY_AT_END =
   'INSERT INTO plan_entries (id, plan_id, dso_id, position, pa_deg, ra, dec, notes, mosaic_id, mosaic_w_deg, mosaic_h_deg, observation_windows) VALUES (?, ?, ?, (SELECT COALESCE(MAX(position) + 1, 0) FROM plan_entries WHERE plan_id = ?), ?, ?, ?, ?, ?, ?, ?, ?)';
-const DELETE_ENTRY = 'DELETE FROM plan_entries WHERE id = ?';
 const DELETE_PLAN_ENTRIES = 'DELETE FROM plan_entries WHERE plan_id = ?';
 const UPDATE_ENTRY_POSITION = 'UPDATE plan_entries SET position = ? WHERE id = ? AND plan_id = ?';
 // A mosaic represents its whole target, so it replaces any standalone frame for the same DSO
@@ -226,6 +222,10 @@ function groupByPlan<T extends { plan_id: string }>(rows: T[]): Map<string, T[]>
   return byPlan;
 }
 
+/** A window bound: a number or a numeric string; null, '' and anything else give NaN (not 0, as `Number` would). */
+const windowBound = (v: unknown): number =>
+  typeof v === 'number' || (typeof v === 'string' && v.trim() !== '') ? Number(v) : NaN;
+
 /**
  * Validate/coerce a raw value into a well-formed observation-window array, then serialise it to a JSON
  * string for storage. Mirrors the client-side `sanitizeObservationWindows` in `src/observation-windows.ts`;
@@ -238,8 +238,8 @@ export function sanitizeObservationWindows(raw: unknown, newId: () => string): s
   const out = [];
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
-    const rawStart = Number(item.startFrac);
-    const rawEnd = Number(item.endFrac);
+    const rawStart = windowBound(item.startFrac);
+    const rawEnd = windowBound(item.endFrac);
     if (!Number.isFinite(rawStart) || !Number.isFinite(rawEnd)) continue;
     let start = clamp01(rawStart);
     let end = clamp01(rawEnd);
@@ -510,14 +510,19 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
       if (hasSettings) {
         const nightOf = 'nightOf' in body ? body.nightOf || null : (existing.night_of ?? null);
         const setupId = 'setupId' in body ? body.setupId || null : (existing.setup_id ?? null);
-        const lat =
-          'lat' in body ? (typeof body.lat === 'number' ? body.lat : null) : (existing.lat ?? null);
-        const lon =
-          'lon' in body ? (typeof body.lon === 'number' ? body.lon : null) : (existing.lon ?? null);
-        if (lat !== null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) {
+        // A coordinate is a number or null (cleared); anything else is refused, never stored as null.
+        const lat = 'lat' in body ? body.lat : (existing.lat ?? null);
+        const lon = 'lon' in body ? body.lon : (existing.lon ?? null);
+        if (
+          lat !== null &&
+          (typeof lat !== 'number' || !Number.isFinite(lat) || lat < -90 || lat > 90)
+        ) {
           throw err('invalid', 'lat must be between -90 and 90', 'PLAN_LAT_OUT_OF_RANGE');
         }
-        if (lon !== null && (!Number.isFinite(lon) || lon < -180 || lon > 180)) {
+        if (
+          lon !== null &&
+          (typeof lon !== 'number' || !Number.isFinite(lon) || lon < -180 || lon > 180)
+        ) {
           throw err('invalid', 'lon must be between -180 and 180', 'PLAN_LON_OUT_OF_RANGE');
         }
         writes.push({ sql: UPDATE_PLAN_SETTINGS, params: [nightOf, setupId, lat, lon, id] });
@@ -590,12 +595,14 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
       await db.batch(ids.map((id, i) => ({ sql: UPDATE_ENTRY_POSITION, params: [i, id, planId] })));
     },
 
-    async removeEntry(entryId) {
-      if ((await db.run(DELETE_ENTRY, [entryId])).changes === 0) throw entryNotFound();
+    async removeEntry(entryId, planId) {
+      if ((await db.run(DELETE_ENTRY_IN_PLAN, [entryId, planId])).changes === 0) {
+        throw entryNotFound();
+      }
     },
 
-    async updateEntry(entryId, changes) {
-      const body = changes as Record<string, unknown>;
+    async updateEntry(entryId, changes, planId) {
+      const body = (changes ?? {}) as Record<string, unknown>;
       const sets: string[] = [];
       const vals: SqlValue[] = [];
       const nullableNumber = (key: 'paDeg' | 'ra' | 'dec' | 'mosaicWDeg' | 'mosaicHDeg') => {
@@ -647,9 +654,9 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
       if (sets.length === 0) {
         throw err('invalid', 'No updatable fields provided', 'ENTRY_NO_FIELDS');
       }
-      vals.push(entryId);
+      vals.push(entryId, planId);
       const { changes: changed } = await db.run(
-        `UPDATE plan_entries SET ${sets.join(', ')} WHERE id = ?`,
+        `UPDATE plan_entries SET ${sets.join(', ')} WHERE id = ? AND plan_id = ?`,
         vals,
       );
       if (changed === 0) throw entryNotFound();

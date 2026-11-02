@@ -291,11 +291,10 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
       async reorderEntries(planId, ids) {
         await call('PUT', `/api/plans/${id(planId)}/entries/order`, { ids });
       },
-      // The route ignores the plan in its path; without one the placeholder '-' stands in.
-      async removeEntry(entryId, planId = '-') {
+      async removeEntry(entryId, planId) {
         await call('DELETE', `/api/plans/${id(planId)}/entries/${id(entryId)}`);
       },
-      async updateEntry(entryId, changes, planId = '-') {
+      async updateEntry(entryId, changes, planId) {
         await call('PATCH', `/api/plans/${id(planId)}/entries/${id(entryId)}`, changes);
       },
       createMosaic: (planId, params) => call('POST', `/api/plans/${id(planId)}/mosaics`, params),

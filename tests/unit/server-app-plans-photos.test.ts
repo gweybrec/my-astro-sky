@@ -212,15 +212,22 @@ describe('PUT /api/plans/:id', () => {
     }
   });
 
-  it('stores a latitude that is a string as null', async () => {
+  it('rejects a coordinate that is not a number or null, and keeps the stored one', async () => {
     const id = await mkPlan();
     expect(await call('PUT', `/api/plans/${id}`, { lat: 45, lon: 6 })).toEqual(OK);
-    expect(await call('PUT', `/api/plans/${id}`, { lat: '48.5' })).toEqual(OK);
-    // KNOWN GAP: a string latitude is not rejected, it silently clears the stored latitude.
+    for (const lat of ['48.5', '', true, {}]) {
+      expect(await call('PUT', `/api/plans/${id}`, { lat })).toEqual({
+        status: 400,
+        body: { error: 'lat must be between -90 and 90', code: 'PLAN_LAT_OUT_OF_RANGE' },
+      });
+    }
+    expect(await call('PUT', `/api/plans/${id}`, { lon: '9' })).toEqual({
+      status: 400,
+      body: { error: 'lon must be between -180 and 180', code: 'PLAN_LON_OUT_OF_RANGE' },
+    });
+    expect(await readPlan(id)).toMatchObject({ lat: 45, lon: 6 });
+    expect(await call('PUT', `/api/plans/${id}`, { lat: null })).toEqual(OK);
     expect(await readPlan(id)).toMatchObject({ lat: null, lon: 6 });
-    expect(await call('PUT', `/api/plans/${id}`, { lon: '9' })).toEqual(OK);
-    // KNOWN GAP: same for a string longitude.
-    expect(await readPlan(id)).toMatchObject({ lat: null, lon: null });
   });
 
   it('clears nightOf and setupId with an empty string, and keeps the keys that are absent', async () => {
@@ -456,14 +463,17 @@ describe('PATCH /api/plans/:id/entries/:entryId', () => {
     });
   });
 
-  it('ignores the plan id in the path', async () => {
+  it('answers 404 for an entry of another plan, and leaves it unchanged', async () => {
     const a = await mkPlan('A');
     const b = await mkPlan('B');
     const entryId = await mkEntry(a, { dsoId: 'M1' });
-    // KNOWN GAP: the entry of plan A is updated through plan B's path (and through a plan id that does not exist).
-    expect(await call('PATCH', `/api/plans/${b}/entries/${entryId}`, { paDeg: 7 })).toEqual(OK);
-    expect(await call('PATCH', `/api/plans/nope/entries/${entryId}`, { paDeg: 8 })).toEqual(OK);
-    expect((await readPlan(a)).entries[0].paDeg).toBe(8);
+    for (const plan of [b, 'nope']) {
+      expect(await call('PATCH', `/api/plans/${plan}/entries/${entryId}`, { paDeg: 7 })).toEqual({
+        status: 404,
+        body: { error: 'Entry not found', code: 'ENTRY_NOT_FOUND' },
+      });
+    }
+    expect((await readPlan(a)).entries[0].paDeg).toBeNull();
   });
 });
 
@@ -603,18 +613,13 @@ describe('observation windows through PATCH', () => {
       { id: 'd', startFrac: {}, endFrac: 0.5 },
       { id: 'ok', startFrac: '0.1', endFrac: '0.4' },
     ]);
-    // KNOWN GAP: a null bound counts as 0 (Number(null) is 0), so these are kept, not skipped.
-    expect(await patchWindows([{ id: 'n', startFrac: null, endFrac: 0.5 }])).toEqual([
-      {
-        id: 'n',
-        startFrac: 0,
-        endFrac: 0.5,
-        filter: null,
-        color: null,
-        frameSeconds: null,
-        snap: false,
-      },
-    ]);
+    // A null or empty bound is not a number, so the window is skipped (Number would read it as 0).
+    expect(
+      await patchWindows([
+        { id: 'n', startFrac: null, endFrac: 0.5 },
+        { id: 'e', startFrac: 0.1, endFrac: '' },
+      ]),
+    ).toEqual([]);
     // Items that are not objects, or have no usable numeric bounds, are skipped; the numeric strings are kept.
     expect(out).toEqual([
       {
@@ -707,7 +712,7 @@ describe('PUT /api/plans/:id/entries/order', () => {
   it('accepts an empty list and an unknown plan id', async () => {
     const { plan } = await threeEntries();
     expect(await call('PUT', `/api/plans/${plan}/entries/order`, { ids: [] })).toEqual(OK);
-    // KNOWN GAP: no 404 for a plan that does not exist.
+    // No 404 for a plan that does not exist: nothing is written, and checking would cost a second trip.
     expect(await call('PUT', '/api/plans/nope/entries/order', { ids: ['a'] })).toEqual(OK);
     expect(await order(plan)).toEqual([
       ['M1', 0],
@@ -736,12 +741,17 @@ describe('DELETE /api/plans/:id/entries/:entryId', () => {
     });
   });
 
-  it('ignores the plan id in the path', async () => {
+  it('answers 404 for an entry of another plan, and keeps it', async () => {
     const a = await mkPlan('A');
+    const b = await mkPlan('B');
     const entryId = await mkEntry(a, { dsoId: 'M1' });
-    // KNOWN GAP: the entry of plan A is removed through a plan id that does not exist.
-    expect(await call('DELETE', `/api/plans/nope/entries/${entryId}`)).toEqual(OK);
-    expect((await readPlan(a)).entries).toEqual([]);
+    for (const plan of [b, 'nope']) {
+      expect(await call('DELETE', `/api/plans/${plan}/entries/${entryId}`)).toEqual({
+        status: 404,
+        body: { error: 'Entry not found', code: 'ENTRY_NOT_FOUND' },
+      });
+    }
+    expect((await readPlan(a)).entries).toHaveLength(1);
   });
 });
 
@@ -1119,44 +1129,47 @@ describe('plan positions', () => {
 });
 
 describe('requests with no body', () => {
-  it('POST /api/plans', async () => {
-    // KNOWN GAP: no body at all gives a 500 from a TypeError instead of the 400 "name is required".
-    const r = await callRaw('POST', '/api/plans');
-    expect(r.status).toBe(500);
-    expect(r.body).toEqual({
-      error: expect.stringContaining("Cannot destructure property 'name' of 'req.body'"),
+  it('POST /api/plans answers 400', async () => {
+    expect(await callRaw('POST', '/api/plans')).toEqual({
+      status: 400,
+      body: { error: 'name is required', code: 'PLAN_NAME_REQUIRED' },
     });
   });
 
-  it('POST /api/plans/:id/entries', async () => {
+  it('PUT /api/plans/order answers 400', async () => {
+    expect(await callRaw('PUT', '/api/plans/order')).toEqual({
+      status: 400,
+      body: { error: 'ids must be an array', code: 'PLAN_IDS_NOT_ARRAY' },
+    });
+  });
+
+  it('POST /api/plans/:id/entries answers 400, or 404 for an unknown plan', async () => {
     const id = await mkPlan();
-    const r = await callRaw('POST', `/api/plans/${id}/entries`);
-    // KNOWN GAP: 500 from a TypeError instead of a 400.
-    expect(r.status).toBe(500);
-    expect(r.body).toEqual({
-      error: expect.stringContaining("Cannot destructure property 'dsoId' of 'req.body'"),
+    expect(await callRaw('POST', `/api/plans/${id}/entries`)).toEqual({
+      status: 400,
+      body: { error: 'dsoId or ra/dec is required', code: 'ENTRY_TARGET_REQUIRED' },
     });
-    // KNOWN GAP: the body is destructured before the plan is looked up, so an unknown plan also answers 500 here.
-    expect(await callRaw('POST', '/api/plans/nope/entries')).toMatchObject({ status: 500 });
+    expect(await callRaw('POST', '/api/plans/nope/entries')).toEqual({
+      status: 404,
+      body: { error: 'Plan not found', code: 'PLAN_NOT_FOUND' },
+    });
   });
 
-  it('PUT /api/plans/:id/entries/order', async () => {
+  it('PUT /api/plans/:id/entries/order answers 400', async () => {
     const id = await mkPlan();
-    const r = await callRaw('PUT', `/api/plans/${id}/entries/order`);
-    // KNOWN GAP: 500 from a TypeError instead of the 400 "ids must be an array".
-    expect(r.status).toBe(500);
-    expect(r.body).toEqual({
-      error: expect.stringContaining("Cannot destructure property 'ids' of 'req.body'"),
+    expect(await callRaw('PUT', `/api/plans/${id}/entries/order`)).toEqual({
+      status: 400,
+      body: { error: 'ids must be an array', code: 'PLAN_IDS_NOT_ARRAY' },
     });
   });
 
-  it('PATCH /api/plans/:id/entries/:entryId', async () => {
+  it('PATCH /api/plans/:id/entries/:entryId answers 400', async () => {
     const id = await mkPlan();
     const entryId = await mkEntry(id, { dsoId: 'M1' });
-    const r = await callRaw('PATCH', `/api/plans/${id}/entries/${entryId}`);
-    // KNOWN GAP: 500 from a TypeError instead of "No updatable fields provided".
-    expect(r.status).toBe(500);
-    expect(r.body).toEqual({ error: expect.stringContaining("'in' operator") });
+    expect(await callRaw('PATCH', `/api/plans/${id}/entries/${entryId}`)).toEqual({
+      status: 400,
+      body: { error: 'No updatable fields provided', code: 'ENTRY_NO_FIELDS' },
+    });
   });
 
   it('PUT /api/plans/:id answers 400 because it defaults the body to {}', async () => {

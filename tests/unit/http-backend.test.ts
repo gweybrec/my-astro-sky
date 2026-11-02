@@ -103,13 +103,13 @@ describe('failed responses', () => {
 });
 
 describe('requests', () => {
-  it('addresses an entry by plan and entry, with a placeholder when the plan is not given', async () => {
+  it('addresses an entry by plan and entry', async () => {
     const { backend, sent } = makeBackend();
     await backend.plans.removeEntry('e/1', 'p 1');
-    await backend.plans.updateEntry('e1', { paDeg: 3 });
+    await backend.plans.updateEntry('e1', { paDeg: 3 }, 'p2');
     expect(sent.map((s) => [s.method, s.url])).toEqual([
       ['DELETE', 'http://app/api/plans/p%201/entries/e%2F1'],
-      ['PATCH', 'http://app/api/plans/-/entries/e1'],
+      ['PATCH', 'http://app/api/plans/p2/entries/e1'],
     ]);
   });
 

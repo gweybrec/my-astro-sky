@@ -763,7 +763,7 @@ describe('Plan + mosaic export/import round-trip', () => {
       ],
     });
     const { id: smartId } = await plans.addEntry('plan-1', { dsoId: 'M42' });
-    await plans.updateEntry(smartId, { mosaicWDeg: 3.25, mosaicHDeg: 3.25 });
+    await plans.updateEntry(smartId, { mosaicWDeg: 3.25, mosaicHDeg: 3.25 }, 'plan-1');
 
     // ── Export (the plan list is the plans.json shape). ──
     const bundle = JSON.parse(JSON.stringify(await plans.list())); // survives JSON serialization

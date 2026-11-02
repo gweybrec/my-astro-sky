@@ -299,7 +299,7 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
       expect(await plan(id)).toMatchObject({ nightOf: null, setupId: 's', lat: 10, lon: 20 });
       await svc.update(id, { setupId: 0 as never, lat: null });
       expect(await plan(id)).toMatchObject({ setupId: null, lat: null, lon: 20 });
-      await svc.update(id, { lon: '9' as never });
+      await svc.update(id, { lon: null });
       expect((await plan(id)).lon).toBeNull();
     });
 
@@ -355,6 +355,28 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
           'PLAN_LON_OUT_OF_RANGE',
         );
       }
+    });
+
+    it('rejects a coordinate that is not a number or null instead of clearing it', async () => {
+      const id = (await svc.create({ name: 'A' })).id;
+      await svc.update(id, { lat: 45, lon: 6 });
+      for (const lat of ['48.5', undefined, true]) {
+        await expectRejected(
+          svc.update(id, { lat } as never),
+          'invalid',
+          'lat must be between -90 and 90',
+          'PLAN_LAT_OUT_OF_RANGE',
+        );
+      }
+      await expectRejected(
+        svc.update(id, { lon: '9' } as never),
+        'invalid',
+        'lon must be between -180 and 180',
+        'PLAN_LON_OUT_OF_RANGE',
+      );
+      expect(await plan(id)).toMatchObject({ lat: 45, lon: 6 });
+      await svc.update(id, { lat: null, lon: null });
+      expect(await plan(id)).toMatchObject({ lat: null, lon: null });
     });
 
     it('rejects a sort key that is not in the list, with the list in the message', async () => {
@@ -501,14 +523,39 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
 
     it('removes an entry, and rejects an unknown one', async () => {
       const e = (await svc.addEntry(planId, { dsoId: 'A' })).id;
-      await svc.removeEntry(e);
+      await svc.removeEntry(e, planId);
       expect((await plan(planId)).entries).toEqual([]);
-      await expectRejected(svc.removeEntry(e), 'notFound', 'Entry not found', 'ENTRY_NOT_FOUND');
+      await expectRejected(
+        svc.removeEntry(e, planId),
+        'notFound',
+        'Entry not found',
+        'ENTRY_NOT_FOUND',
+      );
+    });
+
+    it('rejects an entry of another plan, and leaves it untouched', async () => {
+      const e = (await svc.addEntry(planId, { dsoId: 'A', paDeg: 10 })).id;
+      const other = (await svc.create({ name: 'B' })).id;
+      for (const p of [other, 'nope']) {
+        await expectRejected(
+          svc.updateEntry(e, { paDeg: 20 }, p),
+          'notFound',
+          'Entry not found',
+          'ENTRY_NOT_FOUND',
+        );
+        await expectRejected(
+          svc.removeEntry(e, p),
+          'notFound',
+          'Entry not found',
+          'ENTRY_NOT_FOUND',
+        );
+      }
+      expect((await plan(planId)).entries).toMatchObject([{ id: e, paDeg: 10 }]);
     });
 
     it('updates only the fields present, nulls allowed', async () => {
       const e = (await svc.addEntry(planId, { dsoId: 'A', paDeg: 10 })).id;
-      await svc.updateEntry(e, { ra: 1, dec: 2, mosaicWDeg: 3, mosaicHDeg: 4 });
+      await svc.updateEntry(e, { ra: 1, dec: 2, mosaicWDeg: 3, mosaicHDeg: 4 }, planId);
       expect((await plan(planId)).entries[0]).toMatchObject({
         dsoId: 'A',
         paDeg: 10,
@@ -517,7 +564,7 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
         mosaicWDeg: 3,
         mosaicHDeg: 4,
       });
-      await svc.updateEntry(e, { paDeg: null, ra: null, dsoId: null, mosaicWDeg: null });
+      await svc.updateEntry(e, { paDeg: null, ra: null, dsoId: null, mosaicWDeg: null }, planId);
       expect((await plan(planId)).entries[0]).toMatchObject({
         dsoId: null,
         paDeg: null,
@@ -530,9 +577,13 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
 
     it('sanitises the observation windows it stores', async () => {
       const e = (await svc.addEntry(planId, { dsoId: 'A' })).id;
-      await svc.updateEntry(e, {
-        observationWindows: [{ id: 'w', startFrac: 0.9, endFrac: 0.1, filter: ' Ha ' }] as never,
-      });
+      await svc.updateEntry(
+        e,
+        {
+          observationWindows: [{ id: 'w', startFrac: 0.9, endFrac: 0.1, filter: ' Ha ' }] as never,
+        },
+        planId,
+      );
       expect((await plan(planId)).entries[0].observationWindows).toEqual([
         {
           id: 'w',
@@ -555,7 +606,7 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
     ])('rejects %s = %j', async (key, value) => {
       const e = (await svc.addEntry(planId, { dsoId: 'A' })).id;
       await expectRejected(
-        svc.updateEntry(e, { [key]: value } as never),
+        svc.updateEntry(e, { [key]: value } as never, planId),
         'invalid',
         `${key} must be a number or null`,
         'ENTRY_FIELD_INVALID',
@@ -565,13 +616,13 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
     it('rejects a dsoId that is neither a string nor null, and windows that are not an array', async () => {
       const e = (await svc.addEntry(planId, { dsoId: 'A' })).id;
       await expectRejected(
-        svc.updateEntry(e, { dsoId: 3 } as never),
+        svc.updateEntry(e, { dsoId: 3 } as never, planId),
         'invalid',
         'dsoId must be a string or null',
         'ENTRY_FIELD_INVALID',
       );
       await expectRejected(
-        svc.updateEntry(e, { observationWindows: 'x' } as never),
+        svc.updateEntry(e, { observationWindows: 'x' } as never, planId),
         'invalid',
         'observationWindows must be an array',
         'ENTRY_FIELD_INVALID',
@@ -581,13 +632,13 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
     it('rejects a body with no updatable field, and an unknown entry', async () => {
       const e = (await svc.addEntry(planId, { dsoId: 'A' })).id;
       await expectRejected(
-        svc.updateEntry(e, { notes: 'x' } as never),
+        svc.updateEntry(e, { notes: 'x' } as never, planId),
         'invalid',
         'No updatable fields provided',
         'ENTRY_NO_FIELDS',
       );
       await expectRejected(
-        svc.updateEntry('nope', { ra: 1 }),
+        svc.updateEntry('nope', { ra: 1 }, planId),
         'notFound',
         'Entry not found',
         'ENTRY_NOT_FOUND',
@@ -1071,10 +1122,10 @@ describe.each(SQL_ADAPTERS)('PlanService round trips (%s)', (_adapter, wrap) => 
       expect(await trips(() => svc.addEntry(planId, { ra: 1, dec: 2 }))).toBe(4);
       expect(await trips(() => svc.reorderEntries(planId, ids))).toBe(1);
       const e = (await svc.addEntry(planId, { dsoId: 'E' })).id;
-      expect(await trips(() => svc.updateEntry(e, { ra: 1, dec: 2, observationWindows: [] }))).toBe(
-        1,
-      );
-      expect(await trips(() => svc.removeEntry(e))).toBe(1);
+      expect(
+        await trips(() => svc.updateEntry(e, { ra: 1, dec: 2, observationWindows: [] }, planId)),
+      ).toBe(1);
+      expect(await trips(() => svc.removeEntry(e, planId))).toBe(1);
       // begin, plan, deletes and mosaic insert, next position, tiles, commit
       expect(await trips(() => svc.createMosaic(planId, mosaic({ tiles })))).toBe(6);
       // begin, mosaic, replace/update/tile deletes, next position, tiles, commit
