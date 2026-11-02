@@ -2,6 +2,8 @@
 
 MyAstroSky runs three ways: as a **desktop app** you install like any other program, as a **link someone already set up for you**, or **self-hosted** so you can share it with your astronomy club or family. Pick the one that fits you.
 
+Looking for the Android phone app? See [Phone App](/user/mobile-app.md).
+
 ---
 
 ## Desktop app (recommended)

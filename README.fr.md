@@ -9,6 +9,8 @@ Application web pour superposer des astrophotographies sur une carte du ciel int
 
 📖 **[Documentation complète](https://gweybrec.github.io/my-astro-sky/)** — installation de l'application, solveurs de plaque, fonctionnalités et (pour les contributeurs) architecture et déploiement.
 
+📱 **Application téléphone (Android) :** la carte du ciel, les cibles, les plans et les photos sur votre téléphone, avec un passage des données vers et depuis l'ordinateur par sauvegarde. Voir [Application téléphone](docs/user/mobile-app.md) (en anglais).
+
 ---
 
 ## Prérequis

@@ -9,6 +9,8 @@ Web application for overlaying astrophotos onto an interactive sky map with auto
 
 📖 **[Full documentation](https://gweybrec.github.io/my-astro-sky/)** — installing the app, plate solvers, features, and (for contributors) architecture & deployment.
 
+📱 **Phone app (Android):** the sky map, targets, plans and photos on your phone, with data moved to and from the desktop by backup. See [Phone App](docs/user/mobile-app.md).
+
 ---
 
 ## Prerequisites

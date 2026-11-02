@@ -5,6 +5,7 @@
 - [Getting Started](user/getting-started.md)
 - [Installing MyAstroSky](user/installing-app.md)
 - [Features Reference](user/user-guide.md)
+- [Phone App](user/mobile-app.md)
 - [Installing Plate Solvers](user/installing-solvers.md)
 - [Troubleshooting](user/troubleshooting.md)
 
