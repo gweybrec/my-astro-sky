@@ -79,6 +79,23 @@ describe('createCapacitorSqliteDb (specific to the Capacitor adapter)', () => {
     ]);
   });
 
+  it.each([
+    ['DELETE FROM parent WHERE id = 1'],
+    ['WITH gone AS (SELECT 1 AS id) DELETE FROM parent WHERE id IN (SELECT id FROM gone)'],
+    ['WITH gone AS (SELECT 1 AS id) UPDATE parent SET id = 9 WHERE id IN (SELECT id FROM gone)'],
+  ])('run counts only the rows of the statement, not the cascaded ones: %s', async (sql) => {
+    const { db } = await setup();
+    await db.exec(
+      'CREATE TABLE parent (id INTEGER PRIMARY KEY); ' +
+        'CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER ' +
+        'REFERENCES parent(id) ON DELETE CASCADE ON UPDATE CASCADE)',
+    );
+    await db.exec(
+      'INSERT INTO parent (id) VALUES (1); INSERT INTO child (parent_id) VALUES (1), (1), (1)',
+    );
+    expect((await db.run(sql)).changes).toBe(1);
+  });
+
   it('never lets the plugin wrap run, query or execute in its own transaction', async () => {
     const { conn, db } = await setup();
     await db.run('INSERT INTO t (name) VALUES (?)', ['a']);

@@ -130,9 +130,10 @@ const INSERT_RE = /^\s*(?:insert|replace)\b/i;
 /**
  * Statements whose plugin count may include rows changed by foreign-key actions: the plugin
  * reports SQLite's total_changes difference, not the statement's own count. A plain INSERT cannot
- * trigger one, so it is not corrected.
+ * trigger one, so it is not corrected. A statement opening with WITH may be any of them, so it is
+ * corrected too.
  */
-const MAY_CASCADE_RE = /^\s*(?:delete|update|replace|insert\s+or\s+replace)\b/i;
+const MAY_CASCADE_RE = /^\s*(?:delete|update|replace|insert\s+or\s+replace|with)\b/i;
 
 const isBytes = (p: SqlValue | undefined): p is Uint8Array => p instanceof Uint8Array;
 
