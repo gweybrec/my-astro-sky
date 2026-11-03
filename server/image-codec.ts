@@ -8,6 +8,10 @@ const FORMAT_OF_EXT: Record<string, 'jpeg' | 'png' | 'webp'> = {
   '.webp': 'webp',
 };
 
+// No libvips cache, for the whole process and from start-up: a cached file handle would make Windows refuse to
+// overwrite that file (an import writing over a photo sharp has read).
+sharp.cache(false);
+
 const toBytes = (b: Buffer): Uint8Array => new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
 
 /** The image codec of the server: the `sharp` calls the upload route made before the port existed. */

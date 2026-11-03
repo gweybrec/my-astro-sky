@@ -1,5 +1,4 @@
 import express from 'express';
-import sharp from 'sharp';
 import {
   backupFileName,
   type ExportRequest,
@@ -257,9 +256,6 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
       setupNames: typeof req.body?.setupNames === 'string' ? JSON.parse(req.body.setupNames) : {},
     };
 
-    // Flush libvips handle cache before writing to avoid Windows sharing violations
-    // when re-importing the same files that sharp processed in a previous request.
-    sharp.cache(false);
     res.json(await backupService.importFile(backupFileOf(file), selection));
   } catch (err: any) {
     fail(res, err);
