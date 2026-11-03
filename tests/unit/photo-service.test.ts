@@ -1004,6 +1004,22 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('bad.jpg'), expect.any(Error));
       warn.mockRestore();
     });
+
+    it('does not try again, at the next start, a picture it could not shrink', async () => {
+      await svc.insert(newPhoto('bad', { width: 6000, height: 4000 }));
+      blobs.store.set('bad.jpg', new Uint8Array([9]));
+      let tries = 0;
+      codec.thumbnail = async () => {
+        tries++;
+        throw new Error('not an image');
+      };
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      expect(await svc.makeMissingMediums()).toBe(0);
+      expect(await svc.makeMissingMediums()).toBe(0);
+      expect(tries).toBe(1);
+      expect((await svc.get('bad'))!.mediumFilename).toBeNull();
+      vi.restoreAllMocks();
+    });
   });
 
   describe('importPhoto', () => {

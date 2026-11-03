@@ -196,8 +196,8 @@ export interface PhotoService {
   repairSizes(): Promise<number>;
   /**
    * Makes the medium-sized copy of each large picture that has none (photos stored before copies were made, restored
-   * from a backup, or whose copy failed), one at a time, and stores its name. A picture that cannot be read is left
-   * without one. Returns the number of copies made.
+   * from a backup, or whose copy failed at upload), one at a time, and stores its name. A picture that cannot be
+   * shrunk is left without one and not tried again. Returns the number of copies made.
    */
   makeMissingMediums(): Promise<number>;
 }
@@ -264,6 +264,8 @@ const UPDATE_SIZE = 'UPDATE photos SET width = ?, height = ? WHERE id = ?';
 const SELECT_WITHOUT_MEDIUM = `SELECT id, filename FROM photos
    WHERE medium_filename IS NULL AND MAX(width, height) > ${MEDIUM_MIN_SOURCE}`;
 const UPDATE_MEDIUM = 'UPDATE photos SET medium_filename = ? WHERE id = ?';
+/** The `medium_filename` of a picture whose copy could not be made: not NULL, so start-up does not decode it again. */
+const NO_MEDIUM = '';
 
 /** What deleting a photo's files needs of its row. */
 interface FilesRow {
@@ -399,7 +401,7 @@ function rowToPhoto(p: PhotoRow, corr: readonly CorrespondenceRow[]): Photo {
     captureDetails: parseSanitized(p.capture_details, sanitizeCaptureDetails, {}),
     gearSetupId: p.gear_setup_id ?? null,
     thumbFilename: p.thumb_filename ?? null,
-    mediumFilename: p.medium_filename ?? null,
+    mediumFilename: p.medium_filename || null,
     quarterTurns: cleanQuarterTurns(p.quarter_turns),
     correspondences: corr.map((c) => ({
       pointIndex: c.point_index,
@@ -965,8 +967,10 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
           await blobs.put(name, await images.thumbnail(bytes, MEDIUM_SIZE, MEDIUM_QUALITY));
         } catch (error) {
           console.warn(`[Photos] The medium-sized copy of ${r.filename} could not be made`, error);
+          await db.run(UPDATE_MEDIUM, [NO_MEDIUM, r.id]);
           continue;
         }
+        // Stored at once rather than in one batch at the end: each copy takes seconds, and the app may be closed.
         await db.run(UPDATE_MEDIUM, [name, r.id]);
         made++;
       }

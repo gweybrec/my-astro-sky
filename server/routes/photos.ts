@@ -382,8 +382,8 @@ photosRouter.post('/api/photos/repair-sizes', async (_req, res) => {
  *     description: >
  *       Each photo whose picture is over 3072 px on its longer side and that has no medium-sized copy gets one
  *       (`<id>_medium.jpg`, 2048 px on its longer side), and its `mediumFilename` is stored. A picture that cannot be
- *       read is left without one. The apps call it at start-up, after the size repair; it can take a few seconds per
- *       photo.
+ *       shrunk is left without one and not tried again. The apps call it at start-up, after the size repair; it can
+ *       take a few seconds per photo.
  *     responses:
  *       200:
  *         description: The number of copies made
