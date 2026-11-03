@@ -476,7 +476,7 @@ export const useFovFramesStore = defineStore('fovFrames', () => {
 
       // Standalone frames (one per target) and mosaic tiles render differently:
       // standalone frames are individually movable; mosaic tiles render as a
-      // read-only group (Phase 1) tagged with their mosaic id.
+      // read-only group tagged with their mosaic id.
       const standalone = plan.entries.filter((e) => !e.mosaicId);
       const tiles = plan.entries.filter((e) => e.mosaicId);
 

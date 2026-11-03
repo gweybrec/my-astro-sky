@@ -1,7 +1,7 @@
 // @vitest-environment node
 /**
- * Pins the branches of the plan and photo routes that server-app.test.ts leaves untested
- * (WP2.4b). It is the safety net for moving these two domains into services.
+ * Pins the branches of the plan and photo routes that server-app.test.ts leaves untested.
+ * It is the safety net for moving these two domains into services.
  *
  * Responses that look odd are recorded as they are, not judged; each one is marked
  * `KNOWN GAP`. Every case goes through the real app.
@@ -268,7 +268,7 @@ describe('PUT /api/plans/:id', () => {
       status: 400,
       body: { error: 'lat must be between -90 and 90', code: 'PLAN_LAT_OUT_OF_RANGE' },
     });
-    // Every check runs before the first write (WP2.3f): the rejected request leaves the name alone.
+    // Every check runs before the first write: the rejected request leaves the name alone.
     expect((await readPlan(id)).name).toBe('Before');
 
     expect(await call('PUT', `/api/plans/${id}`, { lat: 12, sortBy: 'nope' })).toEqual({
@@ -910,7 +910,7 @@ describe('mosaics', () => {
     const other = await mkPlan('Other');
     const foreign = await mkEntry(other, { dsoId: 'M9' });
     await mkMosaic(id, { replaceEntryIds: [foreign] });
-    // fixed in WP2.7a: replaceEntryIds is limited to the plan of the mosaic.
+    // replaceEntryIds is limited to the plan of the mosaic.
     expect((await readPlan(other)).entries.map((e: any) => e.id)).toEqual([foreign]);
   });
 
@@ -1454,7 +1454,7 @@ describe('POST /api/photos', () => {
         ],
       }),
     );
-    // fixed in WP2.7a: a 400 with a code, and nothing is written.
+    // a 400 with a code, and nothing is written.
     expect(r).toEqual({
       status: 400,
       body: { error: 'pointIndex en double', code: 'DUPLICATE_POINT_INDEX' },
@@ -1848,7 +1848,7 @@ describe('DELETE /api/photo-metadata', () => {
       body: { ok: true, deleted: 2 },
     });
     expect((await call('GET', '/api/photos')).body).toEqual([]);
-    // fixed in WP2.7a: the image and thumbnail files are removed with the rows.
+    // the image and thumbnail files are removed with the rows.
     expect(uploadsList()).toEqual([]);
     // correspondences went with the rows (ON DELETE CASCADE): a new photo holds only its own
     const c = await upload({

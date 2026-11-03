@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The `SqlDb` port on better-sqlite3 (WP2.1): plain calls, atomic batches, the transaction rule
+ * The `SqlDb` port on better-sqlite3: plain calls, atomic batches, the transaction rule
  * (a body may only await `tx` calls).
  */
 import Database from 'better-sqlite3';

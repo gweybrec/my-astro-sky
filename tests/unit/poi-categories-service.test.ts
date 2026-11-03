@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The POI-category service (WP2.3c) on a private in-memory database.
+ * The POI-category service on a private in-memory database.
  */
 import Database from 'better-sqlite3';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

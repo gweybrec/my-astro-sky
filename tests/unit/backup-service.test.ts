@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The backup service (WP2.8): export, preview and import, on both SQL adapters, with the archive and the
+ * The backup service: export, preview and import, on both SQL adapters, with the archive and the
  * blob store in memory. The routes themselves are pinned by `server-backup.test.ts`.
  */
 import Database from 'better-sqlite3';

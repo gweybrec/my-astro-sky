@@ -289,7 +289,7 @@ describe("a photo's own screen", () => {
       ['Notes', 'Nuit claire.'],
       ['Objets dans cette image', 'M31 · M32'],
     ]);
-    // facts without cards, none on a line of its own (revision 24), the integration rows in the mono face; the sheet is
+    // facts without cards, none on a line of its own, the integration rows in the mono face; the sheet is
     // a third of the screen at most in portrait
     expect(w.find('.mob-facts').classes()).toEqual(['mob-facts', 'mob-photo-facts']);
     expect(w.findAll('.mob-fact--wide')).toHaveLength(0);

@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The sky-region service (WP2.3b) on a private in-memory database.
+ * The sky-region service on a private in-memory database.
  */
 import Database from 'better-sqlite3';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The photo service, data part (WP2.3g), on a private in-memory database, on both SQL adapters.
+ * The photo service, data part, on a private in-memory database, on both SQL adapters.
  */
 import Database from 'better-sqlite3';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -1340,7 +1340,7 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
     });
   });
 
-  describe('upload, list with sizes and delete (WP2.3h)', () => {
+  describe('upload, list with sizes and delete', () => {
     const file = (name = 'm31.png') => ({
       name,
       bytes: new Uint8Array([1, 2, 3]),

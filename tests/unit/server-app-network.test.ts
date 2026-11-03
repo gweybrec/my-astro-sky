@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Pins the routes that reach the network (WP2.7d). The real routes run on a real server; the
+ * Pins the routes that reach the network. The real routes run on a real server; the
  * outgoing requests to the upstream sites are answered by recorded fixtures. `globalThis.fetch`
  * is the interception point: calls to the test server itself pass through, anything else is
  * recorded and answered from `upstream`.
@@ -620,7 +620,7 @@ describe('GET /api/horizon', () => {
     expect(r.body.layers.map((l: any) => l.maxDistKm)).toEqual([2, 4, 7, 11, 16, 23, 40]);
   }, 30_000);
 });
-// ─── Already-solved files (WP2.7f): no network, synthetic FITS and TIFF ──────
+// ─── Already-solved files: no network, synthetic FITS and TIFF ──────
 
 describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', async () => {
   const { buildFits } = await import('../fixtures/fits-builders');

@@ -506,7 +506,7 @@ export const rules = [
   },
   { id: 'ribbon-edge', type: 'sameStart', bars: '.mob-map-ribbon', children: 'ion-button' },
   // The object sheet's facts and buttons start at the same edge as its title; its buttons end at the same edge too
-  // (facts are as wide as their text since design system revision 24).
+  // (facts are as wide as their text).
   {
     id: 'sheet-edges',
     type: 'edges',

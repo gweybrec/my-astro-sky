@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * WP2.2: the baseline schema in core (`BASELINE_SCHEMA`) must equal what the server's old path
+ * The baseline schema in core (`BASELINE_SCHEMA`) must equal what the server's old path
  * (`server/db.ts` + `server/db-migrations.ts`) produces. If this fails after a schema change,
  * update `BASELINE_SCHEMA` / `SCHEMA_VERSION` in `packages/core/src/db/schema.ts`.
  */

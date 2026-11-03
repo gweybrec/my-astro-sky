@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The DSO override service (WP2.3a) on a private in-memory database.
+ * The DSO override service on a private in-memory database.
  */
 import Database from 'better-sqlite3';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

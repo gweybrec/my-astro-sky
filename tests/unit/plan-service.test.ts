@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The plan service (WP2.3f) on a private in-memory database, on both SQL adapters.
+ * The plan service on a private in-memory database, on both SQL adapters.
  */
 import Database from 'better-sqlite3';
 import { describe, it, expect, expectTypeOf, beforeEach, afterEach } from 'vitest';

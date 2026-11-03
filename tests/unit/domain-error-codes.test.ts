@@ -1,7 +1,7 @@
 // @vitest-environment node
 /**
- * Every `DomainError` a service method rejects with carries a non-empty, upper-snake-case `code`
- * (WP2.6a). The paths driven here are the rejection paths of the service tests.
+ * Every `DomainError` a service method rejects with carries a non-empty, upper-snake-case `code`.
+ * The paths driven here are the rejection paths of the service tests.
  */
 import Database from 'better-sqlite3';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

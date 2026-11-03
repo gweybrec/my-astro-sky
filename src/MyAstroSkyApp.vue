@@ -1,20 +1,20 @@
 <template>
-  <!-- Phase 2: panel header teleported into #vue-panel-header -->
+  <!-- Panel header teleported into #vue-panel-header -->
   <Teleport to="#vue-panel-header">
     <PanelHeader />
   </Teleport>
 
-  <!-- Phase 7: photos section teleported into #vue-photos-section -->
+  <!-- Photos section teleported into #vue-photos-section -->
   <Teleport to="#vue-photos-section">
     <PhotosSection />
   </Teleport>
 
-  <!-- Phase 8: unified search teleported into #vue-search-section -->
+  <!-- Unified search teleported into #vue-search-section -->
   <Teleport to="#vue-search-section">
     <UnifiedSearch />
   </Teleport>
 
-  <!-- Phase 3: display controls section teleported into #vue-display-section -->
+  <!-- Display controls section teleported into #vue-display-section -->
   <Teleport to="#vue-display-section">
     <DisplayControlsSection />
   </Teleport>
@@ -24,15 +24,15 @@
     <PerformanceSection />
   </Teleport>
 
-  <!-- Phase 5: settings modal -->
+  <!-- Settings modal -->
   <SettingsModal v-if="activeModal === 'settings'" @close="closeModal()" />
   <SolverSettingsModal v-if="activeModal === 'solverSettings'" @close="closeModal()" />
 
-  <!-- Phase 9: export / import modals -->
+  <!-- Export / import modals -->
   <ExportModal v-if="activeModal === 'export'" @close="closeModal()" />
   <ImportModal v-if="activeModal === 'import'" @close="closeModal()" />
 
-  <!-- Phase 10: delete all data modal -->
+  <!-- Delete all data modal -->
   <DeleteAllDataModal v-if="activeModal === 'deleteAll'" @close="closeModal()" />
 
   <!-- Gallery filter bar (search + label/type/catalog dropdowns) -->
@@ -40,13 +40,13 @@
     <GalleryFilterBar />
   </Teleport>
 
-  <!-- Phase 11: floating map controls (teleported to #app) -->
+  <!-- Floating map controls (teleported to #app) -->
   <FloatingControls />
 
   <!-- Sky tooltip (driven by canvas hover callbacks via useUiStore) -->
   <SkyTooltip />
 
-  <!-- Phase 12: batch upload modal. Stays mounted underneath a dialog opened from
+  <!-- Batch upload modal. Stays mounted underneath a dialog opened from
        it — e.g. a card's POI editor opening Add POI/Identify, declared later so it
        stacks on top — so its batch, which consumed pendingBatchFiles at setup,
        survives the round trip. -->
@@ -55,7 +55,7 @@
     @close="closeModal()"
   />
 
-  <!-- Phase 1: static informational modals -->
+  <!-- Static informational modals -->
   <AboutModal v-if="activeModal === 'about'" @close="closeModal()" />
   <PrivacyModal v-if="activeModal === 'privacy'" @close="closeModal()" />
   <DataCreditsModal v-if="activeModal === 'credits'" @close="closeModal()" />

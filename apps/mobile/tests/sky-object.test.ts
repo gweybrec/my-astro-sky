@@ -74,7 +74,7 @@ describe('the object sheet', () => {
     expect(factsOf(mountSheet())).toEqual([['Magnitude', '3.4']]);
   });
 
-  it('lists its facts without cards, each as wide as its text, values in body text (design system revision 24)', () => {
+  it('lists its facts without cards, each as wide as its text, values in body text', () => {
     const w = mountSheet();
     expect(w.find('.mob-facts').classes()).toEqual(['mob-facts']);
     expect(w.find('.mob-fact-value').classes()).toContain('m-body');

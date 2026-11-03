@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Pins what the Express routes do today (WP2.0a). It is the safety net for splitting
+ * Pins what the Express routes do today. It is the safety net for splitting
  * server/app.ts into route files: Part 1 checks the route table, Part 2 records the
  * behaviour of the routes that do not reach the network, a solver or the real disk.
  *

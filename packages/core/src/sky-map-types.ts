@@ -76,7 +76,7 @@ export interface RenderableFrame {
   /**
    * Mosaic this frame is a tile of, or null/undefined for a standalone frame.
    * Tiles of one mosaic render as a group (no per-tile label/handles) with a
-   * single bounding outline; they are not individually selectable in Phase 1.
+   * single bounding outline; they are not individually selectable.
    */
   mosaicId?: string | null;
   /** True when this tile has at least one free neighbor (no adjacent tile on that

@@ -350,7 +350,7 @@ describe('the shared phone components', () => {
 });
 
 describe('the back arrow', () => {
-  it("is drawn as Android's (design system revision 20), not as an outlined icon button", () => {
+  it("is drawn as Android's, not as an outlined icon button", () => {
     const w = mount(PhoneBackButton, {
       global: { stubs: ionicStubs, provide: { router: {} } },
     });

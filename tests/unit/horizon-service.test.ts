@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The horizon service (WP2.7e) on a private in-memory database, on both adapters, with the tiles
+ * The horizon service on a private in-memory database, on both adapters, with the tiles
  * and the Overpass answers served by a fake `HttpClient` and decoded by the real `sharp` codec.
  */
 import Database from 'better-sqlite3';

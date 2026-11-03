@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Pins the export / import bridge between a user's devices (WP2.4a). It exports everything
+ * Pins the export / import bridge between a user's devices. It exports everything
  * from a seeded instance A through the real routes, imports the ZIP into an empty instance B
  * through the real routes, and checks that the data of B is the data of A. It is the safety
  * net every later service card must keep green.

@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The gear service (WP2.3e) on a private in-memory database with a small fake catalogue.
+ * The gear service on a private in-memory database with a small fake catalogue.
  */
 import Database from 'better-sqlite3';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

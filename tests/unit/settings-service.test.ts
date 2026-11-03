@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The settings service (WP2.3d): the rules on a private in-memory database with a fake codec and
+ * The settings service: the rules on a private in-memory database with a fake codec and
  * environment. The real codec is exercised by settings-security.test.ts.
  */
 import Database from 'better-sqlite3';

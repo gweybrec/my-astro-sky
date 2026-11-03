@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The two server adapters of the image and file ports, on real small images (WP2.3h). The byte-identity
+ * The two server adapters of the image and file ports, on real small images. The byte-identity
  * cases compare them with the `sharp` calls the upload route made before the ports existed.
  */
 import fs from 'fs';

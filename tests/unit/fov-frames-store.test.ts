@@ -910,7 +910,7 @@ describe('fov-frames store', () => {
     expect(border.every((t) => t.mosaicIsBorderTile === true)).toBe(true);
   });
 
-  // ── Phase 3b: per-tile editing → non-rectangular mosaics ────────────────────
+  // ── Per-tile editing → non-rectangular mosaics ─────────────────────────────────
   it('removeMosaicTile drops the clicked tile', async () => {
     const store = await withSpecs();
     const plans = withMosaicPlan(store);

@@ -10,7 +10,7 @@
         <button class="modal-close" @click="onClose">&times;</button>
       </div>
 
-      <!-- Phase 1: pick a file -->
+      <!-- Step 1: pick a file -->
       <div v-if="phase === 'pick'" class="modal-body modal-form-body--loose">
         <label
           class="display-controls-btn self-start"
@@ -42,7 +42,7 @@
         </div>
       </div>
 
-      <!-- Phase 2: show detected contents with options -->
+      <!-- Step 2: show detected contents with options -->
       <div v-else-if="phase === 'options' && preview" class="modal-body modal-form-body--scroll">
         <div class="flex items-center gap-3 mb-2">
           <span
