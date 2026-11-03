@@ -791,6 +791,7 @@ const de: Translations = {
     NOT_ENOUGH_CATALOG_STARS: 'Nicht genügend Katalogsterne im Feld',
     MISSING_FILE: 'Datei fehlt',
     ASTROMETRY_NOT_CONFIGURED: 'ASTROMETRY_API_KEY auf dem Server nicht konfiguriert',
+    PHOTO_TOO_LARGE: 'Dieses Foto ist zu groß für dieses Gerät (höchstens 200 MB).',
     BACKUP_TOO_LARGE:
       'Diese Sicherung ist zu groß, um auf diesem Gerät wiederhergestellt zu werden.',
     CANNOT_DETERMINE_DIMENSIONS: 'Bildabmessungen können nicht bestimmt werden',

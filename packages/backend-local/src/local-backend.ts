@@ -24,6 +24,9 @@ export interface LocalBackendDeps {
   /** The largest file read whole (a `.json` backup, or a file that cannot be read by pieces); larger is
    *  refused with `BACKUP_TOO_LARGE` before it is read. No limit when absent. */
   maxWholeFileBytes?: number;
+  /** The largest photo file (a picture, or a FITS / TIFF / XISF read to convert or solve it); larger is refused
+   *  with `PHOTO_TOO_LARGE` before it is read. No limit when absent. */
+  maxPhotoBytes?: number;
   /** Builds a ZIP archive in memory. */
   newZip(): { writer: BundleWriter; finish(): Promise<Uint8Array> };
   /** Hands a file to the user (the share sheet on the phone). */
@@ -82,8 +85,17 @@ function withDomainErrors(backend: Backend): Backend {
 }
 
 export function createLocalBackend(deps: LocalBackendDeps): Backend {
-  const { services, files, starCatalogUrl, openZip, newZip, saveFile, now, maxWholeFileBytes } =
-    deps;
+  const {
+    services,
+    files,
+    starCatalogUrl,
+    openZip,
+    newZip,
+    saveFile,
+    now,
+    maxWholeFileBytes,
+    maxPhotoBytes,
+  } = deps;
 
   const readWhole = async (file: FileSource) => {
     if (maxWholeFileBytes !== undefined && file.size > maxWholeFileBytes) {
@@ -103,9 +115,15 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
     read: () => readWhole(file),
     openZip: async () => openZip(await rangesOf(file)),
   });
+  const readPhoto = async (file: FileSource) => {
+    if (maxPhotoBytes !== undefined && file.size > maxPhotoBytes) {
+      throw new DomainError('invalid', 'Photo too large', { code: 'PHOTO_TOO_LARGE' });
+    }
+    return file.read();
+  };
   const solvedFileOf = async (file: FileSource) => ({
     fileName: file.name,
-    bytes: await file.read(),
+    bytes: await readPhoto(file),
   });
 
   return withDomainErrors({
@@ -117,7 +135,7 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
       ...services.photos,
       async upload(file, fields, options) {
         throwIfCancelled(options?.cancel);
-        const bytes = await file.read();
+        const bytes = await readPhoto(file);
         // Reading the file is the transfer here: a cancel is honoured until it ends, like an HTTP upload's.
         throwIfCancelled(options?.cancel);
         const { photo } = await services.photos.upload({ name: file.name, bytes }, fields);

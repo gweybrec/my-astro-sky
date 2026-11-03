@@ -789,6 +789,7 @@ const fr = {
     NOT_ENOUGH_CATALOG_STARS: "Pas assez d'étoiles du catalogue dans le champ",
     MISSING_FILE: 'Fichier manquant',
     ASTROMETRY_NOT_CONFIGURED: 'ASTROMETRY_API_KEY non configurée sur le serveur',
+    PHOTO_TOO_LARGE: 'Cette photo est trop volumineuse pour cet appareil (200 Mo au plus).',
     BACKUP_TOO_LARGE: 'Cette sauvegarde est trop volumineuse pour être restaurée sur cet appareil.',
     CANNOT_DETERMINE_DIMENSIONS: "Impossible de déterminer les dimensions de l'image",
     INVALID_IMAGE: 'Fichier image invalide ou corrompu',

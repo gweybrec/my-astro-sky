@@ -791,6 +791,7 @@ const es: Translations = {
     NOT_ENOUGH_CATALOG_STARS: 'No hay suficientes estrellas del catálogo en el campo',
     MISSING_FILE: 'Archivo faltante',
     ASTROMETRY_NOT_CONFIGURED: 'ASTROMETRY_API_KEY no configurada en el servidor',
+    PHOTO_TOO_LARGE: 'Esta foto es demasiado grande para este dispositivo (200 MB como máximo).',
     BACKUP_TOO_LARGE:
       'Esta copia de seguridad es demasiado grande para restaurarse en este dispositivo.',
     CANNOT_DETERMINE_DIMENSIONS: 'No se pueden determinar las dimensiones de la imagen',

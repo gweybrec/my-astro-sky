@@ -28,6 +28,9 @@ import {
 /** The largest file the phone reads whole (a `.json` backup); a ZIP backup is read by pieces, with no limit. */
 export const MAX_WHOLE_FILE_BYTES = 300 * 1024 * 1024;
 
+/** The largest photo the phone imports or solves: the desktop's upload limit; a raw file is decoded whole in memory. */
+export const MAX_PHOTO_BYTES = 200 * 1024 * 1024;
+
 /** The method of `@capacitor/share` that `saveFile` uses. */
 export interface CapacitorShare {
   share(options: { title?: string; url?: string; dialogTitle?: string }): Promise<unknown>;
@@ -153,6 +156,7 @@ export async function createPhoneBackend(
     starCatalogUrl: `${baseUrl}/data/stars.14.json`,
     openZip: openZipRanges,
     maxWholeFileBytes: MAX_WHOLE_FILE_BYTES,
+    maxPhotoBytes: MAX_PHOTO_BYTES,
     newZip: newZipBundle,
     saveFile: (name, bytes) => shareFile(platform, name, bytes),
     now: () => new Date(now()),

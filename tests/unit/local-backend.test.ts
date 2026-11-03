@@ -11,7 +11,7 @@ import type { Services } from '@myastrosky/core/services/create-services';
 import { configureI18n } from '@myastrosky/core/i18n/index';
 import { configureErrorReporter } from '@myastrosky/core/platform/error-hook';
 import { setBackend } from '@myastrosky/app-state/backend';
-import { getPlans } from '@myastrosky/app-state/api';
+import { convertRawPhoto, getPlans } from '@myastrosky/app-state/api';
 
 /** Services with the given members; every other member is empty. */
 function servicesWith(members: Record<string, unknown>): Services {
@@ -24,8 +24,9 @@ function backendWith(plans: Record<string, unknown>) {
   return backendOf({ plans });
 }
 
-function backendOf(members: Record<string, unknown>) {
+function backendOf(members: Record<string, unknown>, maxPhotoBytes?: number) {
   return createLocalBackend({
+    maxPhotoBytes,
     services: servicesWith(members),
     files: { url: (fileName) => `/uploads/${fileName}` },
     starCatalogUrl: '/data/stars-deep.json',
@@ -120,5 +121,65 @@ describe('cancelling a transfer of the local backend', () => {
       .catch((e: unknown) => e);
     expect(err).toMatchObject({ name: 'AbortError' });
     expect(convert).not.toHaveBeenCalled();
+  });
+});
+
+describe('the size limit of a photo on the local backend', () => {
+  /** A photo file of `size` bytes whose reading is recorded; the bytes are never made. */
+  function photoOfSize(size: number) {
+    const read = vi.fn(async () => new Uint8Array(1));
+    return { file: { name: 'stack.fits', size, read }, read };
+  }
+
+  it('refuses a larger photo with PHOTO_TOO_LARGE, before reading or converting it', async () => {
+    const convert = vi.fn();
+    const { file, read } = photoOfSize(101);
+    const err = await backendOf({ solvedImport: { convert } }, 100)
+      .solvedImport.convert(file)
+      .catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: 'PHOTO_TOO_LARGE' });
+    expect(read).not.toHaveBeenCalled();
+    expect(convert).not.toHaveBeenCalled();
+  });
+
+  it('refuses a larger photo for every reading of a whole photo', async () => {
+    const backend = backendOf(
+      {
+        photos: { upload: vi.fn() },
+        solvedImport: { solveWcs: vi.fn() },
+        novaSolve: { submit: vi.fn() },
+      },
+      100,
+    );
+    const { file, read } = photoOfSize(101);
+    for (const call of [
+      () => backend.photos.upload(file, { correspondences: '[]' }),
+      () => backend.solvedImport.solveWcs(file),
+      () => backend.novaSolve.submit(file),
+    ]) {
+      await expect(call()).rejects.toMatchObject({ code: 'PHOTO_TOO_LARGE' });
+    }
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('reaches the import list as the translated message', async () => {
+    configureI18n({
+      storedLang: () => 'fr',
+      storeLang: () => undefined,
+      preferredLanguages: () => ['fr'],
+      reload: () => undefined,
+    });
+    setBackend(backendOf({ solvedImport: { convert: vi.fn() } }, 100));
+    await expect(convertRawPhoto(new File([new Uint8Array(101)], 'stack.fits'))).rejects.toThrow(
+      'Cette photo est trop volumineuse pour cet appareil (200 Mo au plus).',
+    );
+  });
+
+  it('converts a photo of the limit', async () => {
+    const convert = vi.fn(async () => ({ png: new Uint8Array(1), width: 1, height: 1 }));
+    const { file, read } = photoOfSize(100);
+    await backendOf({ solvedImport: { convert } }, 100).solvedImport.convert(file);
+    expect(read).toHaveBeenCalledOnce();
+    expect(convert).toHaveBeenCalledOnce();
   });
 });
