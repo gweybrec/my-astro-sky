@@ -249,7 +249,8 @@ async function main() {
 
   // Dynamic import AFTER env vars are set — static ESM imports are hoisted and
   // would execute before this function body runs.
-  await import('../server/index.js');
+  const { serverStarted } = await import('../server/index.js');
+  await serverStarted;
 
   // Wait for Express to actually accept connections before opening the window.
   await waitForPort(port);

@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import { createApp } from './app.js';
+import { isElectron } from './routes/shared.js';
+import { logServerError } from './logger.js';
 import { logInfo, logNotice } from '@myastrosky/core/platform/log';
 
 async function startServer() {
@@ -13,4 +15,12 @@ async function startServer() {
   });
 }
 
-startServer();
+/** Rejects when the server cannot start. Electron awaits it, so its start-up dialog shows the reason. */
+export const serverStarted = startServer();
+
+if (!isElectron) {
+  serverStarted.catch((err: unknown) => {
+    logServerError('server_start_failed', err);
+    process.exit(1);
+  });
+}
