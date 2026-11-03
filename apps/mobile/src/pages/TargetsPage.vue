@@ -72,6 +72,8 @@ const typesOpen = ref(false);
 const settingsOpen = ref(false);
 const setupsOpen = ref(false);
 let lastKey = '';
+/** Counts the searches: one that a newer search started after writes nothing when it ends. */
+let searchRun = 0;
 
 /** The plan the list adds to, when it was opened from one. */
 const planId = computed(() => (route.params.id ? String(route.params.id) : null));
@@ -188,6 +190,7 @@ async function runSearch() {
     regionsStore.regions,
   ]);
   // The photos can change without the preferences changing: this filter always searches again.
+  const run = ++searchRun;
   if (key === lastKey && !targetsPrefs.excludePhotographed) {
     sort();
     return;
@@ -209,6 +212,7 @@ async function runSearch() {
       },
       nextPaint,
     );
+    if (run !== searchRun) return;
     lastKey = key;
     if (result.kind === 'ok') {
       found = result.suggestions;
@@ -221,13 +225,14 @@ async function runSearch() {
     }
     resetVisible();
   } catch (error) {
+    if (run !== searchRun) return;
     lastKey = '';
     found = [];
     sorted.value = [];
     emptyKind.value = 'no-match';
     void showError(error);
   } finally {
-    loading.value = false;
+    if (run === searchRun) loading.value = false;
   }
 }
 

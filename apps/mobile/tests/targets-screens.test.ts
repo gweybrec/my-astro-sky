@@ -427,6 +427,27 @@ describe('the Cibles page', () => {
     expect(w.findAll('.mob-row--roomy')).toHaveLength(0);
   });
 
+  it('shows the newest search when an older one ends after it', async () => {
+    let endFirst!: (r: unknown) => void;
+    search.mockReturnValueOnce(new Promise((r) => (endFirst = r)));
+    search.mockResolvedValueOnce(ok([suggestion(dso({}), 86, 21)]));
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    // A sheet closes with other settings while the first search still runs.
+    updateTargetsPrefs({ minAltDeg: 40 });
+    w.findComponent(SearchSettingsSheet).vm.$emit('update:open', false);
+    await settle();
+    expect(search).toHaveBeenCalledTimes(2);
+    endFirst(ok([suggestion(dso({ id: 'M27', catalogs: ['M27'], displayName: '' }), 64, 20)]));
+    await settle();
+    const titles = w.findAll('.mob-row--roomy .mob-row-title').map((r) => r.text());
+    expect(titles).toEqual(["Nébuleuse de l'Amérique du Nord"]);
+    // The settings are unchanged since the newest search: closing a sheet again does not search.
+    w.findComponent(SearchSettingsSheet).vm.$emit('update:open', false);
+    await settle();
+    expect(search).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the rows built in chunks as the list is scrolled', async () => {
     search.mockResolvedValue(
       ok(
