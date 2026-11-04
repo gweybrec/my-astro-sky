@@ -142,6 +142,8 @@ const gridStyle = computed(() => ({
   '--photos-per-line': photosPerLine.portrait,
   '--photos-per-line-landscape': photosPerLine.landscape,
 }));
+// Three photos or more to a line: tighter spacing, so a card keeps room for "NGC 7000" beside the "+N" chip.
+const dense = computed(() => photosPerLine[orientation.value] >= 3);
 
 /** What the chip of a waiting photo says. */
 const PENDING_TEXT: Record<PendingState, string> = {
@@ -306,7 +308,12 @@ async function addPicked(pick: () => Promise<File[]>) {
           :button-label="t('mobile.gallery.clearFilters')"
           @action="(clearGalleryFilters(), (galleryFilters.query = ''))"
         />
-        <div v-else class="mob-photo-grid" :style="gridStyle">
+        <div
+          v-else
+          class="mob-photo-grid"
+          :class="{ 'mob-photo-grid--dense': dense }"
+          :style="gridStyle"
+        >
           <PhotoTile
             v-for="tile in waiting"
             :key="tile.id"

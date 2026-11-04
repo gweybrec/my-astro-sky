@@ -415,6 +415,8 @@ describe('the gallery page', () => {
     const grid = () => wrapper.find('.mob-photo-grid').attributes('style');
     expect(grid()).toContain('--photos-per-line: 2');
     expect(grid()).toContain('--photos-per-line-landscape: 6');
+    const dense = () => wrapper.find('.mob-photo-grid').classes('mob-photo-grid--dense');
+    expect(dense()).toBe(false);
     expect(wrapper.findAll('header button').map((b) => b.attributes('aria-label'))).toEqual([
       'Affichage',
       'Trier par',
@@ -428,6 +430,8 @@ describe('the gallery page', () => {
     await flushPromises();
     expect(grid()).toContain('--photos-per-line: 3');
     expect(grid()).toContain('--photos-per-line-landscape: 6');
+    // Three to a line: tighter spacing, so a four-digit NGC chip keeps its place beside "+N".
+    expect(dense()).toBe(true);
     // Read again as at the next start.
     loadGalleryDisplay();
     const again = mountPage();

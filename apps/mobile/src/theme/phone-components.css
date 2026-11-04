@@ -1309,6 +1309,17 @@ ion-modal.mob-sheet-modal.mob-sheet-modal .mob-sheet.mob-sheet--fixed {
     grid-template-columns: repeat(var(--photos-per-line-landscape, 6), minmax(0, 1fr));
   }
 }
+/* Three photos or more to a line: less space between the cards, in their captions and in their chips, so a card keeps
+   room for a four-digit catalogue number beside the "+N" chip ("NGC 7000", "+12"). */
+.mob-photo-grid--dense {
+  gap: var(--space-4);
+}
+.mob-photo-grid--dense .mob-photo-card-caption {
+  padding-inline: var(--space-3);
+}
+.mob-photo-grid--dense .mob-tag {
+  padding-inline: var(--space-2);
+}
 
 /* A photo of the gallery: one card. The picture is its square top, flush with the border; under it, in the same
    border, the file name on one line and the chips. The cards of a line share its height (the grid stretches them). */
