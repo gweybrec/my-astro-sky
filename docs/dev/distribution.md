@@ -34,7 +34,7 @@ bash scripts/download-catalog.sh 14   # optional but recommended
 npm run dev
 ```
 
-Opens Vite on `:5173` (hot-reload) and Express on `:3001`. Vite proxies `/api` and `/uploads` to the Express backend.
+Opens Vite on `:5173` (hot-reload) and Express on `:3002`. Vite proxies `/api` and `/uploads` to the Express backend.
 
 ---
 
@@ -45,13 +45,13 @@ npm run build          # tsc type-check + Vite build → dist/
 npx tsx server/index.ts
 ```
 
-Express serves the built frontend from `dist/` on `:3001`. Requires Node.js 24.18+ on the host.
+Express serves the built frontend from `dist/` on `:3002`. Requires Node.js 24.18+ on the host.
 
 ---
 
 ## Option 3 — Local network sharing
 
-Run Option 2, find your LAN IP (`ip a` on Linux, `ipconfig` on Windows), and share `http://<lan-ip>:3001` with anyone on the same Wi-Fi or network. No internet required, no server needed. The same walkthrough, phrased for end users, is in [Installing MyAstroSky](/user/installing-app.md#sharing-on-your-local-wifi-lan).
+Run Option 2, find your LAN IP (`ip a` on Linux, `ipconfig` on Windows), and share `http://<lan-ip>:3002` with anyone on the same Wi-Fi or network. No internet required, no server needed. The same walkthrough, phrased for end users, is in [Installing MyAstroSky](/user/installing-app.md#sharing-on-your-local-wifi-lan).
 
 ---
 
@@ -73,7 +73,7 @@ Copy `.env.example` to `.env` and fill in what you need (Node.js / Docker deploy
 | ------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ASTROMETRY_API_KEY`      | _(none)_                    | astrometry.net online API key. If set via env var, the value is used directly and in-app edits are blocked (`SETTING_LOCKED_BY_ENV`). Useful for Docker secrets or CI.                                                                        |
 | `STAR_CATALOG_PATH`       | `public/data/stars.14.json` | Path to the star catalog JSON used for WCS star matching.                                                                                                                                                                                     |
-| `PORT`                    | `3001`                      | TCP port Express listens on.                                                                                                                                                                                                                  |
+| `PORT`                    | `3002`                      | TCP port Express listens on. `3001` is reserved for the installed desktop app; outside it only `NODE_ENV=production` (Docker) may use it.                                                                                                     |
 | `NODE_ENV`                | _(none)_                    | `production` turns off the server's debug and info messages (the start-up line still prints) and the Swagger UI. Set in the Docker image and by the packaged Electron app.                                                                    |
 | `DB_PATH`                 | `./data.db`                 | SQLite database path.                                                                                                                                                                                                                         |
 | `SETTINGS_ENCRYPTION_KEY` | _(auto in Electron)_        | Base64-encoded 32-byte key for encrypting secrets (e.g. the API key) in the DB. Electron auto-provisions it via `safeStorage`. For Docker, inject it as a secret if you want at-rest encryption; omit it and secrets are stored in plaintext. |

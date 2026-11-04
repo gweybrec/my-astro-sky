@@ -12,8 +12,8 @@ const pkg = JSON.parse(readFileSync(fromHere('../../package.json'), 'utf-8')) as
 const author = typeof pkg.author === 'object' ? pkg.author : { name: pkg.author };
 
 // The phone app. `webDir` of Capacitor is `dist`. In a desktop browser the app talks to the desktop's server
-// (port 3001, or the address in MOBILE_API_TARGET) through this proxy, so a screen can be developed in a phone-sized browser window.
-const apiTarget = process.env.MOBILE_API_TARGET || 'http://localhost:3001';
+// (port 3002, or the address in MOBILE_API_TARGET) through this proxy, so a screen can be developed in a phone-sized browser window.
+const apiTarget = process.env.MOBILE_API_TARGET || 'http://localhost:3002';
 
 export default defineConfig({
   plugins: [vue()],

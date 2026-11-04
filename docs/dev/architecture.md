@@ -75,7 +75,7 @@
 
 Express 5 server with multiple modules:
 
-- **`index.ts`**: The entry point. Loads `dotenv`, calls `createApp()` and listens on `PORT` (default 3001). It holds no route.
+- **`index.ts`**: The entry point. Loads `dotenv`, calls `createApp()` and listens on `PORT` (default 3002). Port 3001 is reserved for the installed desktop app: the server refuses it unless it runs in Electron or with `NODE_ENV=production` (Docker), and fails to start instead of carrying on when its port is taken. It holds no route.
 - **`app.ts`**: Builds the Express app: helmet/CSP, compression, JSON body parsing, static serving of `dist/` and `/uploads`, the `/api` rate limiter, the mount block of the domain routers, then (inside the async `createApp()`) the dev-only Swagger UI, the SPA fallback and the global error handler. It does not listen.
 - **`server-paths.ts`**: Exports `SERVER_DIR`, `UPLOADS_DIR`, `RESOURCES_DIR`, `DIST_DIR` and `SWAGGER_JSON_PATH` (`UPLOADS_DIR`, `RESOURCES_DIR` and `DIST_DIR` are overridable by env var).
 - **`routes/`**: One Express router per domain, each exported as `<name>Router` and mounted without a prefix in `app.ts`. The `@swagger` comment of each route sits next to it.
@@ -176,14 +176,14 @@ The app ships in two forms: a **web app** (`npm run dev` / Docker) and an **Elec
 
 ### Behaviour differences between Electron and web
 
-| Area                        | Electron                                                                                                                                                                                      | Web (`npm run dev` / Docker)                                                                                                |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **Geolocation**             | `window.electronAPI.getLocation()` → IPC → main process → `fetch('http://ip-api.com/json/')`. `navigator.geolocation` is not used (no Google Maps key / no real browser engine in Electron).  | `navigator.geolocation.getCurrentPosition()` — uses the browser's native geolocation.                                       |
-| **Rate limiting**           | Disabled (`isElectron` guard in `server/app.ts`, defined in `server/routes/shared.ts`). Single-user local app; limits would only hurt the user.                                               | Active. Global limiter + stricter per-upload limiter.                                                                       |
-| **Settings encryption key** | Auto-provisioned via `electron.safeStorage`: generated once, encrypted with the OS keychain, stored in `userData/settings-encryption-key.bin`. Available on every launch without user action. | Must be injected as `SETTINGS_ENCRYPTION_KEY` env var (Docker secret / `.env`). If absent, settings are stored unencrypted. |
-| **Data directories**        | `UPLOADS_DIR` and `DB_PATH` point to `app.getPath('userData')` (OS user-data folder). Data survives app updates because it lives outside the `.asar` archive.                                 | Defaults: `./uploads/` and `./data.db` relative to the process working directory (or overridden via env vars).              |
-| **Express port**            | `findFreePort(3001)` scans for the first free TCP port ≥ 3001. The `BrowserWindow` loads `http://localhost:{port}`. Port 3001 is not guaranteed.                                              | Fixed at `3001` (or `PORT` env var).                                                                                        |
-| **Application menu**        | Removed with `Menu.setApplicationMenu(null)`.                                                                                                                                                 | N/A (browser chrome).                                                                                                       |
+| Area                        | Electron                                                                                                                                                                                                        | Web (`npm run dev` / Docker)                                                                                                |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Geolocation**             | `window.electronAPI.getLocation()` → IPC → main process → `fetch('http://ip-api.com/json/')`. `navigator.geolocation` is not used (no Google Maps key / no real browser engine in Electron).                    | `navigator.geolocation.getCurrentPosition()` — uses the browser's native geolocation.                                       |
+| **Rate limiting**           | Disabled (`isElectron` guard in `server/app.ts`, defined in `server/routes/shared.ts`). Single-user local app; limits would only hurt the user.                                                                 | Active. Global limiter + stricter per-upload limiter.                                                                       |
+| **Settings encryption key** | Auto-provisioned via `electron.safeStorage`: generated once, encrypted with the OS keychain, stored in `userData/settings-encryption-key.bin`. Available on every launch without user action.                   | Must be injected as `SETTINGS_ENCRYPTION_KEY` env var (Docker secret / `.env`). If absent, settings are stored unencrypted. |
+| **Data directories**        | `UPLOADS_DIR` and `DB_PATH` point to `app.getPath('userData')` (OS user-data folder). Data survives app updates because it lives outside the `.asar` archive.                                                   | Defaults: `./uploads/` and `./data.db` relative to the process working directory (or overridden via env vars).              |
+| **Express port**            | Packaged: always the reserved port 3001 (its browser storage belongs to that origin); start-up fails if it is taken. Dev Electron: first free port ≥ 3003. The `BrowserWindow` loads `http://localhost:{port}`. | `3002` (or `PORT` env var).                                                                                                 |
+| **Application menu**        | Removed with `Menu.setApplicationMenu(null)`.                                                                                                                                                                   | N/A (browser chrome).                                                                                                       |
 
 ### Electron startup sequence
 
@@ -191,10 +191,10 @@ The Electron entry point (`electron/main.ts`) runs as follows:
 
 1. `app.whenReady()` — wait for Electron to initialise.
 2. `initSettingsEncryptionKey()` — provision or load the settings encryption key via `safeStorage`.
-3. `findFreePort(3001)` — find a free port and set `process.env.PORT`.
+3. Pick the port (3001 when packaged, else `findFreePort(3003)`), set `process.env.PORT` and a random `MYASTROSKY_INSTANCE_TOKEN`.
 4. Set data-directory env vars (`UPLOADS_DIR`, `DB_PATH`, `PUBLIC_DATA_DIR`, etc.) **if** `app.isPackaged`. In dev Electron (`npm start`), defaults are used, same as the web dev server.
 5. `await import('../server/index.js')` — dynamically import the Express server entry point (`index.ts`, which builds the app via `createApp()` in `app.ts` and listens) **after** env vars are set (static ESM imports would be hoisted before the env vars are ready).
-6. `waitForPort(port)` — poll until Express accepts connections.
+6. `checkOwnServer()` — the server echoes the token in the `X-MyAstroSky-Instance` header; a missing or different token means another program answers on that port, and start-up fails instead of showing its data.
 7. Open `BrowserWindow` and load `http://localhost:{port}`.
 
 ### Dependency note: mixed ESM/CJS interop

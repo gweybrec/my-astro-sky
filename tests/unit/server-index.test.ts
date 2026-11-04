@@ -1,6 +1,7 @@
 // @vitest-environment node
 /** The server's entry point: a failed start is reported, not left as an unhandled rejection. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { EventEmitter } from 'node:events';
 
 const createApp = vi.fn();
 const logServerError = vi.fn();
@@ -24,17 +25,38 @@ describe('server/index.ts', () => {
     createApp.mockReset();
     logServerError.mockReset();
     isElectron = false;
+    vi.stubEnv('PORT', '');
     exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
   });
-  afterEach(() => exit.mockRestore());
+  afterEach(() => {
+    exit.mockRestore();
+    vi.unstubAllEnvs();
+  });
 
-  it('listens once the app is made', async () => {
-    const listen = vi.fn();
+  /** A fake server that either starts listening or fails with the given error. */
+  function fakeListen(error?: NodeJS.ErrnoException) {
+    return vi.fn(() => {
+      const server = Object.assign(new EventEmitter(), { listening: false });
+      setImmediate(() => (error ? server.emit('error', error) : server.emit('listening')));
+      return server;
+    });
+  }
+
+  it('listens once the app is made, on the development port by default', async () => {
+    const listen = fakeListen();
     createApp.mockResolvedValue({ listen });
     const { serverStarted } = await import('../../server/index.js');
     await serverStarted;
-    expect(listen).toHaveBeenCalledOnce();
+    expect(listen).toHaveBeenCalledExactlyOnceWith(3002);
     expect(exit).not.toHaveBeenCalled();
+  });
+
+  it('logs and exits when its port is already taken, instead of carrying on', async () => {
+    const listen = fakeListen(Object.assign(new Error('in use'), { code: 'EADDRINUSE' }));
+    createApp.mockResolvedValue({ listen });
+    const { serverStarted } = await import('../../server/index.js');
+    await expect(serverStarted).rejects.toThrow('Port 3002 is already used by another program.');
+    await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(1));
   });
 
   it('logs a failed start and exits with code 1', async () => {

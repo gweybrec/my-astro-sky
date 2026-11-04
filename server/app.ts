@@ -6,6 +6,7 @@ import fs from 'fs';
 import { UPLOADS_DIR, DIST_DIR, SWAGGER_JSON_PATH } from './server-paths.js';
 import { isElectron, API_LIMIT, checkRateLimit } from './routes/shared.js';
 import { logServerError } from './logger.js';
+import { INSTANCE_HEADER } from './ports.js';
 import { poiCategories } from './services.js';
 import { starsRouter } from './routes/stars.js';
 import { identifyRouter } from './routes/identify.js';
@@ -46,6 +47,15 @@ const enableSwagger =
 
 // All non-CSP helmet protections (X-Content-Type-Options, X-Frame-Options, etc.).
 app.use(helmet({ contentSecurityPolicy: false }));
+
+// The desktop app checks this token before opening its window, so it never shows another server's data.
+const instanceToken = process.env.MYASTROSKY_INSTANCE_TOKEN;
+if (instanceToken) {
+  app.use((_req, res, next) => {
+    res.setHeader(INSTANCE_HEADER, instanceToken);
+    next();
+  });
+}
 
 // Content-Security-Policy. Served by this Express instance for both the web/Docker
 // deployment and the Electron renderer (Electron loads http://localhost), so one header

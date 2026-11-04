@@ -8,6 +8,7 @@ import { setupErrorLogging, logMainError, logCrash } from './error-logger.js';
 import { shouldReloadAfterCrash } from './crash-reload-guard.js';
 import { shouldOpenExternally } from './external-links.js';
 import { installLogger } from '../server/logger.js';
+import { DEFAULT_SERVER_PORT, DESKTOP_APP_PORT, INSTANCE_HEADER } from '../server/ports.js';
 import { msg, type ServerLang } from '../server/messages.js';
 import { ipcMain } from 'electron';
 import { configureLogSink, consoleLogSink, logInfo } from '@myastrosky/core/platform/log';
@@ -77,11 +78,14 @@ function initSettingsEncryptionKey(): void {
   }
 }
 
-/** Find the first TCP port >= start that is not in use. */
+/**
+ * First TCP port >= start that is free, checked on every address the way Express listens
+ * (checking 127.0.0.1 alone misses a server listening on all addresses).
+ */
 function findFreePort(start: number): Promise<number> {
   return new Promise((resolve) => {
     const srv = net.createServer();
-    srv.listen(start, '127.0.0.1', () => {
+    srv.listen(start, () => {
       const port = (srv.address() as net.AddressInfo).port;
       srv.close(() => resolve(port));
     });
@@ -89,31 +93,18 @@ function findFreePort(start: number): Promise<number> {
   });
 }
 
-/** Poll until something accepts connections on the given port. */
-function waitForPort(port: number, maxAttempts = 30): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let attempts = 0;
-    const attempt = () => {
-      const socket = new net.Socket();
-      socket.setTimeout(300);
-      socket.connect(port, '127.0.0.1', () => {
-        socket.destroy();
-        resolve();
-      });
-      socket.on('error', () => {
-        socket.destroy();
-        if (++attempts < maxAttempts) setTimeout(attempt, 300);
-        else
-          reject(new Error(`Express did not start on port ${port} after ${maxAttempts} attempts`));
-      });
-      socket.on('timeout', () => {
-        socket.destroy();
-        if (++attempts < maxAttempts) setTimeout(attempt, 300);
-        else reject(new Error(`Express timed out on port ${port}`));
-      });
-    };
-    attempt();
-  });
+/**
+ * Throws unless the server answering at `origin` is the one this launch started (it echoes the
+ * start-up token), so the window never shows, or deletes, another server's data.
+ */
+async function checkOwnServer(origin: string, token: string): Promise<void> {
+  const res = await fetch(`${origin}/api/config`);
+  if (res.headers.get(INSTANCE_HEADER) !== token) {
+    throw new Error(
+      `Another program answers at ${origin}, not MyAstroSky's own server. ` +
+        `Close it (for example a development server) and start MyAstroSky again.`,
+    );
+  }
 }
 
 // Tracks recent renderer-crash timestamps so auto-reload can give up on a crash loop.
@@ -221,8 +212,12 @@ async function main() {
   installLogger(logMainError);
   initSettingsEncryptionKey();
 
-  const port = await findFreePort(3001);
+  // The installed app always uses its reserved port (its browser storage belongs to that origin);
+  // when the port is taken, the server fails to start and the start-up dialog says so.
+  const port = app.isPackaged ? DESKTOP_APP_PORT : await findFreePort(DEFAULT_SERVER_PORT + 1);
   process.env.PORT = String(port);
+  const instanceToken = crypto.randomBytes(16).toString('hex');
+  process.env.MYASTROSKY_INSTANCE_TOKEN = instanceToken;
 
   if (app.isPackaged) {
     process.env.NODE_ENV = 'production';
@@ -252,8 +247,7 @@ async function main() {
   const { serverStarted } = await import('../server/index.js');
   await serverStarted;
 
-  // Wait for Express to actually accept connections before opening the window.
-  await waitForPort(port);
+  await checkOwnServer(`http://localhost:${port}`, instanceToken);
 
   // Remove the navigation menu.
   Menu.setApplicationMenu(null);

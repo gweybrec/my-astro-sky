@@ -5,8 +5,8 @@ conventions, the CI gate, architecture overview) stay in the root `CLAUDE.md`.
 
 ## Conventions
 
-- Backend reads `PORT` env var (default 3001) and `DB_PATH` (default `./data.db`).
-- Vite proxies `/api` and `/uploads` to `http://localhost:3001` during dev.
+- Backend reads `PORT` env var (default 3002; 3001 is reserved for the installed desktop app and refused outside it and production) and `DB_PATH` (default `./data.db`).
+- Vite proxies `/api` and `/uploads` to `http://localhost:3002` during dev.
 - Uploaded photos go to `uploads/` directory on disk, named with UUIDs.
 - Filters are served at `GET /api/filters` and consumed via `src/gear-catalog.ts` (they are **not** part of a gear setup — picked per integration row / observation window). The catalog itself is `resources/filters.json`; see `scripts/CLAUDE.md` for the colour-seeding step.
 - Migrations 1 to 14 in `server/db-migrations.ts` are frozen. New migrations (version 15 and above) are SQL statements added to `MIGRATIONS` in `packages/core/src/db/schema.ts`, and `BASELINE_SCHEMA` and `SCHEMA_VERSION` are updated in the same commit; `tests/unit/schema-baseline.test.ts` fails otherwise.

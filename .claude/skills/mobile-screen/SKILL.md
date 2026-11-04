@@ -51,7 +51,7 @@ In `apps/mobile/tests/`, with a fake backend installed by `setBackend`. Cover th
 
 ## Step 7 — Check in a phone-sized browser
 
-1. Make sure ports 3001 and 5174 are free. If something else holds them, it is not yours: do not kill it, report it.
+1. Make sure ports 3002 and 5174 are free. If something else holds them, it is not yours: do not kill it, report it.
 2. Start the desktop's server alone (`npm run dev:server`) with `DB_PATH` and `UPLOADS_DIR` pointing to a new empty folder in the scratchpad. Never use the user's data. Seed it through the API if the screen needs data.
 3. Start `npm run mobile:dev` (port 5174).
 4. Open the screen at 384 x 832, 412 x 915 and 832 x 384. The system bars are 0 in a browser: set `--safe-top` and `--safe-bottom` to `24px` on `<html>` to match a phone. Check the console has no error.

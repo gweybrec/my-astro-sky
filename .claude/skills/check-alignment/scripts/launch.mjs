@@ -8,7 +8,7 @@ import path from 'node:path';
 /** A set-up problem (exit code 2): the message says what to do. */
 export class SetupError extends Error {}
 
-const RESERVED = new Set([5173, 5174, 3001]);
+const RESERVED = new Set([5173, 5174, 3001, 3002]);
 
 /** A free port that is none of the development ports, found by asking the system and checking it is not reserved. */
 export async function freePort() {

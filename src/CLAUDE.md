@@ -11,7 +11,7 @@ conventions, the CI gate, architecture overview) stay in the root `CLAUDE.md`.
 
 ### Workflow
 
-1. Start the dev server with `npm run dev` (runs Vite on port 5173 + Express on port 3001).
+1. Start the dev server with `npm run dev` (runs Vite on port 5173 + Express on port 3002).
 2. Navigate to `http://localhost:5173` using `browser_navigate`.
 3. Take a snapshot (`browser_snapshot`) or screenshot (`browser_take_screenshot`) to verify the UI state.
 4. Interact with the app (click, type, etc.) to test the modified feature.
