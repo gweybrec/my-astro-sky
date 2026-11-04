@@ -107,6 +107,7 @@ const es: Translations['mobile'] = {
   targets: {
     searchPlaceholder: 'Buscar un objetivo…',
     searchLabel: 'Buscar un objetivo',
+    shuffled: 'Objetivos que cumplen los criterios, mostrados al azar',
     tonight: 'Esta noche',
     fieldGear: 'Equipo',
     fieldNight: 'Noche',

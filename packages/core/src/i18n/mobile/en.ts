@@ -107,6 +107,7 @@ const en: Translations['mobile'] = {
   targets: {
     searchPlaceholder: 'Search for a target…',
     searchLabel: 'Search for a target',
+    shuffled: 'Targets matching the criteria, shown in random order',
     tonight: 'Tonight',
     fieldGear: 'Gear',
     fieldNight: 'Night',

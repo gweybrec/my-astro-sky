@@ -108,6 +108,7 @@ const de: Translations['mobile'] = {
   targets: {
     searchPlaceholder: 'Ziel suchen…',
     searchLabel: 'Ziel suchen',
+    shuffled: 'Ziele, die den Kriterien entsprechen, in zufälliger Reihenfolge',
     tonight: 'Heute Nacht',
     fieldGear: 'Ausrüstung',
     fieldNight: 'Nacht',

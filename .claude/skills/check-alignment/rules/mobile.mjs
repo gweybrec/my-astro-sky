@@ -623,7 +623,7 @@ export const views = [
     name: 'targets-settings',
     path: '/tabs/targets',
     ready: '.mob-row--roomy',
-    open: [{ click: '.mob-topbar ion-button.mob-icon-btn:first-of-type' }, { wait: '.mob-sheet' }],
+    open: [{ click: '.mob-topbar ion-button.mob-icon-btn:last-of-type' }, { wait: '.mob-sheet' }],
     ...SHEET,
   },
   // The catalogues and the constellations: lists opened from the search settings' fields.
@@ -632,7 +632,7 @@ export const views = [
     path: '/tabs/targets',
     ready: '.mob-row--roomy',
     open: [
-      { click: '.mob-topbar ion-button.mob-icon-btn:first-of-type' },
+      { click: '.mob-topbar ion-button.mob-icon-btn:last-of-type' },
       { wait: '.mob-sheet' },
       { pause: 400 },
       { click: `${OPEN_SHEET} [aria-label^="${field}"]` },

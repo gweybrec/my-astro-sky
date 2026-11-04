@@ -106,6 +106,7 @@ const fr = {
   targets: {
     searchPlaceholder: 'Rechercher une cible…',
     searchLabel: 'Rechercher une cible',
+    shuffled: 'Cibles correspondant aux critères, présentées au hasard',
     tonight: 'Ce soir',
     fieldGear: 'Équipement',
     fieldNight: 'Nuit',

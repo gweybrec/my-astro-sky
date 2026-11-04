@@ -908,6 +908,24 @@ ion-toast.mob-toast::part(wrapper) {
   justify-content: center;
   pointer-events: none;
 }
+/* While a tab is shown the toast stays off the tab bar: in portrait it sits 16 px above it, as the floating plus; in
+   landscape it starts 16 px right of the rail. */
+@media (orientation: landscape) {
+  ion-app:has(.mob-tabs-page:not(.ion-page-hidden) ion-tab-bar:not(.mob-tabbar-hidden))
+    ion-toast.mob-toast::part(wrapper) {
+    --start: calc(var(--rail-width) + var(--safe-left, 0px) + var(--mobile-gutter));
+    left: calc(var(--rail-width) + var(--safe-left, 0px) + var(--mobile-gutter));
+  }
+}
+@media (orientation: portrait) {
+  ion-app:has(.mob-tabs-page:not(.ion-page-hidden) ion-tab-bar:not(.mob-tabbar-hidden))
+    ion-toast.mob-toast::part(wrapper) {
+    bottom: calc(var(--mobile-tabbar-height) + var(--safe-bottom, 0px) + var(--mobile-gutter));
+    inset-block-end: calc(
+      var(--mobile-tabbar-height) + var(--safe-bottom, 0px) + var(--mobile-gutter)
+    );
+  }
+}
 ion-toast.mob-toast::part(container) {
   width: auto;
   max-width: 100%;

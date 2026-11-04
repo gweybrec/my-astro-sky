@@ -15,7 +15,7 @@ import {
   runTargetRecommendationSliced,
   type RecommendationEmptyReason,
 } from '@myastrosky/core/targets/recommend';
-import { sortSuggestions } from '@myastrosky/core/targets/sorting';
+import { shuffleArray, sortSuggestions } from '@myastrosky/core/targets/sorting';
 import type { TargetSuggestion } from '@myastrosky/core/target-recommender';
 import { getGearSetups, getPhotos } from '@myastrosky/app-state/api';
 import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-profile';
@@ -38,6 +38,7 @@ import PhoneRadioSheet from '../components/PhoneRadioSheet.vue';
 import TypesSheet from './targets/TypesSheet.vue';
 import SearchSettingsSheet from './targets/SearchSettingsSheet.vue';
 import slidersIcon from '../icons/sliders.svg?raw';
+import shuffleIcon from '../icons/shuffle.svg?raw';
 import caretIcon from '../icons/chevron-down.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 import mapPinIcon from '@icons/map-pin.svg?raw';
@@ -50,10 +51,12 @@ import mapPinIcon from '@icons/map-pin.svg?raw';
 // desktop's "Trouver des cibles" of a plan: a title bar with the plan's name (in landscape the search shares it), the
 // search run for the plan's place, night and setup (the setup shown as text: it is changed on the plan), and a result
 // opens its page for that plan. The Cibles settings are not changed by it.
+// The shuffle button (boards "Cibles, au hasard") is the desktop's "Cibles aléatoires": each tap mixes what the search
+// found again, and the chosen sort still orders it, so only the targets that tie change places.
 const route = useRoute();
 const router = useRouter();
 const plans = usePlansStore();
-const { showError } = useErrorToast();
+const { showError, showNotice } = useErrorToast();
 const horizonStore = useHorizonProfileStore();
 const regionsStore = useSkyRegionsStore();
 
@@ -65,7 +68,11 @@ const loading = ref(true);
 const gear = shallowRef<GearLists | null>(null);
 /** What the search found, in its own order: every sort starts from it, as on the desktop. */
 let found: TargetSuggestion[] = [];
+/** What the sort orders: what the search found, or it shuffled by the shuffle button until the next search. */
+let pool: TargetSuggestion[] = [];
+let shuffled = false;
 const sorted = shallowRef<TargetSuggestion[]>([]);
+const scroller = ref<HTMLElement | null>(null);
 /** Why the list is empty: the search found nothing, or it could not run (each reason has its own board). */
 const emptyKind = ref<RecommendationEmptyReason | 'no-match'>('no-match');
 const typesOpen = ref(false);
@@ -213,13 +220,18 @@ async function runSearch() {
       nextPaint,
     );
     if (run !== searchRun) return;
+    // The same settings searched again (only the photos may have changed): a shuffle is kept.
+    const keepShuffle = shuffled && key === lastKey;
     lastKey = key;
     if (result.kind === 'ok') {
       found = result.suggestions;
-      sorted.value = sortSuggestions(found, targetsPrefs.sortBy ?? 'rating');
+      pool = keepShuffle ? inOrderOf(found, pool) : found;
+      shuffled = keepShuffle;
+      sorted.value = sortSuggestions(pool, targetsPrefs.sortBy ?? 'rating');
       emptyKind.value = 'no-match';
     } else {
-      found = [];
+      found = pool = [];
+      shuffled = false;
       sorted.value = [];
       emptyKind.value = result.reason;
     }
@@ -227,7 +239,8 @@ async function runSearch() {
   } catch (error) {
     if (run !== searchRun) return;
     lastKey = '';
-    found = [];
+    found = pool = [];
+    shuffled = false;
     sorted.value = [];
     emptyKind.value = 'no-match';
     void showError(error);
@@ -237,8 +250,25 @@ async function runSearch() {
 }
 
 function sort() {
-  sorted.value = sortSuggestions(found, targetsPrefs.sortBy ?? 'rating');
+  sorted.value = sortSuggestions(pool, targetsPrefs.sortBy ?? 'rating');
   loading.value = false;
+}
+
+/** `list` in the order its targets have in `order`; those not in it come last. */
+function inOrderOf(list: TargetSuggestion[], order: TargetSuggestion[]): TargetSuggestion[] {
+  const rank = new Map(order.map((s, i) => [s.dso.id, i]));
+  const at = (s: TargetSuggestion) => rank.get(s.dso.id) ?? order.length;
+  return [...list].sort((a, b) => at(a) - at(b));
+}
+
+/** Mixes what the search found again, shows the list from its top, and says so. */
+function shuffle() {
+  pool = shuffleArray(found);
+  shuffled = true;
+  sort();
+  resetVisible();
+  scroller.value?.scrollTo({ top: 0 });
+  void showNotice(t('mobile.targets.shuffled'));
 }
 
 void load();
@@ -271,6 +301,12 @@ function openTarget(id: string) {
         :placeholder="t('mobile.targets.searchPlaceholder')"
         :label="t('mobile.targets.searchLabel')"
       />
+      <PhoneIconButton
+        :label="t('targets.generateRandom')"
+        :disabled="loading || shown.length === 0"
+        @click="shuffle"
+        ><AppIcon :svg="shuffleIcon"
+      /></PhoneIconButton>
       <PhoneIconButton :label="t('targets.formTitle')" @click="settingsOpen = true"
         ><AppIcon :svg="slidersIcon"
       /></PhoneIconButton>
@@ -299,6 +335,7 @@ function openTarget(id: string) {
     </div>
     <IonContent :scroll-y="false">
       <div
+        ref="scroller"
         class="mob-scroll mob-page-fill"
         :class="{ 'mob-page-safe': planId }"
         style="background: var(--bg-panel)"

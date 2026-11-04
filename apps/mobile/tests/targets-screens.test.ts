@@ -10,9 +10,18 @@ import type { DSO } from '@myastrosky/core/types';
 import { ionicStubs } from './helpers';
 
 const showError = vi.fn();
+const showNotice = vi.fn();
 const confirm = vi.fn();
 const showInfo = vi.fn();
-vi.mock('../src/composables/useErrorToast', () => ({ useErrorToast: () => ({ showError }) }));
+vi.mock('../src/composables/useErrorToast', () => ({
+  useErrorToast: () => ({ showError, showNotice }),
+}));
+// The shuffle reverses, so that its order can be told.
+const shuffleArray = vi.fn(<T>(a: T[]) => [...a].reverse());
+vi.mock('@myastrosky/core/targets/sorting', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  shuffleArray: <T>(a: T[]) => shuffleArray(a),
+}));
 vi.mock('../src/composables/useConfirm', () => ({
   useConfirm: () => ({ confirm }),
   showInfo: (...a: unknown[]) => showInfo(...a),
@@ -248,8 +257,9 @@ describe('the Cibles page', () => {
     const fields = w.findAll('.mob-context > button');
     expect(fields.map((b) => b.text())).toEqual(['Équipement 1', '1 types']);
     expect(fields[1].attributes('aria-label')).toBe("Types d'objets : 1 types");
-    // Beside the search field: one button, the search settings (which hold the filters too).
+    // Beside the search field: the shuffle, and the search settings (which hold the filters too).
     expect(w.findAll('.mob-topbar button').map((b) => b.attributes('aria-label'))).toEqual([
+      'Cibles aléatoires',
       'Paramètres de recherche',
     ]);
   });
@@ -459,6 +469,103 @@ describe('the Cibles page', () => {
     const w = show(TargetsPage, { global: app().global });
     await settle();
     expect(w.findAll('.mob-row--roomy')).toHaveLength(15);
+  });
+});
+
+describe('the shuffle of the Cibles page ("Cibles, au hasard")', () => {
+  // Found in this order: two five-star targets, then a four-star one.
+  const three = () =>
+    ok([
+      suggestion(dso({ id: 'A', catalogs: ['A'], displayName: 'Alpha', rating: 5 }), 80, 21),
+      suggestion(dso({ id: 'B', catalogs: ['B'], displayName: 'Bêta', rating: 5 }), 70, 22),
+      suggestion(dso({ id: 'C', catalogs: ['C'], displayName: 'Gamma', rating: 4 }), 60, 23),
+    ]);
+  const names = (w: ReturnType<typeof show>) =>
+    w.findAll('.mob-row--roomy .mob-row-title').map((r) => r.text());
+  const shuffleButton = (w: ReturnType<typeof show>) =>
+    w.find('button[aria-label="Cibles aléatoires"]');
+
+  beforeEach(() => search.mockResolvedValue(three()));
+
+  it('mixes the targets that tie on the sort, keeps the sort, and says so', async () => {
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    expect(names(w)).toEqual(['Alpha', 'Bêta', 'Gamma']);
+    await shuffleButton(w).trigger('click');
+    // Reversed to C, B, A, then sorted by rating: the five-star ones swap, the four-star one stays last.
+    expect(names(w)).toEqual(['Bêta', 'Alpha', 'Gamma']);
+    expect(showNotice).toHaveBeenCalledWith(
+      'Cibles correspondant aux critères, présentées au hasard',
+    );
+    expect(search).toHaveBeenCalledTimes(1);
+  });
+
+  it('shuffles again on each tap, with no selected state', async () => {
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    await shuffleButton(w).trigger('click');
+    await shuffleButton(w).trigger('click');
+    expect(shuffleArray).toHaveBeenCalledTimes(2);
+    // Each shuffle starts from what the search found, not from the last shuffle.
+    expect((shuffleArray.mock.calls[1][0] as { dso: DSO }[]).map((s) => s.dso.id)).toEqual([
+      'A',
+      'B',
+      'C',
+    ]);
+    expect(showNotice).toHaveBeenCalledTimes(2);
+    expect(shuffleButton(w).attributes('aria-pressed')).not.toBe('true');
+  });
+
+  it('keeps the shuffle when only the sort changes', async () => {
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    await shuffleButton(w).trigger('click');
+    const settings = w.findComponent(SearchSettingsSheet);
+    updateTargetsPrefs({ sortBy: 'name' });
+    settings.vm.$emit('update:open', false);
+    await settle();
+    updateTargetsPrefs({ sortBy: 'rating' });
+    settings.vm.$emit('update:open', false);
+    await settle();
+    expect(names(w)).toEqual(['Bêta', 'Alpha', 'Gamma']);
+    expect(search).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists in the sort order again after a new search', async () => {
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    await shuffleButton(w).trigger('click');
+    updateTargetsPrefs({ minAltDeg: 40 });
+    w.findComponent(SearchSettingsSheet).vm.$emit('update:open', false);
+    await settle();
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(names(w)).toEqual(['Alpha', 'Bêta', 'Gamma']);
+  });
+
+  it('keeps the shuffle when the same settings are searched again for the photos', async () => {
+    updateTargetsPrefs({ excludePhotographed: true });
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    await shuffleButton(w).trigger('click');
+    w.findComponent(SearchSettingsSheet).vm.$emit('update:open', false);
+    await settle();
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(names(w)).toEqual(['Bêta', 'Alpha', 'Gamma']);
+  });
+
+  it('cannot be used while the list is empty', async () => {
+    search.mockResolvedValue(ok([]));
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    expect(shuffleButton(w).attributes('disabled')).toBeDefined();
+  });
+
+  it('cannot be used while the typed text matches no target', async () => {
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    expect(shuffleButton(w).attributes('disabled')).toBeUndefined();
+    await w.find('input[type="search"]').setValue('zzzz');
+    expect(shuffleButton(w).attributes('disabled')).toBeDefined();
   });
 });
 
