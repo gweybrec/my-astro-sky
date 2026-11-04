@@ -17,6 +17,7 @@ Read first: `apps/mobile/CLAUDE.md` and `docs/dev/ui/mobile.md` (the rules every
 - Mockups live in Claude Design only. The user gives the screen's title. A local, git-ignored copy of their source may exist in `design/`; use it when present.
 - Structure, order, texts, icons, states and sheets come from the mockup. If a state, a sheet or a control is missing from it, **ask the user**. Never design it yourself.
 - Never print a text, a description, an icon or a control the mockup does not show.
+- A mockup is a standing requirement for every mobile screen, not something granted only when asked for. **Whenever you are the one creating or changing the mockup** — because none exists yet, or the existing one needs to change for this task — publish it, then STOP. Show the user the board and wait for their explicit go-ahead before Step 2, every time, with no exception. Approval of the overall task or plan is not approval of the mockup itself — a mockup exists to be reviewed by a human, and only the user validates it. Do not self-approve and continue into Build in the same pass, and never dress it up with invented-looking precise numbers presented as real data (placeholders are fine and expected; fabricated "real" stats are not — the issue is pretending they're real, not that they're placeholders).
 
 ## Step 2 — Build
 
