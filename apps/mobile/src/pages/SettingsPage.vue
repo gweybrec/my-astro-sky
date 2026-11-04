@@ -163,6 +163,19 @@ function onRow(row: RowDef) {
             </PhoneRow>
           </IonList>
         </template>
+        <!-- The board "Réglages, zone de danger": the desktop's last section, in the danger colour. -->
+        <PhoneSectionHeader class="mob-status--danger">{{
+          t('settings.dangerSection')
+        }}</PhoneSectionHeader>
+        <IonList class="mob-list" lines="none">
+          <PhoneRow
+            :title="t('settings.deleteAllBtn')"
+            danger
+            button
+            chevron
+            @click="router.push('/settings/delete')"
+          />
+        </IonList>
       </div>
     </IonContent>
     <PhoneRadioSheet

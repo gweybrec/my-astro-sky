@@ -12,7 +12,7 @@
             class="display-controls-btn self-start text-small"
             :class="{ 'btn-busy': backingUp }"
             :aria-busy="backingUp || undefined"
-            :disabled="!hasPhotos || backingUp"
+            :disabled="backingUp"
             @click="doBackup"
           >
             <span v-if="backingUp" class="auto-solve-spinner" aria-hidden="true"></span
@@ -103,6 +103,7 @@ import {
 } from '../../api';
 import { reloadUserOverrides } from '../../dso-catalog';
 import { buildDeleteSummaryLines } from '@myastrosky/core/delete-utils';
+import { FULL_BACKUP_OPTIONS } from '@myastrosky/core/backup-selection';
 import { showToast } from '../../toast';
 import { formatBytes } from '@myastrosky/core/format-utils';
 import BulkDeleteConfirmDialog from './BulkDeleteConfirmDialog.vue';
@@ -113,7 +114,6 @@ const photosStore = usePhotosStore();
 const canvasStore = useCanvasStore();
 
 const photos = computed(() => photosStore.placedPhotos.map((p) => p.photo));
-const hasPhotos = computed(() => photos.value.length > 0);
 
 const deleteMeta = ref(false);
 const deleteDso = ref(false);
@@ -160,7 +160,8 @@ async function doBackup() {
   backingUp.value = true;
   const ids = photos.value.map((p) => p.id);
   try {
-    await exportData({ includeImages: true, includeMetadata: true }, ids);
+    // Everything this window can delete: the photos, the setups, the gear and the DSO changes.
+    await exportData(FULL_BACKUP_OPTIONS, ids);
   } catch (err: any) {
     showToast({ message: err.message ?? t('settings.importError'), type: 'error' });
   } finally {

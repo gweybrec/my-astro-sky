@@ -8,6 +8,8 @@ export interface ConfirmOptions {
   confirmLabel: string;
   /** Red filled confirm button: the sole destructive choice of the dialog (every delete). */
   destructive?: boolean;
+  /** A line under the message in the danger colour (board "Réglages, confirmer la suppression": cannot be undone). */
+  warning?: string;
 }
 
 /** The dialog of the board "Plan, confirmer la suppression": a title, a message, then Annuler and the confirm button. */
@@ -15,8 +17,12 @@ export function useConfirm() {
   async function confirm(options: ConfirmOptions): Promise<boolean> {
     const alert = await alertController.create({
       header: options.title,
+      // Ionic draws the sub-title in the head; the class moves it under the message.
+      subHeader: options.warning,
       message: options.message,
-      cssClass: 'mob-dialog-alert',
+      cssClass: options.warning
+        ? ['mob-dialog-alert', 'mob-dialog-alert--warning']
+        : 'mob-dialog-alert',
       backdropDismiss: true,
       buttons: [
         { text: t('modal.cancel'), role: 'cancel', cssClass: 'mob-btn mob-btn--lg m-body' },

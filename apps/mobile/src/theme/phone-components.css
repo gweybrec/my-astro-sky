@@ -767,6 +767,26 @@ ion-alert.mob-dialog-alert .alert-message {
   line-height: var(--alert-text-line);
   font-weight: 400;
 }
+/* A dialog with a warning line: the head's title and sub-title join the message's column, and the sub-title (the
+   warning) comes after the message, in the danger colour. */
+ion-alert.mob-dialog-alert--warning .alert-head {
+  display: contents;
+}
+ion-alert.mob-dialog-alert--warning .alert-title {
+  margin-bottom: var(--space-7);
+}
+ion-alert.mob-dialog-alert--warning .alert-sub-title {
+  order: 1;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-head);
+  line-height: var(--alert-text-line);
+  font-weight: 400;
+}
+ion-alert.mob-dialog-alert--warning .alert-button-group {
+  order: 2;
+}
 ion-alert.mob-dialog-alert .alert-button-group {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

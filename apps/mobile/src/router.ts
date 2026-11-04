@@ -76,6 +76,7 @@ const routes: RouteRecordRaw[] = [
     path: '/settings/backup/restore/:step(photos|setups|plans|other)',
     component: () => import('./pages/RestorePage.vue'),
   },
+  { path: '/settings/delete', component: () => import('./pages/DeleteDataPage.vue') },
   { path: '/settings/about', component: () => import('./pages/AboutPage.vue') },
   { path: '/settings/privacy', component: () => import('./pages/PrivacyPage.vue') },
   { path: '/settings/credits', component: () => import('./pages/DataCreditsPage.vue') },

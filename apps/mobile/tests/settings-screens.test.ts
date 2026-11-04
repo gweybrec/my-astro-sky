@@ -309,6 +309,25 @@ describe('the Réglages page', () => {
     expect(router.currentRoute.value.path).toBe('/settings/privacy');
   });
 
+  it('ends with the danger zone, whose red row opens the delete data page', async () => {
+    const { global, router } = app();
+    const w = mount(SettingsPage, { global });
+    await flushPromises();
+    const headers = w.findAll('.mob-section-header');
+    expect(headers.at(-1)!.text()).toBe('Zone de danger');
+    expect(headers.at(-1)!.classes()).toContain('mob-status--danger');
+    const row = w
+      .findAll('.mob-row')
+      .find((r) => r.text().includes('Supprimer toutes les données'))!;
+    expect(row.classes()).toContain('mob-row--danger');
+    // It sits right under the header (the language and theme sheets come later in the page).
+    const crumbs = w.findAll('.mob-section-header, .mob-row').map((e) => e.text());
+    expect(crumbs.indexOf('Zone de danger') + 1).toBe(crumbs.indexOf(row.text()));
+    await row.trigger('click');
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/settings/delete');
+  });
+
   it('opens the data credits page from its row, under the privacy row', async () => {
     const { global, router } = app();
     const w = mount(SettingsPage, { global });
