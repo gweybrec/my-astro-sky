@@ -26,6 +26,7 @@ import {
 } from '../src/composables/useSheetStops';
 import PhoneFacts from '../src/components/PhoneFacts.vue';
 import PhoneToggleRow from '../src/components/PhoneToggleRow.vue';
+import PhoneProgressRow from '../src/components/PhoneProgressRow.vue';
 import { showInfo } from '../src/composables/useConfirm';
 
 vi.mock('../src/composables/useConfirm', async (original) => ({
@@ -586,6 +587,28 @@ describe('the photo facts', () => {
     const facts = w.findAll('.mob-fact');
     expect(facts[0].attributes('data-sheet-stop')).toBeUndefined();
     expect(facts[1].attributes('data-sheet-stop')).toBe('');
+  });
+});
+
+describe('the progress row', () => {
+  it('shows the label, the count, and fills the bar to the percentage', () => {
+    const w = mount(PhoneProgressRow, {
+      props: { title: 'Messier', value: '68 / 110', percent: 62 },
+      global,
+    });
+    expect(w.find('.mob-progress-label').text()).toBe('Messier');
+    expect(w.find('.mob-progress-value').text()).toBe('68 / 110');
+    expect(w.find('.mob-progress-fill').attributes('style')).toContain('width: 62%');
+  });
+
+  it('draws the bar with block elements, so the fill takes its width', () => {
+    const w = mount(PhoneProgressRow, {
+      props: { title: 'Lynds (nébuleuses brillantes)', value: '12 / 1125', percent: 1 },
+      global,
+    });
+    expect(w.find('.mob-progress-track').element.tagName).toBe('DIV');
+    expect(w.find('.mob-progress-fill').element.tagName).toBe('DIV');
+    expect(w.find('.mob-progress-label').attributes('title')).toBeUndefined();
   });
 });
 

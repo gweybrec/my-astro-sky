@@ -33,6 +33,10 @@ const version = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '';
 
 const sections: { title: string; rows: RowDef[] }[] = [
   {
+    title: 'stats.modalTitle',
+    rows: [{ title: 'stats.modalTitle', to: '/settings/statistics' }],
+  },
+  {
     title: 'mobile.settings.observation',
     rows: [
       {

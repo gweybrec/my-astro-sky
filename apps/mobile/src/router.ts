@@ -66,6 +66,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/settings/gear/:type', component: () => import('./pages/gear/GearManagePage.vue') },
   { path: '/settings/gear/:type/new', component: () => import('./pages/gear/GearAddPage.vue') },
   { path: '/settings/location', component: () => import('./pages/LocationPage.vue') },
+  { path: '/settings/statistics', component: () => import('./pages/StatisticsPage.vue') },
   {
     path: '/settings/astrometry-key',
     component: () => import('./pages/AstrometryKeyPage.vue'),

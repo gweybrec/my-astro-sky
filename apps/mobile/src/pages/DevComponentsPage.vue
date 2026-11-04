@@ -33,6 +33,7 @@ import PhoneSearch from '../components/PhoneSearch.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PhoneSheet from '../components/PhoneSheet.vue';
 import PhoneSliderRow from '../components/PhoneSliderRow.vue';
+import PhoneProgressRow from '../components/PhoneProgressRow.vue';
 import PhoneStepperRow from '../components/PhoneStepperRow.vue';
 import PhoneToggleRow from '../components/PhoneToggleRow.vue';
 import PhoneCheckLeadRow from '../components/PhoneCheckLeadRow.vue';
@@ -303,6 +304,10 @@ function raiseError() {
           :step="0.05"
           disabled
         />
+        <div class="mob-progress-list">
+          <PhoneProgressRow title="Messier" value="68 / 110" :percent="62" />
+          <PhoneProgressRow title="Lynds (nébuleuses brillantes)" value="12 / 1125" :percent="1" />
+        </div>
         <PhoneStepperRow
           v-model="steps"
           label="Lignes"

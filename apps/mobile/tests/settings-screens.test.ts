@@ -18,7 +18,19 @@ vi.mock('../src/composables/useConfirm', () => ({
   useConfirm: () => ({ confirm }),
   showInfo: (...a: unknown[]) => showInfo(...a),
 }));
-vi.mock('../src/catalogs', () => ({ catalogsReady: () => Promise.resolve() }));
+const { catalogsReady } = vi.hoisted(() => ({ catalogsReady: vi.fn(() => Promise.resolve()) }));
+vi.mock('../src/catalogs', () => ({ catalogsReady }));
+// Three constellations, out of order and one listed twice, as the registry lists a few.
+vi.mock('@myastrosky/core/catalog/star-registry', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getConstellationInfos: () =>
+    [
+      ['CYG', 'Cygne'],
+      ['AND', 'Andromède'],
+      ['AQL', 'Aigle'],
+      ['AND', 'Andromède'],
+    ].map(([id, displayName]) => ({ id, name: id, displayName, ra: 0, dec: 0 })),
+}));
 const getCurrentPosition = vi.fn();
 const pickFile = vi.fn();
 const { LocationDeniedError } = vi.hoisted(() => ({
@@ -43,7 +55,10 @@ import AstrometryKeyPage from '../src/pages/AstrometryKeyPage.vue';
 import AboutPage from '../src/pages/AboutPage.vue';
 import PrivacyPage from '../src/pages/PrivacyPage.vue';
 import DataCreditsPage from '../src/pages/DataCreditsPage.vue';
+import StatisticsPage from '../src/pages/StatisticsPage.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
+import SkyCheckSheet from '../src/pages/sky/SkyCheckSheet.vue';
+import { DSO_CATALOGS_ALL } from '@myastrosky/core/catalog/dso-registry';
 import { applySavedTheme } from '../src/app-theme';
 
 const GEAR = {
@@ -266,7 +281,8 @@ describe('the Réglages page', () => {
     await flushPromises();
     const text = w.text();
     expect(text).toContain('Setups');
-    expect(w.findAll('.mob-row')[0].text()).toContain('2');
+    const setups = w.findAll('.mob-row').find((r) => r.text().includes('Setups'))!;
+    expect(setups.text()).toContain('2');
     expect(text).toContain('48.58, 7.75');
     expect(text).toContain('✓ Configurée');
     expect(text).toContain('Froid moderne (défaut)');
@@ -282,9 +298,24 @@ describe('the Réglages page', () => {
     const { global, router } = app();
     const w = mount(SettingsPage, { global });
     await flushPromises();
-    await w.findAll('.mob-row')[0].trigger('click');
+    const setups = w.findAll('.mob-row').find((r) => r.text().includes('Setups'))!;
+    await setups.trigger('click');
     await flushPromises();
     expect(router.currentRoute.value.path).toBe('/settings/setups');
+  });
+
+  it('starts with the statistics section, above Observation, opening the statistics page', async () => {
+    const { global, router } = app();
+    const w = mount(SettingsPage, { global });
+    await flushPromises();
+    const headers = w.findAll('.mob-section-header');
+    expect(headers[0].text()).toBe('Statistiques');
+    expect(headers[1].text()).toBe('Observation');
+    const row = w.findAll('.mob-row')[0];
+    expect(row.text()).toBe('Statistiques');
+    await row.trigger('click');
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/settings/statistics');
   });
 
   it('opens the about page from its row', async () => {
@@ -456,6 +487,47 @@ describe('the theme', () => {
     storage().set('app-theme', 'night-red');
     applySavedTheme();
     expect(document.documentElement.dataset.theme).toBe('cold-blue-v2');
+  });
+});
+
+describe('the statistics page', () => {
+  it('shows the constellation filter row and one progress row per catalog', async () => {
+    const { global } = app();
+    const w = mount(StatisticsPage, { global });
+    await flushPromises();
+    expect(w.find('h1').text()).toBe('Statistiques');
+    const filter = w.find('.mob-row');
+    expect(filter.text()).toContain('Constellations');
+    expect(filter.text()).toContain('3 / 3');
+    const rows = w.findAll('.mob-progress-row');
+    expect(rows).toHaveLength(DSO_CATALOGS_ALL.length);
+    expect(rows[0].find('.mob-progress-value').text()).toBe('0 / 0');
+  });
+
+  it('reads the constellations only once the catalogues are loaded', async () => {
+    let loaded!: () => void;
+    catalogsReady.mockReturnValueOnce(new Promise<void>((resolve) => (loaded = resolve)));
+    const { global } = app();
+    const w = mount(StatisticsPage, { global });
+    await flushPromises();
+    expect(w.find('.mob-row').text()).toContain('0 / 0');
+    loaded();
+    await flushPromises();
+    expect(w.find('.mob-row').text()).toContain('3 / 3');
+  });
+
+  it('opens the constellation sheet from the filter row, listing each constellation once', async () => {
+    const { global } = app();
+    const w = mount(StatisticsPage, { global });
+    await flushPromises();
+    await w.find('.mob-row').trigger('click');
+    await flushPromises();
+    const sheet = w.getComponent(SkyCheckSheet);
+    expect(sheet.props('options').map((o: { label: string }) => o.label)).toEqual([
+      'Aigle',
+      'Andromède',
+      'Cygne',
+    ]);
   });
 });
 
