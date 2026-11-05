@@ -337,6 +337,46 @@ describe('convert()', () => {
     expect(loader).not.toHaveBeenCalled();
   });
 
+  // Regression: a TOP-DOWN file was drawn with its first stored row at the top while its stars
+  // were placed with that row at the bottom, so every overlay came out mirrored top to bottom.
+  it.each(['TOP-DOWN', 'BOTTOM-UP', undefined] as const)(
+    'puts each star on its own pixel of the picture it makes (ROWORDER %s)',
+    async (roworder) => {
+      const sharp = (await import('sharp')).default;
+      const [W, H] = [40, 30];
+      // The first star sits exactly on the reference pixel: FITS pixel (6, 4), i.e. stored
+      // column 5 of stored row 3, far from the middle row so a mirror would miss it.
+      const cards = WCS_CARDS.map((c) =>
+        c.startsWith('CRPIX1') ? 'CRPIX1  = 6' : c.startsWith('CRPIX2') ? 'CRPIX2  = 4' : c,
+      );
+      const pixels = new Array<number>(W * H).fill(0);
+      pixels[3 * W + 5] = 1;
+      const bytes = new Uint8Array(
+        buildFits({
+          bitpix: -32,
+          naxis1: W,
+          naxis2: H,
+          ...(roworder ? { roworder } : {}),
+          pixels,
+          extraCards: cards,
+        }),
+      );
+      // Two more stars 5 and 10 rows above it (0.1° per pixel) keep the field above three stars.
+      const stars = [
+        STARS[0],
+        { ...STARS[0], hip: 99101, dec: STARS[0].dec + 0.5 },
+        { ...STARS[0], hip: 99102, dec: STARS[0].dec + 1 },
+      ];
+      const service = createSolvedImportService({ images: createSharpImageCodec(), stars });
+      const r = await service.convert({ fileName: 'a.fits', bytes });
+      const star = r.correspondences!.find((c) => c.starHip === 99001)!;
+      const raw = await sharp(Buffer.from(r.png)).greyscale().raw().toBuffer();
+      expect([star.photoX, star.photoY]).toEqual([5, 26]);
+      expect(r.correspondences!.map((c) => c.starHip).sort()).toEqual([99001, 99101, 99102]);
+      expect(raw[Math.round(star.photoY) * W + Math.round(star.photoX)]).toBe(255);
+    },
+  );
+
   it('makes a single-channel PNG through the real codec, pixel for pixel', async () => {
     const sharp = (await import('sharp')).default;
     const service = createSolvedImportService({ images: createSharpImageCodec(), stars: STARS });

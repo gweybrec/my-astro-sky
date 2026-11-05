@@ -60,10 +60,10 @@ export function decodeFitsToBytes(buf: Uint8Array): DecodedFits {
   const isFloat = bitpix === -32 || bitpix === -64;
   const fullScale = isFloat ? 1 : integerFullScale(bitpix);
 
-  // Default FITS convention stores the data unit bottom row first; honour an explicit
-  // ROWORDER when present (Siril writes it explicitly either way).
-  const rowOrder = typeof header.ROWORDER === 'string' ? header.ROWORDER.trim().toUpperCase() : '';
-  const flipY = rowOrder !== 'TOP-DOWN';
+  // The first stored row is always drawn at the bottom, whatever ROWORDER says: the WCS
+  // counts rows in stored order with row 1 at the bottom (the `fitsYConvention=true` the
+  // solved-import service passes), and Siril shows and exports a TOP-DOWN file the same way.
+  // Honouring ROWORDER=TOP-DOWN here drew the picture upside down against its own solution.
 
   const bytesPerSample = Math.abs(bitpix) / 8;
   const dataOffset = headerStr.length; // extractFITSHeaderFromFITS already pads to the 2880 boundary
@@ -104,7 +104,7 @@ export function decodeFitsToBytes(buf: Uint8Array): DecodedFits {
   const out = new Uint8Array(samplesPerPlane * channels);
   for (let plane = 0; plane < channels; plane++) {
     for (let row = 0; row < height; row++) {
-      const outRow = flipY ? height - 1 - row : row;
+      const outRow = height - 1 - row;
       for (let x = 0; x < width; x++) {
         const sampleIndex = plane * samplesPerPlane + row * width + x;
         const raw = readRaw(sampleIndex);

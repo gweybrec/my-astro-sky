@@ -32,6 +32,8 @@ const correspondences = wcsToCorrespondences(wcs, width, height, false);
 
 The input to solve-field is **always** a JPEG or PNG (never a raw FITS file), so this value never needs to change.
 
+**Raw FITS import ignores `ROWORDER`.** A WCS counts rows in stored order whatever `ROWORDER` says, and Siril shows and exports even a `ROWORDER = 'TOP-DOWN'` file with its first stored row at the bottom. `fits-decoder.ts` therefore always draws the first stored row at the bottom, which is what `fitsYConvention=true` assumes. Honouring `TOP-DOWN` there drew the picture upside down against its own objects.
+
 ---
 
 ## 1b. ASTAP false matches: the conformality guard

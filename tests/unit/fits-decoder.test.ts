@@ -3,60 +3,38 @@ import { decodeFitsToBytes, UnsupportedFitsError } from '@myastrosky/core/raw-de
 import { buildFits } from '../fixtures/fits-builders';
 
 describe('decodeFitsToBytes — BITPIX -32 (float), 2D mono', () => {
-  it('maps [0,1] float samples linearly, top-down explicit', () => {
-    // 2x2, row-major, physical values already in [0,1]
+  it('maps [0,1] float samples linearly', () => {
+    // 2x2, row-major, physical values already in [0,1]; the second stored row comes out first
     const buf = buildFits({
       bitpix: -32,
       naxis1: 2,
       naxis2: 2,
-      roworder: 'TOP-DOWN',
       pixels: [0, 0.5, 1, 0.13022],
     });
     const d = decodeFitsToBytes(buf);
     expect(d.width).toBe(2);
     expect(d.height).toBe(2);
     expect(d.channels).toBe(1);
-    expect(Array.from(d.data)).toEqual([0, 128, 255, 33]);
+    expect(Array.from(d.data)).toEqual([255, 33, 0, 128]);
   });
 
-  it('flips rows when ROWORDER is BOTTOM-UP (or absent — the FITS default)', () => {
-    const rowTop = [10, 20];
-    const rowBottom = [30, 40];
-    // File stores bottom row first for BOTTOM-UP
-    const buf = buildFits({
-      bitpix: -32,
-      naxis1: 2,
-      naxis2: 2,
-      roworder: 'BOTTOM-UP',
-      pixels: [...rowBottom.map((v) => v / 255), ...rowTop.map((v) => v / 255)],
-    });
-    const d = decodeFitsToBytes(buf);
-    // Output should present the top row first.
-    expect(Array.from(d.data)).toEqual([...rowTop, ...rowBottom]);
-
-    const bufNoHeader = buildFits({
-      bitpix: -32,
-      naxis1: 2,
-      naxis2: 2,
-      pixels: [...rowBottom.map((v) => v / 255), ...rowTop.map((v) => v / 255)],
-    });
-    const d2 = decodeFitsToBytes(bufNoHeader);
-    expect(Array.from(d2.data)).toEqual([...rowTop, ...rowBottom]);
-  });
-
-  it('does not flip when ROWORDER is TOP-DOWN', () => {
-    const rowTop = [10, 20];
-    const rowBottom = [30, 40];
-    const buf = buildFits({
-      bitpix: -32,
-      naxis1: 2,
-      naxis2: 2,
-      roworder: 'TOP-DOWN',
-      pixels: [...rowTop.map((v) => v / 255), ...rowBottom.map((v) => v / 255)],
-    });
-    const d = decodeFitsToBytes(buf);
-    expect(Array.from(d.data)).toEqual([...rowTop, ...rowBottom]);
-  });
+  // The WCS counts rows in stored order with row 1 at the bottom, and Siril shows and exports
+  // every file that way, so ROWORDER never changes how the picture is drawn.
+  it.each(['BOTTOM-UP', 'TOP-DOWN', undefined] as const)(
+    'draws the first stored row at the bottom (ROWORDER %s)',
+    (roworder) => {
+      const firstStored = [10, 20];
+      const secondStored = [30, 40];
+      const buf = buildFits({
+        bitpix: -32,
+        naxis1: 2,
+        naxis2: 2,
+        ...(roworder ? { roworder } : {}),
+        pixels: [...firstStored, ...secondStored].map((v) => v / 255),
+      });
+      expect(Array.from(decodeFitsToBytes(buf).data)).toEqual([...secondStored, ...firstStored]);
+    },
+  );
 });
 
 describe('decodeFitsToBytes — NAXIS3=3 colour cube', () => {
