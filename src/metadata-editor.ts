@@ -9,11 +9,15 @@ import type {
 import type { GearSetupData } from './api';
 import { updatePhotoMetadata, getGearSetups, solveWCS } from './api';
 import {
+  applyWcsChanges,
   draftFromPhoto,
   draftToMetadata,
-  fillDraftFromWcs,
   isDraftDirty,
+  wcsDraftChanges,
 } from '@myastrosky/core/photo-metadata-draft';
+import { wcsErrorMessage, wcsThrownErrorMessage } from '@myastrosky/core/wcs-load';
+import { confirmWcsDimensionMismatch } from './photo-delete-confirm';
+import { showWcsConflicts } from './wcs-conflicts';
 import { showToast } from './toast';
 import { t } from './i18n';
 import MetadataEditorPanel from './components/modals/MetadataEditorPanel.vue';
@@ -132,9 +136,11 @@ export function buildMetadataEditorPanel(
   app.mount(panelEl);
 
   // ── Load metadata from a WCS/FITS/TIFF file ───────────────────────────────────
-  // Re-solves the companion file to back-fill capture metadata after the fact (e.g.
-  // when the photo was placed with a different solver). Only fills empty fields —
-  // never clobbers values the user already entered.
+  // Re-reads the companion file to back-fill capture metadata after the fact (e.g.
+  // when the photo was placed with a different solver). Empty fields are filled; a
+  // file whose proportions differ from the photo's asks first (probably another
+  // photo's file), and values that differ from ones already entered are listed so
+  // the user picks which to replace. Nothing is saved before Save.
   const wcsRow = document.createElement('div');
   // `wcs-load-row` is a hook gallery.ts uses to relocate this out of the scrolling
   // form into the fixed action area; `my-2` spaces it in the standalone modal.
@@ -164,22 +170,33 @@ export function buildMetadataEditorPanel(
     try {
       const result = await solveWCS(file, photo.width || undefined, photo.height || undefined);
       if (!result.success) {
-        showToast({ message: t('gallery.loadFromWcsError'), type: 'error', duration: 4000 });
+        const info = wcsErrorMessage(result, file.name);
+        showToast({ message: t(info.key, info.params), type: 'error', duration: 8000 });
         return;
       }
-      const { patch, filled } = fillDraftFromWcs(state, result);
+      const warning = result.dimensionWarning;
+      if (warning?.aspectMismatch && !(await confirmWcsDimensionMismatch(warning))) return;
+
+      const { fills, conflicts } = wcsDraftChanges(state, result);
+      let taken = fills;
+      if (conflicts.length > 0) {
+        const chosen = await showWcsConflicts(conflicts);
+        if (!chosen) return;
+        taken = [...fills, ...chosen];
+      }
+      const patch = applyWcsChanges(state, taken);
       Object.assign(state, patch);
       if (patch.integrations) rememberFilters(patch.integrations.map((row) => row.filter));
       showToast({
-        message: filled > 0 ? t('gallery.loadFromWcsSuccess') : t('gallery.loadFromWcsEmpty'),
+        message: taken.length > 0 ? t('gallery.loadFromWcsSuccess') : t('gallery.loadFromWcsEmpty'),
         type: 'info',
         duration: 3500,
       });
-    } catch (err: any) {
+    } catch (err) {
       showToast({
-        message: err?.message || t('gallery.loadFromWcsError'),
+        message: wcsThrownErrorMessage(err, file.name),
         type: 'error',
-        duration: 4000,
+        duration: 8000,
       });
     } finally {
       wcsBtn.disabled = false;

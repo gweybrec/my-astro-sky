@@ -4,6 +4,8 @@ function confirmDeleteDialog(
   title: string,
   message: string,
   actionLabel: string,
+  /** `btn-confirm` for a choice that destroys nothing. */
+  actionClass: 'btn-danger' | 'btn-confirm' = 'btn-danger',
 ): Promise<boolean> {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
@@ -30,7 +32,7 @@ function confirmDeleteDialog(
 
     const confirmBtn = document.createElement('button');
     confirmBtn.type = 'button';
-    confirmBtn.className = 'btn-danger';
+    confirmBtn.className = actionClass;
     confirmBtn.textContent = actionLabel;
 
     const cleanup = () => {
@@ -186,5 +188,28 @@ export function confirmDiscardUnsavedSolves(count: number): Promise<boolean> {
     t('batch.confirmCloseTitle'),
     t('batch.confirmCloseMessage', { count: String(count) }),
     t('batch.confirmCloseAction'),
+  );
+}
+
+/**
+ * A solved file whose picture does not have the photo's proportions is probably another photo's: the same warning as
+ * when adding a photo, with Cancel / Continue anyway. Resolves true to continue.
+ */
+export function confirmWcsDimensionMismatch(warning: {
+  sourceW: number;
+  sourceH: number;
+  targetW: number;
+  targetH: number;
+}): Promise<boolean> {
+  return confirmDeleteDialog(
+    t('modal.wcsDimensionMismatchTitle'),
+    t('modal.wcsDimensionMismatchBody', {
+      fitsW: String(warning.sourceW),
+      fitsH: String(warning.sourceH),
+      jpegW: String(warning.targetW),
+      jpegH: String(warning.targetH),
+    }),
+    t('modal.wcsContinueAnyway'),
+    'btn-confirm',
   );
 }

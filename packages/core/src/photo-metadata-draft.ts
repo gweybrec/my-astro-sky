@@ -102,42 +102,96 @@ export function draftToMetadata(draft: PhotoMetadataDraft, currentName: string) 
   };
 }
 
+/** A value a solved (WCS/FITS/TIFF) file brings for one field of the draft. */
+export type WcsChange =
+  | { key: 'observationDate'; current: string; incoming: string }
+  | { key: 'integrations'; current: PhotoIntegration[]; incoming: PhotoIntegration[] }
+  | {
+      key: `capture.${string}`;
+      field: string;
+      current: string | number | undefined;
+      incoming: string | number;
+    };
+
+const isEmpty = (v: unknown) => v === undefined || v === null || v === '';
+
+function sameDate(a: string, b: string): boolean {
+  const ta = new Date(a).getTime();
+  const tb = new Date(b).getTime();
+  return Number.isNaN(ta) || Number.isNaN(tb) ? a === b : ta === tb;
+}
+
+function sameIntegrations(a: PhotoIntegration[], b: PhotoIntegration[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every(
+      (row, i) =>
+        row.frames === b[i].frames &&
+        row.seconds === b[i].seconds &&
+        row.filter.trim() === b[i].filter.trim(),
+    )
+  );
+}
+
 /**
- * What a solved (WCS/FITS/TIFF) file adds to a draft: only what the draft does not have yet (the date, one integration
- * row when there is none, the capture fields that are absent or empty), never over a value the user entered.
- * `filled` counts the values added.
+ * What a solved (WCS/FITS/TIFF) file brings to a draft: `fills` are values for fields the draft does not have yet
+ * (the date, one integration row when there is none, the capture fields that are absent or empty); `conflicts` are
+ * values that differ from one the draft already has, which the user chooses to take or not. Equal values are left out.
  */
-export function fillDraftFromWcs(
+export function wcsDraftChanges(
   draft: PhotoMetadataDraft,
   result: PlateSolveResult,
-): { patch: Partial<PhotoMetadataDraft>; filled: number } {
-  const patch: Partial<PhotoMetadataDraft> = {};
-  let filled = 0;
-  if (result.dateObs && !draft.observationDate) {
-    patch.observationDate = result.dateObs;
-    filled++;
+): { fills: WcsChange[]; conflicts: WcsChange[] } {
+  const fills: WcsChange[] = [];
+  const conflicts: WcsChange[] = [];
+  if (result.dateObs) {
+    const change: WcsChange = {
+      key: 'observationDate',
+      current: draft.observationDate,
+      incoming: result.dateObs,
+    };
+    if (!draft.observationDate) fills.push(change);
+    else if (!sameDate(draft.observationDate, result.dateObs)) conflicts.push(change);
   }
-  if (result.expTime && result.stackCnt && draft.integrations.length === 0) {
-    patch.integrations = [
+  if (result.expTime && result.stackCnt) {
+    const incoming = [
       {
         frames: Math.round(result.stackCnt),
         seconds: Math.round(result.expTime),
         filter: result.filter ?? '',
       },
     ];
-    filled++;
+    const current = sanitizeIntegrations(draft.integrations);
+    const change: WcsChange = { key: 'integrations', current, incoming };
+    if (draft.integrations.length === 0) fills.push(change);
+    else if (!sameIntegrations(current, incoming)) conflicts.push(change);
   }
-  if (result.captureDetails) {
-    const merged: CaptureDetails = { ...draft.captureDetails };
-    for (const [key, value] of Object.entries(result.captureDetails)) {
-      if (merged[key] === undefined || merged[key] === '') {
-        merged[key] = value;
-        filled++;
-      }
+  for (const [field, incoming] of Object.entries(result.captureDetails ?? {})) {
+    if (isEmpty(incoming)) continue;
+    const current = draft.captureDetails[field];
+    const change: WcsChange = { key: `capture.${field}`, field, current, incoming };
+    if (isEmpty(current)) fills.push(change);
+    else if (String(current).trim() !== String(incoming).trim()) conflicts.push(change);
+  }
+  return { fills, conflicts };
+}
+
+/** The draft fields to assign so that it holds the incoming value of each change. */
+export function applyWcsChanges(
+  draft: PhotoMetadataDraft,
+  changes: WcsChange[],
+): Partial<PhotoMetadataDraft> {
+  const patch: Partial<PhotoMetadataDraft> = {};
+  for (const change of changes) {
+    if (change.key === 'observationDate') patch.observationDate = change.incoming;
+    else if (change.key === 'integrations')
+      patch.integrations = change.incoming.map((row) => ({ ...row }));
+    else {
+      patch.captureDetails ??= { ...draft.captureDetails };
+      patch.captureDetails[change.field] = change.incoming;
     }
-    patch.captureDetails = merged;
   }
-  return { patch, filled };
+  return patch;
 }
 
 /**

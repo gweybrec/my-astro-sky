@@ -58,6 +58,8 @@
   /* A sheet's width in landscape, over a scrim or over the map; a dialog's; a pushed form's footer button's. */
   --mobile-sheet-width: 440px;
   --mobile-dialog-width: 400px;
+  /* A dialog button's share of its row: half, less half the gap between the two. */
+  --mobile-dialog-button-basis: calc(50% - var(--space-2));
   --mobile-footer-button-width: 200px;
   /* The sky's time bar in landscape: a card at the bottom right of the map. */
   --mobile-timebar-width: 480px;

@@ -976,7 +976,11 @@ const es: Translations = {
     loadFromWcsLoading: 'Leyendo…',
     loadFromWcsSuccess: 'Metadatos cargados del archivo',
     loadFromWcsEmpty: 'No se encontraron nuevos metadatos (se conservan los valores)',
-    loadFromWcsError: 'No se pudieron leer los metadatos de este archivo',
+    wcsConflictsTitle: 'Valores ya rellenados',
+    wcsConflictsIntro:
+      'Este archivo contiene otros valores para campos ya rellenados. Marque los que desea sustituir por el valor del archivo.',
+    wcsConflictsSelectAll: 'Usar los valores del archivo ({n})',
+    wcsConflictsApply: 'Aplicar',
     metadataTitle: 'Editar información',
     showOnMap: 'Ver en el mapa',
     rotatePhotoRight: 'Girar a la derecha',

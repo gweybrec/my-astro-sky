@@ -798,15 +798,20 @@ ion-alert.mob-dialog-alert--warning .alert-sub-title {
 ion-alert.mob-dialog-alert--warning .alert-button-group {
   order: 2;
 }
+/* Two equal buttons side by side; when a label does not fit on one line, they stack, the confirming one on top. */
 ion-alert.mob-dialog-alert .alert-button-group {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap-reverse;
   gap: var(--space-4);
   margin-top: var(--space-7);
   padding: 0;
 }
-ion-alert.mob-dialog-alert--single .alert-button-group {
-  grid-template-columns: minmax(0, 1fr);
+ion-alert.mob-dialog-alert .alert-button-group .alert-button {
+  flex: 1 1 var(--mobile-dialog-button-basis);
+  min-width: max-content;
+  padding: 0 var(--space-7);
+  white-space: nowrap;
 }
 ion-alert.mob-dialog-alert .alert-wrapper:focus,
 ion-alert.mob-dialog-alert .alert-wrapper:focus-visible {

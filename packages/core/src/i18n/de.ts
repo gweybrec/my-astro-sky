@@ -980,7 +980,11 @@ const de: Translations = {
     loadFromWcsLoading: 'Lese…',
     loadFromWcsSuccess: 'Metadaten aus Datei geladen',
     loadFromWcsEmpty: 'Keine neuen Metadaten gefunden (Werte beibehalten)',
-    loadFromWcsError: 'Metadaten dieser Datei konnten nicht gelesen werden',
+    wcsConflictsTitle: 'Bereits ausgefüllte Werte',
+    wcsConflictsIntro:
+      'Diese Datei enthält andere Werte für bereits ausgefüllte Felder. Markieren Sie die, die durch den Wert der Datei ersetzt werden sollen.',
+    wcsConflictsSelectAll: 'Werte der Datei verwenden ({n})',
+    wcsConflictsApply: 'Übernehmen',
     metadataTitle: 'Informationen bearbeiten',
     showOnMap: 'Auf Karte anzeigen',
     rotatePhotoRight: 'Nach rechts drehen',

@@ -975,7 +975,11 @@ const fr = {
     loadFromWcsLoading: 'Lecture…',
     loadFromWcsSuccess: 'Métadonnées chargées depuis le fichier',
     loadFromWcsEmpty: 'Aucune nouvelle métadonnée trouvée (valeurs conservées)',
-    loadFromWcsError: 'Impossible de lire les métadonnées de ce fichier',
+    wcsConflictsTitle: 'Valeurs déjà renseignées',
+    wcsConflictsIntro:
+      'Ce fichier contient d’autres valeurs pour des champs déjà remplis. Cochez celles à remplacer par la valeur du fichier.',
+    wcsConflictsSelectAll: 'Utiliser les valeurs du fichier ({n})',
+    wcsConflictsApply: 'Appliquer',
     metadataTitle: 'Modifier les infos',
     showOnMap: 'Voir sur la carte',
     rotatePhotoRight: 'Faire pivoter à droite',

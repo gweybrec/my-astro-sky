@@ -415,6 +415,47 @@ describe("a photo's own screen", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it('explains a file that was not plate-solved, with its name', async () => {
+    const w = mountPage();
+    await flushPromises();
+    pickFile.mockResolvedValueOnce(new File(['x'], 'brut.fits'));
+    solveWCS.mockResolvedValueOnce({ success: false, code: 'NO_WCS_DATA' });
+    await labelled(w, 'Charger un fichier WCS (fits/tiff)').trigger('click');
+    await flushPromises();
+    expect(showError.mock.calls.at(-1)?.[0]).toContain('brut.fits');
+    expect(showError.mock.calls.at(-1)?.[0]).toContain('Siril');
+  });
+
+  it("asks before taking a file whose proportions differ from the photo's", async () => {
+    const w = mountPage();
+    await flushPromises();
+    const result = {
+      success: true,
+      dateObs: '2025-09-14T21:30:00Z',
+      dimensionWarning: {
+        sourceW: 3000,
+        sourceH: 3000,
+        targetW: 4000,
+        targetH: 2000,
+        aspectMismatch: true,
+      },
+    };
+    pickFile.mockResolvedValue(new File(['x'], 'autre.fits'));
+    solveWCS.mockResolvedValue(result);
+    confirm.mockResolvedValueOnce(false);
+    await labelled(w, 'Charger un fichier WCS (fits/tiff)').trigger('click');
+    await flushPromises();
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ confirmLabel: 'Continuer quand même' }),
+    );
+    expect(pendingWcs.value).toBeNull();
+    expect(push).not.toHaveBeenCalled();
+    confirm.mockResolvedValueOnce(true);
+    await labelled(w, 'Charger un fichier WCS (fits/tiff)').trigger('click');
+    await flushPromises();
+    expect(pendingWcs.value).toEqual({ photoId: 'p1', result });
+  });
+
   describe('the objects and points of interest drawn over the photo ("Photo, objets affichés")', () => {
     beforeEach(() => {
       // The photo's area has a size, and its canvas a context, as in a browser.

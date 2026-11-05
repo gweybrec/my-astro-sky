@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   draftFromPhoto,
   draftToMetadata,
-  fillDraftFromWcs,
+  applyWcsChanges,
   filterLabelCandidates,
   isDraftDirty,
+  wcsDraftChanges,
   sanitizeIntegrations,
 } from '@myastrosky/core/photo-metadata-draft';
 import type { Photo, PlateSolveResult } from '@myastrosky/core/types';
@@ -131,7 +132,7 @@ describe('draftToMetadata', () => {
   });
 });
 
-describe('fillDraftFromWcs', () => {
+describe('wcsDraftChanges / applyWcsChanges', () => {
   const result = {
     success: true,
     dateObs: '2024-01-02T03:04:05.000Z',
@@ -141,32 +142,68 @@ describe('fillDraftFromWcs', () => {
     captureDetails: { gain: 200, iso: 800 },
   } as unknown as PlateSolveResult;
 
-  it('fills only what the draft does not have', () => {
-    const draft = draftFromPhoto(photo());
-    draft.captureDetails = { gain: 100, iso: '' };
-    const { patch, filled } = fillDraftFromWcs(draft, result);
-    expect(patch).toEqual({ captureDetails: { gain: 100, iso: 800 } });
-    expect(filled).toBe(1);
-  });
-
   it('fills the date, one integration row and the capture fields of an empty draft', () => {
     const draft = draftFromPhoto(
       photo({ observationDate: null, integrations: [], captureDetails: null }),
     );
-    const { patch, filled } = fillDraftFromWcs(draft, result);
-    expect(patch).toEqual({
+    const { fills, conflicts } = wcsDraftChanges(draft, result);
+    expect(conflicts).toEqual([]);
+    expect(fills.map((c) => c.key)).toEqual([
+      'observationDate',
+      'integrations',
+      'capture.gain',
+      'capture.iso',
+    ]);
+    expect(applyWcsChanges(draft, fills)).toEqual({
       observationDate: '2024-01-02T03:04:05.000Z',
       integrations: [{ frames: 30, seconds: 120, filter: 'Ha' }],
       captureDetails: { gain: 200, iso: 800 },
     });
-    expect(filled).toBe(4);
+  });
+
+  it('reports differing values as conflicts and leaves out equal ones', () => {
+    const draft = draftFromPhoto(photo());
+    draft.observationDate = '2023-05-05T00:00:00Z';
+    draft.integrations = [{ frames: 10, seconds: 60, filter: 'L' }];
+    draft.captureDetails = { gain: 100, iso: '800' };
+    const { fills, conflicts } = wcsDraftChanges(draft, result);
+    expect(fills).toEqual([]);
+    expect(conflicts.map((c) => c.key)).toEqual([
+      'observationDate',
+      'integrations',
+      'capture.gain',
+    ]);
+    expect(conflicts[2]).toMatchObject({ current: 100, incoming: 200 });
+  });
+
+  it('treats the same instant written differently as equal', () => {
+    const draft = draftFromPhoto(photo());
+    draft.observationDate = '2024-01-02T03:04:05Z';
+    draft.integrations = [{ frames: 30, seconds: 120, filter: 'Ha' }];
+    draft.captureDetails = { gain: 200, iso: 800 };
+    expect(wcsDraftChanges(draft, result)).toEqual({ fills: [], conflicts: [] });
+  });
+
+  it('fills an empty capture field while another one conflicts', () => {
+    const draft = draftFromPhoto(photo());
+    draft.captureDetails = { gain: 100, iso: '' };
+    const { fills, conflicts } = wcsDraftChanges(draft, result);
+    expect(fills.map((c) => c.key)).toContain('capture.iso');
+    expect(conflicts.map((c) => c.key)).toContain('capture.gain');
+    // Taking only the fills keeps the user's gain.
+    expect(applyWcsChanges(draft, fills).captureDetails).toEqual({ gain: 100, iso: 800 });
+    // Taking both replaces it.
+    expect(applyWcsChanges(draft, [...fills, ...conflicts]).captureDetails).toEqual({
+      gain: 200,
+      iso: 800,
+    });
   });
 
   it('finds nothing in a file without these headers', () => {
     const draft = draftFromPhoto(photo());
-    expect(fillDraftFromWcs(draft, { success: true } as PlateSolveResult)).toEqual({
-      patch: {},
-      filled: 0,
+    expect(wcsDraftChanges(draft, { success: true } as PlateSolveResult)).toEqual({
+      fills: [],
+      conflicts: [],
     });
   });
 });

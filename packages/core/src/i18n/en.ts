@@ -965,7 +965,11 @@ const en: Translations = {
     loadFromWcsLoading: 'Reading…',
     loadFromWcsSuccess: 'Metadata loaded from file',
     loadFromWcsEmpty: 'No new metadata found (existing values kept)',
-    loadFromWcsError: 'Could not read metadata from this file',
+    wcsConflictsTitle: 'Values already filled in',
+    wcsConflictsIntro:
+      'This file has other values for fields that are already filled in. Tick the ones to replace with the file’s value.',
+    wcsConflictsSelectAll: 'Use the file’s values ({n})',
+    wcsConflictsApply: 'Apply',
     metadataTitle: 'Edit info',
     showOnMap: 'Show on map',
     rotatePhotoRight: 'Rotate right',

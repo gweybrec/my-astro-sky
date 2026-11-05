@@ -10,7 +10,8 @@ import { isPhotoSolved, mergeIdentifiedPois } from '@myastrosky/core/photo-ident
 import {
   draftFromPhoto,
   draftToMetadata,
-  fillDraftFromWcs,
+  applyWcsChanges,
+  wcsDraftChanges,
   filterLabelCandidates,
   isDraftDirty,
   type PhotoMetadataDraft,
@@ -119,9 +120,11 @@ const dirty = computed(() => original.value !== null && isDraftDirty(draft, orig
 // ── WCS file ──────────────────────────────────────────────────────────────────────────────────────
 
 function applyWcs(result: PlateSolveResult) {
-  const { patch, filled } = fillDraftFromWcs(draft, result);
-  Object.assign(draft, patch);
-  void showNotice(filled > 0 ? t('gallery.loadFromWcsSuccess') : t('gallery.loadFromWcsEmpty'));
+  const { fills } = wcsDraftChanges(draft, result);
+  Object.assign(draft, applyWcsChanges(draft, fills));
+  void showNotice(
+    fills.length > 0 ? t('gallery.loadFromWcsSuccess') : t('gallery.loadFromWcsEmpty'),
+  );
 }
 
 async function loadWcs() {
