@@ -5,6 +5,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 It holds only **cross-cutting** guidance. Task-specific rules live in per-directory
 `CLAUDE.md` files, loaded automatically when you read or edit a file in that directory.
 
+## HARD RULE: NO PHONE CODE BEFORE THE USER APPROVES THE MOCKUPS
+
+Any change to the phone app (`apps/mobile/`) starts with mockups on the Claude Design canvas.
+
+1. Propose the mockups.
+2. **STOP and ask explicitly:** "Do you approve the mockups X? Yes or no."
+3. **Write no phone code before the user answers yes.** That means nothing in `apps/mobile/`: no screen, no composable, no test, and not "the parts that do not need the mockup" either.
+
+**Approving the plan is NOT approving the mockups.** Each mockup needs its own explicit yes.
+
 ## Nested guides
 
 | File                           | Covers                                                                                                                             |
