@@ -55,8 +55,10 @@
 
       <!-- Zoom/pan photo, shown turned as its quarterTurns say. A click (not a drag) is
            reported in the pixels of the photo as shown (photoAsShown); the modal's
-           markers are drawn through the `markers` slot's toDisplay(). -->
-      <div class="flex items-center justify-center w-full overflow-hidden">
+           markers are drawn through the `markers` slot's toDisplay(). The photo shrinks to
+           leave room for any extra line (fitPhotoToBody); shrink-0 keeps flex from
+           clipping its bottom (and the zoom buttons) instead. -->
+      <div class="flex items-center justify-center w-full overflow-hidden shrink-0">
         <div ref="photoContainerEl" class="modal-photo-container select-none" @click="onImageClick">
           <img
             ref="imgEl"
@@ -163,9 +165,14 @@ let unsubTransform: (() => void) | null = null;
 const layoutVersion = ref(0);
 let resizeObserver: ResizeObserver | null = null;
 
+let fitObserver: MutationObserver | null = null;
+
 function teardownZoom() {
   resizeObserver?.disconnect();
   resizeObserver = null;
+  fitObserver?.disconnect();
+  fitObserver = null;
+  window.removeEventListener('resize', fitPhotoToBody);
   unsubTransform?.();
   unsubTransform = null;
   zoom?.destroy();
@@ -182,44 +189,93 @@ function setupZoom() {
     dblClick: 'none',
     quarterTurns: turns.value,
   });
-  if (turns.value % 2 === 1) {
-    const img = imgEl.value;
-    if (img.complete) sizeSideways();
-    else img.addEventListener('load', sizeSideways, { once: true });
-  }
   zoomControlsHost.value?.appendChild(zoom.controls);
   unsubTransform = zoom.onTransformChange(() => {
     layoutVersion.value++;
   });
-  imgEl.value.addEventListener('load', () => layoutVersion.value++, { once: true });
+  const img = imgEl.value;
+  img.addEventListener('load', () => layoutVersion.value++, { once: true });
+  if (img.complete) fitPhotoToBody();
+  else img.addEventListener('load', fitPhotoToBody, { once: true });
   if (typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(() => layoutVersion.value++);
-    resizeObserver.observe(imgEl.value);
+    resizeObserver.observe(img);
   }
+  // A line appearing or going away in the body (the slow-search note, an error,
+  // results) changes the room left for the photo: refit before the next paint.
+  const body = bodyEl();
+  if (body && typeof MutationObserver !== 'undefined') {
+    fitObserver = new MutationObserver(fitPhotoToBody);
+    fitObserver.observe(body, { childList: true, subtree: true, characterData: true });
+  }
+  window.addEventListener('resize', fitPhotoToBody);
+}
+
+/** The modal's scrolling body, whose height (capped by the modal) the photo shares. */
+function bodyEl(): HTMLElement | null {
+  return photoContainerEl.value?.closest<HTMLElement>('.modal-form-body--scroll') ?? null;
+}
+
+/** Below this height the photo stops shrinking and the body scrolls instead. */
+const MIN_PHOTO_PX = 160;
+
+/**
+ * Shrinks the photo so that the whole modal body fits without scrolling: an extra line
+ * (slow-search note, error, results) takes its height from the photo, which grows back
+ * when the line goes. The photo is first laid out at its full size (`.modal-photo`'s 60vh)
+ * and then reduced by what overflows, all before the next paint.
+ */
+function fitPhotoToBody() {
+  const img = imgEl.value;
+  const container = photoContainerEl.value;
+  const body = bodyEl();
+  if (!img || !container || !body || !img.naturalWidth) return;
+  const full = window.innerHeight * 0.6;
+  const sideways = turns.value % 2 === 1;
+  const before = container.offsetHeight;
+  if (sideways) sizeSideways(full);
+  else img.style.maxHeight = '';
+  const overflow = bodyOverflow(body);
+  if (overflow > 0) {
+    const h = Math.max(
+      MIN_PHOTO_PX,
+      Math.floor(container.getBoundingClientRect().height - overflow),
+    );
+    if (sideways) sizeSideways(h);
+    else img.style.maxHeight = `${h}px`;
+  }
+  if (sideways && container.offsetHeight !== before) zoom?.reset();
+}
+
+/**
+ * How far the body's content runs past its bottom, in fractional pixels: `scrollHeight`
+ * rounds, and a half-pixel overflow it hides still shows a scroll bar.
+ */
+function bodyOverflow(body: HTMLElement): number {
+  const last = body.lastElementChild;
+  if (!last) return 0;
+  const innerBottom = body.getBoundingClientRect().top + body.clientTop + body.clientHeight;
+  const padBottom = parseFloat(getComputedStyle(body).paddingBottom) || 0;
+  return last.getBoundingClientRect().bottom + padBottom - innerBottom;
 }
 
 /**
  * A photo turned a quarter or three is wider than tall where its file is taller than wide: the container takes the size
- * of the turned picture within the same limits as an upright one (the modal's width, `.modal-photo`'s 60vh, never
- * enlarged), and the image the size of its file at that scale, which the zoom then shows turned in the container.
+ * of the turned picture within the same limits as an upright one (the modal's width, `maxHeight`, never enlarged), and
+ * the image the size of its file at that scale, which the zoom then shows turned in the container.
  */
-function sizeSideways() {
+function sizeSideways(maxHeight: number) {
   const img = imgEl.value;
   const container = photoContainerEl.value;
   const room = container?.parentElement?.clientWidth ?? 0;
   if (!img || !container || !img.naturalWidth || !img.naturalHeight || room <= 0) return;
-  const scale = Math.min(
-    1,
-    room / img.naturalHeight,
-    (window.innerHeight * 0.6) / img.naturalWidth,
-  );
+  const scale = Math.min(1, room / img.naturalHeight, maxHeight / img.naturalWidth);
   img.style.maxWidth = 'none';
   img.style.maxHeight = 'none';
   img.style.width = `${img.naturalWidth * scale}px`;
   img.style.height = `${img.naturalHeight * scale}px`;
   container.style.width = `${img.naturalHeight * scale}px`;
   container.style.height = `${img.naturalWidth * scale}px`;
-  zoom?.reset();
 }
 
 // The photo block only exists while the photo is solved (v-if), so wire zoom up
