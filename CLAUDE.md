@@ -140,6 +140,7 @@ See [docs/dev/dso-catalog.md](docs/dev/dso-catalog.md) for:
 
 ## Conventions
 
+- **Desktop and phone, always.** Every fix, improvement or feature covers both the desktop app and the phone app (`apps/mobile`); only the user may say to skip one. "On desktop" in a request says where it was seen, not a limit.
 - **UI text is internationalized in four languages (FR/EN/ES/DE).** French is the default language. Translations live in `src/i18n/fr.ts`, `en.ts`, `es.ts` and `de.ts` (server-side strings in `server/messages.ts`). Use `t('key')` for all user-facing strings. Constellation/DSO names use `displayName` (populated per-language at load time). Frontend specifics: `src/CLAUDE.md`.
 - **Privacy.** A change that may affect what leaves the device (a new outside server, more data in a request, the position or a photo sent somewhere) must be reviewed for privacy, and the privacy page texts (`settings.privacy*` in `packages/core/src/i18n/*.ts`, shown on desktop and phone) updated in the same change.
 - Editing a `.ts` file in `src/` or `server/`? See `tests/CLAUDE.md` for the matching-test-file rule.
