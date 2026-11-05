@@ -66,6 +66,7 @@ const en: Translations['mobile'] = {
     cometsFound: 'Comets found',
     keepAsPoi: 'Keep {name} as a point of interest',
     tapToAdjust: "Tap the photo to place {name}'s marker on its nucleus",
+    tapToAdjustAsteroid: "Tap the photo to place {name}'s marker",
     poiAddIntro: 'Name the point of interest, choose its type, then tap the photo to place it.',
     poiPanel: 'Point of interest',
     poiMarker: 'Point of interest',

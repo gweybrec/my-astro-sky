@@ -910,6 +910,8 @@ const es: Translations = {
     intro:
       'Marque el inicio y el final de la traza en la foto: IMCCE SkyBoT busca los asteroides conocidos que pasaban por allí entre esos dos instantes.',
     markHint: 'Haga clic en la estela para colocar el marcador seleccionado',
+    adjust: 'Ajustar posición',
+    clickToAdjust: 'Haga clic en la foto para mover el marcador de {name}',
     markStart: 'Inicio',
     markEnd: 'Fin',
     startTimeLabel: 'Hora de inicio (UTC)',

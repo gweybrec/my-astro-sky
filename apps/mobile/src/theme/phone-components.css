@@ -358,15 +358,26 @@ ion-checkbox.mob-check-row.checkbox-disabled::part(container) {
 }
 
 /* A row with its tick box at the start, in the lead holder (PhoneCheckLeadRow): the box is the tick-box row's. The text
-   beside it may be a button of its own, which takes the rest of the row's height. */
+   beside it may be a button of its own, which takes the rest of the row's height. The tick box's tap target
+   (`.mob-check-lead-hit`) is the whole strip before the text: the row's start padding, its full height and the gap; the
+   row hands that padding and gap to the strip, so nothing moves. */
 .mob-check-lead-row {
   align-items: stretch;
+  gap: 0;
+  padding-block: 0;
+  padding-inline-start: 0;
 }
-.mob-check-lead-row > .mob-row-lead {
-  align-self: center;
+.mob-check-lead-hit {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding-block: var(--space-4);
+  padding-inline: var(--mobile-gutter) var(--space-7);
+  cursor: pointer;
 }
 .mob-check-lead-row > .mob-row-body {
   justify-content: center;
+  padding-block: var(--space-4);
 }
 ion-checkbox.mob-lead-check {
   --size: var(--space-9);

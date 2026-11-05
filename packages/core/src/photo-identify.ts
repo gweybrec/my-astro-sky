@@ -9,6 +9,7 @@
  */
 import {
   buildSearch,
+  candidateToPoi as asteroidToPoi,
   isoToJd,
   photoPixelToRaDec,
   rankCandidates,
@@ -18,8 +19,9 @@ import {
 import { findComets, candidateToPoi as cometToPoi, type CometSearchResult } from './comet-identify';
 import type { CometElements } from './comet-ephemeris';
 import type { SkybotSearchParams, TnsSearchParams } from './domain/identify';
+import { applyAffine, invertAffine } from './affine';
 import { computePhotoToProjMatrix } from './photo-placement';
-import { withCanonicalProjection } from './projection';
+import { project, withCanonicalProjection } from './projection';
 import {
   photoFieldCircle,
   placeInImage,
@@ -111,6 +113,37 @@ export function rankAsteroids(
   plan: AsteroidSearchPlan,
 ): RankedCandidate[] {
   return rankCandidates(candidates, plan.marks, plan.params.epochJd);
+}
+
+/** Where each candidate is predicted on the photo (at the trail's middle time), in its pixels; null without a solve. */
+export function asteroidPixels(
+  photo: SolvedPhoto,
+  candidates: Pick<SkybotCandidate, 'raDeg' | 'decDeg'>[],
+): PhotoPixel[] | null {
+  return withCanonicalProjection(() => {
+    const matrix = computePhotoToProjMatrix(photo as Photo);
+    const inv = matrix ? invertAffine(matrix) : null;
+    if (!inv) return null;
+    return candidates.map((c) => applyAffine(inv, project(c.raDeg, c.decDeg)));
+  });
+}
+
+/**
+ * The points of interest of the chosen asteroids, each at the pixel the user put its marker on (`moved`, by
+ * `keyOf`), else at its predicted position.
+ */
+export function asteroidPois(
+  photo: SolvedPhoto,
+  chosen: SkybotCandidate[],
+  moved: ReadonlyMap<string, PhotoPixel>,
+  keyOf: (c: SkybotCandidate) => string,
+  categoryId: string,
+): PointOfInterest[] {
+  return chosen.map((c) => {
+    const px = moved.get(keyOf(c));
+    const sky = px ? photoPixelsToRaDec(photo, [px])?.[0] : null;
+    return asteroidToPoi(sky ? { ...c, raDeg: sky.ra, decDeg: sky.dec } : c, categoryId);
+  });
 }
 
 // ── Supernovae ──────────────────────────────────────────────────────────────────────────────────

@@ -66,6 +66,7 @@ const de: Translations['mobile'] = {
     cometsFound: 'Gefundene Kometen',
     keepAsPoi: '{name} als Point of Interest behalten',
     tapToAdjust: 'Tippen Sie auf das Foto, um die Markierung von {name} auf seinen Kern zu setzen',
+    tapToAdjustAsteroid: 'Tippen Sie auf das Foto, um die Markierung von {name} zu setzen',
     poiAddIntro:
       'Benennen Sie den Point of Interest, wählen Sie seinen Typ und tippen Sie dann auf das Foto, um ihn zu platzieren.',
     poiPanel: 'Point of Interest',

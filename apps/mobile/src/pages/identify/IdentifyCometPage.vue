@@ -140,7 +140,7 @@ function addSelected() {
     <PhoneHelper v-else-if="results && results.inFrame.length === 0">{{
       t('comet.noCandidates')
     }}</PhoneHelper>
-    <PhoneHelper v-else-if="results && activeName">{{
+    <PhoneHelper v-else-if="results && activeName" small>{{
       t('mobile.identify.tapToAdjust', { name: activeName })
     }}</PhoneHelper>
     <div

@@ -909,6 +909,8 @@ const fr = {
     intro:
       'Marquez le début et la fin de la traînée sur la photo : IMCCE SkyBoT recherche les astéroïdes connus qui passaient là entre ces deux instants.',
     markHint: 'Cliquez sur la traînée pour placer le marqueur sélectionné',
+    adjust: 'Ajuster la position',
+    clickToAdjust: 'Cliquez sur la photo pour placer le repère de {name}',
     markStart: 'Départ',
     markEnd: 'Arrivée',
     startTimeLabel: 'Heure de départ (UTC)',

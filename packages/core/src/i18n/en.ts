@@ -900,6 +900,8 @@ const en: Translations = {
     intro:
       'Mark the start and end of the trail on the photo: IMCCE SkyBoT searches for the known asteroids that crossed there between those two times.',
     markHint: 'Click on the trail to place the selected marker',
+    adjust: 'Adjust position',
+    clickToAdjust: 'Click the photo to move the pin of {name}',
     markStart: 'Start',
     markEnd: 'End',
     startTimeLabel: 'Start time (UTC)',

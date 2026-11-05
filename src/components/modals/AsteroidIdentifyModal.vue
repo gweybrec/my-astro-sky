@@ -39,26 +39,33 @@
       </div>
     </template>
 
-    <!-- Which end of the trail the next click on the photo marks. -->
+    <!-- Which end of the trail the next click on the photo marks — or, while a result's
+         Adjust button is pressed, that the click moves its pin instead. -->
     <template #photo-hint>
       <div class="flex items-center gap-2">
         <button
           type="button"
           class="btn-icon"
-          :class="{ 'btn-icon--active': activeMarker === 'start' }"
-          @click="activeMarker = 'start'"
+          :class="{ 'btn-icon--active': !adjustingKey && activeMarker === 'start' }"
+          @click="markTrail('start')"
         >
           {{ t('asteroid.markStart') }}
         </button>
         <button
           type="button"
           class="btn-icon"
-          :class="{ 'btn-icon--active': activeMarker === 'end' }"
-          @click="activeMarker = 'end'"
+          :class="{ 'btn-icon--active': !adjustingKey && activeMarker === 'end' }"
+          @click="markTrail('end')"
         >
           {{ t('asteroid.markEnd') }}
         </button>
-        <span class="text-hint">{{ t('asteroid.markHint') }}</span>
+        <span class="text-hint">
+          {{
+            adjustingCandidate
+              ? t('asteroid.clickToAdjust', { name: formatCandidateName(adjustingCandidate) })
+              : t('asteroid.markHint')
+          }}
+        </span>
       </div>
     </template>
 
@@ -73,6 +80,21 @@
         class="absolute w-[14px] h-[14px] -ml-[7px] -mt-[7px] rounded-full border-2 border-solid border-[var(--color-danger)] pointer-events-none"
         :style="{ left: `${toDisplay(endPx)!.left}px`, top: `${toDisplay(endPx)!.top}px` }"
       ></span>
+      <!-- A pin per selected asteroid, at its predicted position (the trail's middle
+           time) or where the user moved it; the one being adjusted is larger. -->
+      <template v-for="c in selectedCandidates" :key="candidateKey(c)">
+        <span
+          v-if="pinPixel(c) && toDisplay(pinPixel(c)!)"
+          class="absolute w-[28px] h-[28px] -ml-[14px] -mt-[14px] pointer-events-none transition-transform [&>svg]:w-full [&>svg]:h-full"
+          :class="{ 'scale-150': adjustingKey === candidateKey(c) }"
+          :style="{
+            left: `${toDisplay(pinPixel(c)!)!.left}px`,
+            top: `${toDisplay(pinPixel(c)!)!.top}px`,
+            color: pinColor,
+          }"
+          v-html="pinSvg"
+        ></span>
+      </template>
     </template>
 
     <!-- Results, paginated so a wide search radius doesn't dump hundreds of rows.
@@ -85,7 +107,12 @@
             <label
               v-for="c in pagedResults"
               :key="candidateKey(c)"
-              class="flex items-start gap-3 py-2 px-3 border border-[var(--border-panel)] rounded-sm cursor-pointer"
+              class="flex items-start gap-3 py-2 px-3 border border-solid rounded-sm cursor-pointer"
+              :class="
+                adjustingKey === candidateKey(c)
+                  ? 'border-[var(--border-focus)] bg-[var(--accent-fill-sm)]'
+                  : 'border-[var(--border-panel)]'
+              "
             >
               <input
                 type="checkbox"
@@ -94,7 +121,12 @@
                 @change="toggle(candidateKey(c), ($event.target as HTMLInputElement).checked)"
               />
               <div class="flex-1 min-w-0">
-                <div class="font-medium truncate">{{ formatCandidateName(c) }}</div>
+                <div class="flex items-baseline gap-2 min-w-0">
+                  <span class="font-medium truncate">{{ formatCandidateName(c) }}</span>
+                  <span v-if="overrides.has(candidateKey(c))" class="tag-chip-sm">
+                    {{ t('comet.adjusted') }}
+                  </span>
+                </div>
                 <div class="text-hint text-small">
                   {{ formatAsteroidClass(c.className) }} · {{ t('asteroid.colMag') }}
                   {{ c.vMag?.toFixed(1) ?? '—' }} · {{ t('asteroid.colError') }}
@@ -102,8 +134,29 @@
                   <span v-if="c.uncertainOrbit" class="text-[var(--text-warning-sm)]">
                     · {{ t('asteroid.uncertainOrbit') }}
                   </span>
+                  <template v-if="overrides.has(candidateKey(c))">
+                    ·
+                    <button
+                      type="button"
+                      class="settings-link bg-transparent border-none p-0 cursor-pointer text-small"
+                      @click.stop.prevent="resetPosition(candidateKey(c))"
+                    >
+                      {{ t('comet.resetPosition') }}
+                    </button>
+                  </template>
                 </div>
               </div>
+              <!-- Moves this asteroid's pin with the next clicks on the photo; only a
+                   selected asteroid becomes a point of interest, so only it adjusts. -->
+              <button
+                type="button"
+                class="self-center"
+                :class="adjustingKey === candidateKey(c) ? 'btn-icon--active' : 'btn-icon'"
+                :disabled="!selected.has(candidateKey(c))"
+                @click.stop.prevent="toggleAdjust(candidateKey(c))"
+              >
+                {{ t('asteroid.adjust') }}
+              </button>
             </label>
           </div>
 
@@ -171,22 +224,30 @@
 import { ref, computed } from 'vue';
 import IdentifyModalShell from './IdentifyModalShell.vue';
 import { t } from '../../i18n';
-import { asteroidSearchPlan, rankAsteroids } from '@myastrosky/core/photo-identify';
+import {
+  asteroidPixels,
+  asteroidPois,
+  asteroidSearchPlan,
+  rankAsteroids,
+  type PhotoPixel,
+} from '@myastrosky/core/photo-identify';
 import { photoAsShown } from '@myastrosky/core/photo-rotation';
 import { skybotConesearchAPI } from '../../api';
 import { buildPageList } from '@myastrosky/core/targets/sorting';
 import {
   formatCandidateName,
   formatAsteroidClass,
-  candidateToPoi,
   defaultTimeWindow,
   type RankedCandidate,
 } from '@myastrosky/core/asteroid-identify';
 import { useUtcDateTime } from '../../composables/useUtcDateTime';
+import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+import { resolveCategory } from '@myastrosky/core/poi';
+import pinSvg from '../../icons/supernova-pin.svg?raw';
 import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 
 const ASTEROID_CATEGORY_ID = 'cat-asteroid';
-const RESULTS_PAGE_SIZE = 6;
+const RESULTS_PAGE_SIZE = 3;
 
 const props = defineProps<{ photo: Photo }>();
 // The photo as it is shown, turned: the clicks and the markers of the shell are in its pixels.
@@ -197,6 +258,12 @@ const shown = computed(() => photoAsShown(props.photo));
 // BatchUploadModal card still pending its initial save.
 const emit = defineEmits<{ close: []; identified: [Photo, PointOfInterest[]] }>();
 
+const categoriesStore = usePoiCategoriesStore();
+void categoriesStore.ensureLoaded();
+const pinColor = computed(
+  () => resolveCategory(ASTEROID_CATEGORY_ID, categoriesStore.categories).color,
+);
+
 // ─── Trail markers ──────────────────────────────────────────────────────────
 type MarkerKey = 'start' | 'end';
 const activeMarker = ref<MarkerKey>('start');
@@ -204,6 +271,12 @@ const startPx = ref<{ x: number; y: number } | null>(null);
 const endPx = ref<{ x: number; y: number } | null>(null);
 
 function onPhotoClick(px: { x: number; y: number }) {
+  if (adjustingKey.value) {
+    const next = new Map(overrides.value);
+    next.set(adjustingKey.value, px);
+    overrides.value = next;
+    return;
+  }
   if (activeMarker.value === 'start') {
     startPx.value = px;
     activeMarker.value = 'end';
@@ -228,6 +301,10 @@ const searchErrorMessage = ref('');
 const ranked = ref<RankedCandidate[] | null>(null);
 const resultPage = ref(0);
 const selected = ref(new Set<string>());
+/** The asteroid whose pin a click on the photo moves (its Adjust button is pressed); null = marking the trail. */
+const adjustingKey = ref<string | null>(null);
+/** Pixel positions the user put the pins on, per candidate key — they win over the prediction. */
+const overrides = ref(new Map<string, PhotoPixel>());
 
 const canSearch = computed(
   () => !!startPx.value && !!endPx.value && !!startIso.value && !!endIso.value,
@@ -247,6 +324,44 @@ function candidateKey(c: Pick<RankedCandidate, 'number' | 'name'>): string {
   return `${c.number ?? ''}|${c.name}`;
 }
 
+/** Each result's predicted pixel on the photo, by candidate key. */
+const predictedPixels = computed(() => {
+  const map = new Map<string, PhotoPixel>();
+  if (!ranked.value) return map;
+  const pixels = asteroidPixels(shown.value, ranked.value);
+  ranked.value.forEach((c, i) => {
+    if (pixels) map.set(candidateKey(c), pixels[i]);
+  });
+  return map;
+});
+const selectedCandidates = computed(() =>
+  (ranked.value ?? []).filter((c) => selected.value.has(candidateKey(c))),
+);
+const adjustingCandidate = computed(
+  () => (ranked.value ?? []).find((c) => candidateKey(c) === adjustingKey.value) ?? null,
+);
+
+/** An asteroid's pin in photo pixels: where the user put it, else the prediction. */
+function pinPixel(c: RankedCandidate): PhotoPixel | null {
+  const key = candidateKey(c);
+  return overrides.value.get(key) ?? predictedPixels.value.get(key) ?? null;
+}
+
+function toggleAdjust(key: string) {
+  adjustingKey.value = adjustingKey.value === key ? null : key;
+}
+
+function markTrail(marker: MarkerKey) {
+  adjustingKey.value = null;
+  activeMarker.value = marker;
+}
+
+function resetPosition(key: string) {
+  const next = new Map(overrides.value);
+  next.delete(key);
+  overrides.value = next;
+}
+
 async function onSearch() {
   if (!startPx.value || !endPx.value) return;
   searching.value = true;
@@ -254,6 +369,8 @@ async function onSearch() {
   ranked.value = null;
   resultPage.value = 0;
   selected.value = new Set();
+  adjustingKey.value = null;
+  overrides.value = new Map();
   try {
     const plan = asteroidSearchPlan(
       shown.value,
@@ -279,14 +396,23 @@ function toggle(key: string, on: boolean) {
   if (on) next.add(key);
   else next.delete(key);
   selected.value = next;
+  // An unselected asteroid is not added, so there is nothing left to adjust (its moved pin is kept).
+  if (!on && adjustingKey.value === key) adjustingKey.value = null;
 }
 
 // Persistence is the caller's job — see the `identified` emit doc above.
 function onAdd() {
   if (!ranked.value) return;
-  const pois = ranked.value
-    .filter((c) => selected.value.has(candidateKey(c)))
-    .map((c) => candidateToPoi(c, ASTEROID_CATEGORY_ID));
-  emit('identified', props.photo, pois);
+  emit(
+    'identified',
+    props.photo,
+    asteroidPois(
+      shown.value,
+      selectedCandidates.value,
+      overrides.value,
+      candidateKey,
+      ASTEROID_CATEGORY_ID,
+    ),
+  );
 }
 </script>

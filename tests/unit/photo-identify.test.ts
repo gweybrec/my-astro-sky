@@ -10,6 +10,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import {
+  asteroidPixels,
+  asteroidPois,
   asteroidSearchPlan,
   cometPois,
   cometsInPhoto,
@@ -157,6 +159,49 @@ describe('asteroidSearchPlan() and rankAsteroids()', () => {
     expect(
       asteroidSearchPlan(UNSOLVED, start, end, '2026-09-04T20:00:00Z', '2026-09-04T22:00:00Z', 5),
     ).toBeNull();
+  });
+});
+
+describe('asteroidPixels() and asteroidPois()', () => {
+  const candidate = {
+    number: '433',
+    name: 'Eros',
+    raDeg: 339.267614,
+    decDeg: 34.419887,
+    className: 'NEA>Amor',
+    vMag: 12,
+    ephemErrArcsec: 1,
+    distArcsec: 0,
+    dRaArcsecPerHour: 0,
+    dDecArcsecPerHour: 0,
+  };
+  const keyOf = (c: { number: string | null; name: string }) => `${c.number ?? ''}|${c.name}`;
+
+  it('places a candidate on the photo at its predicted position', () => {
+    const [px] = asteroidPixels(NGC7331, [candidate])!;
+    // Within half a pixel: the synthetic solve is a 3-star fit of a linearised field.
+    expect(px.x).toBeCloseTo(332, 0);
+    expect(px.y).toBeCloseTo(235, 0);
+    expect(asteroidPixels(UNSOLVED, [candidate])).toBeNull();
+  });
+
+  it('pins an asteroid at its prediction, or where its marker was moved', () => {
+    const [predicted] = asteroidPois(NGC7331, [candidate], new Map(), keyOf, 'cat-asteroid');
+    expect(predicted).toMatchObject({ name: '(433) Eros', categoryId: 'cat-asteroid' });
+    expect(predicted.ra).toBeCloseTo(candidate.raDeg, 9);
+    expect(predicted.dec).toBeCloseTo(candidate.decDeg, 9);
+
+    const at = { x: 100, y: 50 };
+    const [moved] = asteroidPois(
+      NGC7331,
+      [candidate],
+      new Map([[keyOf(candidate), at]]),
+      keyOf,
+      'cat-asteroid',
+    );
+    const [sky] = photoPixelsToRaDec(NGC7331, [at])!;
+    expect(moved.ra).toBeCloseTo(sky.ra, 9);
+    expect(moved.dec).toBeCloseTo(sky.dec, 9);
   });
 });
 

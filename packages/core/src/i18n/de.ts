@@ -913,6 +913,8 @@ const de: Translations = {
     intro:
       'Markieren Sie Anfang und Ende der Spur auf dem Foto: IMCCE SkyBoT sucht die bekannten Asteroiden, die dort zwischen diesen beiden Zeitpunkten vorbeizogen.',
     markHint: 'Klicken Sie auf die Spur, um den ausgewählten Marker zu setzen',
+    adjust: 'Position anpassen',
+    clickToAdjust: 'Klicken Sie auf das Foto, um die Markierung von {name} zu setzen',
     markStart: 'Start',
     markEnd: 'Ende',
     startTimeLabel: 'Startzeit (UTC)',

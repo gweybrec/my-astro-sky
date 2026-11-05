@@ -195,13 +195,20 @@ describe('identify an asteroid', () => {
     expect(skybotConesearchAPI.mock.calls[0][0].radiusArcmin).toBeCloseTo(24.5, 1);
 
     expect(w.find('.mob-helper').text()).toBe('2 astéroïdes trouvés');
-    const rows = w.findAll('.mob-check-row');
+    const rows = w.findAll('.mob-check-lead-row');
     expect(rows.map((r) => r.find('.mob-row-title').text())).toEqual([
       '(1685) Toro',
       '(2204) Lyyli',
     ]);
     expect(rows[1].find('.mob-status--warn').text()).toBe('Orbite incertaine');
-    expect(rows.map((r) => r.attributes('aria-checked'))).toEqual(['true', 'false']);
+    expect(rows.map((r) => r.find('[role=checkbox]').attributes('aria-checked'))).toEqual([
+      'true',
+      'false',
+    ]);
+    // The best match is the current one: a tap on the photo would move its pin.
+    expect(rows[0].classes()).toContain('mob-row--current');
+    expect(w.text()).toContain('Touchez la photo pour placer le repère de (1685) Toro');
+    expect(w.findAll('.mob-pin')).toHaveLength(1);
 
     await byText(w, 'button', 'Ajouter la sélection (1)').trigger('click');
     await flushPromises();
@@ -225,6 +232,100 @@ describe('identify an asteroid', () => {
     await byText(w, 'button', 'Modifier la recherche').trigger('click');
     expect(w.findAll('.mob-when-row')).toHaveLength(3);
     expect(w.findAll('.mob-marker')).toHaveLength(2);
+  });
+
+  /** Marks a trail, searches, and lists Toro (best match) then Lyyli. */
+  async function twoFound() {
+    const w = await mountPage(IdentifyAsteroidPage);
+    await tapPhoto(w, { x: 200, y: 235 });
+    await tapPhoto(w, { x: 460, y: 235 });
+    const [s, e] = photoPixelsToRaDec(NGC7331, [
+      { x: 200, y: 235 },
+      { x: 460, y: 235 },
+    ])!;
+    const toro = {
+      number: '1685',
+      name: 'Toro',
+      raDeg: (s.ra + e.ra) / 2,
+      decDeg: (s.dec + e.dec) / 2,
+      className: 'NEA>Apollo',
+      vMag: 16.2,
+      ephemErrArcsec: 1,
+      distArcsec: 0,
+      dRaArcsecPerHour: (((e.ra - s.ra) * Math.cos((34.42 * Math.PI) / 180)) / 2) * 3600,
+      dDecArcsecPerHour: 0,
+    };
+    skybotConesearchAPI.mockResolvedValue([
+      toro,
+      { ...toro, number: '2204', name: 'Lyyli', dRaArcsecPerHour: 0 },
+    ]);
+    await byLabel(w, 'button', 'Rechercher').trigger('click');
+    await flushPromises();
+    const rows = () => w.findAll('.mob-check-lead-row');
+    const ticked = () => rows().map((r) => r.find('[role=checkbox]').attributes('aria-checked'));
+    const currentRow = () => rows().findIndex((r) => r.classes().includes('mob-row--current'));
+    return { w, rows, ticked, currentRow };
+  }
+
+  it('ticking an asteroid makes it the current one; a tap on the photo moves its pin, saved where it was put', async () => {
+    const { w, rows, ticked, currentRow } = await twoFound();
+    await rows()[1].find('[role=checkbox]').trigger('click');
+    expect(ticked()).toEqual(['true', 'true']);
+    expect(currentRow()).toBe(1);
+    expect(w.text()).toContain('Touchez la photo pour placer le repère de (2204) Lyyli');
+
+    // In the results, a tap moves the current pin, not the trail's markers.
+    await tapPhoto(w, { x: 100, y: 50 });
+    expect(rows().map((r) => r.find('.mob-badge').classes().includes('mob-invisible'))).toEqual([
+      true,
+      false,
+    ]);
+    expect(w.findAll('.mob-marker')).toHaveLength(2);
+
+    await byText(w, 'button', 'Ajouter la sélection (2)').trigger('click');
+    await flushPromises();
+    const [sky] = photoPixelsToRaDec(NGC7331, [{ x: 100, y: 50 }])!;
+    const lyyli = savedPois().find((p: { name: string }) => p.name === '(2204) Lyyli');
+    expect(lyyli.ra).toBeCloseTo(sky.ra, 9);
+    expect(lyyli.dec).toBeCloseTo(sky.dec, 9);
+  });
+
+  it('the text makes a row current without ticking it; the strip around the tick box ticks it', async () => {
+    const { w, rows, ticked, currentRow } = await twoFound();
+    await rows()[1].find('.mob-row-text').trigger('click');
+    expect(currentRow()).toBe(1);
+    expect(ticked()).toEqual(['true', 'false']);
+    // The current row's pin shows, dimmed while it is not ticked.
+    expect(w.findAll('.mob-pin').map((p) => p.classes().includes('mob-pin--off'))).toEqual([
+      false,
+      true,
+    ]);
+
+    // A tap beside the box, in its strip, ticks it; another unticks it, and the row stays current.
+    await rows()[1].find('.mob-check-lead-hit').trigger('click');
+    expect(ticked()).toEqual(['true', 'true']);
+    await rows()[1].find('.mob-check-lead-hit').trigger('click');
+    expect(ticked()).toEqual(['true', 'false']);
+    expect(currentRow()).toBe(1);
+
+    // Unticking another row leaves the current one as it is.
+    await rows()[0].find('[role=checkbox]').trigger('click');
+    expect(ticked()).toEqual(['false', 'false']);
+    expect(currentRow()).toBe(1);
+  });
+
+  it('"Revenir à la position prédite" puts an asteroid\'s pin back', async () => {
+    const { w, rows } = await twoFound();
+    const reset = () =>
+      rows()[0]
+        .findAll('button')
+        .find((b) => b.text() === 'Revenir à la position prédite')!;
+    expect(reset().attributes('disabled')).toBeDefined();
+    await tapPhoto(w, { x: 10, y: 10 });
+    expect(reset().attributes('disabled')).toBeUndefined();
+    await reset().trigger('click');
+    expect(reset().attributes('disabled')).toBeDefined();
+    expect(rows()[0].find('.mob-badge').classes()).toContain('mob-invisible');
   });
 
   it('shows a spinner while SkyBoT answers, and after 20 s says the search still runs', async () => {
@@ -269,7 +370,7 @@ describe('identify an asteroid', () => {
     await byLabel(w, 'button', 'Rechercher').trigger('click');
     await flushPromises();
     expect(w.find('.mob-helper').text()).toBe('50 astéroïdes trouvés');
-    expect(w.findAll('.mob-check-row')).toHaveLength(20);
+    expect(w.findAll('.mob-check-lead-row')).toHaveLength(20);
     const list = w.find('.mob-results-list').element as HTMLElement;
     Object.defineProperties(list, {
       scrollTop: { value: 1000, configurable: true },
@@ -277,7 +378,7 @@ describe('identify an asteroid', () => {
       scrollHeight: { value: 1400, configurable: true },
     });
     await w.find('.mob-results-list').trigger('scroll');
-    expect(w.findAll('.mob-check-row')).toHaveLength(40);
+    expect(w.findAll('.mob-check-lead-row')).toHaveLength(40);
   });
 
   it('opens the photo instead when it has no solve', async () => {

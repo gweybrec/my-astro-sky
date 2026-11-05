@@ -477,7 +477,7 @@ export const rules = [
   {
     id: 'lead-check',
     type: 'boxCentre',
-    boxes: '.mob-check-lead-row > .mob-row-lead',
+    boxes: '.mob-check-lead-hit > .mob-row-lead',
     icon: 'ion-checkbox',
   },
   // An icon after a text is centred on the text's line.

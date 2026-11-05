@@ -174,6 +174,9 @@ export default defineConfig({
       'inline-grid grid-rows-[minmax(1lh,auto)] place-items-center place-content-center',
       'transition-colors duration-150',
       'hover:bg-[var(--accent-fill-lg)] hover:border-[var(--border-focus)] hover:text-bright',
+      // Disabled: dimmed like the other disabled buttons (.btn-action), no hover fill.
+      'disabled:opacity-40 disabled:cursor-default',
+      'disabled:hover:bg-transparent disabled:hover:border-[var(--border-white-md)] disabled:hover:text-primary',
     ].join(' '),
 
     'btn-icon--danger': [

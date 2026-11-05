@@ -11,7 +11,8 @@ import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import AsteroidIdentifyModal from '../../src/components/modals/AsteroidIdentifyModal.vue';
 import { isoToUtcParts, isoToJd } from '@myastrosky/core/asteroid-identify';
-import type { Photo, ManualPlacement } from '@myastrosky/core/types';
+import type { Photo, ManualPlacement, PointOfInterest } from '@myastrosky/core/types';
+import { photoPixelsToRaDec } from '@myastrosky/core/photo-identify';
 import { setCenterMode, setProjectionObserver } from '@myastrosky/core/projection';
 
 vi.mock('../../src/api', () => ({
@@ -273,16 +274,16 @@ describe('AsteroidIdentifyModal', () => {
   });
 
   it('paginates a large result list and keeps the selection across pages', async () => {
-    mockConesearch.mockResolvedValue(Array.from({ length: 10 }, (_, i) => candidate(i)));
+    mockConesearch.mockResolvedValue(Array.from({ length: 5 }, (_, i) => candidate(i)));
     const wrapper = mountModal();
     await markAndSearch(wrapper);
 
-    // 10 candidates, page size 6: first page shows 6 rows + the same pagination
+    // 5 candidates, page size 3: first page shows 3 rows + the same pagination
     // widget (markup/classes/page-range algorithm) as the Targets tab's result
     // list — see targets-view.ts's buildPageList, reused here directly.
-    expect(checkboxes().length).toBe(6);
+    expect(checkboxes().length).toBe(3);
     expect(document.body.querySelector('.targets-pagination')).toBeTruthy();
-    expect(document.body.querySelector('.targets-pagination-info')?.textContent).toContain('10');
+    expect(document.body.querySelector('.targets-pagination-info')?.textContent).toContain('5');
 
     const nextBtn = Array.from(document.body.querySelectorAll('button')).find(
       (b) => b.title === 'Next page',
@@ -290,9 +291,9 @@ describe('AsteroidIdentifyModal', () => {
     nextBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await wrapper.vm.$nextTick();
 
-    // Second (last) page shows the remaining 4 rows; tick one of them.
-    expect(checkboxes().length).toBe(4);
-    const last = checkboxes()[3];
+    // Second (last) page shows the remaining 2 rows; tick one of them.
+    expect(checkboxes().length).toBe(2);
+    const last = checkboxes()[1];
     last.checked = true;
     last.dispatchEvent(new Event('change'));
     await wrapper.vm.$nextTick();
@@ -300,12 +301,58 @@ describe('AsteroidIdentifyModal', () => {
     // Clicking Next again on the last page is a clamped no-op, not an error.
     nextBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await wrapper.vm.$nextTick();
-    expect(checkboxes().length).toBe(4);
+    expect(checkboxes().length).toBe(2);
 
     // The first page's pre-ticked best match is still selected: two POIs are added.
     buttonByText('Add selected (2)').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const [, pois] = wrapper.emitted('identified')![0] as [Photo, { name: string }[]];
     expect(pois).toHaveLength(2);
+    wrapper.unmount();
+  });
+
+  it('adjusts only a ticked asteroid, moving its point of interest to the clicked pixel', async () => {
+    mockConesearch.mockResolvedValue([candidate(1), candidate(2)]);
+    const wrapper = mountModal();
+    await markAndSearch(wrapper);
+    const adjustButtons = () =>
+      Array.from(document.body.querySelectorAll('button')).filter(
+        (b) => b.textContent?.trim() === 'Adjust position',
+      ) as HTMLButtonElement[];
+
+    // The best match is pre-ticked: only its Adjust button is enabled.
+    expect(adjustButtons().map((b) => b.disabled)).toEqual([false, true]);
+    expect(document.body.querySelectorAll('.modal-photo-container svg').length).toBe(1);
+
+    adjustButtons()[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await wrapper.vm.$nextTick();
+    expect(adjustButtons()[0].className).toContain('btn-icon--active');
+    expect(document.body.textContent).toContain('Click the photo to move the pin of (1) Test 1');
+    // The ticked row's checkbox is not toggled by its Adjust button.
+    expect(checkboxes()[0].checked).toBe(true);
+
+    // A click on the photo now moves the pin, not the trail's end.
+    const photo = document.body.querySelector('.modal-photo-container') as HTMLElement;
+    photo.dispatchEvent(new MouseEvent('click', { clientX: 100, clientY: 50, bubbles: true }));
+    await wrapper.vm.$nextTick();
+    expect(document.body.textContent).toContain('Adjusted');
+
+    buttonByText('Add selected (1)').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const [photoArg, pois] = wrapper.emitted('identified')![0] as [Photo, PointOfInterest[]];
+    const [sky] = photoPixelsToRaDec(photoArg, [{ x: 100, y: 50 }])!;
+    expect(pois[0].ra).toBeCloseTo(sky.ra, 9);
+    expect(pois[0].dec).toBeCloseTo(sky.dec, 9);
+
+    // Back to the predicted position, and Start goes back to marking the trail.
+    buttonByText('Reset to predicted position').dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    );
+    buttonByText('Start').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await wrapper.vm.$nextTick();
+    expect(document.body.textContent).not.toContain('Adjusted');
+    expect(adjustButtons()[0].className).not.toContain('btn-icon--active');
+    buttonByText('Add selected (1)').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const [, predicted] = wrapper.emitted('identified')![1] as [Photo, PointOfInterest[]];
+    expect(predicted[0]).toMatchObject({ ra: 186.966, dec: 12.89 });
     wrapper.unmount();
   });
 

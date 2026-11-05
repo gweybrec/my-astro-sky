@@ -64,6 +64,7 @@ const fr = {
     cometsFound: 'Comètes trouvées',
     keepAsPoi: "Garder {name} comme point d'intérêt",
     tapToAdjust: 'Touchez la photo pour placer le repère de {name} sur son noyau',
+    tapToAdjustAsteroid: 'Touchez la photo pour placer le repère de {name}',
     poiAddIntro:
       "Nommez le point d'intérêt, choisissez son type, puis touchez la photo pour le placer.",
     poiPanel: "Point d'intérêt",

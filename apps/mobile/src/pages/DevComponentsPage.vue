@@ -513,6 +513,7 @@ function raiseError() {
         />
         <PhoneHelper>Ligne d'état</PhoneHelper>
         <PhoneHelper class="mob-status--warn">Ligne d'avertissement</PhoneHelper>
+        <PhoneHelper small>Ligne d'aide en petit</PhoneHelper>
         <div class="mob-form-row"><PhoneBackButton fallback="/tabs/settings" /></div>
       </div>
       <PhoneFab label="Ajouter" />
