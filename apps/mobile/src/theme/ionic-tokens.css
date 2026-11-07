@@ -55,6 +55,10 @@
   --mobile-search-width: 400px;
   /* How long the cover of pages changed out of sight takes to fade onto the page reached (tab-navigation.ts). */
   --page-swap-fade: 0.2s;
+  /* A photo's screen: the gap between a photo and its neighbour while swiping, and how long a photo let go slides
+     (board "Photo, glisser vers la suivante"). */
+  --photo-swipe-gap: var(--space-6);
+  --photo-swipe-duration: 0.25s;
   /* A sheet's width in landscape, over a scrim or over the map; a dialog's; a pushed form's footer button's. */
   --mobile-sheet-width: 440px;
   --mobile-dialog-width: 400px;

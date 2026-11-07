@@ -24,7 +24,7 @@ function fakeList(ids: string[]) {
     set: (v: number) => (scrollTop = Math.max(0, v)),
   });
   Object.defineProperty(host, 'clientHeight', { get: () => (hidden ? 0 : 800) });
-  host.getBoundingClientRect = () => ({ top: 50 }) as DOMRect;
+  host.getBoundingClientRect = () => ({ top: 50, bottom: 850 }) as DOMRect;
   const render = (list: string[]) => {
     host.replaceChildren(
       ...list.map((id, i) => {
@@ -118,13 +118,13 @@ describe('useKeptScroll', () => {
   });
   const frames = (n = 3) => new Promise((r) => setTimeout(r, n));
 
-  function setup(n: number) {
+  function setup(n: number, target?: () => string | null) {
     const list = fakeList(ids(n));
     const prepare = vi.fn();
     const wrapper = mount(
       defineComponent({
         setup() {
-          useKeptScroll(ref(list.host), prepare);
+          useKeptScroll(ref(list.host), prepare, { target });
           return () => h('div');
         },
       }),
@@ -191,5 +191,28 @@ describe('useKeptScroll', () => {
     await frames();
     expect(prepare).not.toHaveBeenCalled();
     expect(list.host.scrollTop).toBe(0);
+  });
+
+  it('goes to the target item instead when it was not wholly in view (the last photo seen, reached by swiping)', async () => {
+    const { list, prepare, scrollTo, hide, show } = setup(100, () => 'p80');
+    scrollTo(6120);
+    hide();
+    show();
+    await flushPromises();
+    await frames();
+    expect(prepare).toHaveBeenCalledWith('p80');
+    // p80 at the top edge (p61 was partly above it).
+    expect(list.host.scrollTop).toBe(8000);
+  });
+
+  it('stays where it was when the target item was wholly in view', async () => {
+    const { list, prepare, scrollTo, hide, show } = setup(100, () => 'p63');
+    scrollTo(6120);
+    hide();
+    show();
+    await flushPromises();
+    await frames();
+    expect(prepare).toHaveBeenCalledWith('p61');
+    expect(list.host.scrollTop).toBe(6120);
   });
 });

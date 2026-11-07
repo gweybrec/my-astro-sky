@@ -32,17 +32,17 @@ import { resumePendingSolves, solvePendingOnline, solvedPhotoCount } from '../pe
 import {
   clearGalleryFilters,
   galleryFilters,
+  galleryShownPhotos,
   gallerySort,
   loadGalleryDisplay,
+  takeLastViewedPhoto,
   photosPerLine,
   setGallerySort,
   type Orientation,
 } from '../gallery-display';
 import {
-  filterGalleryPhotos,
   GALLERY_SORT_LABEL_KEYS,
   GALLERY_SORTS,
-  sortGalleryPhotos,
   type GallerySort,
 } from '@myastrosky/core/gallery-filter';
 import { skyPlacement } from '../sky-modes';
@@ -98,13 +98,10 @@ function tagsOf(photo: Photo): PhotoTag[] {
 // The photos the search and the filters of the "Affichage" sheet keep, in the order of the "Trier par" sheet (the
 // desktop gallery's).
 const shownPhotos = computed(() =>
-  sortGalleryPhotos(
-    filterGalleryPhotos(photos.value ?? [], galleryFilters, {
-      knownSetupIds: new Set(setupNames.value.keys()),
-      poiCategories: poiCategories.categories,
-    }),
-    gallerySort.value,
-  ),
+  galleryShownPhotos(photos.value ?? [], {
+    knownSetupIds: new Set(setupNames.value.keys()),
+    poiCategories: poiCategories.categories,
+  }),
 );
 const sortOpen = ref(false);
 const sortOptions = GALLERY_SORTS.map((value) => ({
@@ -124,8 +121,11 @@ const growing = useGrowingList(() => shownPhotos.value, TILES_CHUNK);
 // The grid stays where it was while the gallery is hidden (a photo opened over it, another tab): its scroll is not left
 // to the WebView, which can lose it on a hidden page far down a long list.
 const scrollHost = ref<HTMLElement | null>(null);
-useKeptScroll(scrollHost, (id) =>
-  growing.showAtLeast(shownPhotos.value.findIndex((p) => p.id === id) + 1),
+// Back from a photo's screen after swiping to other photos, the grid goes to the last one seen.
+useKeptScroll(
+  scrollHost,
+  (id) => growing.showAtLeast(shownPhotos.value.findIndex((p) => p.id === id) + 1),
+  { target: takeLastViewedPhoto },
 );
 const tiles = computed(() =>
   growing.shown.value.map((photo) => ({

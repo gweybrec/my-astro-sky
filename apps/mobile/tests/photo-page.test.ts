@@ -80,6 +80,12 @@ import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/s
 import { setAutoRotateLandscape } from '../src/photo-display';
 import { skyPhotoFocus } from '../src/composables/useSkySelection';
 import { pendingWcs } from '../src/composables/useWcsLoad';
+import {
+  clearGalleryFilters,
+  galleryFilters,
+  gallerySort,
+  takeLastViewedPhoto,
+} from '../src/gallery-display';
 
 /** "Photo, détail", "Photo, zoom", "Photo, informations", "Photo, boutons d'affichage", "Photo, barres masquées". */
 
@@ -590,6 +596,143 @@ describe("a photo's own screen", () => {
       await flushPromises();
       expect(button(w, 'Afficher les objets').attributes('disabled')).toBeDefined();
       expect(button(w, "Afficher les points d'intérêt").attributes('disabled')).toBeDefined();
+    });
+  });
+
+  describe('swiping to the next or previous photo ("Photo, glisser vers la suivante")', () => {
+    // Three photos, by name: a, p1 (the one opened), c; one more that the gallery's search leaves out.
+    const three = () => [
+      photo({ id: 'c', originalName: 'c.jpg', filename: 'c.jpg', thumbFilename: 'c-thumb.jpg' }),
+      photo({ id: 'p1', originalName: 'b.jpg' }),
+      photo({ id: 'a', originalName: 'a.jpg', filename: 'a.jpg' }),
+      photo({ id: 'x', originalName: 'hidden.png', filename: 'x.png', labels: [], notes: '' }),
+    ];
+    beforeEach(() => {
+      getPhotos.mockResolvedValue(three());
+      gallerySort.value = 'name-asc';
+      clearGalleryFilters();
+      galleryFilters.query = '.jpg';
+      takeLastViewedPhoto();
+    });
+
+    /** A pointer event on the stage, at a given time (ms). */
+    async function fire(w: ReturnType<typeof mountPage>, type: string, x: number, at: number) {
+      const event = new Event(type, { bubbles: true });
+      for (const [key, value] of Object.entries({
+        pointerId: 1,
+        clientX: x,
+        clientY: 400,
+        timeStamp: at,
+      }))
+        Object.defineProperty(event, key, { value });
+      w.find('.mob-photo-stage').element.dispatchEvent(event);
+      await flushPromises();
+    }
+    /** Drags one finger sideways over the stage by `dx`, slowly (no flick), then lets go. */
+    async function drag(w: ReturnType<typeof mountPage>, dx: number, up = true) {
+      await fire(w, 'pointerdown', 200, 0);
+      await fire(w, 'pointermove', 200 + dx / 2, 500);
+      await fire(w, 'pointermove', 200 + dx, 1000);
+      if (up) await fire(w, 'pointerup', 200 + dx, 1000);
+    }
+    const track = (w: ReturnType<typeof mountPage>) => w.find('.mob-photo-track');
+    const slid = (w: ReturnType<typeof mountPage>) =>
+      track(w).trigger('transitionend', { propertyName: 'transform' });
+    /** The area is 400 px wide (happy-dom lays nothing out). */
+    const sized = (w: ReturnType<typeof mountPage>) =>
+      Object.defineProperty(w.find('.mob-photo-area').element, 'clientWidth', { value: 400 });
+
+    it("holds the neighbours in the gallery's order beside the photo, the next one with its thumbnail first", async () => {
+      const w = mountPage();
+      await flushPromises();
+      const panes = w.findAll('.mob-photo-pane');
+      expect(panes.map((p) => p.classes().find((c) => c.startsWith('mob-photo-pane--')))).toEqual([
+        'mob-photo-pane--previous',
+        'mob-photo-pane--next',
+      ]);
+      expect(panes[0].findAll('img').map((i) => i.attributes('src'))).toEqual(['/uploads/a.jpg']);
+      expect(panes[1].findAll('img').map((i) => i.attributes('src'))).toEqual([
+        '/uploads/c-thumb.jpg',
+        '/uploads/c.jpg',
+      ]);
+      expect(panes[1].attributes('aria-hidden')).toBe('true');
+    });
+
+    it('follows the finger, slides to the next photo once let go past a third, and replaces the address', async () => {
+      const w = mountPage();
+      await flushPromises();
+      sized(w);
+      await drag(w, -150, false);
+      expect(track(w).attributes('style')).toContain('translateX(-150px)');
+      await fire(w, 'pointerup', 50, 1000);
+      expect(track(w).classes()).toContain('mob-photo-track--settling');
+      expect(track(w).attributes('style')).toContain('calc(-1 * (100% + var(--photo-swipe-gap)))');
+      await slid(w);
+      expect(w.find('h1').text()).toBe('c.jpg');
+      expect(replace).toHaveBeenCalledWith('/gallery/photo/c');
+      expect(w.find('img.mob-photo-view').attributes('src')).toBe('/uploads/c.jpg');
+      expect(track(w).attributes('style') ?? '').not.toContain('translate');
+      // c is the last photo the search keeps: no next one, the previous is b.
+      expect(w.findAll('.mob-photo-pane').map((p) => p.classes())).toEqual([
+        ['mob-photo-pane', 'mob-photo-pane--previous'],
+      ]);
+      expect(takeLastViewedPhoto()).toBe('c');
+    });
+
+    it('goes to the previous photo the other way', async () => {
+      const w = mountPage();
+      await flushPromises();
+      sized(w);
+      await drag(w, 200);
+      await slid(w);
+      expect(w.find('h1').text()).toBe('a.jpg');
+      expect(replace).toHaveBeenCalledWith('/gallery/photo/a');
+    });
+
+    it('springs back when let go short of a third', async () => {
+      const w = mountPage();
+      await flushPromises();
+      sized(w);
+      await drag(w, -100);
+      expect(track(w).attributes('style') ?? '').not.toContain('translate');
+      expect(w.find('h1').text()).toBe('b.jpg');
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it('only gives a little past the first photo, and springs back', async () => {
+      getPhotos.mockResolvedValue(three().filter((p) => p.id !== 'a'));
+      const w = mountPage();
+      await flushPromises();
+      sized(w);
+      await drag(w, 200, false);
+      expect(track(w).attributes('style')).toContain('translateX(50px)');
+      await fire(w, 'pointerup', 400, 1000);
+      expect(track(w).attributes('style') ?? '').not.toContain('translate');
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it('does not change photo on a zoomed photo: the finger moves it', async () => {
+      const w = mountPage();
+      await flushPromises();
+      sized(w);
+      for (const at of [0, 100]) {
+        await fire(w, 'pointerdown', 200, at);
+        await fire(w, 'pointerup', 200, at + 20);
+      }
+      expect(w.find('[aria-label="Réinitialiser le zoom"]').exists()).toBe(true);
+      await drag(w, -300);
+      expect(track(w).attributes('style') ?? '').not.toContain('translate');
+      expect(w.find('h1').text()).toBe('b.jpg');
+    });
+
+    it('has no neighbour for a photo the gallery does not show', async () => {
+      galleryFilters.query = 'nothing';
+      const w = mountPage();
+      await flushPromises();
+      expect(w.findAll('.mob-photo-pane')).toHaveLength(0);
+      sized(w);
+      await drag(w, -300);
+      expect(replace).not.toHaveBeenCalled();
     });
   });
 });

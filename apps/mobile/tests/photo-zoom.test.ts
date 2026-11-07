@@ -176,4 +176,56 @@ describe('the photo zoom', () => {
     send('pointerup', 1, 260, 400, 5020);
     expect(zoom.transform.value).toBe(`translate(60px, 0px) scale(${DOUBLE_TAP_ZOOM})`);
   });
+
+  describe('a swipe ("Photo, glisser vers la suivante")', () => {
+    function swipeViewer() {
+      const move = vi.fn();
+      const end = vi.fn();
+      return { move, end, ...mountViewer({ swipe: { move, end } }) };
+    }
+
+    it('follows one finger moving sideways over the whole photo, then gives its distance and speed', () => {
+      const { move, end, send, zoom } = swipeViewer();
+      send('pointerdown', 1, 300, 400, 0);
+      send('pointermove', 1, 280, 402, 10);
+      send('pointermove', 1, 200, 405, 50);
+      expect(move).toHaveBeenLastCalledWith(-100);
+      send('pointerup', 1, 180, 405, 60);
+      // 80 px in the last 40 ms.
+      expect(end).toHaveBeenCalledWith(-120, -2);
+      expect(zoom.transform.value).toBe('translate(0px, 0px) scale(1)');
+    });
+
+    it('is not a swipe when the finger goes mostly up or down, nor on a zoomed photo', () => {
+      const { move, end, send, tap } = swipeViewer();
+      send('pointerdown', 1, 200, 400, 0);
+      send('pointermove', 1, 210, 460, 10);
+      send('pointerup', 1, 210, 460, 20);
+      tap(200, 400, 2000);
+      tap(200, 400, 2100);
+      send('pointerdown', 1, 200, 400, 5000);
+      send('pointermove', 1, 100, 400, 5010);
+      send('pointerup', 1, 100, 400, 5020);
+      expect(move).not.toHaveBeenCalled();
+      expect(end).not.toHaveBeenCalled();
+    });
+
+    it('ends where it started when a second finger comes, which zooms, or when the touch is cancelled', () => {
+      const { end, send, zoom } = swipeViewer();
+      send('pointerdown', 1, 300, 400, 0);
+      send('pointermove', 1, 250, 400, 10);
+      send('pointerdown', 2, 100, 400, 20);
+      expect(end).toHaveBeenLastCalledWith(0, 0);
+      send('pointermove', 2, 50, 400, 30);
+      expect(zoom.zoomed.value).toBe(true);
+      send('pointerup', 1, 250, 400, 40);
+      send('pointerup', 2, 50, 400, 40);
+      zoom.reset();
+      send('pointerdown', 1, 300, 400, 100);
+      send('pointermove', 1, 250, 400, 110);
+      send('pointercancel', 1, 250, 400, 120);
+      expect(end).toHaveBeenCalledTimes(2);
+      expect(end).toHaveBeenLastCalledWith(0, 0);
+    });
+  });
 });

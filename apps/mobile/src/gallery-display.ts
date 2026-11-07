@@ -1,10 +1,14 @@
 import { reactive, ref } from 'vue';
 import { storage } from '@myastrosky/core/platform/storage';
+import type { Photo } from '@myastrosky/core/types';
 import {
   DEFAULT_GALLERY_SORT,
   emptyGalleryFilters,
+  filterGalleryPhotos,
   loadGallerySort,
   saveGallerySort,
+  sortGalleryPhotos,
+  type GalleryFilterContext,
   type GalleryFilters,
   type GallerySort,
 } from '@myastrosky/core/gallery-filter';
@@ -52,6 +56,30 @@ export function setGallerySort(sort: GallerySort): void {
 /** The search and the filters of the gallery, kept while the app runs (not stored). A list is null while every value
  * is shown. */
 export const galleryFilters = reactive<GalleryFilters>(emptyGalleryFilters());
+
+/**
+ * The photos as the gallery shows them: those its search and filters keep, in the order of its "Trier par" sheet. A
+ * photo's screen goes from one to the next in this order (board "Photo, glisser vers la suivante").
+ */
+export function galleryShownPhotos(photos: Photo[], context: GalleryFilterContext): Photo[] {
+  return sortGalleryPhotos(filterGalleryPhotos(photos, galleryFilters, context), gallerySort.value);
+}
+
+/**
+ * The last photo shown on its own screen, until the gallery takes it (`takeLastViewedPhoto`): back in the gallery, the
+ * grid goes to it when it is not where the grid was left.
+ */
+let lastViewedPhoto: string | null = null;
+
+export function setLastViewedPhoto(id: string): void {
+  lastViewedPhoto = id;
+}
+
+export function takeLastViewedPhoto(): string | null {
+  const id = lastViewedPhoto;
+  lastViewedPhoto = null;
+  return id;
+}
 
 /** Whether a filter (not the search) hides photos. */
 export function galleryFiltered(): boolean {

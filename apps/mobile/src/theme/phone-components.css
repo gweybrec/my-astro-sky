@@ -1523,6 +1523,30 @@ ion-modal.mob-sheet-modal.mob-sheet-modal .mob-sheet.mob-sheet--fixed {
   width: 100cqh;
   height: 100cqw;
 }
+/* The photo and what is drawn over it slide together; its neighbours wait beside it, out of the area (board "Photo,
+   glisser vers la suivante"). */
+.mob-photo-track {
+  position: absolute;
+  inset: 0;
+}
+.mob-photo-track--settling {
+  transition: transform var(--photo-swipe-duration) ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mob-photo-track--settling {
+    transition: none;
+  }
+}
+.mob-photo-pane {
+  position: absolute;
+  inset: 0;
+}
+.mob-photo-pane--previous {
+  transform: translateX(calc(-1 * (100% + var(--photo-swipe-gap))));
+}
+.mob-photo-pane--next {
+  transform: translateX(calc(100% + var(--photo-swipe-gap)));
+}
 /* The facts that open a sheet's body stand off its header (board "Photo, informations"). The row of actions under them
    ends where they end: a sheet's body keeps room for its scrollbar, which the end gutter already counts. */
 .mob-sheet-body > .mob-facts:first-child {

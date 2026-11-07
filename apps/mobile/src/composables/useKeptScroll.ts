@@ -23,6 +23,17 @@ export function readScrollAnchor(host: HTMLElement): ScrollAnchor {
   return { id: null, offset: 0, scrollTop: host.scrollTop };
 }
 
+/** The items (their `data-keep-id`) wholly inside `host`'s visible area. */
+export function visibleKeepIds(host: HTMLElement): string[] {
+  const box = host.getBoundingClientRect();
+  return [...host.querySelectorAll<HTMLElement>('[data-keep-id]')]
+    .filter((el) => {
+      const rect = el.getBoundingClientRect();
+      return rect.bottom > rect.top && rect.top >= box.top && rect.bottom <= box.bottom;
+    })
+    .map((el) => el.dataset.keepId ?? '');
+}
+
 /**
  * Scrolls `host` so the anchor's item is back at its distance from the top edge; without it, back to the offset. An
  * item there but not laid out yet (no height) is left for a later try.
@@ -50,10 +61,16 @@ export function restoreScrollAnchor(host: HTMLElement, anchor: ScrollAnchor): vo
  * it watches the list itself. While the list is scrolled, the item at its top is noted; when the list loses its size
  * (hidden) the note is kept; when it gets it back, `prepare` gets the noted item's id (a list drawn a part at a time
  * draws down to it), then the item is held at its place for `RESTORE_MS`, or until the list is touched. The items carry
- * `data-keep-id`.
+ * `data-keep-id`. With `target`, asked when the list shows again: the item it names, when it was not wholly in view where
+ * the list was left, is brought to the top instead (the last photo seen on its own screen, reached by swiping).
  */
-export function useKeptScroll(host: Ref<HTMLElement | null>, prepare?: (id: string) => void) {
+export function useKeptScroll(
+  host: Ref<HTMLElement | null>,
+  prepare?: (id: string) => void,
+  options: { target?: () => string | null } = {},
+) {
   let kept: ScrollAnchor | null = null;
+  let keptVisible: string[] = [];
   let hidden = false;
   let restoringUntil = 0;
   let frame = 0;
@@ -62,7 +79,10 @@ export function useKeptScroll(host: Ref<HTMLElement | null>, prepare?: (id: stri
 
   function note() {
     const el = host.value;
-    if (el && !hidden && !restoring() && el.clientHeight > 0) kept = readScrollAnchor(el);
+    if (el && !hidden && !restoring() && el.clientHeight > 0) {
+      kept = readScrollAnchor(el);
+      keptVisible = visibleKeepIds(el);
+    }
   }
 
   function stopRestoring() {
@@ -73,7 +93,11 @@ export function useKeptScroll(host: Ref<HTMLElement | null>, prepare?: (id: stri
   }
 
   async function restore() {
-    const anchor = kept;
+    const target = options.target?.() ?? null;
+    const anchor =
+      target && !keptVisible.includes(target)
+        ? { id: target, offset: Math.max(0, kept?.offset ?? 0), scrollTop: kept?.scrollTop ?? 0 }
+        : kept;
     if (!anchor) return;
     if (anchor.id) prepare?.(anchor.id);
     restoringUntil = performance.now() + RESTORE_MS;

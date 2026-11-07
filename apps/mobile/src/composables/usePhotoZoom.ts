@@ -59,11 +59,18 @@ export function zoomToward(zoom: PhotoZoom, point: { x: number; y: number }, fac
  * With `onTap` (board "Identifier les étoiles"), a tap is given to it at once instead, and a double tap does not zoom.
  * With `onSingleTap` (board "Photo, barres masquées"), a tap that no second tap follows is given to it once the
  * double tap's time has passed.
+ * With `swipe` (board "Photo, glisser vers la suivante"), one finger moving mostly sideways over the whole photo (not
+ * zoomed) is a swipe: `move` gets how far it has gone (px, from where it started), `end` how far it went and how fast
+ * at the end (px per ms); a second finger, or a cancelled touch, ends it where it started (0, 0).
  */
 export function usePhotoZoom(
   viewer: Ref<HTMLElement | null>,
   photo: () => Size,
-  options: { onTap?: (x: number, y: number) => void; onSingleTap?: () => void } = {},
+  options: {
+    onTap?: (x: number, y: number) => void;
+    onSingleTap?: () => void;
+    swipe?: { move: (dx: number) => void; end: (dx: number, velocity: number) => void };
+  } = {},
 ) {
   const zoom = ref<PhotoZoom>(WHOLE);
   const zoomed = computed(() => zoom.value.scale > 1);
@@ -73,6 +80,15 @@ export function usePhotoZoom(
 
   const fingers = new Map<number, { x: number; y: number }>();
   let moved = false;
+  /** The one finger's start, and its last two positions in time (for the speed at the end of a swipe). */
+  let start = { x: 0, y: 0 };
+  let swiping = false;
+  let samples: { x: number; at: number }[] = [];
+  function endSwipe(dx: number, velocity: number) {
+    if (!swiping) return;
+    swiping = false;
+    options.swipe?.end(dx, velocity);
+  }
   let lastTap: { at: number; x: number; y: number } | null = null;
   let singleTapTimer: ReturnType<typeof setTimeout> | undefined;
   const cancelSingleTap = () => {
@@ -101,7 +117,11 @@ export function usePhotoZoom(
   };
 
   function onPointerDown(event: PointerEvent) {
-    if (fingers.size === 0) moved = false;
+    if (fingers.size === 0) {
+      moved = false;
+      start = { x: event.clientX, y: event.clientY };
+      samples = [{ x: event.clientX, at: event.timeStamp }];
+    } else endSwipe(0, 0);
     fingers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
   }
@@ -113,8 +133,16 @@ export function usePhotoZoom(
       const dx = event.clientX - before.x;
       const dy = event.clientY - before.y;
       if (!moved && Math.hypot(dx, dy) < TAP_SLOP) return;
+      if (!moved && options.swipe && !zoomed.value) {
+        swiping = Math.abs(event.clientX - start.x) > Math.abs(event.clientY - start.y);
+      }
       moved = true;
       fingers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (swiping) {
+        samples = [...samples.slice(-1), { x: event.clientX, at: event.timeStamp }];
+        options.swipe?.move(event.clientX - start.x);
+        return;
+      }
       if (zoomed.value) apply({ ...zoom.value, tx: zoom.value.tx + dx, ty: zoom.value.ty + dy });
       return;
     }
@@ -135,6 +163,11 @@ export function usePhotoZoom(
 
   function onPointerUp(event: PointerEvent) {
     if (!fingers.delete(event.pointerId)) return;
+    if (swiping) {
+      const [before, last] = samples;
+      const time = last ? last.at - before.at : 0;
+      endSwipe(event.clientX - start.x, time > 0 ? (last.x - before.x) / time : 0);
+    }
     if (fingers.size > 0 || moved) {
       lastTap = null;
       cancelSingleTap();
@@ -162,6 +195,7 @@ export function usePhotoZoom(
 
   function onPointerCancel(event: PointerEvent) {
     fingers.delete(event.pointerId);
+    endSwipe(0, 0);
     lastTap = null;
     cancelSingleTap();
   }
