@@ -1,5 +1,4 @@
 import { getLang, t } from '@myastrosky/core/i18n/index';
-import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import { CAPTURE_FIELDS } from '@myastrosky/core/capture-fields';
 import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
 import { formatPlanDate } from '@myastrosky/core/targets/plan';
@@ -25,12 +24,12 @@ const joined = (items: readonly string[]) => items.join(' · ');
 /**
  * What is known of a photo, as the edit page lists it, read only (the boards "Ciel, photo sélectionnée" and "Photo,
  * informations"): its file name (`fileName`), the observation date, the total exposure, the capture details, the
- * equipment, the integration rows, the labels, the points of interest, the notes and its objects (`objects`). Only the
- * facts the photo has are listed. `brief` (the map's photo sheet) leaves out the sensor temperatures and the binning.
+ * equipment, the integration rows, the labels, the points of interest and the notes (its objects are chips, in
+ * `PhoneChipPager`). Only the facts the photo has are listed. `brief` (the map's photo sheet) leaves out the sensor temperatures and the binning.
  */
 export function photoFacts(
   photo: Photo,
-  options: { setupName?: string; fileName?: boolean; objects?: boolean; brief?: boolean } = {},
+  options: { setupName?: string; fileName?: boolean; brief?: boolean } = {},
 ): PhotoFact[] {
   const out: PhotoFact[] = [];
   if (options.fileName) {
@@ -87,12 +86,6 @@ export function photoFacts(
   }
   if (photo.notes?.trim()) {
     out.push({ label: t('modal.metadataNotes'), value: photo.notes.trim() });
-  }
-  if (options.objects && photo.dsoIds?.length) {
-    out.push({
-      label: t('modal.metadataDsos'),
-      value: joined(sortDsoIdsByImportance(photo.dsoIds)),
-    });
   }
   return out;
 }

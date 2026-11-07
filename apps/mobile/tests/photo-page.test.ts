@@ -290,8 +290,14 @@ describe("a photo's own screen", () => {
       ['Étiquettes', 'Seestar · Mosaïque'],
       ["Points d'intérêt", 'C/2023 A3'],
       ['Notes', 'Nuit claire.'],
-      ['Objets dans cette image', 'M31 · M32'],
     ]);
+    // its objects are compact chips above the facts, as on the map's photo sheet, that only show them (no tap)
+    const chips = w.findAll('.mob-sheet .mob-pager .mob-chip');
+    expect(chips.map((c) => c.text())).toEqual(['M31', 'M32']);
+    expect(
+      chips.every((c) => c.classes('mob-chip--still') && c.attributes('role') === undefined),
+    ).toBe(true);
+    expect(chips.every((c) => c.attributes('tabindex') === undefined)).toBe(true);
     // facts without cards, none on a line of its own, the integration rows in the mono face; the sheet is
     // a third of the screen at most in portrait
     expect(w.find('.mob-facts').classes()).toEqual(['mob-facts', 'mob-photo-facts']);

@@ -527,6 +527,10 @@ ion-chip.mob-chip {
   font-family: var(--font-sans);
   user-select: none;
 }
+/* A chip that only shows something (`still`): no press, and a touch goes to what is under it. */
+ion-chip.mob-chip.mob-chip--still {
+  pointer-events: none;
+}
 ion-chip.mob-chip[aria-pressed='true'] {
   --color: var(--text-bright);
 }

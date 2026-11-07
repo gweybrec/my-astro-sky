@@ -20,6 +20,7 @@ import PhoneHelper from '../components/PhoneHelper.vue';
 import PhoneBusy from '../components/PhoneBusy.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import PhoneChip from '../components/PhoneChip.vue';
+import PhoneChipPager from '../components/PhoneChipPager.vue';
 import PhoneColorButton from '../components/PhoneColorButton.vue';
 import PhoneCredit from '../components/PhoneCredit.vue';
 import PhoneEmptyState from '../components/PhoneEmptyState.vue';
@@ -374,9 +375,31 @@ function raiseError() {
           <PhoneChip>Normale</PhoneChip>
           <PhoneChip :pressed="true">Choisie</PhoneChip>
           <PhoneChip compact>Compacte</PhoneChip>
+          <PhoneChip compact still>Affichée</PhoneChip>
           <PhoneBadge kind="type">Galaxie</PhoneBadge>
           <PhoneBadge kind="const">Andromède</PhoneBadge>
         </div>
+        <!-- A photo's objects: two lines of chips to a page, the others on the next pages. -->
+        <PhoneChipPager
+          :ids="[
+            'NGC6888',
+            'NGC6910',
+            'NGC7000',
+            'IC5070',
+            'SH2-106',
+            'SH2-108',
+            'SH2-112',
+            'SH2-115',
+            'SH2-116',
+            'SH2-117',
+            'IC1318',
+            'NGC6914',
+            'LBN331',
+            'LDN897',
+          ]"
+          label="Objets de la photo"
+          still
+        />
         <!-- Rows mixing plain text and chips: `apps/mobile/scripts/check-baselines.mjs` checks their baselines. -->
         <div class="mob-sheet-header">
           <div class="mob-meta m-secondary" data-baseline-row>

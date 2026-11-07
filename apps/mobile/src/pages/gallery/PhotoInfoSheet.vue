@@ -13,14 +13,16 @@ import { useErrorToast } from '../../composables/useErrorToast';
 import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneBadge from '../../components/PhoneBadge.vue';
 import PhotoFacts from '../../components/PhotoFacts.vue';
+import PhoneChipPager from '../../components/PhoneChipPager.vue';
 import PhoneButton from '../../components/PhoneButton.vue';
 import SkyCheckSheet from '../sky/SkyCheckSheet.vue';
 import { dsoCatalogOptions } from '../../catalog-options';
 import caretIcon from '../../icons/chevron-down.svg?raw';
 import AppIcon from '../../components/AppIcon.vue';
 
-// The board "Photo, informations": the first object of the photo with its type and constellation, what is known of the
-// photo, read only (only the facts it has; the sheet is at most a third of the screen in portrait and its body scrolls),
+// The board "Photo, informations": the first object of the photo with its type and constellation, all its objects as
+// chips that only show them (`PhoneChipPager`, as the map's photo sheet, without a tap), what is known of the photo,
+// read only (only the facts it has; the sheet is at most a third of the screen in portrait and its body scrolls),
 // and its actions: reading a WCS file into its information, editing it and deleting it. While its objects are drawn
 // over the photo (board "Photo, objets affichés"; the toggle is among the photo's buttons), the "Catalogues" field
 // chooses which.
@@ -42,9 +44,11 @@ const emit = defineEmits<{
 const { confirm } = useConfirm();
 const { showError } = useErrorToast();
 
+// The photo's objects, the most important first (Messier, NGC, IC, …).
+const ids = computed(() => sortDsoIdsByImportance(props.photo.dsoIds ?? []));
 const object = computed(() => {
-  // The photo's main object: its most important one (Messier, NGC, IC, …).
-  const id = sortDsoIdsByImportance(props.photo.dsoIds ?? [])[0];
+  // The photo's main object: its most important one.
+  const id = ids.value[0];
   const dso = id ? getDSOById(id) : undefined;
   if (!dso) return null;
   return {
@@ -92,7 +96,8 @@ async function remove() {
         }}</PhoneBadge>
       </div>
     </template>
-    <PhotoFacts :photo="photo" file-name objects />
+    <PhoneChipPager :ids="ids" :label="t('mobile.sky.photoObjects')" still />
+    <PhotoFacts :photo="photo" file-name />
     <div v-if="objects" class="mob-form-row mob-form-row--field">
       <PhoneButton
         variant="field"

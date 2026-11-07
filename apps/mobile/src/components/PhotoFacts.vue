@@ -12,7 +12,6 @@ import { SHEET_HOLD } from './map-sheet';
 const props = defineProps<{
   photo: Photo;
   fileName?: boolean;
-  objects?: boolean;
   brief?: boolean;
 }>();
 
@@ -39,7 +38,6 @@ const facts = computed(() =>
   photoFacts(props.photo, {
     setupName: setupName.value,
     fileName: props.fileName,
-    objects: props.objects,
     brief: props.brief,
   }),
 );
