@@ -1,5 +1,6 @@
 import type { Photo, PointOfInterest } from './types';
 import { DSO_CATALOGS_ALL, sortDsoIdsByImportance, type DSOCatalog } from './catalog/dso-registry';
+import { dsoQueryVariants } from './dso-query';
 
 export interface PhotoQueryMatch {
   photo: Photo;
@@ -12,9 +13,13 @@ export function buildPhotoQueryMatches(photos: Photo[], query: string): PhotoQue
   const q = query.trim().toLowerCase();
   if (!q) return [];
 
+  // The objects are matched with a mistyped catalogue prefix corrected too ("ngv7000" finds NGC7000).
+  const objectQueries = dsoQueryVariants(q);
   const matches: PhotoQueryMatch[] = [];
   for (const photo of photos) {
-    const matchingDsoIds = photo.dsoIds.filter((id) => id.toLowerCase().includes(q));
+    const matchingDsoIds = photo.dsoIds.filter((id) =>
+      objectQueries.some((oq) => id.toLowerCase().includes(oq)),
+    );
     const matchingLabels = photo.labels.filter((label) => label.toLowerCase().includes(q));
     const matchingPois = (photo.pointsOfInterest ?? []).filter((poi) =>
       poi.name.toLowerCase().includes(q),

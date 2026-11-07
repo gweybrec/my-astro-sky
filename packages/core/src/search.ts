@@ -1,6 +1,7 @@
 import type { Star, DSO, DSOSearchResult } from './types';
 import { getStars, getStarByHip } from './catalog/star-registry';
 import { getDSOs } from './catalog/dso-registry';
+import { dsoQueryVariants } from './dso-query';
 import type { StarSearchResult } from './domain/stars';
 import { searchStarsRemote } from './platform/star-search';
 import { t } from './i18n';
@@ -182,58 +183,51 @@ function normCatId(s: string): string {
   return s.toLowerCase().replace(/[\s.]+/g, '');
 }
 
+/** How well an object matches a search (lower-cased `q`, and `qId` as {@link normCatId} reads it); 0 when it does not. */
+function dsoMatchScore(dso: DSO, q: string, qId: string): number {
+  // Normalize the id the same way as the query so id comparisons are symmetric
+  // (an id carrying a dot, e.g. "PK"-style, still matches its dot-stripped query).
+  const idNorm = normCatId(dso.id);
+  const nameLower = dso.displayName ? dso.displayName.toLowerCase() : '';
+  // Check all catalog aliases (e.g. NGC1976 and LBN974 both find M42, and
+  // Barnard33 finds IC434). Distinguish exact from prefix: an exact alias is
+  // the precise designation the user typed and must rank with an exact id.
+  const catsLower = dso.catalogs.map((c) => normCatId(c));
+
+  // 1. Exact match on the primary id OR any catalog alias (the exact thing typed).
+  //    e.g. "barnard33" → IC434 must beat "barnard330" (a mere id prefix).
+  if (idNorm === qId || catsLower.some((c) => c === qId)) return 100;
+  // 2. ID prefix match
+  if (idNorm.startsWith(qId)) return 90;
+  // 3. Exact name match
+  if (nameLower && nameLower === q) return 80;
+  // 4. Name starts with query
+  if (nameLower && nameLower.startsWith(q)) return 70;
+  // 5. Alias prefix match (e.g. "ngc19" → NGC1976, alias of M42)
+  if (catsLower.some((c) => c.startsWith(qId))) return 60;
+  // 6. Name contains query
+  if (nameLower && nameLower.includes(q)) return 40;
+  // 7. Partial ID match (e.g. "ngc70" matches "NGC7000")
+  if (idNorm.includes(qId)) return 30;
+  return 0;
+}
+
 export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
   if (!query || query.length < 1) return [];
 
-  const normalized = normalizeGreekLetters(query);
-  const q = normalized.toLowerCase().trim();
-  // Match catalog ids space- and dot-insensitively: "barnard 33", "ngc 1976",
-  // "m 42" and "PK 217+14.1" resolve like "barnard33", "pk217+141", etc.
-  const qId = normCatId(q);
+  // The typed text, and its reading with a mistyped catalogue prefix corrected ("ngv7000" → "ngc7000"): an object
+  // takes the better score of the two.
+  const queries = dsoQueryVariants(query).map((variant) => {
+    const q = normalizeGreekLetters(variant).toLowerCase().trim();
+    // Match catalog ids space- and dot-insensitively: "barnard 33", "ngc 1976",
+    // "m 42" and "PK 217+14.1" resolve like "barnard33", "pk217+141", etc.
+    return { q, qId: normCatId(q) };
+  });
   const results: DSOSearchResult[] = [];
 
   for (const dso of getDSOs()) {
     let score = 0;
-    // Normalize the id the same way as the query so id comparisons are symmetric
-    // (an id carrying a dot, e.g. "PK"-style, still matches its dot-stripped query).
-    const idNorm = normCatId(dso.id);
-    const nameLower = dso.displayName ? dso.displayName.toLowerCase() : '';
-    // Check all catalog aliases (e.g. NGC1976 and LBN974 both find M42, and
-    // Barnard33 finds IC434). Distinguish exact from prefix: an exact alias is
-    // the precise designation the user typed and must rank with an exact id.
-    const catsLower = dso.catalogs.map((c) => normCatId(c));
-    const aliasExact = catsLower.some((c) => c === qId);
-    const aliasPrefix = catsLower.some((c) => c.startsWith(qId));
-
-    // 1. Exact match on the primary id OR any catalog alias (the exact thing typed).
-    //    e.g. "barnard33" → IC434 must beat "barnard330" (a mere id prefix).
-    if (idNorm === qId || aliasExact) {
-      score = 100;
-    }
-    // 2. ID prefix match
-    else if (idNorm.startsWith(qId)) {
-      score = 90;
-    }
-    // 3. Exact name match
-    else if (nameLower && nameLower === q) {
-      score = 80;
-    }
-    // 4. Name starts with query
-    else if (nameLower && nameLower.startsWith(q)) {
-      score = 70;
-    }
-    // 5. Alias prefix match (e.g. "ngc19" → NGC1976, alias of M42)
-    else if (aliasPrefix) {
-      score = 60;
-    }
-    // 6. Name contains query
-    else if (nameLower && nameLower.includes(q)) {
-      score = 40;
-    }
-    // 7. Partial ID match (e.g. "ngc70" matches "NGC7000")
-    else if (idNorm.includes(qId)) {
-      score = 30;
-    }
+    for (const { q, qId } of queries) score = Math.max(score, dsoMatchScore(dso, q, qId));
 
     if (score > 0) {
       // Brightness boost — capped below the 10-point tier gap so an exact match

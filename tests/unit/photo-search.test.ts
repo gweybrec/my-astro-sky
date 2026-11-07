@@ -46,6 +46,17 @@ describe('buildPhotoQueryMatches', () => {
     expect(matches[0].matchingPois).toEqual([]);
   });
 
+  it('reads the mistyped prefixes "ngv" and "nhc" as NGC in the objects', () => {
+    const photo = makePhoto({
+      originalName: 'Orion',
+      dsoIds: ['M42', 'NGC1976'],
+      labels: [],
+      notes: '',
+    });
+    expect(buildPhotoQueryMatches([photo], 'ngv1976')[0].matchingDsoIds).toEqual(['NGC1976']);
+    expect(buildPhotoQueryMatches([photo], 'nhc')[0].matchingDsoIds).toEqual(['NGC1976']);
+  });
+
   it('matches on a point-of-interest name and returns only matching POIs', () => {
     const photo = makePhoto({
       dsoIds: [],

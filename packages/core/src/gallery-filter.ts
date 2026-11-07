@@ -3,6 +3,7 @@ import { getDSOById } from './catalog/dso-registry';
 import { poisMatchFilter } from './poi';
 import { NO_LABEL } from './photo-placement';
 import { smartSortPhotos, type SortablePhoto } from './photo-search';
+import { dsoQueryVariants } from './dso-query';
 import { storage } from './platform/storage';
 
 /** Sentinel setup id of the photos linked to no (known) gear setup. */
@@ -74,10 +75,12 @@ export function filterGalleryPhotos(
   // Search — file name, objects, labels, points of interest, notes
   const q = filters.query.toLowerCase().trim();
   if (q) {
+    // The objects are matched with a mistyped catalogue prefix corrected too ("ngv7000" finds NGC7000).
+    const objectQueries = dsoQueryVariants(q);
     filtered = filtered.filter(
       (photo) =>
         photo.originalName.toLowerCase().includes(q) ||
-        photo.dsoIds.some((id) => id.toLowerCase().includes(q)) ||
+        photo.dsoIds.some((id) => objectQueries.some((oq) => id.toLowerCase().includes(oq))) ||
         photo.labels.some((l) => l.toLowerCase().includes(q)) ||
         (photo.pointsOfInterest ?? []).some((p) => p.name.toLowerCase().includes(q)) ||
         photo.notes.toLowerCase().includes(q),

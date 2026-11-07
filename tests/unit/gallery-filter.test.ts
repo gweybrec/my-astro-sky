@@ -63,6 +63,17 @@ describe('filterGalleryPhotos', () => {
     expect(filter(photos, { query: '  FIRST ' })).toEqual(['c']);
   });
 
+  it('reads the mistyped prefixes "ngv" and "nhc" as NGC in the objects only', () => {
+    const more = [
+      makePhoto({ id: 'e', originalName: 'Cocoon', dsoIds: ['NGC7000'] }),
+      makePhoto({ id: 'f', originalName: 'Pelican', dsoIds: ['IC5070'], notes: 'NGC7000 nearby' }),
+      makePhoto({ id: 'g', originalName: 'ngv test', dsoIds: [] }),
+    ];
+    expect(filter(more, { query: 'nhc7000' })).toEqual(['e']);
+    // The name, labels and notes are matched as typed.
+    expect(filter(more, { query: 'ngv' })).toEqual(['e', 'g']);
+  });
+
   it('filters labels, with the no-label sentinel for unlabelled photos', () => {
     expect(filter(photos, { labels: ['nebula'] })).toEqual(['a']);
     expect(filter(photos, { labels: [NO_LABEL] })).toEqual(['b', 'c', 'd']);

@@ -272,6 +272,15 @@ describe('searchDSOs()', () => {
     expect(searchDSOs('m42')[0].dso.id).toBe('M42');
   });
 
+  it('reads the mistyped prefixes "ngv" and "nhc" as NGC, with the same scores', () => {
+    for (const typed of ['ngv1976', 'NHC 1976', '  Ngv1976']) {
+      const results = searchDSOs(typed);
+      expect(results[0].dso.id).toBe('M42');
+      expect(results[0].score).toBe(searchDSOs('NGC1976')[0].score);
+    }
+    expect(searchDSOs('nhc202').some((r) => r.dso.id === 'NGC2024')).toBe(true);
+  });
+
   it('ID prefix match', () => {
     const ids = searchDSOs('M3').map((r) => r.dso.id);
     expect(ids).toContain('M31');

@@ -383,6 +383,12 @@ describe('matchesTargetQuery', () => {
     constellation: 'CYG',
   });
 
+  it('reads the mistyped prefixes "ngv" and "nhc" as NGC', () => {
+    expect(matchesTargetQuery(target, 'ngv 7000')).toBe(true);
+    expect(matchesTargetQuery(target, 'NHC70')).toBe(true);
+    expect(matchesTargetQuery(target, 'ngv 7001')).toBe(false);
+  });
+
   it('matches the name without accents or case, the designations and the constellation', () => {
     expect(matchesTargetQuery(target, '')).toBe(true);
     expect(matchesTargetQuery(target, 'nebuleuse amerique')).toBe(false);
