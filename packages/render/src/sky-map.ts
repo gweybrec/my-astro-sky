@@ -69,6 +69,7 @@ import {
 } from './sky-scene-render';
 import {
   renderOverlay,
+  renderSelectionRing,
   renderMountainHorizon,
   renderPhotoOutlines,
   renderFovFrames,
@@ -1746,6 +1747,9 @@ export class SkyMap {
       }
       if (scene.poiPins.length > 0) {
         renderPoiPins(scene);
+      }
+      if (scene.highlightedDSO !== null || scene.highlightedStar !== null) {
+        renderSelectionRing(scene);
       }
     }
 

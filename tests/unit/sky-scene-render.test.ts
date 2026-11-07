@@ -86,18 +86,18 @@ describe('renderStars', () => {
     expect(faintReads).toBe(0);
   });
 
-  it('still draws a highlighted star fainter than the cutoff, with its ring', () => {
+  it('still draws a highlighted star fainter than the cutoff; its ring is the overlay’s, not here', () => {
     const { s, calls } = scene(150);
     renderStars(s);
     expect(calls.drawImage).toHaveLength(2);
-    expect(calls.arc?.length).toBeGreaterThan(0);
-    expect(calls.stroke?.length).toBeGreaterThan(0);
+    expect(calls.fillRect?.length).toBeGreaterThan(0);
+    expect(calls.stroke).toBeUndefined();
   });
 
   it('draws a bright highlighted star once, live rather than from the atlas', () => {
     const { s, calls } = scene(1);
     renderStars(s);
     expect(calls.drawImage).toHaveLength(1);
-    expect(calls.arc?.length).toBeGreaterThan(0);
+    expect(calls.fillRect?.length).toBeGreaterThan(0);
   });
 });

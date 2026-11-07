@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderDSOs } from '@myastrosky/render/sky-scene-render';
-import { HIGHLIGHT_RING } from '@myastrosky/core/canvas-theme';
+import { SELECTION_RING } from '@myastrosky/core/canvas-theme';
 import type { SkyScene } from '@myastrosky/render/sky-scene';
 import type { DSO } from '@myastrosky/core/types';
 
@@ -46,15 +46,12 @@ function render(skyOpacity: number, highlightedDSO: string | null) {
 }
 
 describe('renderDSOs', () => {
-  it('draws the searched object’s ring last, over every outline', () => {
-    const calls = render(1, 'B');
-    const strokes = calls.map(([n], i) => (n === 'stroke' ? i : -1)).filter((i) => i >= 0);
-    expect(strokes.length).toBeGreaterThan(1);
-    const lastStyle = calls
-      .slice(0, strokes[strokes.length - 1])
+  it('leaves the selected object’s ring to the overlay, above the photos (no ring under them)', () => {
+    const styles = render(1, 'B')
       .filter(([n]) => n === 'set strokeStyle')
-      .pop();
-    expect(lastStyle?.[1][0]).toBe(HIGHLIGHT_RING.color);
+      .map(([, [v]]) => v);
+    expect(styles.length).toBeGreaterThan(0);
+    expect(styles).not.toContain(SELECTION_RING.color);
   });
 
   it('draws no outline when the sky opacity is 0', () => {

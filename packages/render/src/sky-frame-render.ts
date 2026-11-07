@@ -36,7 +36,11 @@ import {
   drawResizeDraftRect,
   drawElasticSnapLine,
 } from './frame-draw';
-import { FRAME, PHOTO_OUTLINE, TRAJECTORY } from '@myastrosky/core/canvas-theme';
+import { FRAME, PHOTO_OUTLINE, SELECTION_RING, TRAJECTORY } from '@myastrosky/core/canvas-theme';
+import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
+import { getStarByHip } from '@myastrosky/core/catalog/star-registry';
+import { computeStarPaint } from '@myastrosky/core/star-render-math';
+import { computeDSOHighlightShape } from '@myastrosky/core/dso-highlight';
 import { drawPoiPin } from './poi-pins';
 
 /** Frame stroke/label colours resolved from CSS custom properties. */
@@ -76,7 +80,16 @@ export function renderOverlay(s: SkyScene): void {
   const hasRegionOverlay = s.activeRegionOverlay !== null && s.localSkyMode;
   const hasTrajectory = s.trajectory !== null && s.localSkyMode && horizon !== null;
   const hasPins = s.poiPins.length > 0;
-  if (!horizon && !hasFrames && !hasRegionDraw && !hasRegionOverlay && !hasTrajectory && !hasPins)
+  const hasSelection = s.highlightedDSO !== null || s.highlightedStar !== null;
+  if (
+    !horizon &&
+    !hasFrames &&
+    !hasRegionDraw &&
+    !hasRegionOverlay &&
+    !hasTrajectory &&
+    !hasPins &&
+    !hasSelection
+  )
     return;
 
   const poleOrigin = toCanvas(0, 0, view);
@@ -108,6 +121,54 @@ export function renderOverlay(s: SkyScene): void {
   // mass, the photo layer and the frames.
   if (horizon) renderCardinalPoints(s, horizon);
 
+  ctx.restore();
+
+  // The selection ring on top of everything, photos included.
+  if (hasSelection) renderSelectionRing(s);
+}
+
+/**
+ * The selection ring, the one mark of what is selected on the map, on the desktop and the phone: around the selected
+ * DSO (`highlightedDSO`, its outline's ellipse) or star (`highlightedStar`, its painted disc). Drawn on the overlay
+ * canvas, above the photo layer, or inline in an export.
+ */
+export function renderSelectionRing(s: SkyScene): void {
+  const { ctx, view } = s;
+  const dso = s.highlightedDSO ? getDSOById(s.highlightedDSO) : undefined;
+  const star = s.highlightedStar !== null ? getStarByHip(s.highlightedStar) : undefined;
+  const target = dso ?? star;
+  if (!target) return;
+  const p = project(target.ra, target.dec);
+  const c = toCanvas(p.x, p.y, view);
+  if (!Number.isFinite(c.x) || !Number.isFinite(c.y)) return;
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  if (dso) {
+    const { rx, ry, angle } = computeDSOHighlightShape(dso, view, SELECTION_RING.minAxisPx);
+    ctx.rotate(angle);
+    ctx.scale(1, ry / rx);
+    ctx.beginPath();
+    ctx.arc(0, 0, rx + SELECTION_RING.gapPx, 0, Math.PI * 2);
+  } else {
+    const paint = computeStarPaint(
+      star!.mag,
+      star!.bv,
+      view.scale,
+      s.starBudget.edgeMag,
+      s.theme,
+      true,
+    );
+    ctx.beginPath();
+    ctx.arc(0, 0, paint.radius + SELECTION_RING.gapPx, 0, Math.PI * 2);
+  }
+  ctx.restore();
+  ctx.save();
+  ctx.strokeStyle = SELECTION_RING.color;
+  ctx.lineWidth = SELECTION_RING.lineWidth;
+  ctx.setLineDash([]);
+  ctx.shadowColor = SELECTION_RING.glow;
+  ctx.shadowBlur = SELECTION_RING.glowBlur;
+  ctx.stroke();
   ctx.restore();
 }
 

@@ -46,9 +46,9 @@ import {
 } from './api';
 import type { ServerSettings, SolverAvailability } from './api';
 import { getSolverAvailability } from './api';
-import { DSO_CATALOGS_ALL, findDSOsInImage, getDSOById } from './dso-catalog';
+import { DSO_CATALOGS_ALL, findDSOsInImage } from './dso-catalog';
 import { computeAffineTransform } from '@myastrosky/core/affine';
-import { project, setHemisphere, toCanvas } from '@myastrosky/core/projection';
+import { setHemisphere } from '@myastrosky/core/projection';
 import { showToast } from './toast';
 import { t, getLang, setLang } from './i18n';
 import { showMetadataEditor } from './metadata-editor';
@@ -56,7 +56,6 @@ import { stripExtension } from './file-utils';
 import { openDSOEditModal } from './dso-editor';
 import { buildPhotoQueryMatches, smartSortPhotos } from '@myastrosky/core/photo-search';
 import { filterDrawOrderPhotos } from '@myastrosky/core/photo-draw-order';
-import { computeDSOHighlightShape } from '@myastrosky/core/dso-highlight';
 import { confirmPhotoDelete } from './photo-delete-confirm';
 
 function formatRA(raDeg: number): string {
@@ -135,56 +134,11 @@ export function focusSearchInput() {
 export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery) {
   const panel = document.getElementById('side-panel')!;
   const appRoot = document.getElementById('app');
-  const mapContainer = document.getElementById('map-container')!;
 
   const settings = loadSettings();
-  let highlightedDSOForOverlay: string | null = null;
-
-  const dsoHighlightCanvas = document.createElement('canvas');
-  dsoHighlightCanvas.className = 'dso-highlight-overlay';
-  mapContainer.appendChild(dsoHighlightCanvas);
-
-  const MIN_HIGHLIGHT_PX = 7;
-
-  const updateDSOHighlightOverlay = () => {
-    const ctx2d = dsoHighlightCanvas.getContext('2d');
-    if (!ctx2d) return;
-    const view = skyMap.getView();
-    if (dsoHighlightCanvas.width !== view.width || dsoHighlightCanvas.height !== view.height) {
-      dsoHighlightCanvas.width = view.width;
-      dsoHighlightCanvas.height = view.height;
-    }
-    ctx2d.clearRect(0, 0, view.width, view.height);
-    if (!highlightedDSOForOverlay) return;
-    const dso = getDSOById(highlightedDSOForOverlay);
-    if (!dso) return;
-    const p = project(dso.ra, dso.dec);
-    const c = toCanvas(p.x, p.y, view);
-    if (!Number.isFinite(c.x) || !Number.isFinite(c.y)) return;
-
-    const { rx, ry, angle } = computeDSOHighlightShape(dso, view, MIN_HIGHLIGHT_PX);
-    const GAP = 4;
-
-    ctx2d.save();
-    ctx2d.translate(c.x, c.y);
-    ctx2d.rotate(angle);
-    ctx2d.scale(1, ry / rx);
-    ctx2d.beginPath();
-    ctx2d.arc(0, 0, rx + GAP, 0, Math.PI * 2);
-    ctx2d.restore();
-    ctx2d.strokeStyle = 'rgba(0, 255, 255, 0.9)';
-    ctx2d.lineWidth = 2;
-    ctx2d.setLineDash([]);
-    ctx2d.shadowColor = 'rgba(0, 255, 255, 0.55)';
-    ctx2d.shadowBlur = 6;
-    ctx2d.stroke();
-    ctx2d.shadowBlur = 0;
-  };
-
+  // The selected DSO's ring is drawn by the map on its overlay canvas, above the photos.
   const setHighlightedDSOState = (dsoId: string | null) => {
-    highlightedDSOForOverlay = dsoId;
     skyMap.setHighlightedDSO(dsoId);
-    updateDSOHighlightOverlay();
   };
 
   // Refresh photo outlines and gallery when photos change
@@ -515,7 +469,6 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       settings.mapRotationDeg = currentRotation;
       saveSettings(settings);
     }
-    updateDSOHighlightOverlay();
     useDisplayStore(pinia).onMapViewChanged(currentRotation);
   });
 

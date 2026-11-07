@@ -38,16 +38,11 @@ import {
   dsoSizeCos2,
   dsoCanvasAngle,
 } from '@myastrosky/core/dso-render-math';
-import { DsoOutlines, drawDsoHighlightRing, drawDsoMarkerFill, dsoMarkerHasFill } from './dso-draw';
+import { DsoOutlines, drawDsoMarkerFill, dsoMarkerHasFill } from './dso-draw';
 import { formatDsoLabel, dsoLabelVisible } from '@myastrosky/core/dso-label';
 import { drawMoonMarker } from './moon-draw';
 import { drawBodyMarker, drawBodyLabel } from './body-draw';
-import {
-  FONTS,
-  HIGHLIGHT_RING,
-  DSO_LABEL_COLORS,
-  DEFAULT_DSO_LABEL_COLOR,
-} from '@myastrosky/core/canvas-theme';
+import { FONTS, DSO_LABEL_COLORS, DEFAULT_DSO_LABEL_COLOR } from '@myastrosky/core/canvas-theme';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -264,7 +259,7 @@ export function renderStars(s: SkyScene): void {
 
 /**
  * The highlighted star, drawn live (not via the atlas): rare, uses estab=1, stays at
- * full brightness below the horizon (it's actively selected), and gets a ring.
+ * full brightness below the horizon (it's actively selected). Its ring is `renderSelectionRing`'s, above the photos.
  */
 function drawHighlightedStar(s: SkyScene, star: Star, maxMag: number): void {
   const { ctx, view, theme } = s;
@@ -275,12 +270,6 @@ function drawHighlightedStar(s: SkyScene, star: Star, maxMag: number): void {
   ctx.globalAlpha = 1;
   const paint = computeStarPaint(star.mag, star.bv, view.scale, maxMag, theme, true);
   paintStar(ctx, c.x, c.y, paint);
-  ctx.strokeStyle = HIGHLIGHT_RING.color;
-  ctx.lineWidth = HIGHLIGHT_RING.lineWidth;
-  ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.arc(c.x, c.y, paint.radius + HIGHLIGHT_RING.padPx, 0, Math.PI * 2);
-  ctx.stroke();
 }
 
 export function renderStarLabels(s: SkyScene): void {
@@ -316,15 +305,6 @@ export function renderDSOs(s: SkyScene): void {
   // pixels.
   const base = ctx.getTransform?.();
   const pixelScale = base ? Math.hypot(base.a, base.b) : 1;
-  let highlight: {
-    x: number;
-    y: number;
-    rx: number;
-    ry: number;
-    angle: number;
-    alpha: number;
-  } | null = null;
-
   for (const dso of s.selectedDSOs()) {
     projectCached(dso);
     const c = toCanvas(dso._px!, dso._py!, view);
@@ -352,7 +332,6 @@ export function renderDSOs(s: SkyScene): void {
 
     outlines.add(dso.type, c.x, c.y, rx, ry, angle, alpha);
     // The searched DSO's ring is drawn last, over every outline.
-    if (isHighlighted) highlight = { x: c.x, y: c.y, rx, ry, angle, alpha };
     if (!dsoMarkerHasFill(dso.type)) continue;
 
     ctx.save();
@@ -363,15 +342,7 @@ export function renderDSOs(s: SkyScene): void {
     ctx.restore();
   }
   outlines.draw(ctx);
-
-  if (highlight) {
-    ctx.save();
-    ctx.globalAlpha = highlight.alpha;
-    ctx.translate(highlight.x, highlight.y);
-    ctx.rotate(highlight.angle);
-    drawDsoHighlightRing(ctx, highlight.rx, highlight.ry);
-    ctx.restore();
-  }
+  // The selected DSO's ring is not drawn here, under the photo layer: `renderSelectionRing` draws it above.
 }
 
 export function renderDSOLabels(s: SkyScene): void {

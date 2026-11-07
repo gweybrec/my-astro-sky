@@ -13,7 +13,6 @@
 import type { DSOType } from '@myastrosky/core/types';
 import {
   DSO_MARKER_STYLES,
-  HIGHLIGHT_RING,
   type DsoMarkerStyle,
   type GradientFill,
 } from '@myastrosky/core/canvas-theme';
@@ -212,16 +211,4 @@ export class DsoOutlines {
     ctx.globalAlpha = prevAlpha;
     this.groups.clear();
   }
-}
-
-/** Draw the highlight ring around a searched DSO (caller has translated/rotated). */
-export function drawDsoHighlightRing(ctx: CanvasRenderingContext2D, rx: number, ry: number): void {
-  ctx.strokeStyle = HIGHLIGHT_RING.color;
-  ctx.lineWidth = HIGHLIGHT_RING.lineWidth;
-  ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.scale(1, ry / rx);
-  ctx.arc(0, 0, rx + HIGHLIGHT_RING.padPx, 0, TWO_PI);
-  ctx.stroke();
-  ctx.scale(1, rx / ry);
 }

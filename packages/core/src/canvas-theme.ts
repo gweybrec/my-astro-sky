@@ -203,27 +203,41 @@ export const DSO_LABEL_COLORS: Partial<Record<DSOType, string>> = {
 export const DEFAULT_DSO_LABEL_COLOR = 'rgba(160, 160, 160, 0.7)';
 
 // ── Highlights & misc sky overlays ───────────────────────────────────────────
-/** Ring drawn around a searched/highlighted DSO or star (shared accent orange). */
-export const HIGHLIGHT_RING = {
-  color: 'rgba(192, 120, 48, 0.85)',
+/** The selection colour (#00FFFF), the only one: every selection mark takes it from here, at its own opacity. */
+const SELECTION_RGB = '0, 255, 255';
+
+/** The selection colour at an opacity (0 to 1). */
+export function selectionColor(alpha: number): string {
+  return `rgba(${SELECTION_RGB}, ${alpha})`;
+}
+
+/**
+ * The selection ring around the selected DSO or star, the one style for it on the desktop and the phone, over a photo
+ * or the sky (`renderSelectionRing`, above the photo layer), with a glow; `minAxisPx` keeps a tiny DSO's ring visible.
+ */
+export const SELECTION_RING = {
+  color: selectionColor(0.9),
+  glow: selectionColor(0.55),
+  glowBlur: 6,
   lineWidth: 2,
-  padPx: 4,
+  gapPx: 4,
+  minAxisPx: 7,
 } as const;
 
 /**
  * The selected object's path across the local-sky dome (see sky-trajectory.ts).
- * Deliberately the same cyan as the selection ring above, so the ring and the arc
+ * Deliberately in the selection colour, as the ring above, so the ring and the arc
  * read as one object. Drawn over the photo layer, so the line and the marker labels
  * carry a dark halo to stay legible against a bright astrophoto.
  */
 export const TRAJECTORY = {
-  color: 'rgba(0, 255, 255, 0.9)',
+  color: SELECTION_RING.color,
   lineWidth: 2,
   dash: [2, 6] as number[],
   halo: 'rgba(0, 0, 0, 0.85)',
   haloBlur: 4,
   markerRadius: 3,
-  markerFill: 'rgba(0, 255, 255, 0.95)',
+  markerFill: selectionColor(0.95),
   markerEdge: 'rgba(0, 0, 0, 0.8)',
   labelColor: 'rgba(190, 255, 255, 0.95)',
   labelFont: 'bold 11px sans-serif',
