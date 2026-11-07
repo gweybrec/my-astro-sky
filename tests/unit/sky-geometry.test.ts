@@ -4,6 +4,7 @@ import {
   altitudeAtDeg,
   transitLstHours,
   maxAltDuringWindow,
+  transitTonight,
   mightBeVisible,
   sampleAltCurve,
   angularSeparationDeg,
@@ -14,7 +15,7 @@ import {
   isCardinalAz,
   type AltSample,
 } from '@myastrosky/core/sky-geometry';
-import { lstHours, dateToJD, moonRaDecDeg } from '@myastrosky/core/astro-time';
+import { lstHours, dateToJD, moonRaDecDeg, twilightWindow } from '@myastrosky/core/astro-time';
 
 describe('altAzFromRaDec', () => {
   it('object on meridian (LST = RA) has azimuth ≈ 180° (due south, north hemisphere)', () => {
@@ -132,6 +133,19 @@ describe('maxAltDuringWindow', () => {
     const { atDate } = maxAltDuringWindow(84, -1.2, 48.85, 2.35, windowStart, windowEnd);
     expect(atDate.getTime()).toBeGreaterThanOrEqual(windowStart.getTime());
     expect(atDate.getTime()).toBeLessThanOrEqual(windowEnd.getTime());
+  });
+});
+
+describe('transitTonight', () => {
+  it("is the best time of maxAltDuringWindow over the date's night", () => {
+    const date = new Date('2024-01-15T21:00:00Z');
+    const night = twilightWindow(date, 48.85, 2.35)!;
+    const expected = maxAltDuringWindow(84, -1.2, 48.85, 2.35, night.start, night.end, 10).atDate;
+    expect(transitTonight(84, -1.2, 48.85, 2.35, date)).toEqual(expected);
+  });
+
+  it('is null when the night has no dark window (polar summer)', () => {
+    expect(transitTonight(84, -1.2, 78.2, 15.6, new Date('2024-06-21T12:00:00Z'))).toBeNull();
   });
 });
 

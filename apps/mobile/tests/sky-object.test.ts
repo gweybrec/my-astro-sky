@@ -29,6 +29,8 @@ const M31 = {
   type: 'GxS',
   constellation: 'And',
   mag: 3.4,
+  majAxis: 178,
+  minAxis: 63,
   ra: 10.68,
   dec: 41.27,
 } as unknown as DSO;
@@ -70,8 +72,16 @@ describe('the object sheet', () => {
     expect(w.find('.mob-badge--const').text()).toBe('AND');
   });
 
-  it('shows only the magnitude without a location', () => {
-    expect(factsOf(mountSheet())).toEqual([['Magnitude', '3.4']]);
+  it('shows only the magnitude and the size without a location', () => {
+    expect(factsOf(mountSheet())).toEqual([
+      ['Magnitude', '3.4'],
+      ['Taille', "178.0' × 63.0'"],
+    ]);
+  });
+
+  it('leaves the size out when the catalogue has none', () => {
+    const noSize = { ...M31, majAxis: null, minAxis: null } as unknown as DSO;
+    expect(factsOf(mountSheet({ kind: 'dso', dso: noSize }))).toEqual([['Magnitude', '3.4']]);
   });
 
   it('lists its facts without cards, each as wide as its text, values in body text', () => {
@@ -81,17 +91,20 @@ describe('the object sheet', () => {
     expect(w.find('.mob-fact-value').classes()).not.toContain('m-body-strong');
   });
 
-  it('adds the transit tonight once there is a location, and the altitude too in date mode', () => {
+  it('adds the altitude and the transit in date mode with a location, local sky or not', () => {
     writeObserverLocation(48.58, 7.75);
     setActivePinia(createPinia());
-    const live = factsOf(mountSheet());
-    expect(live.map((f) => f[0])).toEqual(['Transit', 'Magnitude']);
-    expect(live[0][1]).toMatch(/^\d{2}:\d{2}$/);
+    expect(factsOf(mountSheet()).map((f) => f[0])).toEqual(['Magnitude', 'Taille']);
 
-    useSkyTimeStore().setMode('date');
+    const time = useSkyTimeStore();
+    time.setMode('date');
     const date = factsOf(mountSheet());
-    expect(date.map((f) => f[0])).toEqual(['Altitude', 'Transit', 'Magnitude']);
+    expect(date.map((f) => f[0])).toEqual(['Altitude', 'Transit', 'Magnitude', 'Taille']);
     expect(date[0][1]).toMatch(/^-?\d+°$/);
+    expect(date[1][1]).toMatch(/^\d{2}:\d{2}$/);
+
+    time.setLocalSkyMode(true);
+    expect(factsOf(mountSheet())).toEqual(date);
   });
 
   it('has the four actions of the board, all usable; no details button, the facts are in the sheet', () => {
@@ -196,7 +209,7 @@ describe('the sheet of a star', () => {
     expect(mountSheet().find('.mob-icon-row').classes()).not.toContain('mob-icon-row--start');
   });
 
-  it('shows the altitude and the transit with a location, like an object', () => {
+  it('shows the altitude and the transit in date mode with a location, like an object; no size', () => {
     writeObserverLocation(48.58, 7.75);
     setActivePinia(createPinia());
     useSkyTimeStore().setMode('date');

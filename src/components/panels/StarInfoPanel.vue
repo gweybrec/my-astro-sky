@@ -39,6 +39,10 @@
           <td>{{ t('dso.altitude') }}</td>
           <td>{{ altitudeStr }}</td>
         </tr>
+        <tr v-if="transitStr">
+          <td>{{ t('targets.results.bestTime') }}</td>
+          <td>{{ transitStr }}</td>
+        </tr>
       </tbody>
     </table>
     <StarActions :star="star" />
@@ -52,7 +56,8 @@ import type { StarSearchResult } from '../../api';
 import { formatMultiplicity } from '../../star-catalog';
 import { formatRA, formatDec, formatAlt } from '@myastrosky/core/format-utils';
 import StarActions from './StarActions.vue';
-import { altitudeAtDeg } from '@myastrosky/core/sky-geometry';
+import { altitudeAtDeg, transitTonight } from '@myastrosky/core/sky-geometry';
+import { formatClock24 } from '@myastrosky/core/targets/format';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 
 const props = defineProps<{ star: StarSearchResult }>();
@@ -72,6 +77,18 @@ const altitudeStr = computed(() =>
     ),
   ),
 );
+// When it is highest during the night of the map's date, shown with the altitude (date mode with a location).
+const transitStr = computed(() => {
+  if (!showAltitude.value) return null;
+  const transit = transitTonight(
+    props.star.ra,
+    props.star.dec,
+    skyTimeStore.lat!,
+    skyTimeStore.lon!,
+    skyTimeStore.simDate,
+  );
+  return transit ? formatClock24(transit) : null;
+});
 
 const headerName = computed(() => {
   const s = props.star;

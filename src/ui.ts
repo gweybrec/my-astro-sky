@@ -6,7 +6,8 @@ import { useUiStore } from './stores/ui';
 import { usePhotosStore } from './stores/photos';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { useHorizonStore } from './stores/horizon';
-import { altitudeAtDeg } from '@myastrosky/core/sky-geometry';
+import { altitudeAtDeg, transitTonight } from '@myastrosky/core/sky-geometry';
+import { formatClock24 } from '@myastrosky/core/targets/format';
 import { formatAlt } from '@myastrosky/core/format-utils';
 import { starDisplayName, formatMultiplicity } from './star-catalog';
 import {
@@ -298,6 +299,9 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
     const altStr = showAltitude
       ? formatAlt(altitudeAtDeg(star.ra, star.dec, st.lat!, st.lon!, st.simDate))
       : null;
+    const transit = showAltitude
+      ? transitTonight(star.ra, star.dec, st.lat!, st.lon!, st.simDate)
+      : null;
     let html: string;
     if (ds.simplifiedDSOTooltips) {
       const multiLine = star.multiplicity
@@ -327,6 +331,10 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
         `<tr><td>${t('dso.raDec')}</td><td>${formatRA(star.ra)} / ${formatDec(star.dec)}</td></tr>`,
       );
       if (altStr) rows.push(`<tr><td>${t('dso.altitude')}</td><td>${altStr}</td></tr>`);
+      if (transit)
+        rows.push(
+          `<tr><td>${t('targets.results.bestTime')}</td><td>${formatClock24(transit)}</td></tr>`,
+        );
       html = `<div class="dso-info-name">${starDisplayName(star)}</div><table class="dso-info-table">${rows.join('')}</table>`;
     }
     // Only full-mode tooltips carry the star (and thus the Add Frame / Add Mosaic
@@ -346,6 +354,9 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
     const showAltitude = st.mode === 'date' && st.lat !== null && st.lon !== null;
     const altStr = showAltitude
       ? formatAlt(altitudeAtDeg(dso.ra, dso.dec, st.lat!, st.lon!, st.simDate))
+      : null;
+    const transit = showAltitude
+      ? transitTonight(dso.ra, dso.dec, st.lat!, st.lon!, st.simDate)
       : null;
     let html: string;
     if (ds.simplifiedDSOTooltips) {
@@ -374,6 +385,9 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
         sizeStr !== '–' ? `<tr><td>${t('dso.size')}</td><td>${sizeStr}</td></tr>` : '';
       const raDec = `${formatRA(dso.ra)} / ${formatDec(dso.dec)}`;
       const altitudeRow = altStr ? `<tr><td>${t('dso.altitude')}</td><td>${altStr}</td></tr>` : '';
+      const transitRow = transit
+        ? `<tr><td>${t('targets.results.bestTime')}</td><td>${formatClock24(transit)}</td></tr>`
+        : '';
       const ratingRow =
         dso.rating !== null
           ? `<tr><td>${t('targets.ratingFilter')}</td><td>${formatRating(dso.rating)}</td></tr>`
@@ -390,7 +404,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
       const emissionLinesRow = dso.emissionLines
         ? `<tr><td>${t('dso.emissionLines')}</td><td>${dso.emissionLines}</td></tr>`
         : '';
-      html = `${nameStr}<table class="dso-info-table"><tr><td>${t('dso.type')}</td><td>${typeName}</td></tr><tr><td>${t('stars.magnitude')}</td><td>${magStr}</td></tr>${sizeRow}<tr><td>${t('dso.raDec')}</td><td>${raDec}</td></tr>${altitudeRow}${ratingRow}${difficultyRow}${emissionLinesRow}${crossRefRow}</table>`;
+      html = `${nameStr}<table class="dso-info-table"><tr><td>${t('dso.type')}</td><td>${typeName}</td></tr><tr><td>${t('stars.magnitude')}</td><td>${magStr}</td></tr>${sizeRow}<tr><td>${t('dso.raDec')}</td><td>${raDec}</td></tr>${altitudeRow}${transitRow}${ratingRow}${difficultyRow}${emissionLinesRow}${crossRefRow}</table>`;
     }
     // Only full-mode tooltips carry the DSO (and thus the interactive action buttons);
     // simplified tooltips stay minimal.

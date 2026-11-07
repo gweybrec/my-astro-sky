@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { t } from '@myastrosky/core/i18n/index';
-import { twilightWindow } from '@myastrosky/core/astro-time';
-import { altitudeAtDeg, maxAltDuringWindow } from '@myastrosky/core/sky-geometry';
-import { formatAlt } from '@myastrosky/core/format-utils';
+import { altitudeAtDeg, transitTonight } from '@myastrosky/core/sky-geometry';
+import { formatAlt, formatSize } from '@myastrosky/core/format-utils';
 import { formatClock24 } from '@myastrosky/core/targets/format';
 import { formatMultiplicity } from '@myastrosky/core/targets/multiplicity';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
@@ -25,8 +24,8 @@ import editIcon from '@icons/pen.svg?raw';
 // star editor). The facts are already in the sheet, so there is no details button. "Ajouter un cadre", "Ajouter une
 // mosaïque" and "Modifier" are handed to the page. The sheet
 // closes by dragging it down from its handle or header, with the handle, with a tap on an empty spot of the map and with the back button. The altitude is the object's now in the map's time
-// (as the desktop shows it, in date mode with a location only); the transit is when it is highest during the night at
-// the location.
+// (as the desktop shows it, in date mode with a location only), and so is the transit, when it is highest during that
+// date's night at the location. A deep-sky object's size follows its magnitude, when the catalogue has one.
 const props = defineProps<{ selection: Exclude<SkySelection, { kind: 'photo' }> }>();
 const emit = defineEmits<{ close: []; addFrame: []; addMosaic: []; edit: [] }>();
 const time = useSkyTimeStore();
@@ -44,6 +43,7 @@ const shown = computed(() => {
       ra: d.ra,
       dec: d.dec,
       magnitude: d.mag === null ? null : d.mag.toFixed(1),
+      size: d.majAxis === null ? null : formatSize(d.majAxis, d.minAxis),
     };
   }
   const star = s.star;
@@ -67,6 +67,7 @@ const shown = computed(() => {
     ra: star.ra,
     dec: star.dec,
     magnitude: star.mag.toFixed(2),
+    size: null,
   };
 });
 
@@ -80,20 +81,16 @@ const planTarget = computed(() => {
     : null;
 });
 const facts = computed(() => {
-  const { ra, dec, magnitude } = shown.value;
+  const { ra, dec, magnitude, size } = shown.value;
   const out: { label: string; value: string }[] = [];
   if (time.mode === 'date' && located.value) {
     const alt = altitudeAtDeg(ra, dec, time.lat!, time.lon!, time.simDate);
     out.push({ label: t('dso.altitude'), value: formatAlt(alt) });
-  }
-  if (located.value) {
-    const night = twilightWindow(time.simDate, time.lat!, time.lon!);
-    if (night) {
-      const best = maxAltDuringWindow(ra, dec, time.lat!, time.lon!, night.start, night.end, 10);
-      out.push({ label: t('targets.results.bestTime'), value: formatClock24(best.atDate) });
-    }
+    const transit = transitTonight(ra, dec, time.lat!, time.lon!, time.simDate);
+    if (transit) out.push({ label: t('targets.results.bestTime'), value: formatClock24(transit) });
   }
   if (magnitude !== null) out.push({ label: t('stars.magnitude'), value: magnitude });
+  if (size !== null) out.push({ label: t('dso.size'), value: size });
   return out;
 });
 </script>

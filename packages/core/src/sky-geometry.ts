@@ -2,7 +2,7 @@
  * Sky geometry — altitude/azimuth, transit time, visibility over a night.
  */
 
-import { dateToJD, lstHours, moonRaDecDeg } from './astro-time';
+import { dateToJD, lstHours, moonRaDecDeg, twilightWindow } from './astro-time';
 
 const DEG = Math.PI / 180;
 
@@ -112,6 +112,22 @@ export function maxAltDuringWindow(
   }
 
   return { maxAltDeg: best, atDate: bestDate };
+}
+
+/**
+ * The transit shown beside an object on the sky map: when it is highest during the night of `date` at the location,
+ * sampled every 10 minutes. Null when the night has no dark window (`twilightWindow` gives none).
+ */
+export function transitTonight(
+  raDeg: number,
+  decDeg: number,
+  latDeg: number,
+  lonDeg: number,
+  date: Date,
+): Date | null {
+  const night = twilightWindow(date, latDeg, lonDeg);
+  if (!night) return null;
+  return maxAltDuringWindow(raDeg, decDeg, latDeg, lonDeg, night.start, night.end, 10).atDate;
 }
 
 /** One altitude sample along the night (azimuth kept for direction readouts). */
