@@ -56,6 +56,7 @@ import { framesSheetOpen } from '../src/sky-frames';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { skyFocus, skyLayersOpen, skySelection } from '../src/composables/useSkySelection';
 import SkyLayersSheet from '../src/pages/sky/SkyLayersSheet.vue';
+import SkyFramesSheet from '../src/pages/sky/SkyFramesSheet.vue';
 import PhoneToggleRow from '../src/components/PhoneToggleRow.vue';
 
 /** The map's own controls: what shows with the live sky and what shows with the sky at a date. */
@@ -481,6 +482,25 @@ describe('the Ciel page', () => {
       expect(skySelection.value).toEqual({ kind: 'dso', dso: M42 });
       expect(map.navigateUnderFrame).not.toHaveBeenCalled();
       expect(sky.focus).toHaveBeenCalled();
+    });
+
+    it('brings a frame beside its sheet only once the sheet has measured how tall it opens', async () => {
+      /** What the sheet had measured when the map moved the frame. */
+      const coverWhenMoved: (string | undefined)[] = [];
+      const w = mountPage();
+      Object.assign(map, {
+        setCover: vi.fn(),
+        centerFrameInView: vi.fn(() => {
+          const room = w.find('.mob-map-sheet-room').element as HTMLElement;
+          coverWhenMoved.push(room.dataset.cover);
+        }),
+      });
+      await flushPromises();
+      frame('screen');
+      w.findComponent(SkyFramesSheet).vm.$emit('show', 'a1');
+      await new Promise((r) => setTimeout(r, 800));
+      expect(coverWhenMoved).toHaveLength(1);
+      expect(coverWhenMoved[0]).toBeDefined();
     });
 
     it('selects an object tapped on the map as before, letting go of the floating frame', async () => {

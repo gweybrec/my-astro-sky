@@ -479,13 +479,21 @@ function mosaicEdited() {
   if (edited) showFrame(edited.id);
 }
 // Runs a move of the map within the part its sheet leaves free (above it in portrait, right of it in landscape), with
-// that part's size: once the map has what it moves to (Vue's next update) and the sheet has its size (the next drawn
-// frame). Without a sheet the whole map is free.
-function besideSheet(move: (free: { width: number; height: number }) => void) {
+// that part's size: once the map has what it moves to (Vue's next update) and the sheet opening with it has measured
+// how tall it opens (it waits for its content first: moved before, the map took it for no sheet at all and put a new
+// frame under it in landscape). A sheet that does not measure in time is not waited for. Without a sheet the whole map
+// is free.
+const SHEET_MEASURE_FRAMES = 90;
+function besideSheet(move: (free: { width: number; height: number }) => void, waited = 0) {
   void nextTick(() =>
     requestAnimationFrame(() => {
       const map = sky?.map;
       if (!map) return;
+      const room = sheetRoom();
+      if (room && room.dataset.cover === undefined && waited < SHEET_MEASURE_FRAMES) {
+        besideSheet(move, waited + 1);
+        return;
+      }
       const cover = sheetCover();
       const view = map.getView();
       map.setCover(cover);
@@ -499,9 +507,14 @@ function showFrame(id: string) {
   besideSheet(() => sky?.map.centerFrameInView(id));
 }
 // The sheet's place in the map from its room and the height it opens at, not its box on screen: it is still sliding in.
+/** The room of the map's sheet opened last (one closing may still be sliding out before it). */
+function sheetRoom(): HTMLElement | undefined {
+  const rooms = mapEl.value?.querySelectorAll<HTMLElement>('.mob-map-sheet-room');
+  return rooms?.length ? rooms[rooms.length - 1] : undefined;
+}
 function sheetCover() {
   const map = mapEl.value;
-  const room = map?.querySelector<HTMLElement>('.mob-map-sheet-room');
+  const room = sheetRoom();
   if (!map || !room) return { left: 0, bottom: 0 };
   const width = map.clientWidth;
   const height = map.clientHeight;
