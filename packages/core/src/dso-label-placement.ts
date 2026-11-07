@@ -64,6 +64,27 @@ export function overlaps(a: Rect, b: Rect): boolean {
   return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 }
 
+/**
+ * Whether a mark centred on `centre` and reaching `halfWidth`/`halfHeight` from it on each side has any part inside
+ * `view`: a label is only shown, slid into view if need be, for a mark that is at least partly in view.
+ */
+export function reachesView(
+  centre: Point,
+  halfWidth: number,
+  halfHeight: number,
+  view: Rect,
+): boolean {
+  return overlaps(
+    {
+      left: centre.x - halfWidth,
+      top: centre.y - halfHeight,
+      right: centre.x + halfWidth,
+      bottom: centre.y + halfHeight,
+    },
+    view,
+  );
+}
+
 /** How far a label may be pushed down before it is left where it lands. Enough that a
  * whole cluster can stack into a column even in the degenerate case where every object
  * projects onto the same point — eight candidate positions plus these. */

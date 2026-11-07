@@ -10,7 +10,12 @@
 import type { AffineMatrix, PointOfInterest } from '@myastrosky/core/types';
 import { applyAffine, invertAffine } from '@myastrosky/core/affine';
 import { project } from '@myastrosky/core/projection';
-import { placeLabel, type Rect, type Size } from '@myastrosky/core/dso-label-placement';
+import {
+  placeLabel,
+  reachesView,
+  type Rect,
+  type Size,
+} from '@myastrosky/core/dso-label-placement';
 
 /** A POI known to have a sky position. */
 export type PositionedPoi = PointOfInterest & { ra: number; dec: number };
@@ -111,7 +116,8 @@ export interface PoiPinOverlayItem {
 /**
  * Lays out pin labels in image-relative CSS px (same space as
  * `computePhotoDsoOverlayLayout`), avoiding the boxes already taken by DSO labels
- * (`occupied`) and clamped to the visible `viewport`.
+ * (`occupied`) and clamped to the visible `viewport`. A pin wholly out of view (the photo
+ * zoomed in elsewhere) is left out, so that its name is not slid to the edge of the view.
  */
 export function computePoiPinLayout(
   pins: PhotoPoiPin[],
@@ -122,9 +128,12 @@ export function computePoiPinLayout(
   occupied: Rect[] = [],
 ): PoiPinOverlayItem[] {
   const taken = [...occupied];
-  return pins.map((pin) => {
+  const items: PoiPinOverlayItem[] = [];
+  for (const pin of pins) {
     const screenX = pin.x * dispScale;
     const screenY = pin.y * dispScale;
+    const centre = { x: screenX, y: screenY };
+    if (!reachesView(centre, PHOTO_PIN_RADIUS_PX, PHOTO_PIN_RADIUS_PX, viewport)) continue;
     const size: Size = { width: measureLabelWidth(pin.poi.name), height: PIN_LABEL_HEIGHT_PX };
     const clearance = { x: PHOTO_PIN_RADIUS_PX, y: PHOTO_PIN_RADIUS_PX };
     const box = clampRect(
@@ -132,8 +141,9 @@ export function computePoiPinLayout(
       viewport,
     );
     taken.push(box);
-    return { label: pin.poi.name, color: colorFor(pin.poi), screenX, screenY, labelBox: box };
-  });
+    items.push({ label: pin.poi.name, color: colorFor(pin.poi), screenX, screenY, labelBox: box });
+  }
+  return items;
 }
 
 function clampRect(box: Rect, viewport: Rect): Rect {

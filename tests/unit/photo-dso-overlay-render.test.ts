@@ -166,6 +166,26 @@ describe('computePhotoDsoOverlayLayout', () => {
     expect(box.top).toBeGreaterThanOrEqual(viewport.top);
     expect(box.bottom).toBeLessThanOrEqual(viewport.bottom);
   });
+
+  it('leaves out an object whose whole outline is out of view, and keeps one partly in view', () => {
+    // The photo zoomed in elsewhere: the view is a sub-window of the photo.
+    const viewport = { left: 500, top: 500, right: 700, bottom: 650 };
+    const layout = (x: number, y: number, extra?: Partial<PhotoDsoPlacement>) =>
+      computePhotoDsoOverlayLayout(
+        [placement(makeDso('Obj'), x, y, { majorPx: 40, minorPx: 40, ...extra })],
+        1,
+        measure,
+        viewport,
+      ).map((item) => item.dso.id);
+    expect(layout(100, 100)).toEqual([]); // far away
+    expect(layout(721, 600)).toEqual([]); // just past the right edge (radius 20)
+    expect(layout(719, 600)).toEqual(['Obj']); // its outline reaches into view
+    // A long object tilted a quarter: its length runs up and down, so it reaches 50 px down, not to the side.
+    expect(layout(600, 690, { majorPx: 100, minorPx: 20, angleDeg: 90 })).toEqual(['Obj']);
+    expect(layout(730, 600, { majorPx: 100, minorPx: 20, angleDeg: 90 })).toEqual([]);
+    // A large object around the whole view keeps its label.
+    expect(layout(600, 575, { majorPx: 2000, minorPx: 2000 })).toEqual(['Obj']);
+  });
 });
 
 describe('withAlpha', () => {

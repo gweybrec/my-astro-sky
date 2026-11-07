@@ -25,6 +25,7 @@ import type { DSO, DSOType } from '@myastrosky/core/types';
 import type { PhotoDsoPlacement } from '@myastrosky/core/catalog/dso-registry';
 import {
   placeLabel,
+  reachesView,
   type Rect,
   type Clearance,
   type Size,
@@ -210,6 +211,13 @@ export function computePhotoDsoOverlayLayout(
     const screenY = p.y * dispScale;
     const rx = Math.max(MIN_RADIUS_PX, (p.majorPx / 2) * dispScale);
     const ry = Math.max(MIN_RADIUS_PX, (p.minorPx / 2) * dispScale);
+    // An object whose whole outline is out of view (the photo zoomed in elsewhere) is left out: its label would
+    // otherwise be slid to the edge of the view for an object that cannot be seen. Its outline's reach on each axis
+    // is the tilted ellipse's bounding box.
+    const rad = (p.angleDeg * Math.PI) / 180;
+    const halfWidth = Math.hypot(rx * Math.cos(rad), ry * Math.sin(rad));
+    const halfHeight = Math.hypot(rx * Math.sin(rad), ry * Math.cos(rad));
+    if (!reachesView({ x: screenX, y: screenY }, halfWidth, halfHeight, viewport)) continue;
     const label = formatCatalogId(p.displayId, p.dso);
     const width = measureLabelWidth(label);
     const labelSize: Size = { width, height: LABEL_HEIGHT_PX };

@@ -143,6 +143,19 @@ describe('computePoiPinLayout()', () => {
     expect(moved.labelBox).not.toEqual(free.labelBox);
   });
 
+  it('leaves out a pin wholly out of view, and keeps one partly in view', () => {
+    const at = (x: number) =>
+      computePoiPinLayout(
+        [{ ...pin, x, y: 100 }],
+        1,
+        () => '#f00',
+        (s) => s.length * 6,
+        viewport,
+      );
+    expect(at(400 + PHOTO_PIN_RADIUS_PX + 1)).toEqual([]);
+    expect(at(400 + PHOTO_PIN_RADIUS_PX - 1)).toHaveLength(1);
+  });
+
   it('draws pins then labels', () => {
     const ctx = mockCtx();
     const items = computePoiPinLayout(
