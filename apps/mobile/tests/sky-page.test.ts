@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
@@ -9,12 +9,18 @@ const push = vi.hoisted(() => vi.fn());
 const replace = vi.hoisted(() => vi.fn());
 /** The pages Ionic's router opens, with the direction (no slide: 'none'). */
 const navigate = vi.hoisted(() => vi.fn());
-vi.mock('vue-router', () => ({
-  useRouter: () => ({ push, replace, currentRoute: { value: { path: '/tabs/sky' } } }),
-}));
+/** The page shown (reactive: the search page pushed over the map hides it), and the map's "view entered" hooks. */
+const route = vi.hoisted(() => ({ current: null as unknown as { value: { path: string } } }));
+const entered = vi.hoisted(() => [] as (() => void)[]);
+vi.mock('vue-router', async () => {
+  const { ref } = await import('vue');
+  route.current = ref({ path: '/tabs/sky' });
+  return { useRouter: () => ({ push, replace, currentRoute: route.current }) };
+});
 vi.mock('@ionic/vue', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useIonRouter: () => ({ navigate }),
+  onIonViewDidEnter: (hook: () => void) => entered.push(hook),
 }));
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => new Promise(() => {}) }));
 const reloadPhotos = vi.hoisted(() => vi.fn(() => Promise.resolve()));
@@ -22,6 +28,8 @@ const sizesRepaired = vi.hoisted(() => ({ settle: (_n: number) => {} }));
 const mediumsMade = vi.hoisted(() => ({ settle: (_n: number) => {} }));
 /** The map under the page, for the tests that need one (letting go of a frame); none for the others. */
 const fakeMap = vi.hoisted(() => ({ map: undefined as unknown }));
+/** What the page asks of the map: highlight a selection, go somewhere. */
+const sky = vi.hoisted(() => ({ select: vi.fn(), focus: vi.fn() }));
 vi.mock('../src/photo-sizes', () => ({
   photoSizesRepaired: () => new Promise<number>((resolve) => (sizesRepaired.settle = resolve)),
   photoMediumsMade: () => new Promise<number>((resolve) => (mediumsMade.settle = resolve)),
@@ -32,8 +40,8 @@ vi.mock('../src/sky-map-setup', () => ({
   createPhoneSkyMap: () => ({
     photos: {},
     reloadPhotos,
-    select: () => {},
-    focus: () => {},
+    select: (...a: unknown[]) => sky.select(...a),
+    focus: (...a: unknown[]) => sky.focus(...a),
     showPhoto: () => {},
     refreshLocation: () => {},
     catalogsLoaded: () => {},
@@ -46,7 +54,7 @@ import SkyPage from '../src/pages/SkyPage.vue';
 import { skyPlanView, skyRegionDraw, skyRegionView, skyTargetView } from '../src/sky-modes';
 import { framesSheetOpen } from '../src/sky-frames';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
-import { skyLayersOpen, skySelection } from '../src/composables/useSkySelection';
+import { skyFocus, skyLayersOpen, skySelection } from '../src/composables/useSkySelection';
 import SkyLayersSheet from '../src/pages/sky/SkyLayersSheet.vue';
 import PhoneToggleRow from '../src/components/PhoneToggleRow.vue';
 
@@ -58,6 +66,8 @@ describe('the Ciel page', () => {
     setActivePinia(createPinia());
     skyLayersOpen.value = false;
     skySelection.value = null;
+    route.current.value = { path: '/tabs/sky' };
+    entered.length = 0;
   });
   const mountPage = () => mount(SkyPage, { global: { stubs: ionicStubs } });
 
@@ -368,6 +378,120 @@ describe('the Ciel page', () => {
       expect(w.find('.mob-topbar-title').text()).toBe("Galaxie d'Andromède");
       expect(w.find('.mob-topbar button[aria-label="Contours de champ"]').exists()).toBe(false);
       skyTargetView.value = null;
+    });
+  });
+
+  describe('a floating frame and the search (note "Cadre flottant et recherche")', () => {
+    // Each test's page is unmounted: one left over would take the search for its own frame.
+    enableAutoUnmount(afterEach);
+    const M42 = {
+      id: 'M42',
+      ra: 83.8,
+      dec: -5.4,
+      type: 'EN',
+      mag: 4,
+      majAxis: 90,
+      minAxis: 60,
+      constellation: 'Ori',
+      catalogs: ['M42'],
+      displayName: "Nébuleuse d'Orion",
+    } as never;
+    let map: {
+      selectFrame: ReturnType<typeof vi.fn>;
+      navigateUnderFrame: ReturnType<typeof vi.fn>;
+    };
+    beforeEach(() => {
+      map = {
+        selectFrame: vi.fn(),
+        navigateUnderFrame: vi.fn(() => true),
+        getView: () => ({ width: 412, height: 800, scale: 300 }),
+      } as never;
+      fakeMap.map = map;
+      sky.select.mockReset();
+      sky.focus.mockReset();
+      skyFocus.value = null;
+    });
+    afterEach(() => {
+      fakeMap.map = undefined;
+    });
+
+    /** A free frame of a setup, selected: floating on the screen, or pinned to the sky. */
+    function frame(anchor: 'screen' | 'sky') {
+      const fov = useFovFramesStore();
+      fov.specs = new Map([
+        [
+          's1',
+          {
+            name: 'Équipement 1',
+            label: 'Équipement 1',
+            wDeg: 5.4,
+            hDeg: 3.6,
+            smart: false,
+            mosaic: null,
+          },
+        ],
+      ]);
+      fov.adhoc.push({
+        id: 'a1',
+        setupId: 's1',
+        anchor:
+          anchor === 'screen'
+            ? { kind: 'screen', nx: 0.5, ny: 0.4 }
+            : { kind: 'sky', ra: 10.7, dec: 41.3, dsoId: null },
+        rotationDeg: 0,
+      });
+      fov.setSelection({ kind: 'free' });
+      fov.setFramesVisible(true);
+      fov.setActive('a1');
+      return fov;
+    }
+    /** Choosing an object in the search page, pushed over the map, then back to the map. */
+    async function search() {
+      route.current.value = { path: '/sky/search' };
+      await flushPromises();
+      skySelection.value = { kind: 'dso', dso: M42 };
+      skyFocus.value = { ra: 83.8, dec: -5.4, scale: 1200 };
+      await flushPromises();
+      route.current.value = { path: '/tabs/sky' };
+      for (const hook of entered) hook();
+      await flushPromises();
+    }
+
+    it('brings the object under the floating frame, which keeps its sheet; the object is highlighted, without its sheet', async () => {
+      mountPage();
+      await flushPromises();
+      const fov = frame('screen');
+      await flushPromises();
+      await search();
+      expect(map.selectFrame).not.toHaveBeenCalled();
+      expect(fov.activeId).toBe('a1');
+      expect(skySelection.value).toBeNull();
+      expect(map.navigateUnderFrame).toHaveBeenCalledWith('a1', 83.8, -5.4, 1200);
+      expect(sky.select).toHaveBeenLastCalledWith({ kind: 'dso', dso: M42 });
+      expect(sky.focus).not.toHaveBeenCalled();
+    });
+
+    it('selects the object as before when the frame is pinned', async () => {
+      mountPage();
+      await flushPromises();
+      frame('sky');
+      await flushPromises();
+      await search();
+      expect(map.selectFrame).toHaveBeenCalledWith(null);
+      expect(skySelection.value).toEqual({ kind: 'dso', dso: M42 });
+      expect(map.navigateUnderFrame).not.toHaveBeenCalled();
+      expect(sky.focus).toHaveBeenCalled();
+    });
+
+    it('selects an object tapped on the map as before, letting go of the floating frame', async () => {
+      mountPage();
+      await flushPromises();
+      frame('screen');
+      await flushPromises();
+      skySelection.value = { kind: 'dso', dso: M42 };
+      await flushPromises();
+      expect(map.selectFrame).toHaveBeenCalledWith(null);
+      expect(skySelection.value).toEqual({ kind: 'dso', dso: M42 });
     });
   });
 });

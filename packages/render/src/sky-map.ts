@@ -164,12 +164,31 @@ export function centreBesideCover(
   scale: number,
   view: Pick<ViewState, 'rotationDeg'>,
 ): { x: number; y: number } {
-  if ((cover.left <= 0 && cover.bottom <= 0) || !(scale > 0)) return target;
+  if (cover.left <= 0 && cover.bottom <= 0) return target;
+  return centreForScreenOffset(
+    target,
+    { x: Math.max(0, cover.left) / 2, y: Math.max(0, cover.bottom) / -2 },
+    scale,
+    view,
+  );
+}
+
+/**
+ * The view centre (projection units) that puts `target` `offset` canvas px away from the middle of the canvas
+ * (x to the right, y down), at `scale` and the view's rotation.
+ */
+export function centreForScreenOffset(
+  target: { x: number; y: number },
+  offset: { x: number; y: number },
+  scale: number,
+  view: Pick<ViewState, 'rotationDeg'>,
+): { x: number; y: number } {
+  if (!(scale > 0) || (offset.x === 0 && offset.y === 0)) return target;
   const theta = (view.rotationDeg * Math.PI) / 180;
   const cos = Math.cos(theta);
   const sin = Math.sin(theta);
-  const rx = Math.max(0, cover.left) / 2;
-  const ry = -Math.max(0, cover.bottom) / 2;
+  const rx = offset.x;
+  const ry = offset.y;
   const dx = rx * cos - ry * sin;
   const dy = rx * sin + ry * cos;
   return { x: target.x - dx / scale, y: target.y + dy / scale };
@@ -893,7 +912,32 @@ export class SkyMap {
   }
 
   navigateTo(ra: number, dec: number, targetScale = 600, animate = true) {
-    const target = centreBesideCover(project(ra, dec), this.cover, targetScale, this.view);
+    this.flyTo(
+      centreBesideCover(project(ra, dec), this.cover, targetScale, this.view),
+      targetScale,
+      animate,
+    );
+  }
+
+  /**
+   * Moves the map so that (ra, dec) comes under the floating frame `id`, which stays where it is on the screen (the
+   * phone's search while a frame is placed); false when that frame is not floating, and nothing moves.
+   */
+  navigateUnderFrame(id: string, ra: number, dec: number, targetScale: number): boolean {
+    const f = this.frames.frames.find((x) => x.id === id);
+    if (!f || f.anchorKind !== 'screen') return false;
+    const { cx, cy } = this.frames.frameAnchorCanvas(f);
+    const offset = { x: cx - this.view.width / 2, y: cy - this.view.height / 2 };
+    this.flyTo(
+      centreForScreenOffset(project(ra, dec), offset, targetScale, this.view),
+      targetScale,
+      true,
+    );
+    return true;
+  }
+
+  /** Moves the view centre to `target` (projection units) at `targetScale`, animated or at once. */
+  private flyTo(target: { x: number; y: number }, targetScale: number, animate: boolean) {
     // Guard against a caller-supplied non-finite target/scale (e.g. a degenerate
     // photo fit): a NaN/Infinity here propagates into `view.scale` via the `step`
     // interpolation and floods the DSO renderer with non-finite radii.

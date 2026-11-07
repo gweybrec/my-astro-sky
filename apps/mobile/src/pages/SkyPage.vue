@@ -20,6 +20,7 @@ import {
   skyLayersOpen,
   skyPhotoFocus,
   skySelection,
+  type SkySelection,
 } from '../composables/useSkySelection';
 import { useBackClose } from '../composables/useBackClose';
 import { useErrorToast } from '../composables/useErrorToast';
@@ -155,8 +156,20 @@ onIonViewDidEnter(() => {
   if (!focus) return;
   skyFocus.value = null;
   // A photo being placed goes along to the searched object, at the same size on screen.
+  const searched = searchedForFrame;
+  searchedForFrame = null;
   whenMapSized(() => {
     if (placement.value) placement.value.follow(() => sky?.focus(focus));
+    // A floating frame goes along too: the object comes under it, highlighted, and the frame keeps its sheet.
+    else if (searched && floatingFrame.value) {
+      const scale = Math.max(sky?.map.getView().scale ?? 0, focus.scale);
+      if (sky?.map.navigateUnderFrame(floatingFrame.value.id, focus.ra, focus.dec, scale)) {
+        sky.select(searched);
+      } else {
+        skySelection.value = searched;
+        sky?.focus(focus);
+      }
+    }
     // A setup's field ("Afficher sur la carte" of a plan) comes with its frame's sheet: framed in the part left free.
     else if (focus.fov) besideSheet(({ width, height }) => sky?.focus(focus, width, height));
     else sky?.focus(focus);
@@ -380,6 +393,26 @@ const activeFrame = computed(() =>
     : null,
 );
 const releaseFrame = () => sky?.map.selectFrame(null);
+/** The selected frame while it floats (not pinned yet): it follows a search (note "Cadre flottant et recherche"). */
+const floatingFrame = computed(() =>
+  activeFrame.value?.anchorKind === 'screen' ? activeFrame.value : null,
+);
+/**
+ * A search result chosen while a frame floats: it is held here instead of selected (its sheet would close the frame's
+ * and pin the frame where it was), and the map brings it under the frame once it shows again.
+ */
+let searchedForFrame: SkySelection | null = null;
+function holdForFloatingFrame(selection: SkySelection | null): boolean {
+  if (!selection || selection.kind === 'photo' || mapShown.value || !floatingFrame.value)
+    return false;
+  searchedForFrame = selection;
+  clearSkySelection();
+  return true;
+}
+// The object a frame went to stays highlighted while the frame is selected; then the map shows the selection again.
+watch(activeFrame, (frame) => {
+  if (!frame) sky?.select(skySelection.value);
+});
 // The sheets of the map (a photo, an object or a star, a frame, the layers) take turns: the one opened last closes
 // the others, whichever it is.
 const mapSheets = [
@@ -390,6 +423,7 @@ const mapSheets = [
 for (const sheet of mapSheets) {
   watch(sheet.open, (opened) => {
     if (!opened) return;
+    if (sheet === mapSheets[0] && holdForFloatingFrame(skySelection.value)) return;
     for (const other of mapSheets) if (other !== sheet && other.open()) other.close();
   });
 }
