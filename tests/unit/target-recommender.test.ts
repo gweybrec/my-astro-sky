@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { recommendTargets, scoreDso } from '@myastrosky/core/target-recommender';
+import { recommendTargets, scoreDso, fitsInFrame } from '@myastrosky/core/target-recommender';
 import { mightBeVisible, maxAltDuringWindow } from '@myastrosky/core/sky-geometry';
 import { twilightWindow } from '@myastrosky/core/astro-time';
 import { densifyPoints } from '@myastrosky/core/horizon-io';
@@ -717,5 +717,37 @@ describe('recommendTargets — multiple stars (type MS)', () => {
     expect(recommendTargets([asMs], testPreset, testLocation, winterNight, 5000, opts).length).toBe(
       1,
     );
+  });
+});
+
+describe('recommendTargets — objects larger than the frame', () => {
+  // The test preset's frame is about 2.55° × 1.71°.
+  const big = makeDSO({ id: 'LOOP', majAxis: 1200, minAxis: null }); // 20°, like Barnard's Loop
+  const fitting = makeDSO({ id: 'FITS', majAxis: 60, minAxis: 40 });
+
+  it('leaves them out unless they are asked for', () => {
+    const ids = (opts = {}) =>
+      recommendTargets([big, fitting], testPreset, testLocation, winterNight, 10, opts).map(
+        (s) => s.dso.id,
+      );
+    expect(ids()).toEqual(['FITS']);
+    expect(ids({ ignoreFovFit: true }).sort()).toEqual(['FITS', 'LOOP']);
+  });
+
+  it('keeps an elongated object that fits with the camera turned', () => {
+    // 2.2° long, 1° wide: longer than the frame's short side, within its long side.
+    const long = makeDSO({ id: 'LONG', majAxis: 132, minAxis: 60 });
+    const ids = recommendTargets([long], testPreset, testLocation, winterNight).map(
+      (s) => s.dso.id,
+    );
+    expect(ids).toEqual(['LONG']);
+  });
+
+  it('fitsInFrame checks the long axis against the long side and the short one against the short side', () => {
+    expect(fitsInFrame(120, 60, 1.5, 2)).toBe(true);
+    expect(fitsInFrame(150, 60, 1.5, 2)).toBe(false); // 2.5° > long side
+    expect(fitsInFrame(120, 100, 1.5, 2)).toBe(false); // 1.67° wide > short side
+    expect(fitsInFrame(100, null, 1.5, 2)).toBe(false); // round 1.67° > short side
+    expect(fitsInFrame(90, null, 1.5, 2)).toBe(true);
   });
 });

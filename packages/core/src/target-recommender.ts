@@ -61,6 +61,7 @@ export function createRecommender(
   const fov = fovDeg(preset);
   const magLimit = limitingMag(preset);
   const minFovDeg = Math.min(fov.wDeg, fov.hDeg);
+  const maxFovDeg = Math.max(fov.wDeg, fov.hDeg);
   const minAlt = options.minAltDeg ?? 20;
   const maxAlt = options.maxAltDeg ?? 90;
 
@@ -108,6 +109,15 @@ export function createRecommender(
       // Skip objects without angular size (can't compute FOV fit) — except point-like stars
       const majAxisArcmin = dso.majAxis;
       if (!isMultipleStar && !majAxisArcmin) continue;
+
+      // Objects larger than the frame are left out unless the user asked for them ("Include objects larger than
+      // FOV"): a low FOV-fit score alone would still list them, only further down.
+      if (
+        !isMultipleStar &&
+        !options.ignoreFovFit &&
+        !fitsInFrame(majAxisArcmin!, dso.minAxis, minFovDeg, maxFovDeg)
+      )
+        continue;
 
       // Skip objects that are too faint
       if (dso.mag !== null && dso.mag > magLimit) continue;
@@ -238,6 +248,21 @@ export function scoreDso(
   const brightnessScore = brightnessScoreFn(dso.mag, magLimit);
   const score = 0.45 * altScore + 0.35 * fovFitScore + 0.2 * brightnessScore;
   return { score, fovFitScore, altScore, brightnessScore };
+}
+
+/**
+ * Whether an object fits in the frame with the camera turned to suit it: its long axis within the frame's long side
+ * and its short axis (the long one when unknown) within the frame's short side. Axes in arcminutes, sides in degrees.
+ */
+export function fitsInFrame(
+  majAxisArcmin: number,
+  minAxisArcmin: number | null,
+  minFovDeg: number,
+  maxFovDeg: number,
+): boolean {
+  const majDeg = majAxisArcmin / 60;
+  const minDeg = (minAxisArcmin ?? majAxisArcmin) / 60;
+  return majDeg <= maxFovDeg && minDeg <= minFovDeg;
 }
 
 // ─── Score helpers ─────────────────────────────────────────────────────────────
