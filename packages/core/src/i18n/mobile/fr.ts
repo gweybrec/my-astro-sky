@@ -148,6 +148,9 @@ const fr = {
       'La clé astrometry.net enregistrée ne peut plus être lue. Saisissez-la à nouveau pour résoudre vos photos en ligne.',
     keyEnterAgain: 'Saisir la clé',
     lan: 'LAN',
+    autoRotate: 'Pivoter les photos en paysage',
+    autoRotateHelp:
+      "Quand le téléphone est tenu en portrait, une photo en paysage est tournée d'un quart de tour pour occuper tout l'écran, sauf si vous l'avez pivotée vous-même. La photo elle-même n'est pas modifiée.",
   },
   nav: { back: 'Retour' },
   photo: {

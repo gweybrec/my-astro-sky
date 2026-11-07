@@ -18,6 +18,7 @@ import type { PhotoLayer } from '@myastrosky/render/photo-layer';
 import type { SkyMap } from '@myastrosky/render/sky-map';
 import { catalogsReady } from '../../catalogs';
 import { useErrorToast } from '../../composables/useErrorToast';
+import { useLandscape } from '../../composables/useLandscape';
 import { useSheetDrag, useSheetExpand } from '../../composables/useSheetDrag';
 import { pendingPhotoFile, removePendingPhoto } from '../../pending-photos';
 import PhoneButton from '../../components/PhoneButton.vue';
@@ -80,11 +81,7 @@ const opacity = ref(0.85);
 // and does not fold.
 const folded = ref(false);
 const { expanded, grow } = useSheetExpand();
-const landscapeQuery =
-  typeof window.matchMedia === 'function' ? window.matchMedia('(orientation: landscape)') : null;
-const landscape = ref(landscapeQuery?.matches ?? false);
-const onTurn = () => (landscape.value = landscapeQuery?.matches ?? false);
-landscapeQuery?.addEventListener('change', onTurn);
+const landscape = useLandscape();
 const settingsShown = computed(() => landscape.value || !folded.value);
 const grab = useSheetDrag(
   () => {
@@ -152,7 +149,6 @@ onMounted(async () => {
   url.value = URL.createObjectURL(file.value);
 });
 onBeforeUnmount(() => {
-  landscapeQuery?.removeEventListener('change', onTurn);
   stopView?.();
   clearTimeout(followTimer);
   if (file.value && url.value) URL.revokeObjectURL(url.value);

@@ -12,6 +12,13 @@ import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { usePhotoZoom } from '../composables/usePhotoZoom';
 import { usePhotoOverlay } from '../composables/usePhotoOverlay';
 import { setStatusBarHidden } from '../platform-device';
+import { useLandscape } from '../composables/useLandscape';
+import {
+  autoRotateLandscape,
+  loadPhotoDisplay,
+  shownQuarterTurns,
+  turnsForNextQuarter,
+} from '../photo-display';
 import { skyPhotoFocus } from '../composables/useSkySelection';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
@@ -42,9 +49,22 @@ const barsHidden = ref(false);
 const turning = ref(false);
 const { loading: wcsLoading, read: readWcs } = useWcsLoad();
 const { showError } = useErrorToast();
-// The photo as it is shown, turned: the zoom and what is drawn over it work in its pixels.
-const shown = computed(() => (photo.value ? photoAsShown(photo.value) : null));
-const turns = computed(() => (photo.value ? quarterTurnsOf(photo.value) : 0));
+// The photo as it is shown, turned: the zoom and what is drawn over it work in its pixels. The turn is the photo's own,
+// or, on an upright phone with "Pivoter les photos en paysage" on, a quarter for a landscape photo it has none of
+// (board "Réglages, affichage"): that one is only shown, never saved.
+loadPhotoDisplay();
+const landscape = useLandscape();
+const turns = computed(() =>
+  photo.value
+    ? shownQuarterTurns(photo.value, {
+        autoRotate: autoRotateLandscape.value,
+        portrait: !landscape.value,
+      })
+    : 0,
+);
+const shown = computed(() =>
+  photo.value ? photoAsShown({ ...photo.value, quarterTurns: turns.value }) : null,
+);
 const turnTransform = computed(() => (turns.value ? ` rotate(${turns.value * 90}deg)` : ''));
 // A picture that cannot be read leaves the stage with the photo's name.
 const broken = ref(false);
@@ -117,7 +137,9 @@ async function rotate() {
   if (!photo.value || turning.value) return;
   turning.value = true;
   try {
-    photo.value = await rotatePhotoAPI(photo.value.id);
+    // A quarter further right than what is seen, which is ahead of the photo's own rotation when the screen turned it.
+    const presses = turnsForNextQuarter(quarterTurnsOf(photo.value), turns.value);
+    for (let i = 0; i < presses; i++) photo.value = await rotatePhotoAPI(photo.value.id);
     broken.value = false;
     reset();
   } catch (error) {

@@ -150,6 +150,9 @@ const de: Translations['mobile'] = {
       'Der gespeicherte astrometry.net-Schlüssel kann nicht mehr gelesen werden. Geben Sie ihn erneut ein, um Ihre Fotos online zu lösen.',
     keyEnterAgain: 'Schlüssel eingeben',
     lan: 'LAN',
+    autoRotate: 'Querformatfotos drehen',
+    autoRotateHelp:
+      'Wenn das Telefon hochkant gehalten wird, wird ein Querformatfoto um eine Vierteldrehung gedreht, damit es den ganzen Bildschirm füllt, außer Sie haben es selbst gedreht. Das Foto selbst wird nicht verändert.',
   },
   nav: { back: 'Zurück' },
   photo: {

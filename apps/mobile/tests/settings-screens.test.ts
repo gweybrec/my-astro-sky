@@ -53,10 +53,12 @@ import RestorePage from '../src/pages/RestorePage.vue';
 import { useRestore } from '../src/composables/useRestore';
 import AstrometryKeyPage from '../src/pages/AstrometryKeyPage.vue';
 import AboutPage from '../src/pages/AboutPage.vue';
+import DisplaySettingsPage from '../src/pages/DisplaySettingsPage.vue';
 import PrivacyPage from '../src/pages/PrivacyPage.vue';
 import DataCreditsPage from '../src/pages/DataCreditsPage.vue';
 import StatisticsPage from '../src/pages/StatisticsPage.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
+import PhoneToggleRow from '../src/components/PhoneToggleRow.vue';
 import SkyCheckSheet from '../src/pages/sky/SkyCheckSheet.vue';
 import { DSO_CATALOGS_ALL } from '@myastrosky/core/catalog/dso-registry';
 import { applySavedTheme } from '../src/app-theme';
@@ -327,6 +329,35 @@ describe('the Réglages page', () => {
     await about!.trigger('click');
     await flushPromises();
     expect(router.currentRoute.value.path).toBe('/settings/about');
+  });
+
+  it('opens the display page from its row, under the theme', async () => {
+    const { global, router } = app();
+    const w = mount(SettingsPage, { global });
+    await flushPromises();
+    const titles = w.findAll('.mob-row').map((r) => r.find('.mob-row-title').text());
+    expect(titles.indexOf('Affichage')).toBe(titles.indexOf('Thème') + 1);
+    await w
+      .findAll('.mob-row')
+      .find((r) => r.text().includes('Affichage'))!
+      .trigger('click');
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/settings/display');
+  });
+
+  it('turns landscape photos on an upright phone until switched off, and keeps the choice', async () => {
+    const { global } = app();
+    const w = mount(DisplaySettingsPage, { global });
+    await flushPromises();
+    expect(w.find('.mob-topbar-title').text()).toBe('Affichage');
+    expect(w.find('.mob-section-header').text()).toBe('Galerie');
+    const row = w.find('.mob-toggle-row');
+    expect(row.text()).toContain('Pivoter les photos en paysage');
+    expect(row.text()).toContain("sauf si vous l'avez pivotée vous-même");
+    expect(row.attributes('checked')).toBe('true');
+    w.findComponent(PhoneToggleRow).vm.$emit('update:modelValue', false);
+    await flushPromises();
+    expect(storage().get('photo-auto-rotate-v1')).toBe('false');
   });
 
   it('opens the privacy page from its row', async () => {

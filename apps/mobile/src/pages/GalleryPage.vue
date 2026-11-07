@@ -17,6 +17,7 @@ import PhoneFab from '../components/PhoneFab.vue';
 import PhoneSheet from '../components/PhoneSheet.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 import { addImportFiles } from '../composables/usePhotoImport';
+import { useLandscape } from '../composables/useLandscape';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
 import { useGrowingList } from '../composables/useGrowingList';
@@ -138,12 +139,8 @@ const tiles = computed(() =>
 
 // How the phone is held, as the stylesheet sees it: each way has its own number of photos per line.
 const displayOpen = ref(false);
-const landscape =
-  typeof window.matchMedia === 'function' ? window.matchMedia('(orientation: landscape)') : null;
-const orientation = ref<Orientation>(landscape?.matches ? 'landscape' : 'portrait');
-const onTurn = () => (orientation.value = landscape?.matches ? 'landscape' : 'portrait');
-landscape?.addEventListener('change', onTurn);
-onBeforeUnmount(() => landscape?.removeEventListener('change', onTurn));
+const landscape = useLandscape();
+const orientation = computed<Orientation>(() => (landscape.value ? 'landscape' : 'portrait'));
 loadGalleryDisplay();
 const gridStyle = computed(() => ({
   '--photos-per-line': photosPerLine.portrait,

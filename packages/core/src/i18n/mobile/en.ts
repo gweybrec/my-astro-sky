@@ -149,6 +149,9 @@ const en: Translations['mobile'] = {
       'The saved astrometry.net key can no longer be read. Enter it again to solve your photos online.',
     keyEnterAgain: 'Enter the key',
     lan: 'LAN',
+    autoRotate: 'Rotate landscape photos',
+    autoRotateHelp:
+      'When the phone is held upright, a landscape photo is turned a quarter to fill the screen, unless you rotated it yourself. The photo itself is not changed.',
   },
   nav: { back: 'Back' },
   photo: {

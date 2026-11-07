@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, shallowRef } from 'vue';
+import { computed, ref, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
@@ -23,6 +23,7 @@ import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
 import { catalogsReady } from '../catalogs';
 import { useErrorToast } from '../composables/useErrorToast';
+import { useLandscape } from '../composables/useLandscape';
 import { useGrowingList } from '../composables/useGrowingList';
 import { reloadTargetsPrefs, targetsPrefs, updateTargetsPrefs } from '../composables/useTargets';
 import AppIcon from '../components/AppIcon.vue';
@@ -93,12 +94,7 @@ const searchPrefs = computed(() =>
 );
 
 // In landscape the plan's title bar holds the search too (one bar, as the landscape board draws it).
-const landscapeQuery =
-  typeof window.matchMedia === 'function' ? window.matchMedia('(orientation: landscape)') : null;
-const landscape = ref(landscapeQuery?.matches ?? false);
-const onTurn = () => (landscape.value = landscapeQuery?.matches ?? false);
-landscapeQuery?.addEventListener('change', onTurn);
-onBeforeUnmount(() => landscapeQuery?.removeEventListener('change', onTurn));
+const landscape = useLandscape();
 
 const setup = computed(() => gear.value?.setups.find((s) => s.id === searchPrefs.value.setupId));
 const setupName = computed(() => setup.value?.name ?? t('targets.gear.noSetup'));

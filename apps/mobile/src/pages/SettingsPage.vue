@@ -56,6 +56,7 @@ const sections: { title: string; rows: RowDef[] }[] = [
     rows: [
       { title: LANGUAGE_ROW },
       { title: THEME_ROW, value: () => t(THEME_LABEL_KEYS[currentTheme.value]) },
+      { title: 'mobile.photo.display', to: '/settings/display' },
     ],
   },
   {

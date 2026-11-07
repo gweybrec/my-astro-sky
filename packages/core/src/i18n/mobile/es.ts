@@ -149,6 +149,9 @@ const es: Translations['mobile'] = {
       'La clave de astrometry.net guardada ya no se puede leer. Introdúcela de nuevo para resolver tus fotos en línea.',
     keyEnterAgain: 'Introducir la clave',
     lan: 'LAN',
+    autoRotate: 'Girar las fotos horizontales',
+    autoRotateHelp:
+      'Con el teléfono en vertical, una foto horizontal se gira un cuarto de vuelta para ocupar toda la pantalla, salvo si la ha girado usted. La foto en sí no se modifica.',
   },
   nav: { back: 'Atrás' },
   photo: {

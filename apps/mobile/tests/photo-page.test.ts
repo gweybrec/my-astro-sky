@@ -77,6 +77,7 @@ import SkyCheckSheet from '../src/pages/sky/SkyCheckSheet.vue';
 import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { createPinia, setActivePinia } from 'pinia';
 import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
+import { setAutoRotateLandscape } from '../src/photo-display';
 import { skyPhotoFocus } from '../src/composables/useSkySelection';
 import { pendingWcs } from '../src/composables/useWcsLoad';
 
@@ -109,6 +110,13 @@ const labelled = (w: ReturnType<typeof mountPage>, text: string) =>
   w.findAll('.mob-photo-actions button').find((b) => b.text() === text)!;
 const shown = (w: ReturnType<typeof mountPage>, selector: string) =>
   (w.find(selector).element as HTMLElement).style.display !== 'none';
+/** An upright phone: happy-dom's window is wider than tall. */
+const upright = () =>
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }));
 const facts = (w: ReturnType<typeof mountPage>) =>
   w
     .findAll('.mob-fact')
@@ -130,6 +138,10 @@ describe("a photo's own screen", () => {
     pickFile.mockReset();
     solveWCS.mockReset();
     configureStorage(createMemoryStore());
+    // The photo is landscape: the tests that are not about it run without the screen's own turn.
+    setAutoRotateLandscape(false);
+    rotatePhotoAPI.mockReset();
+    vi.unstubAllGlobals();
     setActivePinia(createPinia());
     findDsoPlacementsInImage.mockReset().mockReturnValue([{ dso: { id: 'M31' }, x: 5, y: 5 }]);
     drawPhotoOverlay.mockReset();
@@ -372,6 +384,43 @@ describe("a photo's own screen", () => {
     expect(view.attributes('src')).toBe('/uploads/m31.jpg');
     expect(view.classes()).toContain('mob-photo-view--sideways');
     expect(view.attributes('style')).toContain('rotate(90deg)');
+  });
+
+  it('shows a landscape photo turned a quarter on an upright phone, without saving any rotation', async () => {
+    setAutoRotateLandscape(true);
+    upright();
+    const w = mountPage();
+    await flushPromises();
+    const view = w.find('.mob-photo-view');
+    expect(view.classes()).toContain('mob-photo-view--sideways');
+    expect(view.attributes('style')).toContain('rotate(90deg)');
+    expect(rotatePhotoAPI).not.toHaveBeenCalled();
+  });
+
+  it("shows a photo the user turned with its own rotation, not the screen's", async () => {
+    setAutoRotateLandscape(true);
+    upright();
+    getPhotos.mockResolvedValue([photo({ quarterTurns: 2 })]);
+    const w = mountPage();
+    await flushPromises();
+    const view = w.find('.mob-photo-view');
+    expect(view.classes()).not.toContain('mob-photo-view--sideways');
+    expect(view.attributes('style')).toContain('rotate(180deg)');
+  });
+
+  it('turns a photo the screen turned a quarter further than what is seen', async () => {
+    setAutoRotateLandscape(true);
+    upright();
+    rotatePhotoAPI
+      .mockResolvedValueOnce(photo({ quarterTurns: 1 }))
+      .mockResolvedValueOnce(photo({ quarterTurns: 2 }));
+    const w = mountPage();
+    await flushPromises();
+    await button(w, 'Faire pivoter à droite').trigger('click');
+    await flushPromises();
+    // shown a quarter (the screen's), saved none: two quarters saved, so it now shows half a turn
+    expect(rotatePhotoAPI).toHaveBeenCalledTimes(2);
+    expect(w.find('.mob-photo-view').attributes('style')).toContain('rotate(180deg)');
   });
 
   it('keeps the photo and says so when it cannot be turned', async () => {
