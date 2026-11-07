@@ -83177,7 +83177,10 @@
     "difficulty": 3,
     "catalogs": ["SH2-157", "LBN537"],
     "names": {
-      "fr": "Nébuleuse de la Patte de Sorcière"
+      "fr": "Nébuleuse de la Pince de Homard",
+      "en": "Lobster Claw Nebula",
+      "es": "Nebulosa de la Pinza de Langosta",
+      "de": "Hummerscherennebel"
     }
   },
   {

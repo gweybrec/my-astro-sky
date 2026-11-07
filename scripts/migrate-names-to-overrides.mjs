@@ -701,7 +701,7 @@ const SH2_FRENCH_NAMES = {
   'SH2-142': "Nébuleuse de l'Araignée",
   'SH2-147': 'Nébuleuse Simeis 147',
   'SH2-155': 'Nébuleuse de la Caverne',
-  'SH2-157': 'Nébuleuse de la Patte de Sorcière',
+  'SH2-157': 'Nébuleuse de la Pince de Homard',
   'SH2-162': 'Nébuleuse de la Bulle',
   'SH2-163': 'Nébuleuse SH2-163',
   'SH2-169': 'Nébuleuse SH2-169',
