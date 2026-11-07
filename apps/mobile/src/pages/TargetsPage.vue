@@ -80,6 +80,8 @@ const typesOpen = ref(false);
 const settingsOpen = ref(false);
 const setupsOpen = ref(false);
 let lastKey = '';
+/** The same key without the photographed objects. */
+let lastSettingsKey = '';
 /** Counts the searches: one that a newer search started after writes nothing when it ends. */
 let searchRun = 0;
 
@@ -184,26 +186,35 @@ async function loadOnce() {
 /** Searches again, unless nothing the search reads has changed since the last time. */
 async function runSearch() {
   if (!gear.value) return;
+  const run = ++searchRun;
+  // The photographed objects are read first (the photos can change without the preferences changing), so that they
+  // count among what the search reads: the same photos and settings are not searched again.
+  let photographedIds: Set<string> | null = null;
+  if (targetsPrefs.excludePhotographed) {
+    try {
+      photographedIds = new Set((await getPhotos()).flatMap((p) => p.dsoIds));
+    } catch (error) {
+      if (run === searchRun) void showError(error);
+      return;
+    }
+    if (run !== searchRun) return;
+  }
   const { sortBy: _sortBy, pageSize: _pageSize, ...inputs } = searchPrefs.value;
-  const key = JSON.stringify([
+  const settingsKey = JSON.stringify([
     inputs,
     gear.value.setups,
     nightISO.value,
     horizonStore.profile ? 1 : 0,
     regionsStore.regions,
   ]);
-  // The photos can change without the preferences changing: this filter always searches again.
-  const run = ++searchRun;
-  if (key === lastKey && !targetsPrefs.excludePhotographed) {
+  const key = JSON.stringify([settingsKey, photographedIds ? [...photographedIds].sort() : null]);
+  if (key === lastKey) {
     sort();
     return;
   }
   loading.value = true;
   await nextPaint();
   try {
-    const photographedIds = targetsPrefs.excludePhotographed
-      ? new Set((await getPhotos()).flatMap((p) => p.dsoIds))
-      : null;
     const result = await runTargetRecommendationSliced(
       {
         prefs: searchPrefs.value,
@@ -216,9 +227,10 @@ async function runSearch() {
       nextPaint,
     );
     if (run !== searchRun) return;
-    // The same settings searched again (only the photos may have changed): a shuffle is kept.
-    const keepShuffle = shuffled && key === lastKey;
+    // The same settings searched again (only the photographed objects changed): a shuffle is kept.
+    const keepShuffle = shuffled && settingsKey === lastSettingsKey;
     lastKey = key;
+    lastSettingsKey = settingsKey;
     if (result.kind === 'ok') {
       found = result.suggestions;
       pool = keepShuffle ? inOrderOf(found, pool) : found;
@@ -234,7 +246,7 @@ async function runSearch() {
     resetVisible();
   } catch (error) {
     if (run !== searchRun) return;
-    lastKey = '';
+    lastKey = lastSettingsKey = '';
     found = pool = [];
     shuffled = false;
     sorted.value = [];

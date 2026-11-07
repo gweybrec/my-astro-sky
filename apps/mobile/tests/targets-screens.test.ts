@@ -278,6 +278,30 @@ describe('the Cibles page', () => {
     expect(search.mock.calls[1][0].prefs).toMatchObject({ minAltDeg: 40, enabledRatings: [5] });
   });
 
+  it('does not search again when the search settings close unchanged', async () => {
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    w.findComponent(SearchSettingsSheet).vm.$emit('update:open', false);
+    await settle();
+    expect(search).toHaveBeenCalledTimes(1);
+  });
+
+  it('with photographed objects left out, searches again only when they have changed', async () => {
+    updateTargetsPrefs({ excludePhotographed: true });
+    backend.photos.listWithSizes.mockResolvedValue([{ id: 'p', dsoIds: ['M31'] }]);
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    const settings = w.findComponent(SearchSettingsSheet);
+    settings.vm.$emit('update:open', false);
+    await settle();
+    expect(search).toHaveBeenCalledTimes(1);
+    backend.photos.listWithSizes.mockResolvedValue([{ id: 'p', dsoIds: ['M31', 'M42'] }]);
+    settings.vm.$emit('update:open', false);
+    await settle();
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(search.mock.calls[1][0].photographedIds).toEqual(new Set(['M31', 'M42']));
+  });
+
   it('searches with the stored preferences, the setups and the gear', async () => {
     show(TargetsPage, { global: app().global });
     await settle();
@@ -544,9 +568,11 @@ describe('the shuffle of the Cibles page ("Cibles, au hasard")', () => {
 
   it('keeps the shuffle when the same settings are searched again for the photos', async () => {
     updateTargetsPrefs({ excludePhotographed: true });
+    backend.photos.listWithSizes.mockResolvedValue([]);
     const w = show(TargetsPage, { global: app().global });
     await settle();
     await shuffleButton(w).trigger('click');
+    backend.photos.listWithSizes.mockResolvedValue([{ id: 'p', dsoIds: ['M31'] }]);
     w.findComponent(SearchSettingsSheet).vm.$emit('update:open', false);
     await settle();
     expect(search).toHaveBeenCalledTimes(2);
