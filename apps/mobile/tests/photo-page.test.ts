@@ -189,20 +189,23 @@ describe("a photo's own screen", () => {
       await new Promise((resolve) => setTimeout(resolve, 350));
       await flushPromises();
     };
+    // The bar keeps its place when hidden (only its content goes), so the photo under it does not move.
+    const barHidden = () => w.find('.mob-photo-bar').classes('mob-photo-bar--hidden');
     tap(0);
     await later();
-    expect(shown(w, '.mob-photo-bar')).toBe(false);
+    expect(barHidden()).toBe(true);
+    expect(shown(w, '.mob-photo-bar')).toBe(true);
     expect(shown(w, '.mob-photo-buttons')).toBe(false);
     tap(1000);
     await later();
-    expect(shown(w, '.mob-photo-bar')).toBe(true);
+    expect(barHidden()).toBe(false);
     expect(shown(w, '.mob-photo-buttons')).toBe(true);
     // two taps close together zoom and leave the bars as they are
     tap(5000);
     tap(5120);
     await later();
     expect(w.find('img.mob-photo-view').attributes('style')).toContain('scale(3)');
-    expect(shown(w, '.mob-photo-bar')).toBe(true);
+    expect(barHidden()).toBe(false);
   });
 
   it('shows the name of the photo when the picture cannot be read', async () => {

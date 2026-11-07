@@ -149,8 +149,8 @@ async function loadWcs() {
       <div class="mob-page-fill mob-photo-frame">
         <div class="mob-stage mob-stage--viewer mob-photo-stage" v-on="handlers">
           <header
-            v-show="!barsHidden"
             class="mob-topbar mob-topbar--overlay mob-photo-bar"
+            :class="{ 'mob-photo-bar--hidden': barsHidden }"
             @pointerdown.stop
             @touchstart.stop
           >

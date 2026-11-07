@@ -1475,6 +1475,10 @@ ion-modal.mob-sheet-modal.mob-sheet-modal .mob-sheet.mob-sheet--fixed {
   /* As low as its buttons: the room goes to the photo. */
   min-height: calc(var(--mobile-touch-min) + var(--safe-top, 0px));
 }
+/* Bars hidden by a tap: the bar keeps its place, so the photo's area keeps its size and the photo does not move. */
+.mob-photo-bar--hidden {
+  visibility: hidden;
+}
 /* The photo's column of buttons (board "Photo, boutons d'affichage"): 8px under the top bar's buttons, as the map's
    column is under its top row. */
 .mob-map-ribbon.mob-photo-buttons {
