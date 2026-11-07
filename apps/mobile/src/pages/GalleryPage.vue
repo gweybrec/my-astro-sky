@@ -20,6 +20,7 @@ import { addImportFiles } from '../composables/usePhotoImport';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
 import { useGrowingList } from '../composables/useGrowingList';
+import { useKeptScroll } from '../composables/useKeptScroll';
 import {
   loadPendingPhotos,
   pendingPhotos,
@@ -119,6 +120,12 @@ const sort = computed({
 // The cards are drawn a part at a time as the grid is scrolled (a gallery can hold hundreds of photos).
 const TILES_CHUNK = 24;
 const growing = useGrowingList(() => shownPhotos.value, TILES_CHUNK);
+// The grid stays where it was while the gallery is hidden (a photo opened over it, another tab): its scroll is not left
+// to the WebView, which can lose it on a hidden page far down a long list.
+const scrollHost = ref<HTMLElement | null>(null);
+useKeptScroll(scrollHost, (id) =>
+  growing.showAtLeast(shownPhotos.value.findIndex((p) => p.id === id) + 1),
+);
 const tiles = computed(() =>
   growing.shown.value.map((photo) => ({
     id: photo.id,
@@ -294,7 +301,7 @@ async function addPicked(pick: () => Promise<File[]>) {
       /></PhoneIconButton>
     </PhoneTopBar>
     <IonContent :scroll-y="false">
-      <div class="mob-scroll mob-page-fill" @scroll.passive="growing.onScroll">
+      <div ref="scrollHost" class="mob-scroll mob-page-fill" @scroll.passive="growing.onScroll">
         <PhoneEmptyState
           v-if="isEmpty"
           :text="t('mobile.gallery.empty')"
@@ -330,6 +337,7 @@ async function addPicked(pick: () => Promise<File[]>) {
             :turns="tile.turns"
             :paused="!active"
             :tags="tile.tags"
+            :data-keep-id="tile.id"
             @click="router.push(`/gallery/photo/${tile.id}`)"
           />
         </div>

@@ -7,7 +7,7 @@ const AHEAD_PX = 400;
  * A long list drawn a part at a time (the Cibles list, the asteroids SkyBoT finds: thousands of rows): the first `chunk`
  * items, then `chunk` more each time the list is scrolled near its end. Drawing them all at once froze the page for
  * seconds on a phone. `onScroll` goes on the list's scroll host; `reset` starts again from the first part (a new
- * search).
+ * search); `showAtLeast` draws whole parts down to the `n`th item (a list put back where it was).
  */
 export function useGrowingList<T>(items: () => readonly T[], chunk: number) {
   const count = ref(chunk);
@@ -27,5 +27,9 @@ export function useGrowingList<T>(items: () => readonly T[], chunk: number) {
     count.value = chunk;
   }
 
-  return { shown, onScroll, reset };
+  function showAtLeast(n: number) {
+    if (count.value < n) count.value = Math.ceil(n / chunk) * chunk;
+  }
+
+  return { shown, onScroll, reset, showAtLeast };
 }

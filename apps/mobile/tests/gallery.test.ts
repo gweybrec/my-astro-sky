@@ -94,6 +94,18 @@ describe('the gallery page', () => {
     expect(wrapper.findAll('.mob-photo-card')).toHaveLength(30);
   });
 
+  it('marks each card with its photo, so the grid is put back where it was after a photo or another tab', async () => {
+    getPhotos.mockResolvedValue([
+      { id: 'a', originalName: 'a.jpg' },
+      { id: 'b', originalName: 'b.jpg' },
+    ]);
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(
+      wrapper.findAll('.mob-photo-card').map((card) => card.attributes('data-keep-id')),
+    ).toEqual(['a', 'b']);
+  });
+
   it('shows the empty state when the backend returns no photo', async () => {
     getPhotos.mockResolvedValue([]);
     const wrapper = mountPage();
