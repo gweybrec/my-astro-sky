@@ -124,7 +124,7 @@ running the steps by hand: a locally-passing subset is how a lint error reached 
 
 ## Architecture
 
-**MyAstroSky** overlays astrophotographs onto an interactive sky map (HTML5 Canvas, stereographic polar projection). Photos are positioned via CSS `transform: matrix()` from affine registration. A Targets tab recommends DSOs based on gear, location, and sky conditions.
+**MyAstroSky** overlays astrophotographs onto an interactive sky map (HTML5 Canvas, stereographic polar projection). Each photo is placed by one sky model (`photoSkyModel`: its pixels to RA/Dec through the tangent plane, from its reference points or manual placement), which the map draws as a WebGL mesh and the photo view and identifications use directly. A Targets tab recommends DSOs based on gear, location, and sky conditions.
 
 See [docs/dev/architecture.md](docs/dev/architecture.md) for full module descriptions (frontend + backend), data flows, and key types.
 

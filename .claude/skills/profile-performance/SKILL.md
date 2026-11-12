@@ -87,6 +87,10 @@ A speedup claim needs a before/after on an **identical scripted interaction**. T
    ```
 4. Compare. Confirm frame time dropped **and** allocations didn't balloon. Verify visually too (`browser_take_screenshot`) and check the console for errors (`browser_console_messages`) — a perf change must not alter the output.
 
+Without the Playwright browser tool (busy in another session), or to slow the CPU like a phone,
+`node .claude/skills/profile-performance/scripts/profile-photo-cycles.mjs <label> [--cpu=4]` runs the same benchmark in
+its own Chrome and also profiles the photo layer over "pan, then stop" cycles.
+
 The benchmark function takes a mode: `'pan'` (constant scale, circular drag) or `'zoom'` (continuous wheel in/out). Run both — a fix can help one and hurt the other (the sprite atlas helped pan but first regressed zoom; see the doc).
 
 > Note on Vite HMR timing: after stashing/popping, reload the page and confirm the served code is what you expect before benchmarking — a stale module gives identical before/after numbers. You can sanity-check with `curl -s http://localhost:5173/src/<file>.ts | grep <marker>`.

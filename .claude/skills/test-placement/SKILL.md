@@ -72,8 +72,19 @@ Key checks:
 
 - **Stars solved far from the hint**: if the user gave a hint (e.g. "M31") and the photo landed in Orion, the solve is wrong. Delete and retry with more specific hints.
 - **Mirror/flip**: if the photo is mirrored, the stars will be offset systematically on one side. Visible as a diverging pattern when comparing east vs west edges.
-- **Scale mismatch**: photo looks correct in center but stars diverge toward edges → the WCS scale or the affine fit is off. Check how many correspondences were used (more = better).
+- **Scale mismatch**: photo looks correct in center but stars diverge toward edges → the WCS scale or the photo's sky model is off. Check how many correspondences were used (more = better), and measure it (below).
 - **Constellation sanity**: know the target. IC443 is in Gemini near Tejat (μ Gem). M31 is in Andromeda. M42 is in Orion. If the photo lands in the wrong constellation, something is wrong.
+
+## Measuring placement accuracy (no browser)
+
+`npx tsx .claude/skills/test-placement/scripts/measure-placement-accuracy.mts [files…]` compares the photo sky model
+(`photoSkyModel`) and the sky map's mesh of it with each file's own plate solution, in photo pixels, in every
+projection mode. Expect `model9` and `mesh` ≤ 0.6 px; `affine` is the single-matrix placement used before, for
+reference. Run it after any change to `photo-sky-model.ts`, `photo-placement.ts` or `projection.ts`.
+
+When the Playwright browser tool is busy, `node .claude/skills/test-placement/scripts/inspect-photo-corner.mjs
+<label> "<photo name>"` zooms the dev app onto a photo with the map showing through it, then turns the map:
+screenshots in `.playwright-mcp/`.
 
 ## Step 7 — Toggle visibility
 
