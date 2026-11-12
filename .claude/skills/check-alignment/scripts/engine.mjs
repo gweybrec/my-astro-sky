@@ -304,7 +304,7 @@ export function scaleText(factor) {
   });
 }
 
-/** Runs a view's actions, described as data: { click } or { fill, text } (a selector), { tapCentre } (a click at the middle of an element), { drag, path } (a mouse drag through points of an element), { chooseFiles, files } (a click that opens the file picker, answered with the files), { wait } (a selector) or { pause } (milliseconds). */
+/** Runs a view's actions, described as data: { click } or { fill, text } (a selector), { tapCentre, until? } (a click at the middle of an element, repeated until `until` shows), { drag, path } (a mouse drag through points of an element), { chooseFiles, files } (a click that opens the file picker, answered with the files), { wait } (a selector) or { pause } (milliseconds). */
 export async function runActions(page, actions = []) {
   for (const action of actions) {
     if (action.click) await page.locator(action.click).first().click({ timeout: 10000 });
@@ -318,7 +318,16 @@ export async function runActions(page, actions = []) {
     } else if (action.tapCentre) {
       const box = await page.locator(action.tapCentre).first().boundingBox();
       if (!box) throw new Error(`"${action.tapCentre}" has no box to click`);
-      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      // With `until`, the tap is repeated every half second until that selector shows (what it picks may still be
+      // loading, as the map's photos, drawn in a canvas, give no element to wait for).
+      const deadline = Date.now() + 15000;
+      for (;;) {
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+        if (!action.until) break;
+        if (await page.locator(action.until).first().isVisible()) break;
+        if (Date.now() > deadline) throw new Error(`"${action.until}" did not show after tapping "${action.tapCentre}"`);
+        await page.waitForTimeout(500);
+      }
     } else if (action.tapAt) {
       // A tap at a point of an element given as fractions of its box (x, y from its top left).
       const box = await page.locator(action.tapAt).first().boundingBox();

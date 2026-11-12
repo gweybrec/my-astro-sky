@@ -586,13 +586,15 @@ export const rules = [
 const SHEET = { scope: '.mob-sheet' };
 // The sheet of the modal that is open, when the map's own sheet or other (closed) modals are also on the page.
 const OPEN_SHEET = 'ion-modal.show-modal .mob-sheet';
-// A tap at the middle of the map picks the seed's photo; its sheet's button opens the display order page.
-const DRAW_ORDER_OPEN = [
-  { wait: '.photo-overlay-img' },
-  { pause: 800 },
-  { tapCentre: '.mob-sky-canvas' },
-  { wait: '.mob-map-sheet' },
+// A tap at the middle of the map picks the seed's photo, once the map has it: its sheet is the one with the display
+// order button. The photos are drawn in a canvas, so the tap is repeated until that sheet shows.
+const PHOTO_SHEET_OPEN = [
+  { tapCentre: '.mob-sky-canvas', until: `.mob-map-sheet [aria-label="Ordre d'affichage"]` },
   { pause: 600 },
+];
+// The photo's sheet's button opens the display order page.
+const DRAW_ORDER_OPEN = [
+  ...PHOTO_SHEET_OPEN,
   { click: `.mob-map-sheet [aria-label="Ordre d'affichage"]` },
   { wait: '.mob-entry' },
   { pause: 400 },
@@ -715,13 +717,7 @@ export const views = [
     name: 'sky-photo',
     path: '/tabs/sky',
     ready: '.mob-map-top',
-    open: [
-      { wait: '.photo-overlay-img' },
-      { pause: 800 },
-      { tapCentre: '.mob-sky-canvas' },
-      { wait: '.mob-map-sheet' },
-      { pause: 600 },
-    ],
+    open: PHOTO_SHEET_OPEN,
   },
   // The display order page, opened from the photo's sheet (the seed's photos all lie over the pole: they overlap).
   {
