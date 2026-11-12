@@ -2,27 +2,21 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   buildLabelFilterItems,
   getCorrRaDec,
-  fitPhotoAffine,
-  buildPhotoProjPoints,
-  buildPhotoPoints,
-  projCentroidAndHalfDiag,
   isCentroidInsideBorder,
   isCentroidViewportCulled,
-  mapPhotoCorners,
   computePhotoQuadCorners,
-  computePhotoMatrixForView,
+  computePhotoCanvasMesh,
   computePhotoCenterAndScale,
   computePhotoCenter,
   isLabelAllowed,
-  manualPlacementCentroid,
   computeManualMatrix,
   computeManualProjMatrix,
   computePhotoToProjMatrix,
   buildSyntheticCorrespondences,
-  extractMatrixFromTransform,
   derivePlacementFromCorrespondences,
-  derivePlacementFromMatrix,
   currentPlacement,
+  photoSkyModel,
+  photoSkyModelAtView,
   withAngleOnSky,
   formatZoomPercent,
 } from '@myastrosky/core/photo-placement';
@@ -41,6 +35,7 @@ import type {
   ManualPlacement,
   ViewState,
 } from '@myastrosky/core/types';
+import { linearPhotoSkyModel, type PhotoSkyModel } from '@myastrosky/core/photo-sky-model';
 
 const VIEW: ViewState = {
   centerX: 0,
@@ -67,6 +62,35 @@ function corr(
     starDec: dec,
     starName: `pt${pointIndex}`,
   };
+}
+
+/**
+ * A `width` × `height` photo covering `fieldDeg` of sky across its width, centred on (ra, dec), turned by `angleDeg`,
+ * not mirrored (north up and east left at angle 0, as a photo of the sky is).
+ */
+function fieldAround(
+  ra: number,
+  dec: number,
+  fieldDeg: number,
+  width = 100,
+  height = 80,
+  angleDeg = 0,
+): PhotoSkyModel {
+  const s = (fieldDeg * Math.PI) / 180 / width;
+  const t = (angleDeg * Math.PI) / 180;
+  const [cos, sin] = [Math.cos(t), Math.sin(t)];
+  return linearPhotoSkyModel(
+    { ra, dec },
+    { a: -s * cos, b: -s * sin, c: s * sin, d: -s * cos },
+    width,
+    height,
+  );
+}
+
+/** A correspondence at a pixel of `field`, with the sky position the field gives it. */
+function fieldCorr(field: PhotoSkyModel, i: number, x: number, y: number): PhotoCorrespondence {
+  const sky = field.toSky(x, y);
+  return corr(i, x, y, sky.ra, sky.dec);
 }
 
 function makePhoto(correspondences: PhotoCorrespondence[], extra?: Partial<Photo>): Photo {
@@ -99,96 +123,6 @@ describe('getCorrRaDec', () => {
   });
 });
 
-describe('fitPhotoAffine', () => {
-  it('fits an identity similarity from 2 matched points', () => {
-    const m = fitPhotoAffine(
-      [
-        { x: 0, y: 0 },
-        { x: 10, y: 0 },
-      ],
-      [
-        { x: 0, y: 0 },
-        { x: 10, y: 0 },
-      ],
-    );
-    expect(m.a).toBeCloseTo(1);
-    expect(m.b).toBeCloseTo(0);
-    expect(m.c).toBeCloseTo(0);
-    expect(m.d).toBeCloseTo(1);
-    expect(m.e).toBeCloseTo(0);
-    expect(m.f).toBeCloseTo(0);
-  });
-
-  it('fits an exact affine from 3 points (recovers a known translation+scale)', () => {
-    const src = [
-      { x: 0, y: 0 },
-      { x: 1, y: 0 },
-      { x: 0, y: 1 },
-    ];
-    const dst = src.map((p) => ({ x: 2 * p.x + 5, y: 3 * p.y - 1 }));
-    const m = fitPhotoAffine(src, dst);
-    for (const p of src) {
-      expect(m.a * p.x + m.c * p.y + m.e).toBeCloseTo(2 * p.x + 5);
-      expect(m.b * p.x + m.d * p.y + m.f).toBeCloseTo(3 * p.y - 1);
-    }
-  });
-
-  it('throws on colinear (degenerate) points', () => {
-    expect(() =>
-      fitPhotoAffine(
-        [
-          { x: 0, y: 0 },
-          { x: 1, y: 0 },
-          { x: 2, y: 0 },
-        ],
-        [
-          { x: 0, y: 0 },
-          { x: 1, y: 0 },
-          { x: 2, y: 0 },
-        ],
-      ),
-    ).toThrow();
-  });
-});
-
-describe('buildPhotoProjPoints / buildPhotoPoints', () => {
-  it('skips correspondences whose star cannot be resolved', () => {
-    const photo = makePhoto([
-      corr(0, 10, 10, 0, 80),
-      { pointIndex: 1, photoX: 20, photoY: 20, starHip: 0, starName: 'unresolved' } as any,
-      corr(2, 30, 30, 90, 60),
-    ]);
-    const { photoPoints, projPoints } = buildPhotoProjPoints(photo);
-    expect(photoPoints).toHaveLength(2);
-    expect(projPoints).toHaveLength(2);
-    expect(photoPoints[0]).toEqual({ x: 10, y: 10 });
-  });
-
-  it('buildPhotoPoints also yields canvas points at the view', () => {
-    const photo = makePhoto([corr(0, 0, 0, 0, 90)]);
-    const { projPoints, canvasPoints } = buildPhotoPoints(photo, VIEW);
-    // Dec 90 → celestial pole → projection origin → canvas centre.
-    expect(projPoints[0].x).toBeCloseTo(0);
-    expect(projPoints[0].y).toBeCloseTo(0);
-    expect(canvasPoints[0].x).toBeCloseTo(VIEW.width / 2);
-    expect(canvasPoints[0].y).toBeCloseTo(VIEW.height / 2);
-  });
-});
-
-describe('projCentroidAndHalfDiag', () => {
-  it('computes the average centroid and max radius', () => {
-    const { centroid, halfDiag } = projCentroidAndHalfDiag([
-      { x: -1, y: 0 },
-      { x: 1, y: 0 },
-      { x: 0, y: 2 },
-    ]);
-    expect(centroid.x).toBeCloseTo(0);
-    expect(centroid.y).toBeCloseTo(2 / 3);
-    // Farthest point is (0,2): distance = |2 - 2/3| = 4/3.
-    expect(halfDiag).toBeCloseTo(4 / 3);
-  });
-});
-
 describe('border + viewport culling predicates', () => {
   it('isCentroidInsideBorder is inclusive of the boundary', () => {
     expect(isCentroidInsideBorder({ x: 0.6, y: 0.8 }, 1)).toBe(true); // r = 1.0 exactly
@@ -201,25 +135,21 @@ describe('border + viewport culling predicates', () => {
   });
 });
 
-describe('mapPhotoCorners', () => {
-  it('maps the four photo corners through the matrix', () => {
-    const m = { a: 1, b: 0, c: 0, d: 1, e: 5, f: 7 };
-    const corners = mapPhotoCorners(m, 10, 20);
-    expect(corners).toEqual([
-      { x: 5, y: 7 },
-      { x: 15, y: 7 },
-      { x: 15, y: 27 },
-      { x: 5, y: 27 },
-    ]);
-  });
-});
-
 describe('geometry getters', () => {
-  it('computePhotoCenter round-trips a single correspondence position', () => {
-    const center = computePhotoCenter(makePhoto([corr(0, 0, 0, 123, 45)]));
+  it("computePhotoCenter is the sky position of the photo's centre", () => {
+    const field = fieldAround(123, 45, 1, 100, 80);
+    const center = computePhotoCenter(
+      makePhoto([
+        fieldCorr(field, 0, 10, 10),
+        fieldCorr(field, 1, 90, 20),
+        fieldCorr(field, 2, 30, 70),
+      ]),
+    );
     expect(center).not.toBeNull();
-    expect(center!.ra).toBeCloseTo(123);
-    expect(center!.dec).toBeCloseTo(45);
+    expect(center!.ra).toBeCloseTo(123, 9);
+    expect(center!.dec).toBeCloseTo(45, 9);
+    // One point cannot place a photo.
+    expect(computePhotoCenter(makePhoto([corr(0, 0, 0, 123, 45)]))).toBeNull();
   });
 
   it('computePhotoCenter returns null with no correspondences', () => {
@@ -274,22 +204,33 @@ describe('geometry getters', () => {
       width: 100,
       height: 80,
     });
-    const corners = computePhotoQuadCorners(photo, VIEW)!;
-    const expected = mapPhotoCorners(computeManualMatrix(placement, VIEW, 100, 80), 100, 80);
-    expect(corners).toEqual(expected);
+    // On a small field the corners are where the placement's own matrix puts them (the sky's curvature only shows
+    // on a wide one), and nowhere near the correspondences' outline.
+    const small = { ...placement, centerDec: 60, projPerPx: 0.00002 };
+    const smallPhoto = { ...photo, manualPlacement: small };
+    const corners = computePhotoQuadCorners(smallPhoto, VIEW)!;
+    const m = computeManualMatrix(small, VIEW, 100, 80);
+    const expected = [
+      [0, 0],
+      [100, 0],
+      [100, 80],
+      [0, 80],
+    ].map(([x, y]) => ({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f }));
+    corners.forEach((c, i) => {
+      expect(c.x).toBeCloseTo(expected[i].x, 4);
+      expect(c.y).toBeCloseTo(expected[i].y, 4);
+    });
     // A manually placed photo has an outline without any correspondence.
     const bare = makePhoto([], { manualPlacement: placement, width: 100, height: 80 });
     expect(computePhotoQuadCorners(bare, VIEW)).toHaveLength(4);
   });
 
-  it('computePhotoMatrixForView returns null when centroid is outside the border', () => {
+  it('computePhotoCanvasMesh returns null when the centre is outside the border', () => {
+    const photo = makePhoto([corr(0, 0, 0, 0, 10), corr(1, 100, 80, 5, 10)]);
     // borderRadiusPU = 0 → nothing can be inside.
-    const m = computePhotoMatrixForView(
-      makePhoto([corr(0, 0, 0, 0, 10), corr(1, 100, 80, 5, 10)]),
-      VIEW,
-      0,
-    );
-    expect(m).toBeNull();
+    expect(computePhotoCanvasMesh(photo, VIEW, 0)).toBeNull();
+    const mesh = computePhotoCanvasMesh(photo, VIEW, Infinity)!;
+    expect(mesh.points).toHaveLength((mesh.n + 1) * (mesh.n + 1));
   });
 });
 
@@ -317,14 +258,6 @@ describe('manual placement math', () => {
     mirrorX: false,
     mirrorY: false,
   };
-
-  it('manualPlacementCentroid centres on the placed sky point', () => {
-    const { centroid, halfDiag } = manualPlacementCentroid(placement, 100, 80);
-    const expected = project(placement.centerRa, placement.centerDec);
-    expect(centroid.x).toBeCloseTo(expected.x);
-    expect(centroid.y).toBeCloseTo(expected.y);
-    expect(halfDiag).toBeCloseTo(Math.hypot(50, 40) * 0.002);
-  });
 
   it('computeManualMatrix maps the image centre to the placed canvas point', () => {
     const m = computeManualMatrix(placement, VIEW, 100, 80);
@@ -391,51 +324,33 @@ describe('manual placement math', () => {
     ]);
     const m = computePhotoToProjMatrix(photo);
     expect(m).not.toBeNull();
+    // The affine map closest to the photo's model: on this 10° field, within a thousandth of a projection unit.
     const p0 = project(10, 80);
-    expect(m!.e).toBeCloseTo(p0.x, 6);
-    expect(m!.f).toBeCloseTo(p0.y, 6);
+    expect(m!.e).toBeCloseTo(p0.x, 3);
+    expect(m!.f).toBeCloseTo(p0.y, 3);
   });
 
-  it('computePhotoToProjMatrix places a two-star photo the right way round', () => {
-    // A photo of the sky is not mirrored on screen, so it is mirrored in projection space
-    // (whose y points up). Two stars cannot tell a mirror; the fit must still not turn the
-    // photo over the line through them, or objects off that line land on the wrong side.
-    const truth = { a: 0.001, b: 0.0004, c: 0.0004, d: -0.001, e: 0.3, f: 0.2 };
-    const at = (x: number, y: number) => ({
-      x: truth.a * x + truth.c * y + truth.e,
-      y: truth.b * x + truth.d * y + truth.f,
-    });
-    const starAt = (i: number, x: number, y: number) => {
-      const sky = unproject(at(x, y).x, at(x, y).y);
-      return corr(i, x, y, sky.ra, sky.dec);
-    };
-    const m = computePhotoToProjMatrix(makePhoto([starAt(0, 10, 10), starAt(1, 90, 15)]))!;
-    const off = { x: m.a * 50 + m.c * 70 + m.e, y: m.b * 50 + m.d * 70 + m.f };
-    expect(off.x).toBeCloseTo(at(50, 70).x, 9);
-    expect(off.y).toBeCloseTo(at(50, 70).y, 9);
+  it('places a two-star photo the right way round', () => {
+    // Two stars cannot tell a mirror: the fit must take the photo as a photo of the sky is (not mirrored), or objects
+    // off the line through them land on the wrong side.
+    const truth = fieldAround(210, 54, 2, 100, 80, 35);
+    const model = photoSkyModel(
+      makePhoto([fieldCorr(truth, 0, 10, 10), fieldCorr(truth, 1, 90, 15)]),
+    )!;
+    const off = model.toSky(50, 70);
+    const expected = truth.toSky(50, 70);
+    expect(off.ra).toBeCloseTo(expected.ra, 7);
+    expect(off.dec).toBeCloseTo(expected.dec, 7);
+    // In projection space (y up) such a photo is mirrored.
+    const m = computePhotoToProjMatrix(
+      makePhoto([fieldCorr(truth, 0, 10, 10), fieldCorr(truth, 1, 90, 15)]),
+    )!;
+    expect(m.a * m.d - m.b * m.c).toBeLessThan(0);
   });
 
   it('computePhotoToProjMatrix returns null with fewer than 2 usable correspondences and no manual placement', () => {
     const photo = makePhoto([corr(0, 0, 0, 10, 80)]);
     expect(computePhotoToProjMatrix(photo)).toBeNull();
-  });
-
-  it('derivePlacementFromMatrix inverts computeManualMatrix', () => {
-    const p: ManualPlacement = {
-      centerRa: 10,
-      centerDec: 45,
-      rotationDeg: 30,
-      projPerPx: 0.002,
-      mirrorX: false,
-      mirrorY: false,
-    };
-    const m = computeManualMatrix(p, VIEW, 100, 80);
-    const back = derivePlacementFromMatrix(m, VIEW, 100, 80);
-    expect(back.centerRa).toBeCloseTo(p.centerRa, 3);
-    expect(back.centerDec).toBeCloseTo(p.centerDec, 3);
-    expect(back.rotationDeg).toBeCloseTo(p.rotationDeg, 3);
-    expect(back.projPerPx).toBeCloseTo(p.projPerPx, 6);
-    expect(back.mirrorY).toBe(false);
   });
 
   it('places a photo on the sky whatever the rotation of the map', () => {
@@ -455,17 +370,12 @@ describe('manual placement math', () => {
       expect(onTurned[i].starRa).toBeCloseTo(straight[i].starRa!, 6);
       expect(onTurned[i].starDec).toBeCloseTo(straight[i].starDec!, 6);
     }
-    // And reading it back from the turned map's matrix gives the same placement.
-    const back = derivePlacementFromMatrix(
-      computeManualMatrix(p, turned, 100, 80),
-      turned,
-      100,
-      80,
-    );
-    expect(back.rotationDeg).toBeCloseTo(25, 6);
-    expect(back.angleOnSky).toBe(true);
-    expect(back.centerRa).toBeCloseTo(0, 3);
-    expect(back.centerDec).toBeCloseTo(80, 3);
+    // And the photo is at the same place on the sky on either map.
+    const photo = makePhoto([], { manualPlacement: p });
+    const a = photoSkyModelAtView(photo, VIEW)!.toSky(10, 70);
+    const b = photoSkyModelAtView(photo, turned)!.toSky(10, 70);
+    expect(b.ra).toBeCloseTo(a.ra, 9);
+    expect(b.dec).toBeCloseTo(a.dec, 9);
   });
 
   it('draws a placement saved before the angle was on the sky at its angle on screen, as it was saved', () => {
@@ -575,7 +485,7 @@ describe('manual placement math', () => {
       centerRa: 210.85,
       centerDec: 54.34,
       rotationDeg: -66,
-      projPerPx: 0.0015,
+      projPerPx: 0.00002,
       mirrorX: false,
       mirrorY: false,
     };
@@ -606,26 +516,6 @@ describe('manual placement math', () => {
       mirrorY: false,
       angleOnSky: true,
     });
-  });
-});
-
-describe('extractMatrixFromTransform', () => {
-  it('parses a CSS matrix(...) string', () => {
-    expect(extractMatrixFromTransform('matrix(1, 2, 3, 4, 5, 6)')).toEqual({
-      a: 1,
-      b: 2,
-      c: 3,
-      d: 4,
-      e: 5,
-      f: 6,
-    });
-  });
-
-  it('returns null for none / missing / malformed transforms', () => {
-    expect(extractMatrixFromTransform('none')).toBeNull();
-    expect(extractMatrixFromTransform('')).toBeNull();
-    expect(extractMatrixFromTransform('translate(1px, 2px)')).toBeNull();
-    expect(extractMatrixFromTransform('matrix(1, 2, 3)')).toBeNull();
   });
 });
 

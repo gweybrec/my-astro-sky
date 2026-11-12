@@ -20,9 +20,8 @@ import {
   sortGalleryPhotos,
   type GallerySort,
 } from '@myastrosky/core/gallery-filter';
-import { buildLabelFilterItems, computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { buildLabelFilterItems, photoSkyModel } from '@myastrosky/core/photo-placement';
 import { photoAsShown, quarterTurnsOf } from '@myastrosky/core/photo-rotation';
-import { withCanonicalProjection } from '@myastrosky/core/projection';
 import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import { drawPhotoOverlay } from '@myastrosky/render/photo-dso-overlay-render';
 import { createImageZoomPan } from './image-zoom';
@@ -722,11 +721,9 @@ export class Gallery {
     });
 
     // ── "Show DSOs" toggle + catalog filter ────────────────────────────────────
-    // photo→projection affine, independent of the sky map's view — null when the
-    // photo has no manual placement and fewer than 2 resolvable correspondences.
-    // Only used to know whether the photo is solved: every sky→pixel conversion
-    // below re-fits it and projects in the same withCanonicalProjection scope.
-    const photoToProj = computePhotoToProjMatrix(photo);
+    // Where the photo is on the sky — null when it has no manual placement and fewer than 2 resolvable
+    // correspondences. Only used to know whether the photo is placed: the overlay uses the turned photo's own model.
+    const solved = photoSkyModel(photo) !== null;
     // The photo as it is shown, turned: objects and points of interest are placed in its pixels.
     const shown = photoAsShown(photo);
     let dsoPlacements: PhotoDsoPlacement[] = [];
@@ -743,28 +740,22 @@ export class Gallery {
     const poiState = { show: false };
     // Arrow-captured: redrawDsoOverlay below is a plain function (no `this`).
     const getPoiCategories = () => this.poiCategories;
-    // Canonical pole projection: the zenith-centred display mode would clip a photo
-    // whose field is currently below the horizon (see withCanonicalProjection).
     const recomputePoiPins = (pois: PointOfInterest[]) => {
-      poiPins = withCanonicalProjection(() => {
-        const matrix = computePhotoToProjMatrix(shown);
-        return matrix ? poiPinsInImage(pois, matrix, shown.width, shown.height) : [];
-      });
+      const model = photoSkyModel(shown);
+      poiPins = model ? poiPinsInImage(pois, model, shown.width, shown.height) : [];
     };
     recomputePoiPins(photo.pointsOfInterest ?? []);
 
     function recomputeDsoPlacements() {
-      dsoPlacements = withCanonicalProjection(() => {
-        const matrix = dsoState.show ? computePhotoToProjMatrix(shown) : null;
-        return dsoState.show && matrix
-          ? findDsoPlacementsInImage(matrix, shown.width, shown.height, new Set(dsoState.catalogs))
-          : [];
-      });
+      const model = dsoState.show ? photoSkyModel(shown) : null;
+      dsoPlacements = model
+        ? findDsoPlacementsInImage(model, shown.width, shown.height, new Set(dsoState.catalogs))
+        : [];
     }
 
     function redrawDsoOverlay() {
       const drawPins = poiState.show && poiPins.length > 0;
-      if ((!dsoState.show && !drawPins) || !photoToProj) {
+      if ((!dsoState.show && !drawPins) || !solved) {
         dsoCanvas.style.display = 'none';
         return;
       }
@@ -825,7 +816,7 @@ export class Gallery {
 
     const showDsosBtn = iconButton(dsoGalaxySvg, t('gallery.showDsos'));
     setToggleState(showDsosBtn, false);
-    if (!photoToProj) {
+    if (!solved) {
       showDsosBtn.disabled = true;
       showDsosBtn.title = t('gallery.showDsosUnavailable');
     }

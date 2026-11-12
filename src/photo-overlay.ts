@@ -11,9 +11,8 @@ import { reportUnknownRendererError } from './error-reporter';
 
 import {
   buildSyntheticCorrespondences,
-  extractMatrixFromTransform,
-  derivePlacementFromCorrespondences,
-  derivePlacementFromMatrix,
+  currentPlacement,
+  photoSkyModel,
   computeManualMatrix,
   withAngleOnSky,
   formatZoomPercent,
@@ -1826,29 +1825,18 @@ export class PhotoOverlay extends PhotoLayer {
           };
         }
         if (metaToUpload.dsoIds.length === 0) {
-          const centerProj2 = project(placement.centerRa, placement.centerDec);
-          const rotRad2 = (placement.rotationDeg * Math.PI) / 180;
-          const mx2 = placement.mirrorX ? -1 : 1;
-          const my2 = placement.mirrorY ? -1 : 1;
-          const cx2 = naturalWidth / 2;
-          const cy2 = naturalHeight / 2;
-          const cosR2 = Math.cos(rotRad2) * placement.projPerPx;
-          const sinR2 = Math.sin(rotRad2) * placement.projPerPx;
-          const a2 = cosR2 * mx2;
-          const b2 = sinR2 * mx2;
-          const c2 = -sinR2 * my2;
-          const d2 = cosR2 * my2;
-          const aff = {
-            a: a2,
-            b: b2,
-            c: c2,
-            d: d2,
-            e: centerProj2.x - a2 * cx2 - c2 * cy2,
-            f: centerProj2.y - b2 * cx2 - d2 * cy2,
-          };
+          // The objects the photo covers, where its placement puts it on the sky.
+          const model = photoSkyModel({
+            width: naturalWidth,
+            height: naturalHeight,
+            correspondences: [],
+            manualPlacement: placement,
+          });
           metaToUpload = {
             ...metaToUpload,
-            dsoIds: findDSOsInImage(aff, naturalWidth, naturalHeight).map((d) => d.id),
+            dsoIds: model
+              ? findDSOsInImage(model, naturalWidth, naturalHeight).map((d) => d.id)
+              : [],
           };
         }
 
@@ -1889,6 +1877,7 @@ export class PhotoOverlay extends PhotoLayer {
 
     // Hide the original photo during repositioning
     imgEl.style.display = 'none';
+    this.requestPhotoDraw();
 
     // Create a preview element
     const previewEl = document.createElement('img');
@@ -1911,18 +1900,8 @@ export class PhotoOverlay extends PhotoLayer {
       // Use existing manual placement, its angle on the sky (one saved before had it on screen)
       placement = withAngleOnSky({ ...photo.manualPlacement }, view);
     } else {
-      // Extract placement from the current CSS transform matrix
-      // This ensures the repositioned photo starts exactly where it currently is
-      const matrix = extractMatrixFromTransform(imgEl.style.transform);
-      if (matrix) {
-        placement = derivePlacementFromMatrix(matrix, view, naturalWidth, naturalHeight);
-        // Round rotation to nearest degree for cleaner UI
-        placement.rotationDeg = Math.round(placement.rotationDeg);
-      } else {
-        // Fallback: derive from correspondences (shouldn't normally happen)
-        placement = derivePlacementFromCorrespondences(photo, naturalWidth, naturalHeight);
-        placement.rotationDeg = Math.round(placement.rotationDeg);
-      }
+      // Where the photo is now, from its own placement on the sky (rotation to the whole degree).
+      placement = currentPlacement(photo, view);
     }
 
     const initialProjPerPx = placement.projPerPx;
@@ -2066,6 +2045,7 @@ export class PhotoOverlay extends PhotoLayer {
       previewEl.remove();
       toolbar.remove();
       imgEl.style.display = '';
+      this.requestPhotoDraw();
     };
 
     // Cancel

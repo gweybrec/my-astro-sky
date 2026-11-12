@@ -8,9 +8,8 @@
  * call). Kept separate so the ranking math is unit-testable in isolation
  * (see `tests/unit/asteroid-identify.test.ts`).
  */
-import type { AffineMatrix, Photo, PointOfInterest } from './types';
-import { applyAffine } from './affine';
-import { unproject } from './projection';
+import type { Photo, PointOfInterest } from './types';
+import type { PhotoSkyModel } from './photo-sky-model';
 import { dateToJD, jdToDate } from './astro-time';
 import { t } from './i18n';
 
@@ -69,18 +68,13 @@ export function utcPartsToIso(dateStr: string, timeStr: string): string {
   return new Date(Date.UTC(y, (m || 1) - 1, day || 1, hh || 0, mm || 0)).toISOString();
 }
 
-/**
- * Converts a photo-pixel position to RA/Dec through the photo's photo→projection
- * affine (the same round trip `findDsoPlacementsInImage` uses in reverse).
- * Returns null when the photo has no usable solve.
- */
+/** Converts a photo-pixel position to RA/Dec (RA in [0, 360)) through the photo's sky model. */
 export function photoPixelToRaDec(
-  photoToProj: AffineMatrix,
+  model: PhotoSkyModel,
   x: number,
   y: number,
 ): { ra: number; dec: number } {
-  const projPoint = applyAffine(photoToProj, { x, y });
-  return unproject(projPoint.x, projPoint.y);
+  return model.toSky(x, y);
 }
 
 /**

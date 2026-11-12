@@ -6,8 +6,8 @@ import { findDSOsInImage } from '@myastrosky/core/catalog/dso-registry';
 import {
   buildSyntheticCorrespondences,
   computeManualMatrix,
-  computeManualProjMatrix,
   currentPlacement,
+  photoSkyModel,
   formatZoomPercent,
 } from '@myastrosky/core/photo-placement';
 import { fromCanvas, project, toCanvas, unproject } from '@myastrosky/core/projection';
@@ -329,11 +329,8 @@ async function validate() {
     );
     // The objects that fall in the photo need the deep-sky catalogue.
     await catalogsReady();
-    const dsoIds = findDSOsInImage(
-      computeManualProjMatrix(placed, width, height),
-      width,
-      height,
-    ).map((dso) => dso.id);
+    const model = photoSkyModel({ width, height, correspondences: [], manualPlacement: placed });
+    const dsoIds = model ? findDSOsInImage(model, width, height).map((dso) => dso.id) : [];
     const photo = await uploadPhoto(file.value, correspondences, placed, undefined, {
       dsoIds,
       displayName: stripExtension(file.value.name),

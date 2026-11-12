@@ -713,7 +713,7 @@ content.appendChild(error);
 
 ### 2.22 Sky Map Photo Freeze Class
 
-During pan/zoom interactions, photo overlay images are hidden by toggling `.photos-frozen` on `#photo-layer`:
+During pan/zoom interactions `.photos-frozen` is toggled on `#photo-layer`. The placed photos stay shown and follow the view (the WebGL canvas `.photo-gl-canvas` is not targeted, and a placed `<img>` carries an inline `visibility: visible` that wins); the rule hides only the manual-placement preview images:
 
 ```css
 #photo-layer.photos-frozen .photo-overlay-img {

@@ -13,7 +13,7 @@ import {
   PHOTO_PIN_RADIUS_PX,
 } from '@myastrosky/render/poi-pins';
 import { renderPoiPins } from '@myastrosky/render/sky-frame-render';
-import { fitPhotoAffine } from '@myastrosky/core/photo-placement';
+import { fitPhotoSkyModel } from '@myastrosky/core/photo-sky-model';
 import { project, toCanvas } from '@myastrosky/core/projection';
 import type { PointOfInterest } from '@myastrosky/core/types';
 import type { SkyScene } from '@myastrosky/render/sky-scene';
@@ -49,12 +49,11 @@ const sky = (x: number, y: number) => ({
   ra: 10 - ((x - 50) * 0.01) / Math.cos((40 * Math.PI) / 180),
   dec: 40 - (y - 50) * 0.01,
 });
-const PHOTO_TO_PROJ = fitPhotoAffine(
+const PHOTO_MODEL = fitPhotoSkyModel(
   PTS,
-  PTS.map((p) => {
-    const s = sky(p.x, p.y);
-    return project(s.ra, s.dec);
-  }),
+  PTS.map((p) => sky(p.x, p.y)),
+  100,
+  100,
 );
 
 describe('hasPosition()', () => {
@@ -73,7 +72,7 @@ describe('poiPinsInImage()', () => {
       { name: 'SN out', categoryId: 'cat-supernova', ra: 30, dec: 40 },
       { name: 'Comet', categoryId: 'cat-comet' },
     ];
-    const pins = poiPinsInImage(pois, PHOTO_TO_PROJ, 100, 100);
+    const pins = poiPinsInImage(pois, PHOTO_MODEL, 100, 100);
     expect(pins).toHaveLength(1);
     expect(pins[0].poi.name).toBe('SN in');
     expect(pins[0].x).toBeCloseTo(25, 0);

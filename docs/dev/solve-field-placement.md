@@ -53,7 +53,7 @@ The ASTAP process timeout (`SOLVE_TIMEOUT_MS` in `server/astap.ts`) is **not** a
 
 ## 2. EXIF orientation correction
 
-Astrophoto JPEGs often carry an EXIF orientation tag (e.g., images from camera phones or export pipelines). Browsers apply this tag automatically, displaying the image in the corrected orientation. The CSS matrix transform in `src/photo-overlay.ts` therefore operates in **browser-display coordinates**, not raw pixel coordinates.
+Astrophoto JPEGs often carry an EXIF orientation tag (e.g., images from camera phones or export pipelines). Browsers apply this tag automatically, displaying the image in the corrected orientation. The photo's placement (its sky model, drawn by the photo layer) therefore works in **browser-display coordinates**, not raw pixel coordinates.
 
 solve-field reads the JPEG raw pixel data **without** applying EXIF rotation. Its WCS solution and the resulting `(photoX, photoY)` correspondences are in **raw pixel coordinates**.
 

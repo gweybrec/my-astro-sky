@@ -48,7 +48,15 @@ vi.mock('../src/catalogs', () => ({ catalogsReady: () => Promise.resolve() }));
 
 const solved = { value: true };
 vi.mock('@myastrosky/core/photo-placement', () => ({
-  computePhotoToProjMatrix: () => (solved.value ? [1, 0, 0, 1, 0, 0] : null),
+  photoSkyModel: () =>
+    solved.value
+      ? {
+          width: 100,
+          height: 100,
+          toSky: () => ({ ra: 0, dec: 0 }),
+          toPixel: () => ({ x: 0, y: 0 }),
+        }
+      : null,
 }));
 vi.mock('@myastrosky/core/search', () => ({
   searchDSOs: (q: string) =>

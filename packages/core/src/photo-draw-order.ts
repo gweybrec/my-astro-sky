@@ -5,6 +5,8 @@ export interface PhotoCanvasQuad {
   id: string;
   name: string;
   corners: Point[];
+  /** The photo's edges as drawn (see `PhotoOutline.edge`). */
+  edge?: Point[];
 }
 
 function pointInPolygon(point: Point, polygon: Point[]): boolean {

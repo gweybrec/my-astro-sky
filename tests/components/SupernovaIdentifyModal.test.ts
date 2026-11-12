@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import SupernovaIdentifyModal from '../../src/components/modals/SupernovaIdentifyModal.vue';
-import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { photoSkyModel } from '@myastrosky/core/photo-placement';
 import { photoPixelToRaDec } from '@myastrosky/core/asteroid-identify';
 import type { TnsCandidate } from '@myastrosky/core/supernova-identify';
 import type { Photo, ManualPlacement } from '@myastrosky/core/types';
@@ -59,7 +59,7 @@ function candidateAt(
   y: number,
   over: Partial<TnsCandidate>,
 ): TnsCandidate {
-  const { ra, dec } = photoPixelToRaDec(computePhotoToProjMatrix(photo)!, x, y);
+  const { ra, dec } = photoPixelToRaDec(photoSkyModel(photo)!, x, y);
   return {
     name: 'SN 2026aaiv',
     raDeg: ra,

@@ -1,6 +1,7 @@
 import { bytesToAscii7 } from './raw-decode/ascii';
 import { logDebug } from './platform/log';
 import { checkReferencePoints } from './reference-points';
+import { REFERENCE_FRACTIONS } from './photo-sky-model';
 
 export interface WCSData {
   CRPIX1: number;
@@ -343,12 +344,6 @@ export function extractFITSHeaderFromFITS(buffer: Uint8Array): string {
 // --- WCS → Correspondences ---
 
 const DEG2RAD = Math.PI / 180;
-
-/**
- * Where a plate solution's reference points are taken, as fractions of the photo's width and height: the corners,
- * the middles of the edges and the centre, 5 % inside the edges.
- */
-const REFERENCE_FRACTIONS = [0.05, 0.5, 0.95];
 
 /**
  * The reference points a plate-solved photo is stored with: points spread over the whole photo, each with the sky

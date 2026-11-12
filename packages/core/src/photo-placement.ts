@@ -1,11 +1,11 @@
 /**
  * Pure placement / geometry / visibility logic for astrophotos on the sky map.
  *
- * This module holds the math that was previously embedded in `photo-overlay.ts`.
- * Nothing here touches the DOM, an `<img>`, or a modal — it takes plain data
- * (a `Photo`, a `ViewState`, filter state) and returns plain data (matrices,
- * coordinates, booleans). `PhotoOverlay` composes these functions and applies
- * the results to the DOM. Keeping the math here makes it unit-testable (see
+ * Every placement goes through one model per photo, {@link photoSkyModel} (its pixels to the sky): the sky map's
+ * drawing (a mesh of it in the map's projection, {@link projectPhotoMesh}), its outline and culling, the objects
+ * drawn on the photo and the identifications, so none of them can disagree with another. Nothing here touches the
+ * DOM, an `<img>`, or a modal — it takes plain data (a `Photo`, a `ViewState`, filter state) and returns plain data
+ * (models, meshes, coordinates, booleans). Keeping the math here makes it unit-testable (see
  * `tests/unit/photo-placement.test.ts`) instead of hidden behind canvas code.
  */
 import type {
@@ -16,8 +16,24 @@ import type {
   ManualPlacement,
   AffineMatrix,
 } from './types';
-import { project, toCanvas, fromCanvas, unproject } from './projection';
-import { computeAffineTransform, computeAffineLSQ, computeSimilarityTransform } from './affine';
+import {
+  project,
+  projectContinued,
+  toCanvas,
+  fromCanvas,
+  unproject,
+  getHemisphere,
+  withCanonicalProjection,
+} from './projection';
+import { computeAffineTransform, computeAffineLSQ } from './affine';
+import {
+  fitPhotoSkyModel,
+  linearPhotoSkyModel,
+  pixelScaleDeg,
+  tangentToSky,
+  type PhotoSkyModel,
+  type RaDec,
+} from './photo-sky-model';
 import { getStarByHip } from './catalog/star-registry';
 import { reportError } from './platform/error-hook';
 import { normalizeRotationDeg } from './sky-map-types';
@@ -43,91 +59,248 @@ export function getCorrRaDec(corr: PhotoCorrespondence): { ra: number; dec: numb
   return null;
 }
 
+type PlaceablePhoto = Pick<Photo, 'width' | 'height' | 'correspondences' | 'manualPlacement'>;
+
 /**
- * Fit a photo→target affine matrix, choosing the estimator by point count:
- * 2 points → similarity (rigid + uniform scale), 3 → exact affine, 4+ →
- * least-squares affine. `targetPoints` may be in canvas space or projection space
- * — the estimator is agnostic. Throws when the points are degenerate (colinear);
- * callers decide whether that means "skip" or "error".
+ * The model of a photo placed by hand: its placement draws it in the default projection (pole-centred stereographic)
+ * as an affine map; the model is the one that matches it at its centre (same position, scale, angle and mirroring)
+ * and follows the sky's curvature away from it, as a photo's own pixels do.
  */
-export function fitPhotoAffine(photoPoints: Point[], targetPoints: Point[]): AffineMatrix {
-  if (photoPoints.length === 2) {
-    return computeSimilarityTransform(
-      photoPoints as [Point, Point],
-      targetPoints as [Point, Point],
+function manualPlacementSkyModel(
+  placement: ManualPlacement,
+  width: number,
+  height: number,
+): PhotoSkyModel {
+  return withCanonicalProjection(() => {
+    const m = computeManualProjMatrix(placement, width, height);
+    const center: RaDec = { ra: placement.centerRa, dec: placement.centerDec };
+    // How the projection moves with the standard coordinates at the centre, to undo it: d(proj)/d(ξ, η).
+    const h = 1e-6;
+    const p0 = project(center.ra, center.dec);
+    const sx = tangentToSky(h, 0, center.ra, center.dec);
+    const sy = tangentToSky(0, h, center.ra, center.dec);
+    const px = project(sx.ra, sx.dec);
+    const py = project(sy.ra, sy.dec);
+    const j00 = (px.x - p0.x) / h;
+    const j01 = (py.x - p0.x) / h;
+    const j10 = (px.y - p0.y) / h;
+    const j11 = (py.y - p0.y) / h;
+    const det = j00 * j11 - j01 * j10;
+    const [i00, i01, i10, i11] = [j11 / det, -j01 / det, -j10 / det, j00 / det];
+    return linearPhotoSkyModel(
+      center,
+      {
+        a: i00 * m.a + i01 * m.b,
+        b: i10 * m.a + i11 * m.b,
+        c: i00 * m.c + i01 * m.d,
+        d: i10 * m.c + i11 * m.d,
+      },
+      width,
+      height,
     );
-  } else if (photoPoints.length === 3) {
-    return computeAffineTransform(
-      photoPoints as [Point, Point, Point],
-      targetPoints as [Point, Point, Point],
-    );
+  });
+}
+
+const modelCache = new WeakMap<
+  object,
+  {
+    correspondences: unknown;
+    manualPlacement: unknown;
+    width: number;
+    height: number;
+    hemisphere: string;
+    model: PhotoSkyModel | null;
   }
-  return computeAffineLSQ(photoPoints, targetPoints);
-}
+>();
 
 /**
- * {@link fitPhotoAffine} onto projection space. Projection y points up while photo and canvas y point down, so a
- * photo is mirrored in projection space. The fit is made with the target's y turned over and the result turned back:
- * the two-point (or points-in-a-line) similarity, which cannot mirror, then assumes "not mirrored on screen" — true
- * of a photo of the sky — instead of "not mirrored in projection space", which never is.
+ * Where the photo is on the sky (see {@link PhotoSkyModel}): from its manual placement when it has one, else from its
+ * reference points (a plate solution's, or the stars matched by hand). Null when it cannot be placed: fewer than 2
+ * points with a sky position, or points in a line. Kept per photo object until its points or placement change.
  */
-export function fitPhotoToProj(photoPoints: Point[], projPoints: Point[]): AffineMatrix {
-  const m = fitPhotoAffine(
-    photoPoints,
-    projPoints.map((p) => ({ x: p.x, y: -p.y })),
-  );
-  return { a: m.a, b: -m.b, c: m.c, d: -m.d, e: m.e, f: -m.f };
-}
-
-/**
- * Build the parallel photo-pixel / projection-space point arrays for a photo's
- * correspondences, skipping any whose star can't be resolved. Projection-space
- * points are view-independent, so this is reused by callers that need a
- * projection fit (centre/scale) and by {@link buildPhotoPoints} for canvas fits.
- */
-export function buildPhotoProjPoints(photo: Photo): {
-  photoPoints: Point[];
-  projPoints: Point[];
-} {
-  const photoPoints: Point[] = [];
-  const projPoints: Point[] = [];
-  for (const corr of photo.correspondences) {
-    const raDec = getCorrRaDec(corr);
-    if (!raDec) continue;
-    projPoints.push(project(raDec.ra, raDec.dec));
-    photoPoints.push({ x: corr.photoX, y: corr.photoY });
+export function photoSkyModel(photo: PlaceablePhoto): PhotoSkyModel | null {
+  const hemisphere = getHemisphere();
+  const cached = modelCache.get(photo);
+  if (
+    cached &&
+    cached.correspondences === photo.correspondences &&
+    cached.manualPlacement === photo.manualPlacement &&
+    cached.width === photo.width &&
+    cached.height === photo.height &&
+    cached.hemisphere === hemisphere
+  ) {
+    return cached.model;
   }
-  return { photoPoints, projPoints };
+  let model: PhotoSkyModel | null = null;
+  if (photo.manualPlacement) {
+    model = manualPlacementSkyModel(photo.manualPlacement, photo.width, photo.height);
+  } else {
+    const photoPoints: Point[] = [];
+    const sky: RaDec[] = [];
+    for (const corr of photo.correspondences ?? []) {
+      const raDec = getCorrRaDec(corr);
+      if (!raDec) continue;
+      photoPoints.push({ x: corr.photoX, y: corr.photoY });
+      sky.push(raDec);
+    }
+    if (photoPoints.length >= 2) {
+      try {
+        model = fitPhotoSkyModel(photoPoints, sky, photo.width, photo.height);
+      } catch {
+        model = null; // points in a line
+      }
+    }
+  }
+  modelCache.set(photo, {
+    correspondences: photo.correspondences,
+    manualPlacement: photo.manualPlacement,
+    width: photo.width,
+    height: photo.height,
+    hemisphere,
+    model,
+  });
+  return model;
 }
 
 /**
- * As {@link buildPhotoProjPoints} but also projects every point into canvas space
- * at the given view — for callers fitting a photo→canvas matrix.
+ * {@link photoSkyModel} as the sky map draws the photo at `view`: a manual placement saved before its angle was on
+ * the sky (no `angleOnSky`) keeps its angle on screen, so it is placed with the map's rotation (see
+ * {@link withAngleOnSky}). Repositioning such a photo saves its angle on the sky.
  */
-export function buildPhotoPoints(
-  photo: Photo,
-  view: ViewState,
-): { photoPoints: Point[]; projPoints: Point[]; canvasPoints: Point[] } {
-  const { photoPoints, projPoints } = buildPhotoProjPoints(photo);
-  const canvasPoints = projPoints.map((p) => toCanvas(p.x, p.y, view));
-  return { photoPoints, projPoints, canvasPoints };
+export function photoSkyModelAtView(
+  photo: PlaceablePhoto,
+  view: Pick<ViewState, 'rotationDeg'>,
+): PhotoSkyModel | null {
+  const mp = photo.manualPlacement;
+  if (!mp || mp.angleOnSky) return photoSkyModel(photo);
+  return photoSkyModel({ ...photo, manualPlacement: withAngleOnSky(mp, view as ViewState) });
 }
 
 /**
- * Projection-space centroid (average correspondence position) and the max distance
- * from it to any correspondence — the photo's sky footprint radius, used as the
- * viewport-cull margin. Caller must pass a non-empty array.
+ * A photo's model as the sky map draws it: a grid of (n + 1) × (n + 1) points of the photo, from its top-left corner
+ * row by row, in projection space (the active projection, continued past the rim; see `projectContinued`), with the
+ * photo's centre, the largest distance from it to its edge, and the projection units per photo pixel at the centre.
+ * Valid until the projection changes (`getProjectionGeneration`).
  */
-export function projCentroidAndHalfDiag(projPoints: Point[]): {
+export interface PhotoMesh {
+  n: number;
+  /** x, y of each grid point, in projection units. */
+  nodes: Float64Array;
   centroid: Point;
   halfDiag: number;
-} {
-  const cx = projPoints.reduce((s, p) => s + p.x, 0) / projPoints.length;
-  const cy = projPoints.reduce((s, p) => s + p.y, 0) / projPoints.length;
-  const halfDiag = projPoints.reduce((m, p) => Math.max(m, Math.hypot(p.x - cx, p.y - cy)), 0);
-  return { centroid: { x: cx, y: cy }, halfDiag };
+  projPerPx: number;
 }
 
+/**
+ * How many cells a side of a photo's mesh has: enough for the drawing to stay within about a pixel of the model (its
+ * error grows with the square of a cell's size on the sky), from 2 for a small field to 16 for a wide one.
+ */
+export function meshDivisions(model: PhotoSkyModel): number {
+  const diagDeg = pixelScaleDeg(model) * Math.hypot(model.width, model.height);
+  return Math.max(2, Math.min(16, Math.ceil(diagDeg * 5)));
+}
+
+/** The photo's {@link PhotoMesh} in the active projection, `n` cells a side. */
+export function projectPhotoMesh(model: PhotoSkyModel, n = meshDivisions(model)): PhotoMesh {
+  const { width, height } = model;
+  const nodes = new Float64Array((n + 1) * (n + 1) * 2);
+  let k = 0;
+  for (let j = 0; j <= n; j++) {
+    for (let i = 0; i <= n; i++) {
+      const sky = model.toSky((width * i) / n, (height * j) / n);
+      const p = projectContinued(sky.ra, sky.dec);
+      nodes[k++] = p.x;
+      nodes[k++] = p.y;
+    }
+  }
+  const sc = model.toSky(width / 2, height / 2);
+  const centroid = projectContinued(sc.ra, sc.dec);
+  let halfDiag = 0;
+  for (let j = 0; j <= n; j++) {
+    for (let i = 0; i <= n; i++) {
+      if (j !== 0 && j !== n && i !== 0 && i !== n) continue;
+      const q = (j * (n + 1) + i) * 2;
+      halfDiag = Math.max(halfDiag, Math.hypot(nodes[q] - centroid.x, nodes[q + 1] - centroid.y));
+    }
+  }
+  const sx = model.toSky(width / 2 + 1, height / 2);
+  const sy = model.toSky(width / 2, height / 2 + 1);
+  const px = projectContinued(sx.ra, sx.dec);
+  const py = projectContinued(sy.ra, sy.dec);
+  const projPerPx = Math.sqrt(
+    Math.abs((px.x - centroid.x) * (py.y - centroid.y) - (px.y - centroid.y) * (py.x - centroid.x)),
+  );
+  return { n, nodes, centroid, halfDiag, projPerPx };
+}
+
+/** The four corners of the photo, (0,0), (w,0), (w,h), (0,h), in projection space. */
+export function meshCorners(mesh: PhotoMesh): Point[] {
+  const { n, nodes } = mesh;
+  return [0, n, (n + 1) * (n + 1) - 1, n * (n + 1)].map((k) => ({
+    x: nodes[k * 2],
+    y: nodes[k * 2 + 1],
+  }));
+}
+
+/**
+ * The photo's outline in projection space: its edges as the mesh draws them, clockwise from the top-left corner,
+ * `n` points a side.
+ */
+export function meshOutline(mesh: PhotoMesh): Point[] {
+  const { n, nodes } = mesh;
+  const at = (i: number, j: number) => {
+    const k = (j * (n + 1) + i) * 2;
+    return { x: nodes[k], y: nodes[k + 1] };
+  };
+  const out: Point[] = [];
+  for (let i = 0; i < n; i++) out.push(at(i, 0));
+  for (let j = 0; j < n; j++) out.push(at(n, j));
+  for (let i = n; i > 0; i--) out.push(at(i, n));
+  for (let j = n; j > 0; j--) out.push(at(0, j));
+  return out;
+}
+
+/**
+ * The affine map from photo pixels to canvas pixels at `view` that best follows the mesh (least squares on its
+ * points): for what needs one matrix (the picture size to load, the drawing where WebGL is missing).
+ */
+export function meshCanvasAffine(
+  mesh: PhotoMesh,
+  width: number,
+  height: number,
+  view: ViewState,
+): AffineMatrix {
+  const { n, nodes } = mesh;
+  const photoPoints: Point[] = [];
+  const canvasPoints: Point[] = [];
+  const step = Math.max(1, Math.floor(n / 2));
+  for (let j = 0; j <= n; j += step) {
+    for (let i = 0; i <= n; i += step) {
+      const k = (j * (n + 1) + i) * 2;
+      photoPoints.push({ x: (width * i) / n, y: (height * j) / n });
+      canvasPoints.push(toCanvas(nodes[k], nodes[k + 1], view));
+    }
+  }
+  return computeAffineLSQ(photoPoints, canvasPoints);
+}
+
+/** The affine map from photo pixels to projection space that best follows the model (least squares on a 3 × 3 grid). */
+function modelProjAffine(model: PhotoSkyModel): AffineMatrix | null {
+  const photoPoints: Point[] = [];
+  const projPoints: Point[] = [];
+  for (const fy of [0, 0.5, 1]) {
+    for (const fx of [0, 0.5, 1]) {
+      const sky = model.toSky(model.width * fx, model.height * fy);
+      photoPoints.push({ x: model.width * fx, y: model.height * fy });
+      projPoints.push(project(sky.ra, sky.dec));
+    }
+  }
+  try {
+    return computeAffineLSQ(photoPoints, projPoints);
+  } catch {
+    return null;
+  }
+}
 /** True when the centroid falls inside the border circle of radius `borderRadiusPU`. */
 export function isCentroidInsideBorder(centroid: Point, borderRadiusPU: number): boolean {
   return Math.hypot(centroid.x, centroid.y) <= borderRadiusPU;
@@ -154,20 +327,6 @@ export function isCentroidViewportCulled(
   );
 }
 
-/** Map the four photo corners (0,0)-(w,h) through an affine matrix. */
-export function mapPhotoCorners(matrix: AffineMatrix, w: number, h: number): Point[] {
-  const photoCorners = [
-    { x: 0, y: 0 },
-    { x: w, y: 0 },
-    { x: w, y: h },
-    { x: 0, y: h },
-  ];
-  return photoCorners.map((p) => ({
-    x: matrix.a * p.x + matrix.c * p.y + matrix.e,
-    y: matrix.b * p.x + matrix.d * p.y + matrix.f,
-  }));
-}
-
 /**
  * Canvas-space corners of a photo's outline at `view`, or null when it can't be
  * placed (fewer than 2 resolvable correspondences, or colinear points). A manual
@@ -175,51 +334,38 @@ export function mapPhotoCorners(matrix: AffineMatrix, w: number, h: number): Poi
  * visibility filtering is the caller's job — this is pure geometry.
  */
 export function computePhotoQuadCorners(photo: Photo, view: ViewState): Point[] | null {
-  if (photo.manualPlacement) {
-    return mapPhotoCorners(
-      computeManualMatrix(photo.manualPlacement, view, photo.width, photo.height),
-      photo.width,
-      photo.height,
-    );
-  }
-  if (photo.correspondences.length < 2) return null;
-  const { photoPoints, canvasPoints } = buildPhotoPoints(photo, view);
-  if (photoPoints.length < 2) return null;
-  try {
-    return mapPhotoCorners(fitPhotoAffine(photoPoints, canvasPoints), photo.width, photo.height);
-  } catch {
-    return null; // colinear points
-  }
+  const model = photoSkyModelAtView(photo, view);
+  if (!model) return null;
+  return [
+    [0, 0],
+    [photo.width, 0],
+    [photo.width, photo.height],
+    [0, photo.height],
+  ].map(([x, y]) => {
+    const sky = model.toSky(x, y);
+    const p = projectContinued(sky.ra, sky.dec);
+    return toCanvas(p.x, p.y, view);
+  });
 }
 
 /**
- * The photo→canvas affine matrix at an arbitrary view, independent of any on-screen
- * transform. Returns null when the photo can't be placed (too few correspondences)
- * or its centroid falls outside the border circle. Used by the "full sky map" export.
+ * The photo's mesh in canvas pixels at `view` (see {@link projectPhotoMesh}), or null when the photo can't be placed
+ * or its centre falls outside the border circle. Used by the map export to draw a photo at any view.
  */
-export function computePhotoMatrixForView(
+export function computePhotoCanvasMesh(
   photo: Photo,
   view: ViewState,
   borderRadiusPU: number,
-): AffineMatrix | null {
-  if (photo.manualPlacement) {
-    const cp = project(photo.manualPlacement.centerRa, photo.manualPlacement.centerDec);
-    if (!isCentroidInsideBorder(cp, borderRadiusPU)) return null;
-    return computeManualMatrix(photo.manualPlacement, view, photo.width, photo.height);
+): { n: number; points: Point[] } | null {
+  const model = photoSkyModelAtView(photo, view);
+  if (!model) return null;
+  const mesh = projectPhotoMesh(model);
+  if (!isCentroidInsideBorder(mesh.centroid, borderRadiusPU)) return null;
+  const points: Point[] = [];
+  for (let k = 0; k < mesh.nodes.length; k += 2) {
+    points.push(toCanvas(mesh.nodes[k], mesh.nodes[k + 1], view));
   }
-
-  if (photo.correspondences.length < 2) return null;
-  const { photoPoints, projPoints, canvasPoints } = buildPhotoPoints(photo, view);
-  if (photoPoints.length < 2) return null;
-
-  const { centroid } = projCentroidAndHalfDiag(projPoints);
-  if (!isCentroidInsideBorder(centroid, borderRadiusPU)) return null;
-
-  try {
-    return fitPhotoAffine(photoPoints, canvasPoints);
-  } catch {
-    return null;
-  }
+  return { n: mesh.n, points };
 }
 
 /**
@@ -232,13 +378,11 @@ export function computePhotoCenterAndScale(
   viewWidth: number,
   viewHeight: number,
 ): { ra: number; dec: number; scale: number } | null {
-  if (photo.correspondences.length < 2) return null;
-  const { photoPoints, projPoints } = buildPhotoProjPoints(photo);
-  if (photoPoints.length < 2) return null;
+  const model = photoSkyModel(photo);
+  if (!model) return null;
 
   try {
-    const matrix = fitPhotoToProj(photoPoints, projPoints);
-    const projCorners = mapPhotoCorners(matrix, photo.width, photo.height);
+    const projCorners = meshOutline(projectPhotoMesh(model, 4));
 
     let minX = Infinity,
       maxX = -Infinity,
@@ -270,13 +414,8 @@ export function computePhotoCenterAndScale(
 
 /** Average RA/Dec centre of a photo from its correspondences, or null if none resolve. */
 export function computePhotoCenter(photo: Photo): { ra: number; dec: number } | null {
-  if (photo.correspondences.length === 0) return null;
-  const { projPoints } = buildPhotoProjPoints(photo);
-  if (projPoints.length === 0) return null;
-  const sumX = projPoints.reduce((s, p) => s + p.x, 0);
-  const sumY = projPoints.reduce((s, p) => s + p.y, 0);
-  const avg = unproject(sumX / projPoints.length, sumY / projPoints.length);
-  return { ra: avg.ra, dec: avg.dec };
+  const model = photoSkyModel(photo);
+  return model ? model.toSky(photo.width / 2, photo.height / 2) : null;
 }
 
 /** The label filter's entry for the photos that have no label. */
@@ -304,21 +443,6 @@ export function isLabelAllowed(photo: Photo, visibleLabels: { [label: string]: b
     return visibleLabels[NO_LABEL] !== false;
   }
   return photo.labels.some((l) => visibleLabels[l] !== false);
-}
-
-/**
- * Projection-space centroid and footprint radius for a manually placed photo.
- * The centroid is simply the placed centre; the footprint radius is half the image
- * diagonal scaled by the placement's projection-units-per-pixel.
- */
-export function manualPlacementCentroid(
-  placement: ManualPlacement,
-  natW: number,
-  natH: number,
-): { centroid: Point; halfDiag: number } {
-  const centroid = project(placement.centerRa, placement.centerDec);
-  const halfDiagPx = Math.hypot(natW / 2, natH / 2);
-  return { centroid, halfDiag: halfDiagPx * placement.projPerPx };
 }
 
 /**
@@ -387,8 +511,8 @@ const PROJ_VIEW: ViewState = {
 
 /**
  * Build the photo→projection-space affine matrix for a manual placement, independent
- * of any view/canvas — the manual-placement analogue of
- * {@link buildPhotoProjPoints}+{@link fitPhotoAffine} for correspondence-based photos.
+ * of any view/canvas: what the placement's centre, angle, scale and mirroring mean, before
+ * {@link photoSkyModel} turns it into a placement on the sky.
  * Reuses {@link computeManualMatrix}'s rotation/mirror math via the neutral
  * {@link PROJ_VIEW} rather than re-deriving it, then un-flips the y row.
  */
@@ -410,14 +534,8 @@ export function computePhotoToProjMatrix(photo: Photo): AffineMatrix | null {
   if (photo.manualPlacement) {
     return computeManualProjMatrix(photo.manualPlacement, photo.width, photo.height);
   }
-  if (photo.correspondences.length < 2) return null;
-  const { photoPoints, projPoints } = buildPhotoProjPoints(photo);
-  if (photoPoints.length < 2) return null;
-  try {
-    return fitPhotoToProj(photoPoints, projPoints);
-  } catch {
-    return null;
-  }
+  const model = photoSkyModel(photo);
+  return model ? modelProjAffine(model) : null;
 }
 
 /**
@@ -463,16 +581,6 @@ export function buildSyntheticCorrespondences(
   }
 
   return correspondences;
-}
-
-/** Extract the 6 matrix coefficients from a CSS `matrix(...)` transform string. */
-export function extractMatrixFromTransform(transform: string): AffineMatrix | null {
-  if (!transform || transform === 'none') return null;
-  const match = transform.match(/matrix\(([^)]+)\)/);
-  if (!match) return null;
-  const values = match[1].split(',').map((v) => parseFloat(v.trim()));
-  if (values.length !== 6) return null;
-  return { a: values[0], b: values[1], c: values[2], d: values[3], e: values[4], f: values[5] };
 }
 
 const DEFAULT_MANUAL_PLACEMENT: ManualPlacement = {
@@ -564,42 +672,6 @@ export function currentPlacement(photo: Photo, view: ViewState): ManualPlacement
     ? placementFromProjMatrix(matrix, photo.width, photo.height)
     : derivePlacementFromCorrespondences(photo, photo.width, photo.height);
   return { ...placement, rotationDeg: Math.round(placement.rotationDeg) };
-}
-
-/** Derive ManualPlacement params from a live photo→canvas CSS transform matrix. */
-export function derivePlacementFromMatrix(
-  matrix: AffineMatrix,
-  view: ViewState,
-  photoWidth: number,
-  photoHeight: number,
-): ManualPlacement {
-  // matrix maps photo pixel (px,py) → canvas: cx = a*px + c*py + e, cy = b*px + d*py + f.
-  const photoCenterX = photoWidth / 2;
-  const photoCenterY = photoHeight / 2;
-  const canvasCenterX = matrix.a * photoCenterX + matrix.c * photoCenterY + matrix.e;
-  const canvasCenterY = matrix.b * photoCenterX + matrix.d * photoCenterY + matrix.f;
-
-  const projCenter = fromCanvas(canvasCenterX, canvasCenterY, view);
-  const centerSky = unproject(projCenter.x, projCenter.y);
-
-  // a=cos*scale, b=sin*scale → the angle on screen is atan2(b, a); on the sky it is that plus the map's rotation.
-  const rotationDeg = (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI + view.rotationDeg;
-  // |first column| = canvas px per photo px; ÷ view.scale → projection units per photo px.
-  const pxPerPx = Math.sqrt(matrix.a * matrix.a + matrix.b * matrix.b);
-  const projPerPx = pxPerPx / view.scale;
-
-  // A negative determinant indicates a reflection.
-  const det = matrix.a * matrix.d - matrix.b * matrix.c;
-
-  return {
-    centerRa: centerSky.ra,
-    centerDec: centerSky.dec,
-    rotationDeg,
-    projPerPx,
-    mirrorX: false,
-    mirrorY: det < 0,
-    angleOnSky: true,
-  };
 }
 
 /**

@@ -1,33 +1,10 @@
 import { jsPDF } from 'jspdf';
 import type { SkyMap } from '@myastrosky/render/sky-map';
 import type { PhotoOverlay, PlacedPhoto } from './photo-overlay';
-import type { Photo, QuarterTurns } from '@myastrosky/core/types';
+import type { Photo, Point, QuarterTurns } from '@myastrosky/core/types';
+import { drawImageMesh } from '@myastrosky/render/photo-mesh-draw';
 import { quarterTurnsOf } from '@myastrosky/core/photo-rotation';
 import { photoFileUrl } from './api';
-
-// ─── Affine helpers (pure, unit-tested) ─────────────────────────────────────
-
-export interface AffineCoeffs {
-  a: number;
-  b: number;
-  c: number;
-  d: number;
-  e: number;
-  f: number;
-}
-
-/**
- * Scale a CSS-pixel affine matrix to backing-store pixels.
- *
- * Photo overlay matrices map photo-pixel space → CSS canvas pixels, but the
- * sky canvas backing store is `devicePixelRatio`-scaled. Drawing onto an
- * offscreen canvas sized to the backing store therefore needs every output
- * coordinate multiplied by `dpr` — which for an affine matrix means scaling
- * all six coefficients.
- */
-export function scaleMatrixForDpr(m: AffineCoeffs, dpr: number): AffineCoeffs {
-  return { a: m.a * dpr, b: m.b * dpr, c: m.c * dpr, d: m.d * dpr, e: m.e * dpr, f: m.f * dpr };
-}
 
 // ─── Gallery contact-sheet layout (pure, unit-tested) ───────────────────────
 
@@ -91,11 +68,11 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number)
  */
 export type MapExportScope = 'view' | 'full';
 
-/** Draw one placed photo onto `ctx` using `m` (photo→canvas, CSS px) scaled by `dpr`. */
+/** Draw one placed photo onto `ctx` through its mesh (canvas CSS px, see `computeMeshForView`) scaled by `dpr`. */
 async function drawPlacedPhoto(
   ctx: CanvasRenderingContext2D,
   placed: PlacedPhoto,
-  m: AffineCoeffs,
+  mesh: { n: number; points: Point[] },
   dpr: number,
 ): Promise<void> {
   // Load full-resolution image for quality (on-screen img may be a thumbnail via LOD swap).
@@ -106,19 +83,18 @@ async function drawPlacedPhoto(
     img = placed.imgEl; // fall back to whatever is on screen
   }
 
-  const s = scaleMatrixForDpr(m, dpr);
   ctx.save();
   ctx.globalAlpha = placed.opacity;
-  ctx.setTransform(s.a, s.b, s.c, s.d, s.e, s.f);
-  ctx.drawImage(img, 0, 0, placed.photo.width, placed.photo.height);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawImageMesh(ctx, img, placed.photo.width, placed.photo.height, mesh);
   ctx.restore();
 }
 
 /**
  * Composite the sky map and the photos onto one offscreen canvas.
  *
- * - `'view'`: copies the live canvas (already rendered) and reads each photo's
- *   current CSS transform — an exact snapshot of what is on screen.
+ * - `'view'`: copies the live canvas (already rendered) and draws each shown photo
+ *   at the live view, as the map draws it.
  * - `'full'`: re-renders the sky at a whole-map view off-screen and recomputes
  *   every photo's placement at that view.
  */
@@ -147,9 +123,9 @@ export async function renderMapToCanvas(
     // 2. Recompute each placed photo's transform at that view and draw it.
     for (const placed of overlay.getPlacedPhotos()) {
       if (!placed.visible) continue;
-      const m = overlay.computeMatrixForView(placed, view);
-      if (!m) continue;
-      await drawPlacedPhoto(ctx, placed, m, dpr);
+      const mesh = overlay.computeMeshForView(placed, view);
+      if (!mesh) continue;
+      await drawPlacedPhoto(ctx, placed, mesh, dpr);
     }
   } else {
     out.width = skyCanvas.width;
@@ -158,18 +134,13 @@ export async function renderMapToCanvas(
     // 1. Lay down the already-rendered live sky.
     ctx.drawImage(skyCanvas, 0, 0);
 
-    // 2. Draw each visible photo with its current on-screen transform, in draw order.
+    // 2. Draw each photo shown on screen at the live view, in draw order.
+    const view = skyMap.getView();
     for (const placed of overlay.getPlacedPhotos()) {
       if (!placed.visible || placed.imgEl.style.display === 'none') continue;
-      const transform = getComputedStyle(placed.imgEl).transform;
-      if (!transform || transform === 'none') continue;
-      const dm = new DOMMatrix(transform);
-      await drawPlacedPhoto(
-        ctx,
-        placed,
-        { a: dm.a, b: dm.b, c: dm.c, d: dm.d, e: dm.e, f: dm.f },
-        dpr,
-      );
+      const mesh = overlay.computeMeshForView(placed, view);
+      if (!mesh) continue;
+      await drawPlacedPhoto(ctx, placed, mesh, dpr);
     }
 
     // 3. Draw overlay canvas (FOV frames) on top of photos.

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
-import type { AffineMatrix } from '@myastrosky/core/types';
+import { linearPhotoSkyModel, type PhotoSkyModel } from '@myastrosky/core/photo-sky-model';
 
 vi.mock('../../src/i18n', () => ({
   getLang: vi.fn(() => 'en'),
@@ -480,52 +480,35 @@ describe('getDSOCatalog()', () => {
 
 // ─── findDSOsInImage ─────────────────────────────────────────────────────────
 
+/**
+ * A square photo of `sizePx` pixels covering `fieldDeg` of sky, centred on (ra, dec), north up and east left as a
+ * photo of the sky is.
+ */
+function fieldAround(ra: number, dec: number, fieldDeg: number, sizePx = 1000): PhotoSkyModel {
+  const s = (fieldDeg * Math.PI) / 180 / sizePx;
+  return linearPhotoSkyModel({ ra, dec }, { a: -s, b: 0, c: 0, d: -s }, sizePx, sizePx);
+}
+
 describe('findDSOsInImage()', () => {
-  // With project(ra, dec) = {x: ra/360, y: dec/90}:
-  //  TESTOBJ (ra=0, dec=0) → projection (0, 0)
-  //  Identity affine maps projection coords directly to photo pixels.
-  //  TESTOBJ → photo pixel (0, 0) → inside [0, 10] × [0, 10].
-  //  All other DSOs have ra>0 or dec≠0 → photo pixel outside.
-
-  const IDENTITY: AffineMatrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
-
-  it('returns DSOs whose projected center falls within the image', () => {
-    const inside = findDSOsInImage(IDENTITY, 10, 10);
+  it('returns DSOs whose centre falls within the image', () => {
+    const inside = findDSOsInImage(fieldAround(0, 0, 1), 1000, 1000);
     expect(inside.some((d) => d.id === 'TESTOBJ')).toBe(true);
   });
 
   it('excludes DSOs outside the image bounds', () => {
-    const inside = findDSOsInImage(IDENTITY, 10, 10);
-    // M42 projects to (83.82/360, -5.39/90) ≈ (0.233, -0.060) — py < 0 → outside
+    const inside = findDSOsInImage(fieldAround(0, 0, 1), 1000, 1000);
     expect(inside.some((d) => d.id === 'M42')).toBe(false);
   });
 
-  it('returns empty array when affine determinant is near zero (singular matrix)', () => {
-    // det = 1*6 - 2*3 = 0 → singular
-    const singular: AffineMatrix = { a: 1, b: 2, c: 3, d: 6, e: 0, f: 0 };
-    expect(findDSOsInImage(singular, 100, 100)).toEqual([]);
-  });
-
-  it('returns all DSOs when affine maps everything inside a large image', () => {
-    // Scale so ra/360 and dec/90 both map into [0, 10]
-    // photoToCanvas: maps (px, py) pixel → projection (ra/360, dec/90)
-    // We need inverse: projection → pixel such that all DSOs map inside image.
-    // Use a large image and a scale-down affine:
-    //   photoToCanvas = {a:1/1000, b:0, c:0, d:1/1000, e:0, f:0}
-    //   inverse: {a:1000, b:0, c:0, d:1000, e:0, f:0}
-    //   For TESTOBJ (0,0) → px=0, py=0 → inside
-    //   For M42 (0.233, -0.060) → py=-60 → still outside (negative)
-    // This test just verifies the function runs without error on a non-trivial affine
-    const affine: AffineMatrix = { a: 0.001, b: 0, c: 0, d: 0.001, e: 0, f: 0 };
-    const result = findDSOsInImage(affine, 1000, 1000);
-    expect(Array.isArray(result)).toBe(true);
+  it('excludes DSOs on the far side of the sky from the photo', () => {
+    // TESTOBJ (0°, 0°) is opposite the photo's centre: it has no pixel at all, not a mirrored one inside it.
+    expect(findDSOsInImage(fieldAround(180, 0, 1), 1000, 1000)).toEqual([]);
   });
 });
 
 // ─── findDsoPlacementsInImage ────────────────────────────────────────────────
 
 describe('findDsoPlacementsInImage()', () => {
-  const IDENTITY: AffineMatrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
   const ALL_CATALOGS = new Set([
     'M',
     'NGC',
@@ -539,29 +522,29 @@ describe('findDsoPlacementsInImage()', () => {
     'Barnard',
   ]);
 
-  it('returns DSOs whose projected center falls within the image, with photo-pixel geometry', () => {
-    const placements = findDsoPlacementsInImage(IDENTITY, 10, 10, ALL_CATALOGS);
+  it('returns DSOs whose centre falls within the image, with photo-pixel geometry', () => {
+    const placements = findDsoPlacementsInImage(fieldAround(0, 0, 1), 1000, 1000, ALL_CATALOGS);
     const testObj = placements.find((p) => p.dso.id === 'TESTOBJ');
     expect(testObj).toBeDefined();
-    expect(testObj!.x).toBeCloseTo(0);
-    expect(testObj!.y).toBeCloseTo(0);
-    // majAxis=1 arcmin → a finite, positive ellipse size in photo pixels.
-    expect(testObj!.majorPx).toBeGreaterThan(0);
-    expect(testObj!.minorPx).toBeGreaterThan(0);
+    expect(testObj!.x).toBeCloseTo(500);
+    expect(testObj!.y).toBeCloseTo(500);
+    // majAxis = 1′ on a field of 60′ over 1000 px: about 17 px.
+    expect(testObj!.majorPx).toBeCloseTo(1000 / 60, 1);
+    expect(testObj!.minorPx).toBeCloseTo(1000 / 60, 1);
     expect(Number.isFinite(testObj!.angleDeg)).toBe(true);
   });
 
   it('excludes DSOs outside the image bounds', () => {
-    const placements = findDsoPlacementsInImage(IDENTITY, 10, 10, ALL_CATALOGS);
+    const placements = findDsoPlacementsInImage(fieldAround(0, 0, 1), 1000, 1000, ALL_CATALOGS);
     expect(placements.some((p) => p.dso.id === 'M42')).toBe(false);
   });
 
   it('filters by the given catalog set, same predicate as the sky map', () => {
     // SH2-106 has only one catalog family (no alias), so this is the plain
     // exclusion case: disabling SH2 hides it outright.
-    const affine: AffineMatrix = { a: 0.001, b: 0, c: 0, d: 0.001, e: 0, f: 0 };
-    const withSH2 = findDsoPlacementsInImage(affine, 100000, 100000, new Set(['SH2']));
-    const withoutSH2 = findDsoPlacementsInImage(affine, 100000, 100000, new Set(['NGC']));
+    const field = fieldAround(308.76, 37.38, 2);
+    const withSH2 = findDsoPlacementsInImage(field, 1000, 1000, new Set(['SH2']));
+    const withoutSH2 = findDsoPlacementsInImage(field, 1000, 1000, new Set(['NGC']));
     expect(withSH2.some((p) => p.dso.id === 'SH2-106')).toBe(true);
     expect(withoutSH2.some((p) => p.dso.id === 'SH2-106')).toBe(false);
   });
@@ -569,30 +552,37 @@ describe('findDsoPlacementsInImage()', () => {
   it('falls back to an enabled catalog alias instead of hiding the DSO entirely', () => {
     // M1's catalogs are ['M1', 'NGC1952']. Unchecking Messier but leaving NGC
     // enabled must still show it — labelled with its NGC alias, not hidden.
-    const affine: AffineMatrix = { a: 0.001, b: 0, c: 0, d: 0.001, e: 0, f: 0 };
-    const ngcOnly = findDsoPlacementsInImage(affine, 100000, 100000, new Set(['NGC']));
+    const ngcOnly = findDsoPlacementsInImage(
+      fieldAround(83.63, 22.01, 2),
+      1000,
+      1000,
+      new Set(['NGC']),
+    );
     const placed = ngcOnly.find((p) => p.dso.id === 'M1');
     expect(placed).toBeDefined();
     expect(placed!.displayId).toBe('NGC1952');
   });
 
   it('uses the primary id as displayId when its own catalog is enabled', () => {
-    const affine: AffineMatrix = { a: 0.001, b: 0, c: 0, d: 0.001, e: 0, f: 0 };
-    const withM = findDsoPlacementsInImage(affine, 100000, 100000, new Set(['M']));
+    const withM = findDsoPlacementsInImage(
+      fieldAround(83.63, 22.01, 2),
+      1000,
+      1000,
+      new Set(['M']),
+    );
     const placed = withM.find((p) => p.dso.id === 'M1');
     expect(placed).toBeDefined();
     expect(placed!.displayId).toBe('M1');
   });
 
   it('hides a DSO entirely when none of its catalog aliases are enabled', () => {
-    const affine: AffineMatrix = { a: 0.001, b: 0, c: 0, d: 0.001, e: 0, f: 0 };
-    const neither = findDsoPlacementsInImage(affine, 100000, 100000, new Set(['IC', 'LBN']));
+    const neither = findDsoPlacementsInImage(
+      fieldAround(83.63, 22.01, 2),
+      1000,
+      1000,
+      new Set(['IC', 'LBN']),
+    );
     expect(neither.some((p) => p.dso.id === 'M1')).toBe(false);
-  });
-
-  it('returns empty array when the affine is singular', () => {
-    const singular: AffineMatrix = { a: 1, b: 2, c: 3, d: 6, e: 0, f: 0 };
-    expect(findDsoPlacementsInImage(singular, 100, 100, ALL_CATALOGS)).toEqual([]);
   });
 });
 
@@ -632,56 +622,49 @@ describe('photoOverlayCatalogs()', () => {
 // ─── findDSOIdsFromCorrespondences ───────────────────────────────────────────
 
 describe('findDSOIdsFromCorrespondences()', () => {
-  // With project(ra, dec) = {x: ra/360, y: dec/90} and photoX/photoY chosen to
-  // equal the projection of each star, computeAffineTransform yields the identity
-  // photo→projection transform — so this mirrors the findDSOsInImage identity case:
-  // TESTOBJ (ra=0, dec=0) → pixel (0, 0), inside a 10×10 image.
-  const corr = (
-    pointIndex: number,
-    photoX: number,
-    photoY: number,
-    starRa: number,
-    starDec: number,
-  ): PhotoCorrespondence => ({
-    pointIndex,
-    photoX,
-    photoY,
-    starHip: 0,
-    starName: `s${pointIndex}`,
-    starRa,
-    starDec,
-  });
+  // Three points of a 1000 × 1000 photo of 1° centred on TESTOBJ (0°, 0°), their sky positions from that field.
+  const field = fieldAround(0, 0, 1);
+  const corr = (pointIndex: number, photoX: number, photoY: number): PhotoCorrespondence => {
+    const sky = field.toSky(photoX, photoY);
+    return {
+      pointIndex,
+      photoX,
+      photoY,
+      starHip: 0,
+      starName: `s${pointIndex}`,
+      starRa: sky.ra,
+      starDec: sky.dec,
+    };
+  };
 
-  const identityCorrespondences: PhotoCorrespondence[] = [
-    corr(0, 0, 0, 0, 0), // → projection (0, 0)
-    corr(1, 0.5, 0, 180, 0), // → projection (0.5, 0)
-    corr(2, 0, 1, 0, 90), // → projection (0, 1)
+  const fieldCorrespondences: PhotoCorrespondence[] = [
+    corr(0, 100, 100),
+    corr(1, 900, 150),
+    corr(2, 400, 900),
   ];
 
   it('derives DSO ids inside the solved field', () => {
-    const ids = findDSOIdsFromCorrespondences(identityCorrespondences, 10, 10);
+    const ids = findDSOIdsFromCorrespondences(fieldCorrespondences, 1000, 1000);
     expect(ids).toContain('TESTOBJ');
-    // M42 projects below the image (py < 0) → excluded
     expect(ids).not.toContain('M42');
   });
 
   it('returns [] when fewer than 3 correspondences carry RA/Dec', () => {
-    const partial = [corr(0, 0, 0, 0, 0), corr(1, 0.5, 0, 180, 0)];
-    expect(findDSOIdsFromCorrespondences(partial, 10, 10)).toEqual([]);
+    expect(findDSOIdsFromCorrespondences(fieldCorrespondences.slice(0, 2), 1000, 1000)).toEqual([]);
   });
 
   it('ignores correspondences missing RA/Dec when counting the 3 needed', () => {
     const withGaps: PhotoCorrespondence[] = [
-      corr(0, 0, 0, 0, 0),
+      fieldCorrespondences[0],
       { pointIndex: 1, photoX: 5, photoY: 5, starHip: 42, starName: 'noradec' },
-      corr(2, 0.5, 0, 180, 0),
-      corr(3, 0, 1, 0, 90),
+      fieldCorrespondences[1],
+      fieldCorrespondences[2],
     ];
-    expect(findDSOIdsFromCorrespondences(withGaps, 10, 10)).toContain('TESTOBJ');
+    expect(findDSOIdsFromCorrespondences(withGaps, 1000, 1000)).toContain('TESTOBJ');
   });
 
   it('returns [] when image dimensions are unknown', () => {
-    expect(findDSOIdsFromCorrespondences(identityCorrespondences, 0, 0)).toEqual([]);
+    expect(findDSOIdsFromCorrespondences(fieldCorrespondences, 0, 0)).toEqual([]);
   });
 });
 

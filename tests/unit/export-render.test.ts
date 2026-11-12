@@ -1,19 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { scaleMatrixForDpr, computeGalleryLayout } from '../../src/export-render';
+import { computeGalleryLayout } from '../../src/export-render';
 import { computeFramedViewScale, computeLegendLayout } from '@myastrosky/render/plan-pdf';
 import { angularSizeToCanvasPxForDSO } from '@myastrosky/core/dso-highlight';
-
-describe('scaleMatrixForDpr', () => {
-  it('multiplies all six coefficients by the device pixel ratio', () => {
-    const m = { a: 2, b: 0.5, c: -0.5, d: 3, e: 100, f: 200 };
-    expect(scaleMatrixForDpr(m, 2)).toEqual({ a: 4, b: 1, c: -1, d: 6, e: 200, f: 400 });
-  });
-
-  it('is a no-op at dpr = 1', () => {
-    const m = { a: 1.5, b: 0, c: 0, d: 1.5, e: 10, f: 20 };
-    expect(scaleMatrixForDpr(m, 1)).toEqual(m);
-  });
-});
 
 describe('computeGalleryLayout', () => {
   // A4 portrait in jsPDF "px" units is roughly 595 x 842.

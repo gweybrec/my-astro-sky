@@ -7,9 +7,8 @@
  * Shared by the gallery detail overlay (photo pixels) and the sky map overlay
  * (canvas pixels); both call {@link drawPoiPin}.
  */
-import type { AffineMatrix, PointOfInterest } from '@myastrosky/core/types';
-import { applyAffine, invertAffine } from '@myastrosky/core/affine';
-import { project } from '@myastrosky/core/projection';
+import type { PointOfInterest } from '@myastrosky/core/types';
+import type { PhotoSkyModel } from '@myastrosky/core/photo-sky-model';
 import {
   placeLabel,
   reachesView,
@@ -47,17 +46,15 @@ export interface PhotoPoiPin {
 /** Positioned POIs that fall inside the photo, in photo pixels. */
 export function poiPinsInImage(
   pois: PointOfInterest[],
-  photoToProj: AffineMatrix,
+  model: PhotoSkyModel,
   width: number,
   height: number,
 ): PhotoPoiPin[] {
-  const inv = invertAffine(photoToProj);
-  if (!inv) return [];
   const pins: PhotoPoiPin[] = [];
   for (const poi of pois) {
     if (!hasPosition(poi)) continue;
-    const p = applyAffine(inv, project(poi.ra, poi.dec));
-    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+    const p = model.toPixel(poi.ra, poi.dec);
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
     if (p.x < 0 || p.x > width || p.y < 0 || p.y > height) continue;
     pins.push({ poi, x: p.x, y: p.y });
   }

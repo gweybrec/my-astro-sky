@@ -180,6 +180,35 @@ export function project(raDeg: number, decDeg: number): Point {
 }
 
 /**
+ * {@link project}, continued past the edge of the map instead of clipped: below the horizon (local-sky mode) and on
+ * the far hemisphere (fisheye) a point gets a position beyond the rim, where the map's circle hides it, instead of the
+ * off-screen sentinel. For a photo drawn as a mesh across the rim: a sentinel vertex would tear its triangles.
+ * The fisheye's radius there is 2 − cos(angle past the rim), continuous with the visible side.
+ */
+export function projectContinued(raDeg: number, decDeg: number): Point {
+  if (_centerMode === 'zenith') {
+    const { altDeg, azDeg } = altAzFromRaDec(raDeg, decDeg, _obsLstH, _obsLatDeg);
+    const azRad = azDeg * DEG2RAD;
+    let r: number;
+    if (_projectionMode === 'fisheye') {
+      const c = Math.cos(altDeg * DEG2RAD);
+      r = altDeg >= 0 ? c : 2 - c;
+    } else {
+      r = Math.tan(((90 - altDeg) / 2) * DEG2RAD);
+    }
+    return { x: -r * Math.sin(azRad), y: r * Math.cos(azRad) };
+  }
+  if (_projectionMode === 'fisheye') {
+    const decN = _hemisphere === 'south' ? -decDeg : decDeg;
+    const c = Math.cos(decN * DEG2RAD);
+    const r = decN >= 0 ? c : 2 - c;
+    const raRad = raDeg * DEG2RAD;
+    return { x: r * Math.sin(raRad), y: r * Math.cos(raRad) };
+  }
+  return project(raDeg, decDeg);
+}
+
+/**
  * Zenith ("local sky") mode only: given two sky points that straddle the horizon
  * (one above, one below alt=0), return the projection-unit (x, y) of the alt=0 point
  * between them, so a line joining a visible star to a below-horizon one can be clipped

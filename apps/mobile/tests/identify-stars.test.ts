@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { skyToTangent, type PhotoSkyModel } from '@myastrosky/core/photo-sky-model';
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import type { PhotoCorrespondence } from '@myastrosky/core/types';
 import { ionicStubs } from './helpers';
@@ -273,9 +274,17 @@ describe('identifying the stars of a waiting photo', () => {
     ]);
     expect((correspondences as PhotoCorrespondence[])[0].starRa).toBeCloseTo(210.8, 1);
     expect(meta).toEqual({ dsoIds: ['M101'], displayName: 'M101' });
-    // Two stars: the photo is looked in the right way round, mirrored in the sky's projection as a photo of the sky is.
-    const { a: ma, b: mb, c: mc, d: md } = findDSOsInImage.mock.calls[0][0];
-    expect(ma * md - mb * mc).toBeLessThan(0);
+    // Two stars: the photo is looked in the right way round, as a photo of the sky is (east to the left of north).
+    const model = findDSOsInImage.mock.calls[0][0] as PhotoSkyModel;
+    const c = model.toSky(2000, 1300);
+    const toPlane = (x: number, y: number) => {
+      const s = model.toSky(x, y);
+      return skyToTangent(s.ra, s.dec, c.ra, c.dec)!;
+    };
+    const o = toPlane(2000, 1300);
+    const ex = toPlane(2001, 1300);
+    const ey = toPlane(2000, 1301);
+    expect((ex.x - o.x) * (ey.y - o.y) - (ex.y - o.y) * (ey.x - o.x)).toBeGreaterThan(0);
     expect(pendingPhotos.value).toHaveLength(0);
     expect(skyPhotoFocus.value).toBe('p9');
     expect(replace).toHaveBeenCalledWith('/tabs/sky');

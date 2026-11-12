@@ -1,8 +1,10 @@
 /**
- * The photo layer of the sky map: each placed photo is an `<img>` of a container laid over the canvas, moved by a CSS
- * matrix fitted to its star correspondences (or its manual placement) at the current view. It holds what the photos
- * look like and where they are; where their files are, and what to tell the user when one cannot be placed, come
- * from the hooks of the app.
+ * The photo layer of the sky map: each placed photo is drawn where its sky model puts it (`photoSkyModel`: from its
+ * reference points or its manual placement), as a mesh that follows the map's projection, by WebGL on a canvas laid
+ * over the map. Each photo keeps an `<img>`: it loads the picture of the size the photo shows at, and its `display`
+ * says whether the photo is shown. Without WebGL the `<img>` itself is shown, moved by the CSS matrix that best
+ * follows the model. It holds what the photos look like and where they are; where their files are, and what to tell
+ * the user when one cannot be placed, come from the hooks of the app.
  */
 import type {
   Photo,
@@ -13,23 +15,27 @@ import type {
   AffineMatrix,
 } from '@myastrosky/core/types';
 import { toCanvas, borderRadiusPU, getProjectionGeneration } from '@myastrosky/core/projection';
+import type { PhotoSkyModel } from '@myastrosky/core/photo-sky-model';
 import { MEDIUM_SIZE, THUMB_SIZE } from '@myastrosky/core/services/photos';
 import { affineToCSS } from '@myastrosky/core/affine';
 import { logDebug } from '@myastrosky/core/platform/log';
 import {
-  fitPhotoAffine,
-  buildPhotoPoints,
-  projCentroidAndHalfDiag,
   isCentroidInsideBorder,
   isCentroidViewportCulled,
-  computePhotoQuadCorners,
-  computePhotoMatrixForView,
+  computePhotoCanvasMesh,
   computePhotoCenterAndScale,
   computePhotoCenter,
   isLabelAllowed as labelAllowed,
-  manualPlacementCentroid,
   computeManualMatrix,
+  photoSkyModelAtView,
+  projectPhotoMesh,
+  meshDivisions,
+  meshCanvasAffine,
+  meshCorners,
+  meshOutline,
+  type PhotoMesh,
 } from '@myastrosky/core/photo-placement';
+import { PhotoGlRenderer, type GlPhoto } from './photo-gl';
 import type { PhotoCanvasQuad } from '@myastrosky/core/photo-draw-order';
 import { resolveCategory, isPoiVisible } from '@myastrosky/core/poi';
 import { hasPosition, type SkyPoiPin } from './poi-pins';
@@ -68,6 +74,25 @@ export interface PlacedPhoto {
   projGen: number;
   /** The full picture being decoded off-screen before it replaces the thumbnail (see showSrc). */
   pendingSrc?: string;
+  /** Where the photo is, in the projection it was last placed in (see PhotoLayer.geometryOf). */
+  geometry?: PhotoGeometry;
+  /** WebGL may not read its picture: it is shown as its `<img>`, as without WebGL. */
+  domFallback?: boolean;
+}
+
+/** A photo's model and its meshes for one projection generation. */
+interface PhotoGeometry {
+  photo: Photo;
+  gen: number;
+  /** The map's rotation it was made with: only for a placement saved with its angle on screen, else 0. */
+  rot: number;
+  correspondences: Photo['correspondences'];
+  manualPlacement: Photo['manualPlacement'];
+  model: PhotoSkyModel;
+  /** 2 × 2 cells: the centre, footprint and outline, and the CSS matrix (cheap, every photo). */
+  coarse: PhotoMesh;
+  /** The drawing's mesh, made when the photo is first drawn. */
+  fine?: PhotoMesh;
 }
 
 /** What the layer asks of its app. */
@@ -96,12 +121,123 @@ export class PhotoLayer {
   protected visiblePois: { [poiKey: string]: boolean } = {};
   protected showPois = true; // "Show points of interest" — pins over photos
   protected poiCategories: PoiCategory[] = [];
+  /** Draws the photos; null without WebGL, and the `<img>`s are shown instead. */
+  protected gl: PhotoGlRenderer | null = null;
+  private glCanvas: HTMLCanvasElement | null = null;
+  private drawFrame: number | null = null;
+  /** Inside placeAll: it draws once at its end. */
+  private placing = false;
 
   constructor(container: HTMLDivElement, getView: () => ViewState, hooks: PhotoLayerHooks) {
     this.container = container;
     this.getView = getView;
     this.hooks = hooks;
     this.skyMap = hooks.skyMap ?? null;
+    const canvas = document.createElement('canvas');
+    // Not `photo-overlay-img`: `photos-frozen` hides those while the view moves, and the photos follow the view.
+    canvas.className = 'photo-gl-canvas';
+    Object.assign(canvas.style, {
+      position: 'absolute',
+      left: '0',
+      top: '0',
+      pointerEvents: 'none',
+    });
+    this.gl = PhotoGlRenderer.create(canvas, () => this.drawPhotos());
+    if (this.gl) {
+      this.glCanvas = canvas;
+      container.appendChild(canvas);
+    }
+  }
+
+  /** Draws the photos again at the next frame (one draw however many asks). */
+  requestPhotoDraw(): void {
+    if (!this.gl || this.placing || this.drawFrame !== null) return;
+    this.drawFrame = requestAnimationFrame(() => {
+      this.drawFrame = null;
+      this.drawPhotos();
+    });
+  }
+
+  /**
+   * The photo's model and meshes in the current projection; null when it cannot be placed. Recomputed when the
+   * projection changes (hemisphere, mode, the clock in local-sky mode) or the photo does.
+   */
+  protected geometryOf(placed: PlacedPhoto): PhotoGeometry | null {
+    const gen = getProjectionGeneration();
+    const { photo } = placed;
+    const mp = photo.manualPlacement;
+    // A placement saved with its angle on screen turns with the map (see photoSkyModelAtView).
+    const rot = mp && !mp.angleOnSky ? this.getView().rotationDeg : 0;
+    const g = placed.geometry;
+    // A placement changed in place (repositioning) is a new object: the references tell it.
+    if (
+      g &&
+      g.photo === photo &&
+      g.gen === gen &&
+      g.rot === rot &&
+      g.correspondences === photo.correspondences &&
+      g.manualPlacement === mp
+    ) {
+      return g;
+    }
+    const model = photoSkyModelAtView(photo, { rotationDeg: rot });
+    if (!model) {
+      placed.geometry = undefined;
+      return null;
+    }
+    placed.geometry = {
+      photo,
+      gen,
+      rot,
+      correspondences: photo.correspondences,
+      manualPlacement: mp,
+      model,
+      coarse: projectPhotoMesh(model, 2),
+    };
+    return placed.geometry;
+  }
+
+  private fineMesh(g: PhotoGeometry): PhotoMesh {
+    if (!g.fine) {
+      const n = meshDivisions(g.model);
+      g.fine = n === 2 ? g.coarse : projectPhotoMesh(g.model, n);
+    }
+    return g.fine;
+  }
+
+  /** Draws every shown photo with WebGL, in draw order, at the current view (also while it moves). */
+  protected drawPhotos(): void {
+    if (this.drawFrame !== null) {
+      cancelAnimationFrame(this.drawFrame);
+      this.drawFrame = null;
+    }
+    const gl = this.gl;
+    if (!gl || !this.glCanvas) return;
+    const view = this.getView();
+    this.glCanvas.style.width = `${view.width}px`;
+    this.glCanvas.style.height = `${view.height}px`;
+    const photos: GlPhoto[] = [];
+    if (this.showPhotos) {
+      for (const placed of this.placedPhotos) {
+        const img = placed.imgEl;
+        if (placed.pendingDelete || !placed.visible || placed.viewportCulled) continue;
+        if (placed.borderHidden || placed.domFallback) continue;
+        if (img.style.display === 'none' || img.style.visibility === 'hidden') continue;
+        if (!img.complete || !img.naturalWidth) continue;
+        const g = this.geometryOf(placed);
+        if (!g) continue;
+        photos.push({ key: img, image: img, mesh: this.fineMesh(g), opacity: placed.opacity });
+      }
+    }
+    const { pending, failed } = gl.render(view, photos);
+    for (const key of failed) {
+      const placed = this.placedPhotos.find((p) => p.imgEl === key);
+      if (!placed) continue;
+      placed.domFallback = true;
+      this.container.appendChild(placed.imgEl);
+      this.applyTransform(placed, view);
+    }
+    if (pending) this.requestPhotoDraw();
   }
 
   /**
@@ -144,6 +280,7 @@ export class PhotoLayer {
       const shouldDisplay = this.showPhotos && placed.visible && this.isLabelAllowed(placed);
       placed.imgEl.style.display = shouldDisplay ? 'block' : 'none';
     }
+    this.requestPhotoDraw();
     // POI pins are drawn on the sky map's overlay canvas — repaint so they follow.
     this.skyMap?.requestRender();
   }
@@ -226,6 +363,16 @@ export class PhotoLayer {
   private moving = false;
 
   private placeAll() {
+    this.placing = true;
+    try {
+      this.placeEach();
+    } finally {
+      this.placing = false;
+    }
+    this.drawPhotos();
+  }
+
+  private placeEach() {
     const view = this.getView();
     const gen = getProjectionGeneration();
 
@@ -276,14 +423,12 @@ export class PhotoLayer {
   }
 
   /**
-   * Compute a placed photo's photo→canvas affine matrix at an arbitrary view,
-   * independent of its current on-screen transform. Returns null when the photo
-   * cannot be placed (too few correspondences) or its centroid falls outside the
-   * border circle. Used by the "full sky map" export to position photos at a view
-   * other than the live one.
+   * A placed photo's mesh in canvas pixels at an arbitrary view (see `computePhotoCanvasMesh`), independent of what is
+   * on screen. Null when the photo cannot be placed or its centre falls outside the border circle. Used by the map
+   * export to draw the photos as the map does, at the live view or another.
    */
-  computeMatrixForView(placed: PlacedPhoto, view: ViewState): AffineMatrix | null {
-    return computePhotoMatrixForView(placed.photo, view, this.borderRadiusPU);
+  computeMeshForView(placed: PlacedPhoto, view: ViewState): { n: number; points: Point[] } | null {
+    return computePhotoCanvasMesh(placed.photo, view, this.borderRadiusPU);
   }
 
   /**
@@ -325,18 +470,27 @@ export class PhotoLayer {
     for (const placed of this.placedPhotos) {
       if (!placed.visible || placed.borderHidden || placed.viewportCulled) continue;
 
-      // Always uses stored dimensions so outlines are correct even when a thumbnail is loaded.
-      const corners = computePhotoQuadCorners(placed.photo, view);
-      if (!corners) continue; // < 2 correspondences or colinear points
-      results.push({ id: placed.photo.id, name: placed.photo.originalName, corners });
+      const g = this.geometryOf(placed);
+      if (!g) continue; // < 2 correspondences or colinear points
+      const toView = (p: Point) => toCanvas(p.x, p.y, view);
+      results.push({
+        id: placed.photo.id,
+        name: placed.photo.originalName,
+        corners: meshCorners(g.coarse).map(toView),
+        edge: meshOutline(g.coarse).map(toView),
+      });
     }
 
     return results;
   }
 
   /** Compute canvas-space outlines for sky-map hit testing. */
-  getPhotoCanvasOutlines(view: ViewState): { name: string; corners: Point[] }[] {
-    return this.getPhotoCanvasQuads(view).map(({ name, corners }) => ({ name, corners }));
+  getPhotoCanvasOutlines(view: ViewState): { name: string; corners: Point[]; edge?: Point[] }[] {
+    return this.getPhotoCanvasQuads(view).map(({ name, corners, edge }) => ({
+      name,
+      corners,
+      edge,
+    }));
   }
 
   /** Compute the center RA/Dec and ideal scale to fit a photo in the viewport */
@@ -362,6 +516,7 @@ export class PhotoLayer {
     if (!placed) return;
     placed.opacity = opacity;
     placed.imgEl.style.opacity = String(opacity);
+    this.requestPhotoDraw();
   }
 
   toggleVisibility(photoId: string) {
@@ -373,6 +528,7 @@ export class PhotoLayer {
     if (shouldDisplay) {
       this.applyTransform(placed, this.getView());
     }
+    this.requestPhotoDraw();
     this.skyMap?.requestRender();
   }
 
@@ -388,6 +544,7 @@ export class PhotoLayer {
         this.applyTransform(placed, view);
       }
     }
+    this.requestPhotoDraw();
     this.fireOnPhotosChanged();
   }
 
@@ -452,8 +609,9 @@ export class PhotoLayer {
 
   protected reorderDOM() {
     for (const placed of this.placedPhotos) {
-      this.container.appendChild(placed.imgEl);
+      if (!this.gl || placed.domFallback) this.container.appendChild(placed.imgEl);
     }
+    this.requestPhotoDraw();
   }
 
   hidePhoto(photoId: string) {
@@ -461,6 +619,7 @@ export class PhotoLayer {
     if (!placed) return;
     placed.pendingDelete = true;
     placed.imgEl.style.display = 'none';
+    this.requestPhotoDraw();
     this.fireOnPhotosChanged();
   }
 
@@ -472,6 +631,7 @@ export class PhotoLayer {
     if (placed.visible) {
       this.applyTransform(placed, this.getView());
     }
+    this.requestPhotoDraw();
     this.fireOnPhotosChanged();
   }
 
@@ -479,8 +639,12 @@ export class PhotoLayer {
   removePhotosFromMap(ids: string[]) {
     const idSet = new Set(ids);
     const removed = this.placedPhotos.filter((p) => idSet.has(p.photo.id));
-    removed.forEach((p) => p.imgEl.remove());
+    removed.forEach((p) => {
+      p.imgEl.remove();
+      this.gl?.release(p.imgEl);
+    });
     this.placedPhotos = this.placedPhotos.filter((p) => !idSet.has(p.photo.id));
+    this.requestPhotoDraw();
     if (removed.length > 0) this.fireOnPhotosChanged();
   }
 
@@ -505,8 +669,12 @@ export class PhotoLayer {
 
   /** Remove all photos from the in-memory overlay without calling the API. */
   clearAllPhotos() {
-    this.placedPhotos.forEach((p) => p.imgEl.remove());
+    this.placedPhotos.forEach((p) => {
+      p.imgEl.remove();
+      this.gl?.release(p.imgEl);
+    });
     this.placedPhotos = [];
+    this.requestPhotoDraw();
     this.fireOnPhotosChanged();
   }
 
@@ -534,7 +702,9 @@ export class PhotoLayer {
     placed.borderHidden = old.borderHidden;
     if (!old.visible) placed.imgEl.style.display = 'none';
     old.imgEl.remove();
+    this.gl?.release(old.imgEl);
     this.placedPhotos[idx] = placed;
+    this.requestPhotoDraw();
     this.fireOnPhotosChanged();
   }
 
@@ -555,7 +725,8 @@ export class PhotoLayer {
     // Pin to full-image dims: affine matrix is in full-image pixel space; thumbnail LOD src swaps must not change the coordinate space.
     img.style.width = `${photo.width}px`;
     img.style.height = `${photo.height}px`;
-    this.container.insertBefore(img, before);
+    // With WebGL the picture is drawn from it: it stays out of the page.
+    if (!this.gl) this.container.insertBefore(img, before);
 
     img.style.opacity = String(opacity);
     const placed: PlacedPhoto = {
@@ -589,61 +760,46 @@ export class PhotoLayer {
 
       img.style.visibility = 'visible';
       this.applyTransform(live, this.getView());
+      this.requestPhotoDraw();
     };
     return placed;
   }
 
   protected applyTransform(placed: PlacedPhoto, view: ViewState) {
     const { photo, imgEl } = placed;
-
-    // If this photo has manual placement params, use them directly to compute the transform
-    if (photo.manualPlacement) {
-      const { centroid, halfDiag } = manualPlacementCentroid(
-        photo.manualPlacement,
-        photo.width,
-        photo.height,
-      );
-      placed.projCentroid = centroid;
-      placed.projGen = getProjectionGeneration();
-      placed.projHalfDiag = halfDiag;
-      imgEl.style.display = this.showPhotos && this.isLabelAllowed(placed) ? 'block' : 'none';
-      const matrix = computeManualMatrix(photo.manualPlacement, view, photo.width, photo.height);
-      imgEl.style.transform = affineToCSS(matrix);
-      this.showPictureFor(placed, matrix);
+    const geometry = this.geometryOf(placed);
+    if (!geometry) {
+      // Fewer than 2 points say nothing; 2 or more that cannot place the photo (in a line) are reported once.
+      if (!photo.manualPlacement && photo.correspondences.length >= 2) {
+        imgEl.style.display = 'none';
+        if (!this.affineErrorShown.has(photo.id)) {
+          this.affineErrorShown.add(photo.id);
+          this.hooks.onPlacementError?.(photo);
+        }
+      }
       return;
     }
 
-    if (photo.correspondences.length < 2) return;
+    // Centre and footprint in projection space, kept for the viewport cull.
+    const { coarse } = geometry;
+    placed.projCentroid = coarse.centroid;
+    placed.projGen = geometry.gen;
+    placed.projHalfDiag = coarse.halfDiag;
 
-    const { photoPoints, projPoints, canvasPoints } = buildPhotoPoints(photo, view);
-    if (photoPoints.length < 2) return;
-
-    // Compute centroid in projection space and cache it for viewport culling.
-    const { centroid, halfDiag } = projCentroidAndHalfDiag(projPoints);
-    placed.projCentroid = centroid;
-    placed.projGen = getProjectionGeneration();
-    placed.projHalfDiag = halfDiag;
-
-    // Check if photo centroid is inside the border circle
-    if (!isCentroidInsideBorder(centroid, this.borderRadiusPU)) {
+    // A photo whose centre is outside the border circle is hidden (one placed by hand is always shown).
+    if (!photo.manualPlacement && !isCentroidInsideBorder(coarse.centroid, this.borderRadiusPU)) {
       placed.borderHidden = true;
       imgEl.style.display = 'none';
+      this.requestPhotoDraw();
       return;
     }
     placed.borderHidden = false;
     imgEl.style.display = this.showPhotos && this.isLabelAllowed(placed) ? 'block' : 'none';
 
-    try {
-      const matrix = fitPhotoAffine(photoPoints, canvasPoints);
-      imgEl.style.transform = affineToCSS(matrix);
-      this.showPictureFor(placed, matrix);
-    } catch {
-      imgEl.style.display = 'none';
-      if (!this.affineErrorShown.has(photo.id)) {
-        this.affineErrorShown.add(photo.id);
-        this.hooks.onPlacementError?.(photo);
-      }
-    }
+    const matrix = meshCanvasAffine(coarse, photo.width, photo.height, view);
+    if (!this.gl || placed.domFallback) imgEl.style.transform = affineToCSS(matrix);
+    this.showPictureFor(placed, matrix);
+    this.requestPhotoDraw();
   }
 
   /**

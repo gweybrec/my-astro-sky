@@ -1,6 +1,6 @@
 # Architecture
 
-**MyAstroSky** is a web app for overlaying astrophotographs onto an interactive sky map. The frontend renders stars on an HTML5 Canvas using stereographic polar projection, while uploaded photos are positioned as DOM elements using CSS `transform: matrix()` computed from affine registration (3-point manual or automatic plate solving). A Targets tab recommends DSOs to image tonight based on gear, location, and sky conditions.
+**MyAstroSky** is a web app for overlaying astrophotographs onto an interactive sky map. The frontend renders stars on an HTML5 Canvas using stereographic polar projection, while uploaded photos are drawn over it by WebGL, each where its sky model puts it (from the reference points of a plate solution, stars identified by hand, or a manual placement). A Targets tab recommends DSOs to image tonight based on gear, location, and sky conditions.
 
 ## Frontend (`src/`)
 
@@ -12,7 +12,7 @@
   - `frame-controller.ts` — the interactive FOV-frame state machine (drag, pin, snap, merge, resize).
   - `sky-hit-test.ts` — star/DSO hover indexes and the `findClosest*` queries.
   - `dso-render-select.ts`, `star-budget.ts`, `star-sprite-atlas.ts`, `hover-resolve.ts`, `sky-region-draw.ts` — density gating, the sprite atlas rebuild policy, tooltip resolution, and the freehand region gesture.
-- **Photo layer** (`photo-overlay.ts`): Each photo is an `<img>` with absolute positioning and CSS matrix transform. On view change, all photo transforms are recomputed so they track the canvas. LOD: a photo shows its thumbnail, its medium-sized copy or its full picture depending on its size on screen (see [Sky map pan/zoom freeze + LOD](#sky-map-panzoom-freeze-lod)). `photo.width` (authoritative DB value) is always used for matrix math — never `imgEl.naturalWidth` — so LOD swaps do not disturb hit-testing or transform accuracy. Manages:
+- **Photo layer** (`photo-overlay.ts`, extending `packages/render/src/photo-layer.ts`): each photo is drawn by WebGL (`photo-gl.ts`) on one canvas over the map, as a mesh of its sky model in the map's projection (see [Photo placement](#photo-placement)); its `<img>` stays out of the page and only loads the picture, and its `display` says whether the photo is shown. Without WebGL the `<img>` is shown instead, moved by the CSS matrix that best follows the model. On view change only the view matrix changes; the meshes are recomputed when the projection does. LOD: a photo shows its thumbnail, its medium-sized copy or its full picture depending on its size on screen (see [Sky map pan/zoom freeze + LOD](#sky-map-panzoom-freeze-lod)). `photo.width` (authoritative DB value) is always used for matrix math — never `imgEl.naturalWidth` — so LOD swaps do not disturb hit-testing or transform accuracy. Manages:
   - `openManualIdentifyModal()` — the manual star-identification sub-modal launched per-card from the batch upload flow (user clicks photo pixel → searches for matching star / enters RA-Dec / picks on map; "Validate" enabled at 2+ identified points). No solve buttons or metadata — those live in the batch card. Resolves with correspondences, a free-drag hand-off, or cancel.
   - Manual placement mode (`openManualPlacement()`: drag photo, rotate/zoom sliders, mirror X/Y toggles)
   - Photo repositioning (re-enter manual placement for existing photo, extracts current transform)
@@ -227,7 +227,7 @@ Blob URLs are revoked when a card is removed (trash button) and when the modal c
 
 ### Sky map pan/zoom freeze + LOD
 
-**Pan/zoom debounce:** `main.ts` listens to `skyMap.setOnViewChange()`. On the first callback of an interaction, it adds `.photos-frozen` to `#photo-layer`, hiding all `.photo-overlay-img` elements via `visibility: hidden`. A 100 ms debounce timer removes the class after interaction ends. This prevents full-res images from repainting on every animation frame during pan or wheel zoom while still allowing transform recomputation to proceed.
+**Pan/zoom debounce:** `main.ts` listens to `skyMap.setOnViewChange()`. On the first callback of an interaction, it adds `.photos-frozen` to `#photo-layer`, and a 100 ms debounce timer removes it after the interaction ends; meanwhile `updateTransforms(true)` loads no new full picture (the medium copy stands in). The photos stay shown and follow the view: the WebGL canvas (`.photo-gl-canvas`) is not targeted by the class rule, and a placed `<img>` (without WebGL) carries an inline `visibility: visible` that wins over it (see [render-performance.md](render-performance.md)). The rule only hides the manual-placement preview images while the view moves.
 
 **Level-of-detail swap:** `PhotoLayer.showPictureFor()` (`packages/render/src/photo-layer.ts`), called from `applyTransform()` for star-placed and hand-placed photos alike, picks the picture from the photo's size on screen, `Math.hypot(matrix.a, matrix.b) × longer side`. With a medium-sized copy it counts screen pixels (× `devicePixelRatio`): the thumbnail up to 400, the copy up to 2048, the full picture beyond, so no picture is shown stretched. Without one, the thumbnail below 300 page pixels wide, the full picture beyond. Every photo starts with its thumbnail. A medium or full picture is decoded off-screen (`decode()`) before it replaces the visible one (see [render-performance.md → Technique 6](/dev/render-performance.md#technique-6--decode-big-photos-before-they-are-shown)). `photo.width` (the authoritative database value) is always used for all matrix calculations — `imgEl.naturalWidth` is never used — so swapping `src` does not affect hit-testing, outline drawing, repositioning or transform accuracy.
 
@@ -265,11 +265,24 @@ On every upload, `POST /api/photos` in `server/routes/photos.ts` runs Sharp twic
    - **solve-field**: Write temp file → spawn `solve-field` with index files → parse WCS output → generate correspondences
    - **Online**: Upload to astrometry.net → poll job status → parse calibration → generate correspondences
 6. Backend returns correspondences array with photoX/photoY + starRa/starDec (and starHip if catalog match found)
-7. Frontend receives correspondences → calls `computeAffineTransform()` with correspondence pairs
-8. Affine transform computed (3-point exact or N-point least squares)
-9. CSS `matrix()` applied to `<img>` element for GPU-accelerated positioning
-10. Photo stored in SQLite with correspondences, file saved to `uploads/` with UUID name
-11. On zoom/pan, `SkyMap` fires `onViewChange` → `PhotoOverlay.updateTransforms()` recomputes all CSS matrices to track canvas viewport
+7. Frontend receives correspondences → `photoSkyModel()` fits the photo's sky model on them (see [Photo placement](#photo-placement))
+8. The photo layer draws the model's mesh in the map's projection with WebGL
+9. Photo stored in SQLite with correspondences, file saved to `uploads/` with UUID name
+10. On zoom/pan, `SkyMap` fires `onViewChange` → `PhotoOverlay.updateTransforms()` culls the photos and draws them again with the new view matrix
+
+## Photo placement
+
+One model per photo, `photoSkyModel` (`packages/core/src/photo-placement.ts`, the model in `photo-sky-model.ts`), maps
+its pixels to RA/Dec and back through the plane tangent at its centre, as the gnomonic projection of a camera does. It
+is fitted on the photo's reference points: a quadratic fit on a plate solution's 3 × 3 grid (`wcsToCorrespondences`;
+it also takes the quadratic part of a SIP distortion), an affine one on 3 or more stars, a similarity on 2. A manual
+placement becomes the model that matches it at its centre. Everything uses it: the sky map draws it as a mesh in the
+active projection (`projectPhotoMesh`, 2 to 16 cells a side by field size; `projectContinued` past the rim), the
+outline, culling and export come from the same mesh, and the photo view's objects and the identifications go through
+`toSky`/`toPixel` without any projection. A single affine map in the projection was off by up to ~20 px on fields of
+2–4° (more in fisheye and low in local-sky mode); the model and its mesh stay within 0.6 px of the files' own
+solutions (`.claude/skills/test-placement/scripts/measure-placement-accuracy.mts`). A manual placement saved before
+its angle was on the sky (`angleOnSky` unset) keeps its angle on screen on the map (`photoSkyModelAtView`).
 
 ## Data Flow: Photo Repositioning
 
@@ -292,6 +305,7 @@ On every upload, `POST /api/photos` in `server/routes/photos.ts` runs Sharp twic
 - `Photo`: id, filename, originalName, width, height, displayOrder, createdAt, thumbFilename?, correspondences[]
 - `PhotoCorrespondence`: pointIndex, photoX, photoY, starHip?, starName?, starRa, starDec
 - `AffineMatrix`: a, b, c, d, e, f (CSS matrix coefficients)
+- `PhotoSkyModel`: a photo's pixels ↔ RA/Dec (`toSky`, `toPixel`), see [Photo placement](#photo-placement)
 - `ViewState`: centerX, centerY, scale, width, height
 - `ViewMode`: 'skymap' | 'gallery' | 'targets'
 - `GearPreset`: id, nameKey, apertureMm, focalLengthMm, sensorWidthMm, sensorHeightMm, pixelSizeUm, mono, builtIn

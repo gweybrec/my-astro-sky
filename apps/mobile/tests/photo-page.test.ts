@@ -51,7 +51,15 @@ vi.mock('../src/composables/useErrorToast', () => ({ useErrorToast: () => ({ sho
 const solved = { value: true };
 vi.mock('@myastrosky/core/photo-placement', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@myastrosky/core/photo-placement')>()),
-  computePhotoToProjMatrix: () => (solved.value ? { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 } : null),
+  photoSkyModel: () =>
+    solved.value
+      ? {
+          width: 100,
+          height: 100,
+          toSky: () => ({ ra: 0, dec: 0 }),
+          toPixel: () => ({ x: 0, y: 0 }),
+        }
+      : null,
 }));
 const findDsoPlacementsInImage = vi.fn();
 const drawPhotoOverlay = vi.fn();

@@ -1,8 +1,6 @@
 import type { DSO, DSOType, DSOUserOverride, PhotoCorrespondence, Point } from '../types';
-import type { AffineMatrix } from '../types';
-import { project, invalidateProjections } from '../projection';
-import { invertAffine, applyAffine } from '../affine';
-import { fitPhotoToProj } from '../photo-placement';
+import { invalidateProjections } from '../projection';
+import { fitPhotoSkyModel, type PhotoSkyModel } from '../photo-sky-model';
 
 const dsos: DSO[] = [];
 const dsoById = new Map<string, DSO>();
@@ -441,19 +439,11 @@ export function getDSOsNear(ra: number, dec: number, radiusDeg: number): DSO[] {
  * @param imgWidth - Image width in pixels (photo coordinates)
  * @param imgHeight - Image height in pixels (photo coordinates)
  */
-export function findDSOsInImage(
-  photoToCanvas: AffineMatrix,
-  imgWidth: number,
-  imgHeight: number,
-): DSO[] {
-  // Invert the affine: canvas projection → photo pixels
-  const inv = invertAffine(photoToCanvas);
-  if (!inv) return [];
-
+export function findDSOsInImage(model: PhotoSkyModel, imgWidth: number, imgHeight: number): DSO[] {
   const result: DSO[] = [];
   for (const dso of dsos) {
-    const pt = applyAffine(inv, project(dso.ra, dso.dec));
-    if (pt.x >= 0 && pt.x <= imgWidth && pt.y >= 0 && pt.y <= imgHeight) {
+    const pt = model.toPixel(dso.ra, dso.dec);
+    if (pt && pt.x >= 0 && pt.x <= imgWidth && pt.y >= 0 && pt.y <= imgHeight) {
       result.push(dso);
     }
   }
@@ -480,12 +470,12 @@ export interface PhotoDsoPlacement {
 /**
  * Photo-pixel vector from a DSO's centre to a point `arcmin` away along
  * `positionAngleDeg` (measured east of north, the catalog's convention). Ports
- * TiffViewer's `SkyCatalogue.offsetPixels`: projecting the offset sky point through
- * the same affine as the centre means the result inherits the photo's own rotation,
+ * TiffViewer's `SkyCatalogue.offsetPixels`: placing the offset sky point through
+ * the same model as the centre means the result inherits the photo's own rotation,
  * mirroring and scale rather than re-deriving them separately.
  */
 function offsetPhotoPx(
-  inv: AffineMatrix,
+  model: PhotoSkyModel,
   ra: number,
   dec: number,
   centerPx: Point,
@@ -497,7 +487,7 @@ function offsetPhotoPx(
   const decOffset = dec + radius * Math.cos(angle);
   const raOffset =
     ra + (radius * Math.sin(angle)) / Math.max(Math.cos((dec * Math.PI) / 180), 1e-6);
-  const edgePx = applyAffine(inv, project(raOffset, decOffset));
+  const edgePx = model.toPixel(raOffset, decOffset) ?? centerPx;
   return { x: edgePx.x - centerPx.x, y: edgePx.y - centerPx.y };
 }
 
@@ -527,25 +517,28 @@ function pickVisibleCatalogAlias(dso: DSO, catalogs: Set<string>): string | null
  * the richer sibling of {@link findDSOsInImage}, used by the gallery detail view's
  * "show DSOs" overlay rather than the auto-tagging path.
  *
- * @param photoToProj - Affine matrix mapping photo pixels → the same projection space `project()` returns
+ * @param model - Where the photo's pixels are on the sky
  * @param catalogs - The enabled catalog families (matches the predicate `dso-render-select.ts` uses for the sky map's own catalog filter, generalised to also check aliases)
  */
 export function findDsoPlacementsInImage(
-  photoToProj: AffineMatrix,
+  model: PhotoSkyModel,
   imgWidth: number,
   imgHeight: number,
   catalogs: Set<string>,
 ): PhotoDsoPlacement[] {
-  const inv = invertAffine(photoToProj);
-  if (!inv) return [];
-
   const result: PhotoDsoPlacement[] = [];
   for (const dso of dsos) {
     const displayId = pickVisibleCatalogAlias(dso, catalogs);
     if (displayId === null) continue;
 
-    const centerPx = applyAffine(inv, project(dso.ra, dso.dec));
-    if (centerPx.x < 0 || centerPx.x > imgWidth || centerPx.y < 0 || centerPx.y > imgHeight) {
+    const centerPx = model.toPixel(dso.ra, dso.dec);
+    if (
+      !centerPx ||
+      centerPx.x < 0 ||
+      centerPx.x > imgWidth ||
+      centerPx.y < 0 ||
+      centerPx.y > imgHeight
+    ) {
       continue;
     }
 
@@ -555,9 +548,9 @@ export function findDsoPlacementsInImage(
     let angleDeg = 0;
     if (majorArcmin > 0) {
       const minorArcmin = dso.minAxis ?? majorArcmin;
-      const majorOffset = offsetPhotoPx(inv, dso.ra, dso.dec, centerPx, majorArcmin / 2, dso.pa);
+      const majorOffset = offsetPhotoPx(model, dso.ra, dso.dec, centerPx, majorArcmin / 2, dso.pa);
       const minorOffset = offsetPhotoPx(
-        inv,
+        model,
         dso.ra,
         dso.dec,
         centerPx,
@@ -609,16 +602,16 @@ export function findDSOIdsFromCorrespondences(
 ): string[] {
   if (!imgWidth || !imgHeight) return [];
   const photoPoints: Point[] = [];
-  const projPoints: Point[] = [];
+  const sky: { ra: number; dec: number }[] = [];
   for (const c of correspondences) {
     if (c.starRa == null || c.starDec == null) continue;
     photoPoints.push({ x: c.photoX, y: c.photoY });
-    projPoints.push(project(c.starRa, c.starDec));
+    sky.push({ ra: c.starRa, dec: c.starDec });
   }
   if (photoPoints.length < 3) return [];
   try {
-    const aff = fitPhotoToProj(photoPoints, projPoints);
-    return findDSOsInImage(aff, imgWidth, imgHeight).map((d) => d.id);
+    const model = fitPhotoSkyModel(photoPoints, sky, imgWidth, imgHeight);
+    return findDSOsInImage(model, imgWidth, imgHeight).map((d) => d.id);
   } catch {
     return [];
   }

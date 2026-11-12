@@ -11,7 +11,7 @@ import { createTestingPinia } from '@pinia/testing';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import CometIdentifyModal from '../../src/components/modals/CometIdentifyModal.vue';
-import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
+import { photoSkyModel } from '@myastrosky/core/photo-placement';
 import { photoPixelToRaDec } from '@myastrosky/core/asteroid-identify';
 import { cometRaDec } from '@myastrosky/core/comet-ephemeris';
 import { dateToJD } from '@myastrosky/core/astro-time';
@@ -213,7 +213,7 @@ describe('CometIdentifyModal', () => {
 
     byText('Add selected (1)')!.click();
     const [, pois] = wrapper.emitted('identified')![0] as [Photo, any[]];
-    const clicked = photoPixelToRaDec(computePhotoToProjMatrix(photo)!, 400, 300);
+    const clicked = photoPixelToRaDec(photoSkyModel(photo)!, 400, 300);
     expect(pois[0].ra).toBeCloseTo(clicked.ra, 6);
     expect(pois[0].dec).toBeCloseTo(clicked.dec, 6);
 

@@ -19,8 +19,7 @@ import {
   NEARBY_RADIUS_DEG,
 } from '@myastrosky/core/comet-identify';
 import type { CometElements } from '@myastrosky/core/comet-ephemeris';
-import { fitPhotoAffine } from '@myastrosky/core/photo-placement';
-import { project } from '@myastrosky/core/projection';
+import { fitPhotoSkyModel } from '@myastrosky/core/photo-sky-model';
 
 const COMETS = parseCometEls(
   readFileSync(join(__dirname, '../fixtures/comets/CometEls-sample.txt'), 'utf-8'),
@@ -40,12 +39,11 @@ function frame(width: number, height: number, ra0: number, dec0: number) {
     { x: 0, y: height },
     { x: width / 2, y: height / 2 },
   ];
-  const matrix = fitPhotoAffine(
+  const matrix = fitPhotoSkyModel(
     points,
-    points.map((p) => {
-      const s = pixelToSky(p.x, p.y);
-      return project(s.ra, s.dec);
-    }),
+    points.map((p) => pixelToSky(p.x, p.y)),
+    width,
+    height,
   );
   return { width, height, matrix };
 }
@@ -56,7 +54,7 @@ const TEMPEL_FRAME = frame(1147, 876, 327.783, -24.622);
 describe('findComets()', () => {
   it('finds C/2025 R2 near the centre of its photo, with its motion', () => {
     const { width, height, matrix } = R2_FRAME;
-    const r = findComets(COMETS, matrix!, width, height, '2025-11-07T18:42:00.000Z');
+    const r = findComets(COMETS, matrix, width, height, '2025-11-07T18:42:00.000Z');
     expect(r.inFrame.map((c) => c.name)).toEqual(['C/2025 R2 (SWAN)']);
     const [r2] = r.inFrame;
     expect(Math.hypot(r2.x - width / 2, r2.y - height / 2)).toBeLessThan(150);
@@ -67,20 +65,20 @@ describe('findComets()', () => {
 
   it('lists 10P as nearby on the wrong stored date, and in frame on the right one', () => {
     const { width, height, matrix } = TEMPEL_FRAME;
-    const wrong = findComets(COMETS, matrix!, width, height, '2026-07-27T20:12:00.000Z');
+    const wrong = findComets(COMETS, matrix, width, height, '2026-07-27T20:12:00.000Z');
     expect(wrong.inFrame).toEqual([]);
     const tempel = wrong.nearby.find((c) => c.designation === '10P')!;
     expect(tempel.separationDeg).toBeGreaterThan(2.5);
     expect(tempel.separationDeg).toBeLessThan(3.1);
 
-    const right = findComets(COMETS, matrix!, width, height, '2026-08-02T00:00:00.000Z');
+    const right = findComets(COMETS, matrix, width, height, '2026-08-02T00:00:00.000Z');
     expect(right.inFrame.map((c) => c.designation)).toEqual(['10P']);
   });
 
   it('ignores comets farther than the nearby radius', () => {
     const { width, height, matrix } = TEMPEL_FRAME;
     // Five days earlier, 10P is well over 3° away.
-    const r = findComets(COMETS, matrix!, width, height, '2026-07-20T00:00:00.000Z');
+    const r = findComets(COMETS, matrix, width, height, '2026-07-20T00:00:00.000Z');
     expect(r.nearby.every((c) => c.separationDeg <= NEARBY_RADIUS_DEG + 1)).toBe(true);
     expect(r.nearby.some((c) => c.designation === '10P')).toBe(false);
   });
@@ -88,7 +86,7 @@ describe('findComets()', () => {
   it('drops comets predicted fainter than magnitude 20', () => {
     const { width, height, matrix } = R2_FRAME;
     const faint: CometElements[] = COMETS.map((c) => ({ ...c, h: 30 }));
-    const r = findComets(faint, matrix!, width, height, '2025-11-07T18:42:00.000Z');
+    const r = findComets(faint, matrix, width, height, '2025-11-07T18:42:00.000Z');
     expect(r.inFrame).toEqual([]);
   });
 
@@ -96,13 +94,13 @@ describe('findComets()', () => {
     const { width, height, matrix } = R2_FRAME;
     const r2 = COMETS.find((c) => c.designation === 'C/2025 R2')!;
     const twin: CometElements = { ...r2, designation: 'X', name: 'X (twin)', h: null, k: null };
-    const r = findComets([twin, r2], matrix!, width, height, '2025-11-07T18:42:00.000Z');
+    const r = findComets([twin, r2], matrix, width, height, '2025-11-07T18:42:00.000Z');
     expect(r.inFrame.map((c) => c.name)).toEqual(['C/2025 R2 (SWAN)', 'X (twin)']);
   });
 
   it('returns nothing for an invalid date', () => {
     const { width, height, matrix } = R2_FRAME;
-    expect(findComets(COMETS, matrix!, width, height, '')).toEqual({ inFrame: [], nearby: [] });
+    expect(findComets(COMETS, matrix, width, height, '')).toEqual({ inFrame: [], nearby: [] });
   });
 });
 

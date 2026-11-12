@@ -8,8 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { isDomainError } from '@myastrosky/core/domain/errors';
 import { createSolvedImportService } from '@myastrosky/core/services/solved-import';
 import { checkReferencePoints } from '@myastrosky/core/reference-points';
-import { fitPhotoAffine } from '@myastrosky/core/photo-placement';
-import { applyAffine, invertAffine } from '@myastrosky/core/affine';
+import { applyAffine, computeAffineLSQ, invertAffine } from '@myastrosky/core/affine';
 import { createSharpImageCodec } from '../../server/image-codec';
 import { buildFits } from '../fixtures/fits-builders';
 import { buildTiff } from '../fixtures/tiff-builders';
@@ -115,7 +114,7 @@ function pixelOf(points: Points, sky: { ra: number; dec: number }) {
         (d + c),
     };
   };
-  const m = fitPhotoAffine(
+  const m = computeAffineLSQ(
     points.map((p) => ({ x: p.photoX, y: p.photoY })),
     points.map((p) => tangent(p.starRa!, p.starDec!)),
   );

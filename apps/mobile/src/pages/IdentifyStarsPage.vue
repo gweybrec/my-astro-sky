@@ -4,8 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { findDSOsInImage } from '@myastrosky/core/catalog/dso-registry';
-import { fitPhotoToProj, getCorrRaDec } from '@myastrosky/core/photo-placement';
-import { project } from '@myastrosky/core/projection';
+import { photoSkyModel } from '@myastrosky/core/photo-placement';
 import { raDecFromSexagesimal, starDisplayLabel } from '@myastrosky/core/star-identify';
 import type { StarSearchResult } from '@myastrosky/core/domain/stars';
 import type { PhotoCorrespondence } from '@myastrosky/core/types';
@@ -246,22 +245,9 @@ async function validate() {
     // The stars' positions and the objects that fall in the photo need the catalogues.
     await catalogsReady();
     const { width, height } = size.value;
-    const photoPoints: PhotoPoint[] = [];
-    const projPoints: PhotoPoint[] = [];
-    for (const c of correspondences) {
-      const sky = getCorrRaDec(c);
-      if (!sky) continue;
-      photoPoints.push({ x: c.photoX, y: c.photoY });
-      projPoints.push(project(sky.ra, sky.dec));
-    }
-    let dsoIds: string[] = [];
-    try {
-      dsoIds = findDSOsInImage(fitPhotoToProj(photoPoints, projPoints), width, height).map(
-        (dso) => dso.id,
-      );
-    } catch {
-      // Points on one line give no placement to look in: the photo is stored without objects.
-    }
+    // Points on one line give no placement to look in: the photo is stored without objects.
+    const model = photoSkyModel({ width, height, correspondences, manualPlacement: undefined });
+    const dsoIds = model ? findDSOsInImage(model, width, height).map((dso) => dso.id) : [];
     const photo = await uploadPhoto(file.value, correspondences, undefined, undefined, {
       dsoIds,
       displayName: stripExtension(file.value.name),

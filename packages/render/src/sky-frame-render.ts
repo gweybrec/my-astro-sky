@@ -343,14 +343,14 @@ export function renderPhotoOutlines(s: SkyScene): void {
   const { ctx } = s;
 
   for (const outline of s.photoOutlines) {
-    const { corners, name } = outline;
+    const { corners, name, edge } = outline;
     if (corners.length < 4) continue;
 
     ctx.save();
     ctx.strokeStyle = PHOTO_OUTLINE.stroke;
     ctx.lineWidth = PHOTO_OUTLINE.lineWidth;
     ctx.setLineDash(PHOTO_OUTLINE.dash);
-    drawFramePolyline(ctx, corners);
+    drawFramePolyline(ctx, edge ?? corners);
 
     // Label along the longest edge, always readable (not upside-down)
     drawEdgeLabel(ctx, corners, name, PHOTO_OUTLINE.label);

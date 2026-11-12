@@ -24,8 +24,7 @@ import {
   type TnsCandidate,
   type PlacedTransient,
 } from '@myastrosky/core/supernova-identify';
-import { fitPhotoAffine } from '@myastrosky/core/photo-placement';
-import { project } from '@myastrosky/core/projection';
+import { fitPhotoSkyModel } from '@myastrosky/core/photo-sky-model';
 import { parseTnsCsv } from '@myastrosky/core/services/identify';
 
 const CANDIDATES: TnsCandidate[] = parseTnsCsv(
@@ -53,12 +52,11 @@ const PHOTO_POINTS = [
   { x: 0, y: H },
   { x: W / 2, y: H / 2 },
 ];
-const PHOTO_TO_PROJ = fitPhotoAffine(
+const PHOTO_MODEL = fitPhotoSkyModel(
   PHOTO_POINTS,
-  PHOTO_POINTS.map((p) => {
-    const s = pixelToSky(p.x, p.y);
-    return project(s.ra, s.dec);
-  }),
+  PHOTO_POINTS.map((p) => pixelToSky(p.x, p.y)),
+  W,
+  H,
 );
 
 function inWindow(c: TnsCandidate, obsIso: string) {
@@ -69,7 +67,7 @@ function inWindow(c: TnsCandidate, obsIso: string) {
 
 describe('photoFieldCircle()', () => {
   it('is centred on the photo and reaches its corners', () => {
-    const f = photoFieldCircle(PHOTO_TO_PROJ, W, H);
+    const f = photoFieldCircle(PHOTO_MODEL, W, H);
     expect(f.raDeg).toBeCloseTo(RA0, 3);
     expect(f.decDeg).toBeCloseTo(DEC0, 3);
     // Half-diagonal of 664×470 px at 1.5″/px ≈ 10.2′, +5 % margin.
@@ -79,13 +77,13 @@ describe('photoFieldCircle()', () => {
   });
 
   it('caps a very wide field at 60′ and flags it', () => {
-    const wide = {
-      ...PHOTO_TO_PROJ,
-      a: PHOTO_TO_PROJ.a * 20,
-      b: PHOTO_TO_PROJ.b * 20,
-      c: PHOTO_TO_PROJ.c * 20,
-      d: PHOTO_TO_PROJ.d * 20,
-    };
+    // The same photo at 20 times the scale: 30″ a pixel.
+    const wide = fitPhotoSkyModel(
+      PHOTO_POINTS,
+      PHOTO_POINTS.map((p) => pixelToSky(W / 2 + (p.x - W / 2) * 20, H / 2 + (p.y - H / 2) * 20)),
+      W,
+      H,
+    );
     const f = photoFieldCircle(wide, W, H);
     expect(f.radiusArcmin).toBe(60);
     expect(f.truncated).toBe(true);
@@ -132,7 +130,7 @@ describe('daysFromDiscovery()', () => {
 });
 
 describe('placeInImage()', () => {
-  const placed = placeInImage(CANDIDATES, PHOTO_TO_PROJ, W, H, '2026-09-04T20:02:11Z');
+  const placed = placeInImage(CANDIDATES, PHOTO_MODEL, W, H, '2026-09-04T20:02:11Z');
 
   it('keeps only the transients inside the frame (both NGC 7331 supernovae)', () => {
     expect(placed.map((c) => c.name).sort()).toEqual(['SN 2025rbs', 'SN 2026aaiv']);

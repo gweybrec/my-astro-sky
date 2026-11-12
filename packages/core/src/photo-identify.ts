@@ -4,8 +4,8 @@
  * the photo's solve. The desktop's identification modals and the phone's identification pages share these steps; they
  * only differ in how they show them.
  *
- * Every step runs in the canonical pole projection (`withCanonicalProjection`): the zenith-centred display mode clips
- * a field that is currently below the horizon (collapsing the photo's fit) and rotates with the sky clock.
+ * Every step goes through the photo's sky model (`photoSkyModel`), which does not depend on how the map projects the
+ * sky: the same placement the map draws the photo with.
  */
 import {
   buildSearch,
@@ -19,9 +19,7 @@ import {
 import { findComets, candidateToPoi as cometToPoi, type CometSearchResult } from './comet-identify';
 import type { CometElements } from './comet-ephemeris';
 import type { SkybotSearchParams, TnsSearchParams } from './domain/identify';
-import { applyAffine, invertAffine } from './affine';
-import { computePhotoToProjMatrix } from './photo-placement';
-import { project, withCanonicalProjection } from './projection';
+import { photoSkyModel } from './photo-placement';
 import {
   photoFieldCircle,
   placeInImage,
@@ -49,7 +47,7 @@ type SolvedPhoto = Pick<Photo, 'width' | 'height' | 'correspondences' | 'manualP
 
 /** Whether the photo has a solve: the identifications need one to turn a pixel into a sky position. */
 export function isPhotoSolved(photo: SolvedPhoto): boolean {
-  return withCanonicalProjection(() => computePhotoToProjMatrix(photo as Photo) !== null);
+  return photoSkyModel(photo) !== null;
 }
 
 /** The sky position (degrees, RA in [0, 360)) of each pixel; null when the photo has no solve. */
@@ -57,14 +55,9 @@ export function photoPixelsToRaDec(
   photo: SolvedPhoto,
   pixels: PhotoPixel[],
 ): { ra: number; dec: number }[] | null {
-  return withCanonicalProjection(() => {
-    const matrix = computePhotoToProjMatrix(photo as Photo);
-    if (!matrix) return null;
-    return pixels.map((p) => {
-      const { ra, dec } = photoPixelToRaDec(matrix, p.x, p.y);
-      return { ra: ((ra % 360) + 360) % 360, dec };
-    });
-  });
+  const model = photoSkyModel(photo);
+  if (!model) return null;
+  return pixels.map((p) => photoPixelToRaDec(model, p.x, p.y));
 }
 
 // ── Asteroids ───────────────────────────────────────────────────────────────────────────────────
@@ -120,12 +113,10 @@ export function asteroidPixels(
   photo: SolvedPhoto,
   candidates: Pick<SkybotCandidate, 'raDeg' | 'decDeg'>[],
 ): PhotoPixel[] | null {
-  return withCanonicalProjection(() => {
-    const matrix = computePhotoToProjMatrix(photo as Photo);
-    const inv = matrix ? invertAffine(matrix) : null;
-    if (!inv) return null;
-    return candidates.map((c) => applyAffine(inv, project(c.raDeg, c.decDeg)));
-  });
+  const model = photoSkyModel(photo);
+  if (!model) return null;
+  // A candidate on the far side of the sky from the photo has no pixel: it is put far outside the photo.
+  return candidates.map((c) => model.toPixel(c.raDeg, c.decDeg) ?? { x: -1e9, y: -1e9 });
 }
 
 /**
@@ -153,10 +144,8 @@ export function supernovaSearchPlan(
   photo: SolvedPhoto,
   obsIso: string,
 ): { field: FieldCircle; params: TnsSearchParams } | null {
-  const field = withCanonicalProjection(() => {
-    const matrix = computePhotoToProjMatrix(photo as Photo);
-    return matrix ? photoFieldCircle(matrix, photo.width, photo.height) : null;
-  });
+  const model = photoSkyModel(photo);
+  const field = model ? photoFieldCircle(model, photo.width, photo.height) : null;
   const window = obsIso ? searchWindow(obsIso) : null;
   if (!field || !window) return null;
   return {
@@ -176,10 +165,8 @@ export function placeSupernovae(
   candidates: TnsCandidate[],
   obsIso: string,
 ): PlacedTransient[] {
-  const placed = withCanonicalProjection(() => {
-    const matrix = computePhotoToProjMatrix(photo as Photo);
-    return matrix ? placeInImage(candidates, matrix, photo.width, photo.height, obsIso) : [];
-  });
+  const model = photoSkyModel(photo);
+  const placed = model ? placeInImage(candidates, model, photo.width, photo.height, obsIso) : [];
   return rankTransients(placed);
 }
 
@@ -191,12 +178,10 @@ export function cometsInPhoto(
   comets: CometElements[],
   obsIso: string,
 ): CometSearchResult {
-  return withCanonicalProjection(() => {
-    const matrix = computePhotoToProjMatrix(photo as Photo);
-    return matrix
-      ? findComets(comets, matrix, photo.width, photo.height, obsIso)
-      : { inFrame: [], nearby: [] };
-  });
+  const model = photoSkyModel(photo);
+  return model
+    ? findComets(comets, model, photo.width, photo.height, obsIso)
+    : { inFrame: [], nearby: [] };
 }
 
 /**

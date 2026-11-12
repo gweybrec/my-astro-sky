@@ -1,7 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import type { Photo } from '@myastrosky/core/types';
-import { computePhotoToProjMatrix } from '@myastrosky/core/photo-placement';
-import { withCanonicalProjection } from '@myastrosky/core/projection';
+import { photoSkyModel } from '@myastrosky/core/photo-placement';
 import { findDsoPlacementsInImage } from '@myastrosky/core/catalog/dso-registry';
 import { resolveCategory } from '@myastrosky/core/poi';
 import { drawPhotoOverlay } from '@myastrosky/render/photo-dso-overlay-render';
@@ -32,29 +31,19 @@ export function usePhotoOverlay(options: {
   const catalogLoaded = ref(false);
   void catalogsReady().then(() => (catalogLoaded.value = true));
 
-  // The canonical pole projection, as the desktop: the zenith-centred mode would clip a photo below the horizon.
-  const solved = computed(() =>
-    photo.value
-      ? withCanonicalProjection(() => computePhotoToProjMatrix(photo.value!)) !== null
-      : false,
-  );
+  // The photo's place on the sky, the one the map draws it with.
+  const solved = computed(() => (photo.value ? photoSkyModel(photo.value) !== null : false));
   const placements = computed(() => {
     const p = photo.value;
     if (!p || !objects.value || !catalogLoaded.value) return [];
-    return withCanonicalProjection(() => {
-      const matrix = computePhotoToProjMatrix(p);
-      return matrix
-        ? findDsoPlacementsInImage(matrix, p.width, p.height, new Set(catalogs.value))
-        : [];
-    });
+    const model = photoSkyModel(p);
+    return model ? findDsoPlacementsInImage(model, p.width, p.height, new Set(catalogs.value)) : [];
   });
   const pins = computed(() => {
     const p = photo.value;
     if (!p) return [];
-    return withCanonicalProjection(() => {
-      const matrix = computePhotoToProjMatrix(p);
-      return matrix ? poiPinsInImage(p.pointsOfInterest ?? [], matrix, p.width, p.height) : [];
-    });
+    const model = photoSkyModel(p);
+    return model ? poiPinsInImage(p.pointsOfInterest ?? [], model, p.width, p.height) : [];
   });
 
   function draw() {

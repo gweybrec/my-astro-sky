@@ -7,9 +7,8 @@
  * these functions with `src/api.ts` (which does the `/api/tns/conesearch` call).
  * See `tests/unit/supernova-identify.test.ts`.
  */
-import type { AffineMatrix, PointOfInterest } from './types';
-import { applyAffine, invertAffine } from './affine';
-import { project } from './projection';
+import type { PointOfInterest } from './types';
+import type { PhotoSkyModel } from './photo-sky-model';
 import { angularSeparationDeg } from './sky-geometry';
 import { photoPixelToRaDec } from './asteroid-identify';
 import { t } from './i18n';
@@ -64,18 +63,18 @@ export interface FieldCircle {
  * default the TNS server's 60′ cap.
  */
 export function photoFieldCircle(
-  photoToProj: AffineMatrix,
+  model: PhotoSkyModel,
   width: number,
   height: number,
   maxRadiusArcmin = MAX_SEARCH_RADIUS_ARCMIN,
 ): FieldCircle {
-  const center = photoPixelToRaDec(photoToProj, width / 2, height / 2);
+  const center = photoPixelToRaDec(model, width / 2, height / 2);
   const corners = [
     [0, 0],
     [width, 0],
     [width, height],
     [0, height],
-  ].map(([x, y]) => photoPixelToRaDec(photoToProj, x, y));
+  ].map(([x, y]) => photoPixelToRaDec(model, x, y));
   const maxSepDeg = Math.max(
     ...corners.map((c) => angularSeparationDeg(center.ra, center.dec, c.ra, c.dec)),
   );
@@ -112,23 +111,20 @@ export function daysFromDiscovery(obsIso: string, discoveryIso: string | null): 
 }
 
 /**
- * Projects each candidate onto the photo (the inverse of the photo→projection
- * affine, same round trip as `findDsoPlacementsInImage`) and drops those outside
- * the frame — the TNS cone is a circle around a rectangle.
+ * Places each candidate on the photo through its sky model and drops those outside the frame: the TNS cone is a
+ * circle around a rectangle.
  */
 export function placeInImage(
   candidates: TnsCandidate[],
-  photoToProj: AffineMatrix,
+  model: PhotoSkyModel,
   width: number,
   height: number,
   obsIso: string,
 ): PlacedTransient[] {
-  const inv = invertAffine(photoToProj);
-  if (!inv) return [];
   const placed: PlacedTransient[] = [];
   for (const c of candidates) {
-    const p = applyAffine(inv, project(c.raDeg, c.decDeg));
-    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+    const p = model.toPixel(c.raDeg, c.decDeg);
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
     if (p.x < 0 || p.x > width || p.y < 0 || p.y > height) continue;
     placed.push({
       ...c,

@@ -9,9 +9,8 @@
  * functions with `src/api.ts` (`/api/comets/elements`).
  * See `tests/unit/comet-identify.test.ts`.
  */
-import type { AffineMatrix, PointOfInterest } from './types';
-import { applyAffine, invertAffine } from './affine';
-import { project } from './projection';
+import type { PointOfInterest } from './types';
+import type { PhotoSkyModel } from './photo-sky-model';
 import { angularSeparationDeg } from './sky-geometry';
 import { isoToJd } from './asteroid-identify';
 import { photoFieldCircle } from './supernova-identify';
@@ -58,22 +57,20 @@ export interface CometSearchResult {
 /**
  * Places every comet at the observation time: inside the frame (pixel position,
  * brightest first) or within {@link NEARBY_RADIUS_DEG} of it (closest first).
- * `photoToProj` and the projections here must share one projection state: call
- * inside `withCanonicalProjection` (the display modes clip and rotate).
+ * Positions go through the photo's sky model, whatever the map's projection.
  */
 export function findComets(
   elements: CometElements[],
-  photoToProj: AffineMatrix,
+  model: PhotoSkyModel,
   width: number,
   height: number,
   obsIso: string,
 ): CometSearchResult {
   const empty: CometSearchResult = { inFrame: [], nearby: [] };
   const obsMs = Date.parse(obsIso);
-  const inv = invertAffine(photoToProj);
-  if (!Number.isFinite(obsMs) || !inv) return empty;
+  if (!Number.isFinite(obsMs)) return empty;
   const jd = isoToJd(obsIso);
-  const field = photoFieldCircle(photoToProj, width, height, Number.POSITIVE_INFINITY);
+  const field = photoFieldCircle(model, width, height, Number.POSITIVE_INFINITY);
   const maxSepDeg = field.radiusArcmin / 60 + NEARBY_RADIUS_DEG;
 
   const inFrame: PlacedComet[] = [];
@@ -85,8 +82,9 @@ export function findComets(
     const mag = cometTotalMag(el, pos.rAu, pos.deltaAu);
     if (mag !== null && mag > MAX_COMET_MAG) continue;
 
-    const p = applyAffine(inv, project(pos.raDeg, pos.decDeg));
+    const p = model.toPixel(pos.raDeg, pos.decDeg);
     const inside =
+      p !== null &&
       Number.isFinite(p.x) &&
       Number.isFinite(p.y) &&
       p.x >= 0 &&

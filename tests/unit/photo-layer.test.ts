@@ -132,11 +132,15 @@ describe('PhotoLayer', () => {
     ) {
       return new Promise<void>((done) => decodes.push({ src: this.getAttribute('src')!, done }));
     });
-    const { container, layer } = make();
-    // its first 100 px spanning 0.01° it shows tiny; a 1000 px photo whose first 100 px span 40° shows over 300 px
+    // Zoomed in: 4000 page pixels a projection unit.
+    const container = document.createElement('div');
+    const layer = new PhotoLayer(container, () => ({ ...VIEW, scale: 4000 }), {
+      photoUrl: (name) => `/files/${name}`,
+    });
+    // its first 100 px spanning 0.01° it shows tiny; a 1000 px photo whose first 100 px span 4° shows over 300 px
     layer.loadPhotos([
       starPlaced('small', 0.01),
-      starPlaced('large', 40, 1000),
+      starPlaced('large', 4, 1000),
       placedPhoto('hand'),
     ]);
     const src = () => [...container.querySelectorAll('img')].map((i) => i.getAttribute('src'));
@@ -163,8 +167,8 @@ describe('PhotoLayer', () => {
       manualPlacement: undefined,
       correspondences: [
         [0, 0, 10, 50],
-        [100, 0, 50, 50],
-        [0, 100, 10, 90],
+        [100, 0, 14, 50],
+        [0, 100, 10, 54],
       ].map(([photoX, photoY, starRa, starDec], i) => ({
         pointIndex: i,
         photoX,
@@ -175,7 +179,7 @@ describe('PhotoLayer', () => {
         starDec,
       })) as never,
     });
-    let view = VIEW;
+    let view = { ...VIEW, scale: 4000 };
     const container = document.createElement('div');
     const layer = new PhotoLayer(container, () => view, { photoUrl: (name) => `/files/${name}` });
     layer.loadPhotos([photo]);
