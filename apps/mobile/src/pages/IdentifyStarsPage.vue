@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { findDSOsInImage } from '@myastrosky/core/catalog/dso-registry';
-import { fitPhotoAffine, getCorrRaDec } from '@myastrosky/core/photo-placement';
+import { fitPhotoToProj, getCorrRaDec } from '@myastrosky/core/photo-placement';
 import { project } from '@myastrosky/core/projection';
 import { raDecFromSexagesimal, starDisplayLabel } from '@myastrosky/core/star-identify';
 import type { StarSearchResult } from '@myastrosky/core/domain/stars';
@@ -256,7 +256,7 @@ async function validate() {
     }
     let dsoIds: string[] = [];
     try {
-      dsoIds = findDSOsInImage(fitPhotoAffine(photoPoints, projPoints), width, height).map(
+      dsoIds = findDSOsInImage(fitPhotoToProj(photoPoints, projPoints), width, height).map(
         (dso) => dso.id,
       );
     } catch {

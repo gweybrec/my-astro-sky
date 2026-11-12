@@ -66,6 +66,20 @@ export function fitPhotoAffine(photoPoints: Point[], targetPoints: Point[]): Aff
 }
 
 /**
+ * {@link fitPhotoAffine} onto projection space. Projection y points up while photo and canvas y point down, so a
+ * photo is mirrored in projection space. The fit is made with the target's y turned over and the result turned back:
+ * the two-point (or points-in-a-line) similarity, which cannot mirror, then assumes "not mirrored on screen" — true
+ * of a photo of the sky — instead of "not mirrored in projection space", which never is.
+ */
+export function fitPhotoToProj(photoPoints: Point[], projPoints: Point[]): AffineMatrix {
+  const m = fitPhotoAffine(
+    photoPoints,
+    projPoints.map((p) => ({ x: p.x, y: -p.y })),
+  );
+  return { a: m.a, b: -m.b, c: m.c, d: -m.d, e: m.e, f: -m.f };
+}
+
+/**
  * Build the parallel photo-pixel / projection-space point arrays for a photo's
  * correspondences, skipping any whose star can't be resolved. Projection-space
  * points are view-independent, so this is reused by callers that need a
@@ -223,7 +237,7 @@ export function computePhotoCenterAndScale(
   if (photoPoints.length < 2) return null;
 
   try {
-    const matrix = fitPhotoAffine(photoPoints, projPoints);
+    const matrix = fitPhotoToProj(photoPoints, projPoints);
     const projCorners = mapPhotoCorners(matrix, photo.width, photo.height);
 
     let minX = Infinity,
@@ -400,7 +414,7 @@ export function computePhotoToProjMatrix(photo: Photo): AffineMatrix | null {
   const { photoPoints, projPoints } = buildPhotoProjPoints(photo);
   if (photoPoints.length < 2) return null;
   try {
-    return fitPhotoAffine(photoPoints, projPoints);
+    return fitPhotoToProj(photoPoints, projPoints);
   } catch {
     return null;
   }

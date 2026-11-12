@@ -33,6 +33,7 @@ import {
   setHemisphere,
   setProjectionMode,
   setCenterMode,
+  unproject,
 } from '@myastrosky/core/projection';
 import type {
   Photo,
@@ -393,6 +394,25 @@ describe('manual placement math', () => {
     const p0 = project(10, 80);
     expect(m!.e).toBeCloseTo(p0.x, 6);
     expect(m!.f).toBeCloseTo(p0.y, 6);
+  });
+
+  it('computePhotoToProjMatrix places a two-star photo the right way round', () => {
+    // A photo of the sky is not mirrored on screen, so it is mirrored in projection space
+    // (whose y points up). Two stars cannot tell a mirror; the fit must still not turn the
+    // photo over the line through them, or objects off that line land on the wrong side.
+    const truth = { a: 0.001, b: 0.0004, c: 0.0004, d: -0.001, e: 0.3, f: 0.2 };
+    const at = (x: number, y: number) => ({
+      x: truth.a * x + truth.c * y + truth.e,
+      y: truth.b * x + truth.d * y + truth.f,
+    });
+    const starAt = (i: number, x: number, y: number) => {
+      const sky = unproject(at(x, y).x, at(x, y).y);
+      return corr(i, x, y, sky.ra, sky.dec);
+    };
+    const m = computePhotoToProjMatrix(makePhoto([starAt(0, 10, 10), starAt(1, 90, 15)]))!;
+    const off = { x: m.a * 50 + m.c * 70 + m.e, y: m.b * 50 + m.d * 70 + m.f };
+    expect(off.x).toBeCloseTo(at(50, 70).x, 9);
+    expect(off.y).toBeCloseTo(at(50, 70).y, 9);
   });
 
   it('computePhotoToProjMatrix returns null with fewer than 2 usable correspondences and no manual placement', () => {

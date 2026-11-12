@@ -273,6 +273,9 @@ describe('identifying the stars of a waiting photo', () => {
     ]);
     expect((correspondences as PhotoCorrespondence[])[0].starRa).toBeCloseTo(210.8, 1);
     expect(meta).toEqual({ dsoIds: ['M101'], displayName: 'M101' });
+    // Two stars: the photo is looked in the right way round, mirrored in the sky's projection as a photo of the sky is.
+    const { a: ma, b: mb, c: mc, d: md } = findDSOsInImage.mock.calls[0][0];
+    expect(ma * md - mb * mc).toBeLessThan(0);
     expect(pendingPhotos.value).toHaveLength(0);
     expect(skyPhotoFocus.value).toBe('p9');
     expect(replace).toHaveBeenCalledWith('/tabs/sky');
