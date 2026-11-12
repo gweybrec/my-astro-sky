@@ -4725,8 +4725,6 @@ details.targets-form-details[open] .targets-form-summary::before {
   display: none !important;
 }
 
-/* ─── DSO highlight overlay canvas (ui.ts) ─── */
-
 /* ─── DSO Coordinate Editor ─── */
 .dso-editor-modal {
   max-width: 420px;
