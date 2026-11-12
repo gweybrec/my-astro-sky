@@ -1,5 +1,6 @@
 import { storage } from '../platform/storage';
 import { TARGETS_PREFS_KEY } from '../observer-location';
+import { renameLegacyCatalogs } from '../display-settings';
 
 export type SortKey =
   | 'score'
@@ -47,7 +48,11 @@ export function loadTargetsPrefs(): TargetsPrefs {
     const raw = storage().get(TARGETS_PREFS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as TargetsPrefs;
-      if ('setupId' in parsed) return parsed;
+      if ('setupId' in parsed) {
+        if (parsed.enabledCatalogs)
+          parsed.enabledCatalogs = renameLegacyCatalogs(parsed.enabledCatalogs);
+        return parsed;
+      }
     }
     // Migrate from v2 (had telescopeId/cameraId/accessoryId) — copy non-gear fields
     const legacy = storage().get('targets-prefs-v2');
@@ -64,7 +69,7 @@ export function loadTargetsPrefs(): TargetsPrefs {
         horizonDirs: old.horizonDirs,
         enabledRatings: old.enabledRatings,
         enabledDifficulties: old.enabledDifficulties,
-        enabledCatalogs: old.enabledCatalogs,
+        enabledCatalogs: old.enabledCatalogs && renameLegacyCatalogs(old.enabledCatalogs),
         includeOversized: old.includeOversized,
         pageSize: old.pageSize,
       };

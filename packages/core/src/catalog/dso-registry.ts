@@ -5,6 +5,45 @@ import { fitPhotoSkyModel, type PhotoSkyModel } from '../photo-sky-model';
 const dsos: DSO[] = [];
 const dsoById = new Map<string, DSO>();
 
+/**
+ * Old id → current id, for objects renamed in the catalogue. Saved photos, plans and
+ * overrides may still hold the old id, so {@link getDSOById} resolves it; the old id is
+ * never shown. (These objects used to carry an invented "LPN-" prefix.)
+ */
+const LEGACY_DSO_IDS: Readonly<Record<string, string>> = {
+  'LPN-Sh2216': 'SH2-216',
+  'LPN-Outters4': 'Outters4',
+  'LPN-TK1': 'TK1',
+  'LPN-TK2': 'TK2',
+  'LPN-WeDe1': 'WeDe1',
+  'LPN-PuWe1': 'PuWe1',
+  'LPN-PFP1': 'PFP1',
+  'LPN-IsWe1': 'IsWe1',
+  'LPN-IsWe2': 'IsWe2',
+  'LPN-HFG1': 'HFG1',
+  'LPN-EGB1': 'EGB1',
+  'LPN-EGB6': 'EGB6',
+  'LPN-MWP1': 'MWP1',
+  'LPN-Jacoby1': 'Jacoby1',
+  'LPN-HDW3': 'HDW3',
+  'LPN-DeHt5': 'DeHt5',
+  'LPN-LoTr5': 'LoTr5',
+  'LPN-Ko2-2': 'Ko2-2',
+  'LPN-JnEr1': 'JnEr1',
+  'LPN-YM16': 'YM16',
+  'LPN-IPHASX205013': 'IPHASX205013',
+  'LPN-Jones1': 'Jones1',
+  'LPN-Abell7': 'Abell7',
+  'LPN-Abell24': 'Abell24',
+  'LPN-Abell28': 'Abell28',
+  'LPN-Abell29': 'Abell29',
+  'LPN-Abell31': 'Abell31',
+  'LPN-Abell35': 'Abell35',
+  'LPN-Abell36': 'Abell36',
+  'LPN-Abell45': 'Abell45',
+  'LPN-Abell74': 'Abell74',
+};
+
 // Language the display names were resolved for. Set by setDsoCatalog; the app reloads the
 // page on a language change, so it is fixed for the lifetime of a loaded catalog.
 let currentLang = 'fr';
@@ -127,8 +166,9 @@ export function replaceUserOverrides(overridesMap: Record<string, DSOUserOverrid
   // Apply new overrides
   userOverrides.clear();
   for (const [id, override] of Object.entries(overridesMap)) {
-    userOverrides.set(id, override);
     const dso = dsoById.get(id.toUpperCase());
+    // Keyed by the current id, so an override saved under an old id (LEGACY_DSO_IDS) is found
+    userOverrides.set(dso?.id ?? id, override);
     if (dso) applyUserOverrideToDso(dso, override, lang);
   }
 }
@@ -236,7 +276,7 @@ export function setDsoCatalog(
       // Catalog prefix is a pure function of the (immutable) id; precompute it once
       // here so the per-frame selection loop reads a field instead of re-running the
       // regex/startsWith chain for every DSO on every render.
-      catalog: getDSOCatalog(row[idxId]),
+      catalog: getDSOCatalogFamily(row[idxId]),
     };
     dsos.push(dso);
 
@@ -260,10 +300,17 @@ export function setDsoCatalog(
     }
   }
 
+  // Ids that older catalogue versions used, still held by saved photos, plans and overrides
+  for (const [oldId, id] of Object.entries(LEGACY_DSO_IDS)) {
+    const dso = dsoById.get(id.toUpperCase());
+    if (dso && !dsoById.has(oldId.toUpperCase())) dsoById.set(oldId.toUpperCase(), dso);
+  }
+
   // Apply any existing user overrides
   for (const [id, override] of Object.entries(overrides)) {
-    userOverrides.set(id, override);
     const dso = dsoById.get(id.toUpperCase());
+    // Keyed by the current id, so an override saved under an old id (LEGACY_DSO_IDS) is found
+    userOverrides.set(dso?.id ?? id, override);
     if (dso) applyUserOverrideToDso(dso, override, lang);
   }
 
@@ -321,13 +368,12 @@ function catalogSortKey(id: string): number {
   if (id.startsWith('LDN')) return 5;
   if (id.startsWith('vdB')) return 6;
   if (id.startsWith('Abell')) return 7;
-  if (id.startsWith('LPN')) return 8;
-  if (id.startsWith('Barnard')) return 9;
-  return 10;
+  if (id.startsWith('Barnard')) return 8;
+  return 9;
 }
 
 /**
- * Orders object ids by catalogue importance (Messier, NGC, IC, SH2, LBN, LDN, vdB, Abell, LPN, Barnard, then the
+ * Orders object ids by catalogue importance (Messier, NGC, IC, SH2, LBN, LDN, vdB, Abell, Barnard, then the
  * others), then by their number within a catalogue (M1 before M42), for the chips that list a photo's objects.
  */
 export function compareDsoIdsByImportance(a: string, b: string): number {
@@ -340,9 +386,12 @@ export function sortDsoIdsByImportance(ids: readonly string[]): string[] {
 }
 
 export type DSOCatalog =
-  'M' | 'NGC' | 'IC' | 'SH2' | 'LBN' | 'LDN' | 'vdB' | 'Abell' | 'LPN' | 'Barnard';
+  'M' | 'NGC' | 'IC' | 'SH2' | 'LBN' | 'LDN' | 'vdB' | 'Abell' | 'Barnard' | 'Other';
 
-/** Master catalog list — used by both the sky map toggles and the targets view. */
+/**
+ * Master catalog list — used by both the sky map toggles and the targets view. `Other` gathers
+ * every object whose primary id is in none of the named catalogues (WeDe 1, EGB 6…).
+ */
 export const DSO_CATALOGS_ALL: DSOCatalog[] = [
   'M',
   'NGC',
@@ -352,10 +401,11 @@ export const DSO_CATALOGS_ALL: DSOCatalog[] = [
   'LDN',
   'vdB',
   'Abell',
-  'LPN',
   'Barnard',
+  'Other',
 ];
 
+/** The named catalogue an id belongs to, or null for any other designation (an alias such as "PN G…" too). */
 export function getDSOCatalog(id: string): DSOCatalog | null {
   if (/^M\d/.test(id)) return 'M';
   if (id.startsWith('NGC')) return 'NGC';
@@ -365,9 +415,21 @@ export function getDSOCatalog(id: string): DSOCatalog | null {
   if (id.startsWith('LDN')) return 'LDN';
   if (id.startsWith('vdB')) return 'vdB';
   if (id.startsWith('Abell')) return 'Abell';
-  if (id.startsWith('LPN')) return 'LPN';
   if (id.startsWith('Barnard')) return 'Barnard';
   return null;
+}
+
+/** The catalogue family of a DSO's primary id: its named catalogue, else `Other`. */
+export function getDSOCatalogFamily(id: string): DSOCatalog {
+  return getDSOCatalog(id) ?? 'Other';
+}
+
+/**
+ * Whether a DSO is in no named catalogue (WeDe 1, Kohoutek 2-2…). Its id is then only a
+ * compact key, so the app shows its proper name (`displayName`) instead.
+ */
+export function isOtherCatalogDso(dso: Pick<DSO, 'id' | 'catalog'>): boolean {
+  return (dso.catalog ?? getDSOCatalogFamily(dso.id)) === 'Other';
 }
 
 export interface CatalogStat {
@@ -405,6 +467,7 @@ export function computeCatalogStats(
       const family = getDSOCatalog(alias);
       if (family !== null) families.add(family);
     }
+    if (families.size === 0) families.add('Other');
 
     const photographed = photographedIds.has(d.id);
     for (const family of families) {
@@ -497,12 +560,12 @@ function offsetPhotoPx(
  * existing priority order, e.g. M before NGC before IC) whose own catalog family is
  * enabled, so unchecking Messier still shows an M-object with an enabled NGC alias
  * under its NGC name rather than hiding it outright. Null when none of its catalogs
- * are enabled. A DSO with no recognized catalog at all (`dso.catalog` null — no id
- * in `dso.catalogs` matches any known prefix) is never filtered, same as
- * {@link findDSOsInImage}'s own predicate.
+ * are enabled. The primary id counts under the DSO's own family (`Other` for an
+ * object in no named catalogue), an alias only under a named catalogue.
  */
 function pickVisibleCatalogAlias(dso: DSO, catalogs: Set<string>): string | null {
-  if (!dso.catalog) return dso.id;
+  const primaryFamily = dso.catalog ?? getDSOCatalogFamily(dso.id);
+  if (catalogs.has(primaryFamily)) return dso.id;
   for (const id of dso.catalogs) {
     const cat = getDSOCatalog(id);
     if (cat && catalogs.has(cat)) return id;

@@ -60,6 +60,17 @@ describe('targets preferences', () => {
     expect(loadTargetsPrefs()).not.toHaveProperty('telescopeId');
   });
 
+  it('replaces the retired LPN catalogue by Other in a saved selection', () => {
+    saveTargetsPrefs({
+      setupId: null,
+      lat: null,
+      lon: null,
+      lastDateISO: null,
+      enabledCatalogs: ['M', 'LPN', 'Other'],
+    });
+    expect(loadTargetsPrefs().enabledCatalogs).toEqual(['M', 'Other']);
+  });
+
   it('falls back to defaults on a corrupt record', () => {
     const store = createMemoryStore();
     store.set('targets-prefs-v3', '{nope');

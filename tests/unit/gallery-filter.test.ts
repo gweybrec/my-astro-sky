@@ -89,6 +89,15 @@ describe('filterGalleryPhotos', () => {
     expect(filter(photos, { dsoCatalogs: ['M'] })).toEqual(['a', 'c']);
   });
 
+  it('puts an object in no named catalogue under Other, never a photo by its name alone', () => {
+    const withOther = [
+      ...photos,
+      makePhoto({ id: 'w', originalName: 'Faint PN', dsoIds: ['WeDe1'] }),
+    ];
+    expect(filter(withOther, { dsoCatalogs: ['Other'] })).toEqual(['w']);
+    expect(filter(withOther, { dsoCatalogs: ['M'] })).toEqual(['a', 'c']);
+  });
+
   it('filters dates: a single day, an inclusive range, a reversed range; undated photos drop out', () => {
     const dated = [
       makePhoto({ id: 'x', observationDate: '2024-03-14T21:05:00.000Z' }),

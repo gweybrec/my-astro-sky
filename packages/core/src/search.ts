@@ -1,6 +1,6 @@
 import type { Star, DSO, DSOSearchResult } from './types';
 import { getStars, getStarByHip } from './catalog/star-registry';
-import { getDSOs } from './catalog/dso-registry';
+import { getDSOs, isOtherCatalogDso } from './catalog/dso-registry';
 import { dsoQueryVariants } from './dso-query';
 import type { StarSearchResult } from './domain/stars';
 import { searchStarsRemote } from './platform/star-search';
@@ -154,12 +154,11 @@ export function getDSOTypeName(type: string): string {
 
 function dsoLabel(dso: DSO): string {
   const typeName = getDSOTypeName(dso.type);
-  // Drop internal "LPN-xxx" ids from cross refs (consistent with the tooltip/info panel)
-  const crossRefList = dso.catalogs.slice(1).filter((c) => !c.startsWith('LPN-'));
+  const crossRefList = dso.catalogs.slice(1);
   const crossRefs = crossRefList.length ? ` (${crossRefList.join(' · ')})` : '';
-  if (dso.id.startsWith('LPN-')) {
-    // For LPN objects, show displayName or stripped id (no "LPN-xxx" prefix in label)
-    const name = dso.displayName || dso.id.replace(/^LPN-/, '');
+  if (isOtherCatalogDso(dso)) {
+    // In no named catalogue: the id is only a compact key, show the proper name
+    const name = dso.displayName || dso.id;
     return `${name}${crossRefs || ` (${typeName})`}`;
   }
   if (dso.displayName) {

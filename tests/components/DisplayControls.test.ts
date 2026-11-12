@@ -271,7 +271,7 @@ const mockSetVisibleDSOCatalogs = vi.hoisted(() => vi.fn());
 const mockSetShowDSOs2 = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/dso-catalog', () => ({
-  DSO_CATALOGS_ALL: ['M', 'NGC', 'IC', 'SH2', 'LBN', 'LDN', 'vdB', 'Abell', 'LPN'],
+  DSO_CATALOGS_ALL: ['M', 'NGC', 'IC', 'SH2', 'LBN', 'LDN', 'vdB', 'Abell', 'Other'],
   findDSOsInImage: vi.fn(),
   getDSOById: vi.fn(),
   reloadUserOverrides: vi.fn(),

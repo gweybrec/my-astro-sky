@@ -8,7 +8,10 @@ vi.mock('@myastrosky/core/catalog/star-registry', () => ({
   getStarByHip: vi.fn(),
 }));
 
-vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
+vi.mock('@myastrosky/core/catalog/dso-registry', async (importOriginal) => ({
+  isOtherCatalogDso: (
+    await importOriginal<typeof import('@myastrosky/core/catalog/dso-registry')>()
+  ).isOtherCatalogDso,
   getDSOs: vi.fn(),
 }));
 
@@ -421,7 +424,7 @@ describe('searchDSOs()', () => {
 
   it('does not repeat id and name when the name is just the spaced-out id', () => {
     // Regression: id "Abell24" + displayName "Abell 24" produced the redundant
-    // label "Abell24 – Abell 24". Internal LPN- ids are also dropped from refs.
+    // label "Abell24 – Abell 24".
     const abell24: DSO = {
       id: 'Abell24',
       ra: 112.3,
@@ -432,7 +435,7 @@ describe('searchDSOs()', () => {
       pa: 0,
       mag: null,
       displayName: 'Abell 24',
-      catalogs: ['Abell24', 'LPN-Abell24', 'PN G217.1+14.7'],
+      catalogs: ['Abell24', 'PN G217.1+14.7'],
       emissionLines: null,
       constellation: 'CMi',
       rating: 1,
@@ -443,9 +446,25 @@ describe('searchDSOs()', () => {
     expect(result.label).toBe('Abell 24 (PN G217.1+14.7)');
   });
 
-  it('formats LPN labels by stripping prefix when displayName is missing', () => {
-    const lpn: DSO = {
-      id: 'LPN-123',
+  it('labels an object in no named catalogue by its proper name, else its id', () => {
+    const named: DSO = {
+      id: 'WeDe1',
+      ra: 89.85,
+      dec: 10.69,
+      type: 'PN',
+      majAxis: 22,
+      minAxis: 17,
+      pa: 0,
+      mag: null,
+      displayName: 'WeDe 1',
+      catalogs: ['WeDe1', 'PN G197.4-06.4'],
+      emissionLines: null,
+      constellation: 'Ori',
+      rating: 3,
+      difficulty: 2,
+    };
+    const unnamed: DSO = {
+      id: 'Xyz123',
       ra: 12,
       dec: -3,
       type: 'PN',
@@ -454,15 +473,16 @@ describe('searchDSOs()', () => {
       pa: 0,
       mag: null,
       displayName: null,
-      catalogs: ['LPN-123'],
+      catalogs: ['Xyz123'],
       emissionLines: null,
       constellation: 'Ori',
       rating: 1,
       difficulty: 5,
     };
-    mockGetDSOs.mockReturnValueOnce([...TEST_DSOS, lpn]);
-    const result = searchDSOs('LPN-123')[0];
-    expect(result.label).toBe('123 (dso.types.PN)');
+    mockGetDSOs.mockReturnValue([...TEST_DSOS, named, unnamed]);
+    expect(searchDSOs('WeDe1')[0].label).toBe('WeDe 1 (PN G197.4-06.4)');
+    expect(searchDSOs('Xyz123')[0].label).toBe('Xyz123 (dso.types.PN)');
+    mockGetDSOs.mockReturnValue(TEST_DSOS);
   });
 });
 

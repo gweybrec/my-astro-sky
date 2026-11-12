@@ -44,19 +44,19 @@ node scripts/add-constellations.mjs
 | **SH2-171 … SH2-220**         | Systematic drift (3–15°) in the Perseus/Cassiopeia SH2 region                    | Included in the 96-object batch fix                                                                                                  |
 | **SH2-238, SH2-239, SH2-245** | Large drifts (26–41°) in the Taurus/Orion fringe                                 | Included in batch fix                                                                                                                |
 | **IC443**                     | Missing name                                                                     | Added: nameEn "Jellyfish Nebula", nameFr "Nébuleuse de la Méduse"                                                                    |
-| **LPN-Abell*** (PNe)          | SIMBAD resolves "Abell N" to galaxy clusters (ACO N); script now uses "PN A66 N" | Coordinates verified correct via PN G identifiers                                                                                    |
+| **Abell*** (PNe)              | SIMBAD resolves "Abell N" to galaxy clusters (ACO N); script now uses "PN A66 N" | Coordinates verified correct via PN G identifiers                                                                                    |
 
 ### SIMBAD identifier normalisation (for the validation script)
 
-| Our format    | SIMBAD query format                        |
-| ------------- | ------------------------------------------ |
-| `SH2-240`     | `Sh2-240` (hyphen, not space)              |
-| `LBN873`      | `LBN 873`                                  |
-| `NGC7009`     | `NGC 7009`                                 |
-| `IC1805`      | `IC 1805`                                  |
-| `M31`         | `M 31`                                     |
-| `LPN-Abell36` | `PN A66 36` (avoids galaxy cluster ACO 36) |
-| `vdB107`      | `vdB 107`                                  |
+| Our format | SIMBAD query format                        |
+| ---------- | ------------------------------------------ |
+| `SH2-240`  | `Sh2-240` (hyphen, not space)              |
+| `LBN873`   | `LBN 873`                                  |
+| `NGC7009`  | `NGC 7009`                                 |
+| `IC1805`   | `IC 1805`                                  |
+| `M31`      | `M 31`                                     |
+| `Abell36`  | `PN A66 36` (avoids galaxy cluster ACO 36) |
+| `vdB107`   | `vdB 107`                                  |
 
 ### Rules when adding new catalog objects
 

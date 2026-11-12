@@ -1,5 +1,5 @@
 import type { DSO } from '../types';
-import { getDSOCatalog } from '../catalog/dso-registry';
+import { getDSOCatalogFamily } from '../catalog/dso-registry';
 
 /** Every object type the recommendation can propose, in the order of the type filter. */
 export const ALL_DSO_TYPES = [
@@ -32,8 +32,7 @@ export function filterTargetDSOs(dsos: DSO[], opts: DSOFilterOptions): DSO[] {
     if (!opts.enabledTypes.has(d.type as string)) return false;
     if (d.rating !== null && !opts.enabledRatings.has(d.rating)) return false;
     if (d.difficulty !== null && !opts.enabledDifficulties.has(d.difficulty)) return false;
-    const cat = getDSOCatalog(d.id);
-    if (cat !== null && !opts.enabledCatalogs.has(cat)) return false;
+    if (!opts.enabledCatalogs.has(d.catalog ?? getDSOCatalogFamily(d.id))) return false;
     if (opts.photographedIds !== null && opts.photographedIds.has(d.id)) return false;
     if (
       opts.enabledConstellations !== null &&

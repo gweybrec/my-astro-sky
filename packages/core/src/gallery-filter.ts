@@ -1,5 +1,5 @@
 import type { Photo, PoiCategory } from './types';
-import { getDSOById } from './catalog/dso-registry';
+import { getDSOById, getDSOCatalog } from './catalog/dso-registry';
 import { poisMatchFilter } from './poi';
 import { NO_LABEL } from './photo-placement';
 import { smartSortPhotos, type SortablePhoto } from './photo-search';
@@ -51,6 +51,13 @@ export function gallerySetupKey(photo: Photo, knownSetupIds: ReadonlySet<string>
 }
 
 /** True when an id or a file name belongs to one of the catalogues (prefix followed by a digit, space or dash). */
+/** An object of the photo in no named catalogue (WeDe 1…), when 'Other' is selected. */
+function isOtherCatalogObject(id: string, catalogs: string[]): boolean {
+  if (!catalogs.includes('Other')) return false;
+  const dso = getDSOById(id);
+  return dso ? dso.catalog === 'Other' : getDSOCatalog(id) === null;
+}
+
 function matchesCatalog(name: string, catalogs: string[]): boolean {
   const upper = name.toUpperCase();
   return catalogs.some((cat) => {
@@ -121,7 +128,7 @@ export function filterGalleryPhotos(
     const sel = filters.dsoCatalogs;
     filtered = filtered.filter((photo) =>
       photo.dsoIds.length > 0
-        ? photo.dsoIds.some((id) => matchesCatalog(id, sel))
+        ? photo.dsoIds.some((id) => matchesCatalog(id, sel) || isOtherCatalogObject(id, sel))
         : matchesCatalog(photo.originalName, sel),
     );
   }

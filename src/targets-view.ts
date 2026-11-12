@@ -1746,7 +1746,8 @@ export class TargetsView {
     catFilters.className = 'targets-type-filters';
     const enabledCatSet = new Set(this.prefs.enabledCatalogs ?? [...DSO_CATALOGS_ALL]);
     for (const cat of DSO_CATALOGS_ALL) {
-      const chip = createTargetsChip(cat);
+      // Catalogue codes (M, NGC…) are shown as-is; Other is a word, so translated
+      const chip = createTargetsChip(cat === 'Other' ? t('dso.catalogLabels.Other') : cat);
       const cb = chip.querySelector('input')!;
       cb.checked = enabledCatSet.has(cat);
       cb.addEventListener('change', () => {

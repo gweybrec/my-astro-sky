@@ -110,7 +110,7 @@ const en: Translations = {
       LDN: "Lynds' Dark Nebulae",
       vdB: 'van den Bergh',
       Abell: 'Abell Planetary Nebulae',
-      LPN: 'Large planetary nebulae',
+      Other: 'Other',
       Barnard: "Barnard's Dark Nebulae",
     },
     typeLabels: {

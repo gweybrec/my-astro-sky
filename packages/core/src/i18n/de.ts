@@ -110,7 +110,7 @@ const de: Translations = {
       LDN: 'Lynds (dunkle Nebel)',
       vdB: 'van den Bergh',
       Abell: 'Abell (Planetarische Nebel)',
-      LPN: 'Große Planetarische Nebel',
+      Other: 'Andere',
       Barnard: 'Barnard (Dunkelnebel)',
     },
     typeLabels: {

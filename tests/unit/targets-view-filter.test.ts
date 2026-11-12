@@ -26,7 +26,7 @@ const baseOpts: DSOFilterOptions = {
   enabledTypes: new Set(['EN', 'Gx', 'OC', 'GC', 'RN', 'PN', 'SNR', 'DN', 'GxS', 'GxE', 'GxI']),
   enabledRatings: new Set([1, 2, 3, 4, 5]),
   enabledDifficulties: new Set([1, 2, 3, 4, 5]),
-  enabledCatalogs: new Set(['M', 'NGC', 'IC', 'SH2', 'LBN', 'LDN', 'vdB', 'Abell', 'LPN']),
+  enabledCatalogs: new Set(['M', 'NGC', 'IC', 'SH2', 'LBN', 'LDN', 'vdB', 'Abell', 'Other']),
   photographedIds: null,
   enabledConstellations: null,
 };
@@ -310,5 +310,15 @@ describe('filterTargetDSOs — M13/M10/M12 catalog and type filters', () => {
     };
     const result = filterTargetDSOs([m13, m10], opts);
     expect(result.map((d) => d.id)).toEqual(['M13']);
+  });
+});
+
+describe('filterTargetDSOs — catalogue families', () => {
+  it('keeps an object in no named catalogue only while Other is enabled', () => {
+    const dsos = [makeDSO({ id: 'WeDe1' }), makeDSO({ id: 'NGC7000' })];
+    expect(filterTargetDSOs(dsos, baseOpts).map((d) => d.id)).toEqual(['WeDe1', 'NGC7000']);
+    const noOther = new Set([...baseOpts.enabledCatalogs].filter((c) => c !== 'Other'));
+    const result = filterTargetDSOs(dsos, { ...baseOpts, enabledCatalogs: noOther });
+    expect(result.map((d) => d.id)).toEqual(['NGC7000']);
   });
 });

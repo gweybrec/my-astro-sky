@@ -267,16 +267,15 @@ console.log(`Added ${xxxAdded} standalone XXX entries`);
 ### 3d. Priority — update `catalogSortKey()` in `src/dso-catalog.ts`
 
 When an object has several catalog ids, the displayed primary is chosen by `catalogSortKey()` (lower number = higher priority). Current order:
-`M(0) > NGC(1) > IC(2) > SH2(3) > LBN(4) > LDN(5) > vdB(6) > Abell(7) > LPN(8) > Barnard(9) > default(10)`
+`M(0) > NGC(1) > IC(2) > SH2(3) > LBN(4) > LDN(5) > vdB(6) > Abell(7) > Barnard(8) > default(9)`
 
 Add your prefix and bump the trailing `return` default:
 
 ```typescript
 if (id.startsWith('Abell')) return 7;
-if (id.startsWith('LPN')) return 8;
-if (id.startsWith('Barnard')) return 9;
-if (id.startsWith('XXX')) return 10; // ← new
-return 11; // ← bump default
+if (id.startsWith('Barnard')) return 8;
+if (id.startsWith('XXX')) return 9; // ← new
+return 10; // ← bump default
 ```
 
 Where to slot the new catalog matters: a catalog that only ever appears as an _alias_ on a brighter object (Barnard on IC434) belongs **last** so the bright id stays primary. But if your catalog is the _more canonical_ designation for an object it shares with a lower-priority catalog (e.g. Barnard vs LDN for the same dark nebula — "Barnard 72 / Snake Nebula" should win over "LDN 66"), give it a _higher_ priority than that catalog so the famous name is shown. Decide deliberately.
@@ -323,7 +322,7 @@ All three live in this file. Add `'XXX'` to the type union and the master list, 
 
 ```typescript
 export type DSOCatalog =
-  'M' | 'NGC' | 'IC' | 'SH2' | 'LBN' | 'LDN' | 'vdB' | 'Abell' | 'LPN' | 'Barnard' | 'XXX';
+  'M' | 'NGC' | 'IC' | 'SH2' | 'LBN' | 'LDN' | 'vdB' | 'Abell' | 'Barnard' | 'XXX' | 'Other';
 
 export const DSO_CATALOGS_ALL: DSOCatalog[] = [
   'M',
@@ -334,9 +333,9 @@ export const DSO_CATALOGS_ALL: DSOCatalog[] = [
   'LDN',
   'vdB',
   'Abell',
-  'LPN',
   'Barnard',
   'XXX',
+  'Other', // always last: objects in no named catalogue
 ];
 
 export function getDSOCatalog(id: string): DSOCatalog | null {
@@ -354,7 +353,7 @@ export function getDSOCatalog(id: string): DSOCatalog | null {
 
 ## Step 6 — Default-on set (`src/display-settings.ts`)
 
-`DSO_CATALOGS_DEFAULT_ON` controls which catalogs are checked at startup. **New catalogs are off by default** (LBN, LDN, vdB, Abell, LPN, Barnard all are) — usually leave this file untouched:
+`DSO_CATALOGS_DEFAULT_ON` controls which catalogs are checked at startup. **New catalogs are off by default** (LBN, LDN, vdB, Abell, Barnard, Other all are) — usually leave this file untouched:
 
 ```typescript
 export const DSO_CATALOGS_DEFAULT_ON = new Set(['M', 'NGC', 'IC', 'SH2']);
@@ -371,8 +370,8 @@ Find the label line (search for `replace('LBN'`) and add an **anchored** spacing
 ```typescript
 const label = isMess
   ? dso.id
-  : dso.id.startsWith('LPN-')
-    ? dso.displayName || dso.id.replace(/^LPN-/, '')
+  : isOtherCatalogDso(dso)
+    ? dso.displayName || dso.id
     : dso.id
         .replace('NGC', 'NGC ')
         .replace(/^IC(\d)/, 'IC $1')
@@ -483,9 +482,13 @@ OpenNGC's SH2 coordinates are **wrong for ~96 out of 259 objects** (errors of 2�
 - SIMBAD treats every Barnard dark nebula as a **distinct object** from the bright IC/NGC nebula it is silhouetted against (no NGC/IC cross-ID for any Barnard object), but **does** equate many Barnard objects with **LDN** entries (e.g. B86=LDN93, B92=LDN323). So Barnard↔IC/NGC merges are a deliberate de-duplication choice; Barnard↔LDN would be true identity (not yet merged).
 - Source `VII/220A` provides J2000 directly (bytes 23–44); ids use the spelled-out `Barnard` prefix. A few ids carry a letter suffix (`67a`, `83a`, `117a`).
 
-### Abell planetary nebulae (LPN-AbellN)
+### Abell planetary nebulae (AbellN)
 
-SIMBAD resolves plain "Abell N" to **galaxy clusters** (ACO N), not planetary nebulae. Always use the PN G identifier (stored in the `catalogs` array, e.g. `PN G318.4+41.4`) to verify in SIMBAD. The validation script already handles this (`PN A66 N` query format). All LPN-Abell* coordinates have been verified correct.
+SIMBAD resolves plain "Abell N" to **galaxy clusters** (ACO N), not planetary nebulae. Always use the PN G identifier (stored in the `catalogs` array, e.g. `PN G318.4+41.4`) to verify in SIMBAD. The validation script already handles this (`PN A66 N` query format). All Abell PN coordinates have been verified correct.
+
+### No invented catalogue prefixes
+
+An object from an observing list or a small catalogue the app does not list (WeDe 1, EGB 6, Kohoutek 2-2) keeps its own designation as id (`WeDe1`, `EGB6`, `Ko2-2`) and its proper name in `names`; it falls in the `Other` family automatically. Never give such objects a made-up prefix: the old `LPN-` ids survive only as lookups in `LEGACY_DSO_IDS` (`packages/core/src/catalog/dso-registry.ts`) for saved photos.
 
 ### Naming confusions already fixed
 

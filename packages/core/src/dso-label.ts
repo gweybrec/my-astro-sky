@@ -4,6 +4,7 @@
  * culling loop + `ctx.fillText`.
  */
 import type { DSO, ViewState } from './types';
+import { isOtherCatalogDso } from './catalog/dso-registry';
 
 /** Messier objects are `M<n>` (not `M0…`, which are other catalogs' ids). */
 export function isMessier(id: string): boolean {
@@ -12,14 +13,14 @@ export function isMessier(id: string): boolean {
 
 /**
  * Human-readable label for any catalog id belonging to `dso` — its primary id or one
- * of its aliases (`dso.catalogs`). Messier shown as-is, LPN objects use their proper
- * name (`dso.displayName`, since an LPN alias has no readable form of its own),
- * and other catalogs get a space inserted after the prefix (NGC/IC/LBN/LDN/Sh2/vdB/
- * Abell/Barnard). Mirrors the original inline `replace` chain exactly.
+ * of its aliases (`dso.catalogs`). Messier shown as-is; an object in no named catalogue
+ * (`Other`: WeDe1, Ko2-2…) shows its proper name (`dso.displayName`: "WeDe 1",
+ * "Kohoutek 2-2"); other catalogs get a space inserted after the prefix
+ * (NGC/IC/LBN/LDN/Sh2/vdB/Abell/Barnard). Mirrors the original inline `replace` chain exactly.
  */
 export function formatCatalogId(id: string, dso: DSO): string {
   if (isMessier(id)) return id;
-  if (id.startsWith('LPN-')) return dso.displayName || id.replace(/^LPN-/, '');
+  if (id === dso.id && isOtherCatalogDso(dso)) return dso.displayName || id;
   return id
     .replace('NGC', 'NGC ')
     .replace(/^IC(\d)/, 'IC $1')

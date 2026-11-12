@@ -7,6 +7,7 @@ import { reportError } from '@myastrosky/core/platform/error-hook';
 import { searchUnified, type UnifiedSearchResult } from '@myastrosky/core/search';
 import { buildPhotoQueryMatches, smartSortPhotos } from '@myastrosky/core/photo-search';
 import type { Photo } from '@myastrosky/core/types';
+import { isOtherCatalogDso } from '@myastrosky/core/catalog/dso-registry';
 import { getPhotos } from '@myastrosky/app-state/api';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { catalogsReady } from '../catalogs';
@@ -96,9 +97,10 @@ onBeforeUnmount(() => clearTimeout(debounce));
 function designation(result: UnifiedSearchResult): string | undefined {
   const { dso, star } = result;
   if (dso) {
-    const others = dso.catalogs.slice(1).filter((c) => !c.startsWith('LPN-'));
+    const others = dso.catalogs.slice(1);
     const cross = others.length ? ` (${others.join(' · ')})` : '';
-    return dso.displayName
+    // In no named catalogue, the id is only a compact key: the name is the designation
+    return dso.displayName && !isOtherCatalogDso(dso)
       ? `${dso.id}${cross}`
       : cross.trim().replace(/^\(|\)$/g, '') || undefined;
   }

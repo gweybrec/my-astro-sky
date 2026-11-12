@@ -109,7 +109,7 @@ const fr = {
       LDN: 'Lynds (nébuleuses sombres)',
       vdB: 'van den Bergh',
       Abell: 'Abell (nébuleuses planétaires)',
-      LPN: 'Nébuleuses planétaires larges',
+      Other: 'Autres',
       Barnard: 'Barnard (nébuleuses sombres)',
     },
     typeLabels: {

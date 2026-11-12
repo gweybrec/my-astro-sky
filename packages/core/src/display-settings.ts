@@ -96,6 +96,15 @@ export function normalizeRotationDeg(deg: number): number {
   return normalized;
 }
 
+/**
+ * A saved catalogue selection with the retired 'LPN' family replaced by 'Other', which now
+ * holds those objects (they were never a real catalogue).
+ */
+export function renameLegacyCatalogs(catalogs: string[]): string[] {
+  if (!catalogs.includes('LPN')) return catalogs;
+  return [...new Set(catalogs.map((c) => (c === 'LPN' ? 'Other' : c)))];
+}
+
 export function loadSettings(): DisplaySettings {
   try {
     const raw = storage().get(SETTINGS_KEY);
@@ -125,6 +134,8 @@ export function loadSettings(): DisplaySettings {
         const i = settings.dsoTypes.indexOf('Gx');
         settings.dsoTypes.splice(i, 0, 'GxS', 'GxE', 'GxI');
       }
+      // Migration: the former 'LPN' family is now part of 'Other'
+      settings.dsoCatalogs = renameLegacyCatalogs(settings.dsoCatalogs);
       settings.mapRotationDeg = normalizeRotationDeg(Number(settings.mapRotationDeg) || 0);
       return pinAutoStarBudget(settings);
     }

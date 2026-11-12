@@ -110,7 +110,7 @@ const es: Translations = {
       LDN: 'Lynds (nebulosas oscuras)',
       vdB: 'van den Bergh',
       Abell: 'Abell (nebulosas planetarias)',
-      LPN: 'Nebulosas planetarias grandes',
+      Other: 'Otros',
       Barnard: 'Barnard (nebulosas oscuras)',
     },
     typeLabels: {

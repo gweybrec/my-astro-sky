@@ -94,15 +94,11 @@ function toSimbadId(id) {
   if (/^IC\d/.test(id)) return 'IC ' + id.slice(2);
   // M31      → M 31
   if (/^M\d/.test(id)) return 'M ' + id.slice(1);
-  // LPN-Abell36 → PN A66 36  (avoids hitting galaxy clusters ACO N)
-  if (/^LPN-Abell(\d+)$/.test(id)) return 'PN A66 ' + id.slice(9);
-  // LPN-Sh2216  → Sh2-216
-  if (/^LPN-Sh2(\d+)$/.test(id)) return 'Sh2-' + id.slice(7);
-  // LPN-XXX — strip prefix and insert space before trailing number
-  if (/^LPN-/.test(id)) {
-    const name = id.slice(4);
-    // Insert space before trailing digits: "WeDe1" → "WeDe 1", "HFG1" → "HFG 1"
-    return name.replace(/([A-Za-z])(\d+)$/, '$1 $2').replace(/-/g, ' ');
+  // Abell36 → PN A66 36  (avoids hitting galaxy clusters ACO N)
+  if (/^Abell\d+$/.test(id)) return 'PN A66 ' + id.slice(5);
+  // Objects in no named catalogue: space before the trailing number ("WeDe1" → "WeDe 1")
+  if (/^[A-Za-z]+\d+(-\d+)?$/.test(id)) {
+    return id.replace(/([A-Za-z])(\d+)$/, '$1 $2').replace(/-/g, ' ');
   }
   return id;
 }

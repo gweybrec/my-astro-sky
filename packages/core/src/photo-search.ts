@@ -51,7 +51,7 @@ export function buildPhotoQueryMatches(photos: Photo[], query: string): PhotoQue
 /** Catalogue prefixes as written in file names, in {@link DSO_CATALOGS_ALL}'s order of importance; built on first use. */
 let catalogPrefixes: [DSOCatalog, RegExp][] | null = null;
 function getCatalogPrefixes(): [DSOCatalog, RegExp][] {
-  catalogPrefixes ??= DSO_CATALOGS_ALL.map((cat) => [
+  catalogPrefixes ??= DSO_CATALOGS_ALL.filter((cat) => cat !== 'Other').map((cat) => [
     cat,
     // "SH2-101", "Sh2 101", "sh2_101"; the others: "M31", "NGC 7000", "vdB-142"…
     new RegExp(String.raw`^${cat === 'SH2' ? String.raw`sh\s*2` : cat}[\s_-]*(\d+)`, 'i'),
@@ -123,7 +123,7 @@ const naturalCompare = (a: string, b: string) =>
 
 /**
  * Natural order of photo names: catalogue names first, the most important catalogue first (Messier, NGC, IC, SH2,
- * LBN, LDN, vdB, Abell, LPN, Barnard, then other catalogues alphabetically), numbers in numeric order within a
+ * LBN, LDN, vdB, Abell, Barnard, then other catalogues alphabetically), numbers in numeric order within a
  * catalogue (M4 before M10 before M100). A photo whose name holds no catalogue number takes the place of its most
  * important solved object. The other photos come last, in natural text order of their names.
  */

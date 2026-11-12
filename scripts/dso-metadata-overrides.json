@@ -9673,11 +9673,11 @@
     "catalogs": ["NGC7513"]
   },
   {
-    "id": "LPN-Abell36",
+    "id": "Abell36",
     "constellation": "Vir",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-Abell36", "PN G318.4+41.4"]
+    "catalogs": ["PN G318.4+41.4"]
   },
   {
     "id": "NGC1461",
@@ -10829,11 +10829,11 @@
     "catalogs": ["NGC7044"]
   },
   {
-    "id": "LPN-Abell31",
+    "id": "Abell31",
     "constellation": "Cnc",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-Abell31", "PN G219.1+31.2"]
+    "catalogs": ["PN G219.1+31.2"]
   },
   {
     "id": "NGC3599",
@@ -18773,11 +18773,11 @@
     "catalogs": ["NGC7578"]
   },
   {
-    "id": "LPN-Abell7",
+    "id": "Abell7",
     "constellation": "Lep",
     "rating": 2,
     "difficulty": 4,
-    "catalogs": ["LPN-Abell7", "PN G215.5-30.8"]
+    "catalogs": ["PN G215.5-30.8"]
   },
   {
     "id": "IC5262",
@@ -19353,11 +19353,11 @@
     "catalogs": ["NGC7139"]
   },
   {
-    "id": "LPN-Abell35",
+    "id": "Abell35",
     "constellation": "Hya",
     "rating": 3,
     "difficulty": 2,
-    "catalogs": ["LPN-Abell35", "PN G303.6+40.0"]
+    "catalogs": ["PN G303.6+40.0"]
   },
   {
     "id": "IC2421",
@@ -23710,11 +23710,11 @@
     "type": "GxE"
   },
   {
-    "id": "LPN-Abell29",
+    "id": "Abell29",
     "constellation": "Pyx",
     "rating": 3,
     "difficulty": 3,
-    "catalogs": ["LPN-Abell29", "PN G244.5+12.5"]
+    "catalogs": ["PN G244.5+12.5"]
   },
   {
     "id": "NGC4883",
@@ -25577,11 +25577,11 @@
     "type": "GxS"
   },
   {
-    "id": "LPN-Abell74",
+    "id": "Abell74",
     "constellation": "Vul",
     "rating": 3,
     "difficulty": 2,
-    "catalogs": ["LPN-Abell74", "PN G072.7-17.1"]
+    "catalogs": ["PN G072.7-17.1"]
   },
   {
     "id": "IC1365",
@@ -96233,182 +96233,182 @@
     "catalogs": ["vdB84"]
   },
   {
-    "id": "LPN-Sh2216",
+    "id": "SH2-216",
     "constellation": "Per",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-Sh2216", "SH2-216", "PN G158.6+00.7"],
+    "catalogs": ["SH2-216", "PN G158.6+00.7"],
     "names": {
       "fr": "Nébuleuse SH2-216"
     }
   },
   {
-    "id": "LPN-Outters4",
+    "id": "Outters4",
     "constellation": "Cep",
     "rating": 3,
     "difficulty": 2,
-    "catalogs": ["LPN-Outters4"]
+    "catalogs": ["Outters4"]
   },
   {
-    "id": "LPN-TK2",
+    "id": "TK2",
     "constellation": "Dra",
     "rating": 3,
     "difficulty": 2,
-    "catalogs": ["LPN-TK2", "RE 1738+665", "PN G096.8+31.9"]
+    "catalogs": ["TK2", "RE 1738+665", "PN G096.8+31.9"]
   },
   {
-    "id": "LPN-TK1",
+    "id": "TK1",
     "constellation": "Cnc",
     "rating": 3,
     "difficulty": 2,
-    "catalogs": ["LPN-TK1", "TON 320", "PN G191.4+33.0"]
+    "catalogs": ["TK1", "TON 320", "PN G191.4+33.0"]
   },
   {
-    "id": "LPN-WeDe1",
+    "id": "WeDe1",
     "constellation": "Ori",
     "rating": 3,
     "difficulty": 2,
-    "catalogs": ["LPN-WeDe1", "WDHS 1", "PN G197.4-06.4"]
+    "catalogs": ["WeDe1", "WDHS 1", "PN G197.4-06.4"]
   },
   {
-    "id": "LPN-PuWe1",
+    "id": "PuWe1",
     "constellation": "Lyn",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-PuWe1", "PN G158.9+17.8"]
+    "catalogs": ["PuWe1", "PN G158.9+17.8"]
   },
   {
-    "id": "LPN-PFP1",
+    "id": "PFP1",
     "constellation": "Mon",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-PFP1", "PN G222.1+03.9"]
+    "catalogs": ["PFP1", "PN G222.1+03.9"]
   },
   {
-    "id": "LPN-IsWe2",
+    "id": "IsWe2",
     "constellation": "Cep",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-IsWe2", "PN G107.7+07.8"]
+    "catalogs": ["IsWe2", "PN G107.7+07.8"]
   },
   {
-    "id": "LPN-HFG1",
+    "id": "HFG1",
     "constellation": "Cas",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-HFG1", "PN G136.3+05.5"]
+    "catalogs": ["HFG1", "PN G136.3+05.5"]
   },
   {
-    "id": "LPN-IsWe1",
+    "id": "IsWe1",
     "constellation": "Per",
     "rating": 3,
     "difficulty": 2,
-    "catalogs": ["LPN-IsWe1", "PN G149.7-03.3"]
+    "catalogs": ["IsWe1", "PN G149.7-03.3"]
   },
   {
-    "id": "LPN-EGB6",
+    "id": "EGB6",
     "constellation": "Leo",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-EGB6", "PN G221.5+46.3"]
+    "catalogs": ["EGB6", "PN G221.5+46.3"]
   },
   {
-    "id": "LPN-MWP1",
+    "id": "MWP1",
     "constellation": "Cyg",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-MWP1", "PN G080.3-10.4"]
+    "catalogs": ["MWP1", "PN G080.3-10.4"]
   },
   {
-    "id": "LPN-Jacoby1",
+    "id": "Jacoby1",
     "constellation": "Boo",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-Jacoby1", "PK 085+52.1"]
+    "catalogs": ["Jacoby1", "PK 085+52.1"]
   },
   {
-    "id": "LPN-HDW3",
+    "id": "HDW3",
     "constellation": "Per",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-HDW3", "HW 4", "PN G149.4-09.2"]
+    "catalogs": ["HDW3", "HW 4", "PN G149.4-09.2"]
   },
   {
-    "id": "LPN-DeHt5",
+    "id": "DeHt5",
     "constellation": "Cep",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-DeHt5", "DHW 5", "PN G111.0+11.6"]
+    "catalogs": ["DeHt5", "DHW 5", "PN G111.0+11.6"]
   },
   {
-    "id": "LPN-LoTr5",
+    "id": "LoTr5",
     "constellation": "Com",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-LoTr5", "PN G339.9+88.4"]
+    "catalogs": ["LoTr5", "PN G339.9+88.4"]
   },
   {
-    "id": "LPN-Ko2-2",
+    "id": "Ko2-2",
     "constellation": "Mon",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-Ko2-2", "PN G204.1+04.7"]
+    "catalogs": ["Ko2-2", "PN G204.1+04.7"]
   },
   {
-    "id": "LPN-JnEr1",
+    "id": "JnEr1",
     "constellation": "Lyn",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-JnEr1", "VV 47", "PN G164.8+31.1"]
+    "catalogs": ["JnEr1", "VV 47", "PN G164.8+31.1"]
   },
   {
-    "id": "LPN-YM16",
+    "id": "YM16",
     "constellation": "Ser",
     "rating": 3,
     "difficulty": 2,
-    "catalogs": ["LPN-YM16", "PN G038.7+01.9"]
+    "catalogs": ["YM16", "PN G038.7+01.9"]
   },
   {
-    "id": "LPN-IPHASX205013",
+    "id": "IPHASX205013",
     "constellation": "Cyg",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-IPHASX205013", "IPHASX J205013.7+465518"]
+    "catalogs": ["IPHASX205013", "IPHASX J205013.7+465518"]
   },
   {
-    "id": "LPN-Abell24",
+    "id": "Abell24",
     "constellation": "CMi",
     "rating": 3,
     "difficulty": 2,
-    "catalogs": ["LPN-Abell24", "PN G217.1+14.7"]
+    "catalogs": ["PN G217.1+14.7"]
   },
   {
-    "id": "LPN-Abell28",
+    "id": "Abell28",
     "constellation": "UMa",
     "rating": 3,
     "difficulty": 2,
-    "catalogs": ["LPN-Abell28", "PN G158.8+37.1"]
+    "catalogs": ["PN G158.8+37.1"]
   },
   {
-    "id": "LPN-EGB1",
+    "id": "EGB1",
     "constellation": "Cas",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-EGB1", "HDW 1", "PN G124.0+10.7"]
+    "catalogs": ["EGB1", "HDW 1", "PN G124.0+10.7"]
   },
   {
-    "id": "LPN-Abell45",
+    "id": "Abell45",
     "constellation": "Sct",
     "rating": 3,
     "difficulty": 2,
-    "catalogs": ["LPN-Abell45", "PN G020.2-00.6"]
+    "catalogs": ["PN G020.2-00.6"]
   },
   {
-    "id": "LPN-Jones1",
+    "id": "Jones1",
     "constellation": "Peg",
     "rating": 3,
     "difficulty": 1,
-    "catalogs": ["LPN-Jones1", "PN G104.2-29.6"]
+    "catalogs": ["Jones1", "PN G104.2-29.6"]
   },
   {
     "id": "M40",

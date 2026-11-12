@@ -850,10 +850,10 @@ const DUPLICATE_MERGE_ALIASES = {
   LBN504: 'vdB143',
   LBN523: 'vdB154',
   LBN531: 'vdB152',
-  LBN624: 'LPN-EGB1',
+  LBN624: 'EGB1',
   LBN682: 'vdB15',
   LBN734: 'vdB12',
-  LBN744: 'LPN-Sh2216',
+  LBN744: 'SH2-216',
   LBN746: 'vdB16',
   LBN772: 'LBN770',
   LBN785: 'vdB27',
@@ -864,7 +864,7 @@ const DUPLICATE_MERGE_ALIASES = {
   LBN851: 'vdB37',
   LBN866: 'vdB38',
   LBN874: 'LBN873',
-  LBN926: 'LPN-Ko2-2',
+  LBN926: 'Ko2-2',
   LBN972: 'LBN971',
   LBN973: 'LBN971',
   LBN995: 'vdB69',
@@ -1495,11 +1495,13 @@ async function main() {
   // Strategy:
   // a) For objects already in the catalog (NGC/M/SH2 entries), inject emissionLines
   //    and any extra cross-ref IDs into their existing data row.
-  // b) For objects not in any existing catalog, add new LPN-prefixed entries.
+  // b) For objects not in any existing catalog, add new entries under their own
+  //    designation (WeDe1, EGB6…). "Large planetary nebulae" is an observing list,
+  //    not a catalogue: these objects fall in the app's "Other" catalogue family.
   //
   // Build a lookup: canonical existingId → { emissionLines, extraCatIds, coordFix, magFix, nameEnFix, nameFrFix }
   // coordFix: { ra, dec, majAxis, minAxis } overrides wrong OpenNGC coordinates
-  const existingLPNUpdates = [
+  const existingLargePnUpdates = [
     { id: 'NGC7293', emissionLines: 'HD and OIII', extraCatIds: [] },
     { id: 'M27', emissionLines: 'Halo OIII', extraCatIds: [] },
     { id: 'NGC1360', emissionLines: null, extraCatIds: [] },
@@ -1549,10 +1551,10 @@ async function main() {
     magFix,
     nameEnFix,
     nameFrFix,
-  } of existingLPNUpdates) {
+  } of existingLargePnUpdates) {
     const idx = dataIdxById.get(id);
     if (idx === undefined) {
-      console.warn(`LPN update: ${id} NOT FOUND in data, skipping`);
+      console.warn(`Large PN update: ${id} NOT FOUND in data, skipping`);
       continue;
     }
     const row = data[idx];
@@ -1581,7 +1583,7 @@ async function main() {
   }
   console.log(`Updated ${existingUpdated} existing entries with Large PN data`);
 
-  // New standalone LPN entries (not in any existing catalog)
+  // New standalone Large PN entries (not in any existing catalog)
   // Format: [id, ra°, dec°, type, majAxis', minAxis', pa, mag, nameFr, nameEn, catalogs[], emissionLines]
   function hms(h, m, s) {
     return (h + m / 60 + s / 3600) * 15;
@@ -1594,7 +1596,7 @@ async function main() {
   const lpnEntries = [
     // [id, ra, dec, majAxis, minAxis, emissionLines, nameEn, nameFr, otherCatIds]
     [
-      'LPN-Sh2216',
+      'SH2-216',
       hms(4, 43, 22),
       dms(46, 42, 7),
       100,
@@ -1604,9 +1606,9 @@ async function main() {
       'Sh 2-216',
       ['SH2-216', 'PN G158.6+00.7'],
     ],
-    ['LPN-Outters4', hms(21, 11, 48), dms(59, 59, 12), 69, 20, null, 'Outters 4', 'Outters 4', []],
+    ['Outters4', hms(21, 11, 48), dms(59, 59, 12), 69, 20, null, 'Outters 4', 'Outters 4', []],
     [
-      'LPN-TK2',
+      'TK2',
       hms(17, 38, 2),
       dms(66, 53, 48),
       60,
@@ -1617,7 +1619,7 @@ async function main() {
       ['RE 1738+665', 'PN G096.8+31.9'],
     ],
     [
-      'LPN-TK1',
+      'TK1',
       hms(8, 27, 6),
       dms(31, 30, 9),
       30,
@@ -1628,7 +1630,7 @@ async function main() {
       ['TON 320', 'PN G191.4+33.0'],
     ],
     [
-      'LPN-WeDe1',
+      'WeDe1',
       hms(5, 59, 24),
       dms(10, 41, 40),
       22,
@@ -1639,7 +1641,7 @@ async function main() {
       ['WDHS 1', 'PN G197.4-06.4'],
     ],
     [
-      'LPN-PuWe1',
+      'PuWe1',
       hms(6, 19, 34),
       dms(55, 36, 42),
       20,
@@ -1650,7 +1652,7 @@ async function main() {
       ['PN G158.9+17.8'],
     ],
     [
-      'LPN-PFP1',
+      'PFP1',
       hms(7, 22, 18),
       dms(6, 21, 46, true),
       19,
@@ -1660,8 +1662,7 @@ async function main() {
       'PFP 1',
       ['PN G222.1+03.9'],
     ],
-    // Abell PNe: primary IDs are now Abell{N} (Abell catalog priority > LPN).
-    // LPN-Abell{N} is kept as a secondary cross-reference (same pattern as M > NGC).
+    // Abell PNe: primary IDs are Abell{N}.
     [
       'Abell31',
       hms(8, 54, 13),
@@ -1671,11 +1672,11 @@ async function main() {
       'OIII > HD',
       'Abell 31',
       'Abell 31',
-      ['LPN-Abell31', 'PN G219.1+31.2'],
+      ['PN G219.1+31.2'],
       12.0,
     ],
     [
-      'LPN-IsWe2',
+      'IsWe2',
       hms(22, 13, 22),
       dms(65, 53, 55),
       16,
@@ -1694,11 +1695,11 @@ async function main() {
       'HD and OIII', // coords from SIMBAD (PN A66 35); maj updated to SIMBAD 12.87→13
       'Abell 35',
       'Abell 35',
-      ['LPN-Abell35', 'PN G303.6+40.0'],
+      ['PN G303.6+40.0'],
       13.3,
     ],
     [
-      'LPN-HFG1',
+      'HFG1',
       hms(3, 3, 46),
       dms(64, 54, 36),
       15,
@@ -1717,7 +1718,7 @@ async function main() {
       'HD and OIII',
       'Abell 74',
       'Abell 74',
-      ['LPN-Abell74', 'PN G072.7-17.1'],
+      ['PN G072.7-17.1'],
       15.8,
     ],
     [
@@ -1729,11 +1730,11 @@ async function main() {
       'HD and OIII', // maj updated to SIMBAD 12.73→13
       'Abell 7',
       'Abell 7',
-      ['LPN-Abell7', 'PN G215.5-30.8'],
+      ['PN G215.5-30.8'],
       13.2,
     ],
     [
-      'LPN-IsWe1',
+      'IsWe1',
       hms(3, 49, 5),
       dms(50, 0, 15),
       13,
@@ -1744,7 +1745,7 @@ async function main() {
       ['PN G149.7-03.3'],
     ],
     [
-      'LPN-EGB6',
+      'EGB6',
       hms(9, 53, 0),
       dms(13, 44, 50),
       13,
@@ -1755,7 +1756,7 @@ async function main() {
       ['PN G221.5+46.3'],
     ],
     [
-      'LPN-MWP1',
+      'MWP1',
       hms(21, 17, 7),
       dms(34, 12, 40),
       13,
@@ -1766,7 +1767,7 @@ async function main() {
       ['PN G080.3-10.4'],
     ],
     [
-      'LPN-Jacoby1',
+      'Jacoby1',
       hms(15, 21, 47),
       dms(52, 22, 5),
       11,
@@ -1777,7 +1778,7 @@ async function main() {
       ['PK 085+52.1'],
     ],
     [
-      'LPN-HDW3',
+      'HDW3',
       hms(3, 27, 15),
       dms(45, 24, 19),
       9,
@@ -1788,7 +1789,7 @@ async function main() {
       ['HW 4', 'PN G149.4-09.2'],
     ],
     [
-      'LPN-DeHt5',
+      'DeHt5',
       hms(22, 19, 34),
       dms(70, 56, 1),
       9,
@@ -1799,7 +1800,7 @@ async function main() {
       ['DHW 5', 'PN G111.0+11.6'],
     ],
     [
-      'LPN-LoTr5',
+      'LoTr5',
       hms(12, 55, 34),
       dms(25, 53, 28),
       9,
@@ -1819,7 +1820,7 @@ async function main() {
       null, // coords from SIMBAD (PN A66 29)
       'Abell 29',
       'Abell 29',
-      ['LPN-Abell29', 'PN G244.5+12.5'],
+      ['PN G244.5+12.5'],
       14.3,
     ],
     [
@@ -1831,11 +1832,11 @@ async function main() {
       'mostly OIII', // maj updated to SIMBAD 6.12→6
       'Abell 36',
       'Abell 36',
-      ['LPN-Abell36', 'PN G318.4+41.4'],
+      ['PN G318.4+41.4'],
       11.8,
     ],
     [
-      'LPN-Ko2-2',
+      'Ko2-2',
       hms(6, 52, 28),
       dms(9, 58, 17),
       7,
@@ -1846,7 +1847,7 @@ async function main() {
       ['PN G204.1+04.7'],
     ],
     [
-      'LPN-JnEr1',
+      'JnEr1',
       hms(7, 57, 51),
       dms(53, 25, 16),
       7,
@@ -1857,7 +1858,7 @@ async function main() {
       ['VV 47', 'PN G164.8+31.1'],
     ],
     [
-      'LPN-YM16',
+      'YM16',
       hms(18, 54, 57),
       dms(6, 2, 31),
       6,
@@ -1868,7 +1869,7 @@ async function main() {
       ['PN G038.7+01.9'],
     ],
     [
-      'LPN-IPHASX205013',
+      'IPHASX205013',
       hms(20, 50, 5),
       dms(46, 52, 48),
       6,
@@ -1887,7 +1888,7 @@ async function main() {
       null,
       'Abell 24',
       'Abell 24',
-      ['LPN-Abell24', 'PN G217.1+14.7'],
+      ['PN G217.1+14.7'],
     ],
     [
       'Abell28',
@@ -1898,10 +1899,10 @@ async function main() {
       null, // maj updated to SIMBAD 4.47→4
       'Abell 28',
       'Abell 28',
-      ['LPN-Abell28', 'PN G158.8+37.1'],
+      ['PN G158.8+37.1'],
     ],
     [
-      'LPN-EGB1',
+      'EGB1',
       hms(1, 7, 8),
       dms(73, 33, 24),
       5,
@@ -1920,10 +1921,10 @@ async function main() {
       null,
       'Abell 45',
       'Abell 45',
-      ['LPN-Abell45', 'PN G020.2-00.6'],
+      ['PN G020.2-00.6'],
     ],
     [
-      'LPN-Jones1',
+      'Jones1',
       hms(23, 35, 53),
       dms(30, 28, 2),
       5,
@@ -1949,7 +1950,7 @@ async function main() {
     mag = null,
   ] of lpnEntries) {
     if (dec < -35) continue; // southern cut-off
-    const cats = [id, ...otherCatIds];
+    const cats = [id, ...otherCatIds.filter((c) => c !== id)];
     data.push([
       id,
       Math.round(ra * 1000) / 1000,
@@ -1975,15 +1976,15 @@ async function main() {
   // ── Step 12: Abell Planetary Nebulae (Abell 1966) ─────────────────────────
   // Source: SIMBAD TAP query 'PN A66 %' (scripts/download-abell-pn.py).
   // 86 objects total. 14 already in DB are handled separately:
-  //   - Abell 21 = SH2-274 (cross-ref 'Abell21' added in existingLPNUpdates above)
-  //   - Abell 7,24,28,29,31,35,36,45,74 migrated from LPN in lpnEntries above
+  //   - Abell 21 = SH2-274 (cross-ref 'Abell21' added in existingLargePnUpdates above)
+  //   - Abell 7,24,28,29,31,35,36,45,74 listed in lpnEntries above
   //   - Abell 37=IC972, 50=NGC6742, 75=NGC7076, 81=IC1454 → add Abell{N} cross-ref
   // Remaining 72 are new standalone entries below.
   // All objects are dec > -35, so none excluded by southern cut-off.
 
   // PK, PN ARO, and PN G identifiers from SIMBAD for all 86 Abell PNe.
   // Generated by scripts/download-abell-crossrefs.py — applied to every entry
-  // that already carries an Abell{N} catalog ID (standalone, LPN-migrated,
+  // that already carries an Abell{N} catalog ID (standalone, Large-PN-list,
   // NGC/IC primary, or SH2-274). Abell 85 = CTB 1 SNR has no PN cross-refs.
   const ABELL_CROSSREFS = {
     Abell1: ['PK 119+06  1', 'PN ARO  198', 'PN G119.4+06.5'],
@@ -3053,7 +3054,7 @@ async function main() {
   console.log(`Added ${abellAdded} standalone Abell PN entries`);
 
   // ── Apply PK / PN ARO / PN G cross-refs to every Abell-bearing entry ─────
-  // Covers: standalone entries above, LPN-migrated entries (Step 9 lpnEntries),
+  // Covers: standalone entries above, Large PN list entries (Step 11 lpnEntries),
   // NGC/IC primaries (abellNGCICRefs above), and SH2-274 = Abell 21.
   let abellXrefCount = 0;
   for (const row of data) {

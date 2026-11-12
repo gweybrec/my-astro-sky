@@ -10,7 +10,7 @@
     </div>
     <table class="dso-info-table">
       <tbody>
-        <tr v-if="!isLPN">
+        <tr v-if="!isOther">
           <td>ID</td>
           <td>{{ dso.catalogs[0] ?? dso.id }}</td>
         </tr>
@@ -69,6 +69,7 @@ import { computed } from 'vue';
 import { t } from '../../i18n';
 import type { DSO } from '@myastrosky/core/types';
 import { getDSOTypeName } from '@myastrosky/core/search';
+import { isOtherCatalogDso } from '@myastrosky/core/catalog/dso-registry';
 import {
   formatSize,
   formatRating,
@@ -87,7 +88,8 @@ defineEmits<{ recenter: []; edit: [] }>();
 
 const skyTimeStore = useSkyTimeStore();
 
-const isLPN = computed(() => props.dso.id.startsWith('LPN-'));
+// In no named catalogue: the id is only a compact key, the name above is its designation
+const isOther = computed(() => isOtherCatalogDso(props.dso));
 const typeName = computed(() => getDSOTypeName(props.dso.type));
 const magStr = computed(() => (props.dso.mag !== null ? props.dso.mag.toFixed(1) : '—'));
 const sizeStr = computed(() => formatSize(props.dso.majAxis, props.dso.minAxis));
@@ -120,7 +122,5 @@ const transitStr = computed(() => {
 });
 const ratingStr = computed(() => formatRating(props.dso.rating));
 const difficultyStr = computed(() => formatDifficulty(props.dso.difficulty));
-const crossRefs = computed(() =>
-  props.dso.catalogs.slice(1).filter((c: string) => !c.startsWith('LPN-')),
-);
+const crossRefs = computed(() => props.dso.catalogs.slice(1));
 </script>

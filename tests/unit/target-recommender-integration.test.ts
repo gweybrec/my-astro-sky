@@ -84,7 +84,7 @@ const ALL_TYPES = new Set([
   'DN',
   '?',
 ]);
-const ALL_CATS = new Set(['M', 'NGC', 'IC', 'SH2', 'LBN', 'LDN', 'vdB', 'Abell', 'LPN']);
+const ALL_CATS = new Set(['M', 'NGC', 'IC', 'SH2', 'LBN', 'LDN', 'vdB', 'Abell', 'Other']);
 const ALL_RATS = new Set([1, 2, 3, 4, 5]);
 const ALL_DIFFS = new Set([1, 2, 3, 4, 5]);
 

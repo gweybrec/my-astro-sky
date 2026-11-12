@@ -23,6 +23,7 @@ import {
   photoOverlayCatalogs,
   findDSOIdsFromCorrespondences,
   getDSOCatalog,
+  getDSOCatalogFamily,
   applyAndStoreSingleOverride,
   resetDsoToBaseValues,
   getDSOCatalogBaseValues,
@@ -248,7 +249,7 @@ const FIXTURE = {
       'Abell 35',
       null,
       null,
-      ['Abell35', 'LPN-Abell35', 'PN G303.6+40.0', 'SH2-313'],
+      ['Abell35', 'PN G303.6+40.0', 'SH2-313'],
       null,
       'Hya',
       3,
@@ -256,9 +257,9 @@ const FIXTURE = {
       null,
       10,
     ],
-    // LPN
+    // In no named catalogue (Other)
     [
-      'LPN-1',
+      'WeDe1',
       10.0,
       10.0,
       'PN',
@@ -266,11 +267,11 @@ const FIXTURE = {
       2,
       0,
       12.0,
+      'WeDe 1',
+      'WeDe 1',
       null,
       null,
-      null,
-      null,
-      ['LPN-1'],
+      ['WeDe1', 'PN G197.4-06.4'],
       null,
       'And',
       1,
@@ -324,10 +325,17 @@ describe('getDSOs()', () => {
     expect(getDSOs().length).toBe(FIXTURE.data.length);
   });
 
-  it('precomputes the catalog prefix on every DSO to match getDSOCatalog(id)', () => {
+  it('precomputes the catalog family on every DSO to match getDSOCatalogFamily(id)', () => {
     for (const dso of getDSOs()) {
-      expect(dso.catalog).toBe(getDSOCatalog(dso.id));
+      expect(dso.catalog).toBe(getDSOCatalogFamily(dso.id));
     }
+    expect(getDSOById('WeDe1')?.catalog).toBe('Other');
+  });
+
+  it('resolves an id an older catalogue used, without listing it as an alias', () => {
+    expect(getDSOById('LPN-WeDe1')?.id).toBe('WeDe1');
+    expect(getDSOById('LPN-Abell35')?.id).toBe('Abell35');
+    expect(getDSOById('WeDe1')?.catalogs).toEqual(['WeDe1', 'PN G197.4-06.4']);
   });
 });
 
@@ -341,10 +349,12 @@ describe('computeCatalogStats()', () => {
     expect(stats.NGC.total).toBe(2);
     expect(stats.IC.total).toBe(1);
     // SH2-106 plus Abell35's SH2-313 alias — a DSO belongs to every family it has an
-    // alias in, so Abell35 counts toward SH2 (and Abell/LPN) at once.
+    // alias in, so Abell35 counts toward SH2 (and Abell) at once.
     expect(stats.SH2.total).toBe(2);
     expect(stats.LBN.total).toBe(1);
     expect(stats.LDN.total).toBe(1);
+    // Other: only objects with no alias in a named catalogue (WeDe1, TESTOBJ)
+    expect(stats.Other.total).toBe(2);
   });
 
   it('counts a photographed object toward every catalog family it belongs to', () => {
@@ -465,7 +475,6 @@ describe('getDSOCatalog()', () => {
     ['LDN1622', 'LDN'],
     ['vdB141', 'vdB'],
     ['Abell21', 'Abell'],
-    ['LPN-1', 'LPN'],
     ['Barnard33', 'Barnard'],
     ['Barnard67a', 'Barnard'],
   ])('getDSOCatalog(%s) === %s', (id, expected) => {
@@ -475,6 +484,11 @@ describe('getDSOCatalog()', () => {
   it('returns null for unrecognized id format', () => {
     expect(getDSOCatalog('TESTOBJ')).toBeNull();
     expect(getDSOCatalog('')).toBeNull();
+  });
+
+  it('puts an id in no named catalogue in the Other family', () => {
+    expect(getDSOCatalogFamily('WeDe1')).toBe('Other');
+    expect(getDSOCatalogFamily('NGC224')).toBe('NGC');
   });
 });
 
@@ -518,8 +532,8 @@ describe('findDsoPlacementsInImage()', () => {
     'LDN',
     'vdB',
     'Abell',
-    'LPN',
     'Barnard',
+    'Other',
   ]);
 
   it('returns DSOs whose centre falls within the image, with photo-pixel geometry', () => {
@@ -590,13 +604,13 @@ describe('findDsoPlacementsInImage()', () => {
 
 describe('photoOverlayCatalogs()', () => {
   it("adds the catalog of a listed object that the sky map's catalogs would not show", () => {
-    // LPN-1 is only in LPN, which the default sky map selection leaves off.
-    expect(photoOverlayCatalogs(['M', 'NGC', 'IC', 'SH2'], ['LPN-1'])).toEqual([
+    // WeDe1 is only in Other, which the default sky map selection leaves off.
+    expect(photoOverlayCatalogs(['M', 'NGC', 'IC', 'SH2'], ['WeDe1'])).toEqual([
       'M',
       'NGC',
       'IC',
       'SH2',
-      'LPN',
+      'Other',
     ]);
   });
 

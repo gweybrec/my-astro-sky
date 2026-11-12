@@ -594,7 +594,7 @@ describe("a photo's own screen", () => {
       setDsoCatalog(
         {
           fields: ['id', 'ra', 'dec', 'type', 'nameFr', 'catalogs'],
-          data: [['Abell24', 117.908, 3.008, 'PN', 'Abell 24', ['Abell24', 'LPN-Abell24']]],
+          data: [['Abell24', 117.908, 3.008, 'PN', 'Abell 24', ['Abell24']]],
         } as never,
         {},
         'fr',

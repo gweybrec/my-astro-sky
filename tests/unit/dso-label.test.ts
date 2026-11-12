@@ -46,9 +46,12 @@ describe('formatDsoLabel', () => {
     expect(formatDsoLabel(dso('Barnard33'))).toBe('Barnard 33');
   });
 
-  it('uses the proper name for LPN objects, falling back to the stripped id', () => {
-    expect(formatDsoLabel(dso('LPN-7', { displayName: 'Cave Nebula' }))).toBe('Cave Nebula');
-    expect(formatDsoLabel(dso('LPN-7', { displayName: '' }))).toBe('7');
+  it('uses the proper name for an object in no named catalogue, falling back to its id', () => {
+    expect(formatDsoLabel(dso('Ko2-2', { displayName: 'Kohoutek 2-2' }))).toBe('Kohoutek 2-2');
+    expect(formatDsoLabel(dso('WeDe1', { displayName: '' }))).toBe('WeDe1');
+    // An alias of such an object is shown as written
+    const d = dso('WeDe1', { displayName: 'WeDe 1' });
+    expect(formatCatalogId('PN G197.4-06.4', d)).toBe('PN G197.4-06.4');
   });
 });
 
