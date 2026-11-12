@@ -38,20 +38,23 @@ export async function placeBatchItem(
   item.status = 'placing';
   delete item.uploadError;
   try {
-    const photo = await uploadFn(item.file, item.solveCorrespondences!,
+    const photo = await uploadFn(
+      item.file,
+      item.solveCorrespondences!,
       item.manualPlacement ?? undefined,
       undefined,
       {
-      dsoIds: item.dsoIds,
-      labels: [...new Set([...item.labels, ...batchLabels])],
-      pointsOfInterest: item.pointsOfInterest,
-      integrations: sanitizeIntegrationRows(item.integrations),
-      observationDate: item.observationDate || null,
-      captureDetails: sanitizeCaptureDetails(item.captureDetails),
-      gearSetupId: item.gearSetupId || null,
-      notes: item.notes,
-      displayName: item.customName,
-    });
+        dsoIds: item.dsoIds,
+        labels: [...new Set([...item.labels, ...batchLabels])],
+        pointsOfInterest: item.pointsOfInterest,
+        integrations: sanitizeIntegrationRows(item.integrations),
+        observationDate: item.observationDate || null,
+        captureDetails: sanitizeCaptureDetails(item.captureDetails),
+        gearSetupId: item.gearSetupId || null,
+        notes: item.notes,
+        displayName: item.customName,
+      },
+    );
     item.photo = photo;
     item.status = 'placed';
     onPlaced(photo);
