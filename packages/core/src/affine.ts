@@ -164,60 +164,56 @@ export function computeAffineLSQ(photoPoints: Point[], canvasPoints: Point[]): A
     );
   }
 
-  // Normal equations for CSS affine: newX = a·px + c·py + e, newY = b·px + d·py + f
-  // Build A^T·A (3×3) and solve two right-hand sides (for X and for Y).
+  // Least squares on coordinates relative to the points' mean: newX = a·dx + c·dy + mX,
+  // newY = b·dx + d·dy + mY. Centring keeps the fit well conditioned whatever the
+  // photo's size, and lets the "points in a line" test below be scale-free.
+  let mx = 0,
+    my = 0,
+    mX = 0,
+    mY = 0;
+  for (let i = 0; i < n; i++) {
+    mx += photoPoints[i].x;
+    my += photoPoints[i].y;
+    mX += canvasPoints[i].x;
+    mY += canvasPoints[i].y;
+  }
+  mx /= n;
+  my /= n;
+  mX /= n;
+  mY /= n;
+
   let s_xx = 0,
     s_xy = 0,
-    s_x = 0;
-  let s_yy = 0,
-    s_y = 0;
-  let s_xX = 0,
+    s_yy = 0,
+    s_xX = 0,
     s_yX = 0,
-    s_X = 0;
-  let s_xY = 0,
-    s_yY = 0,
-    s_Y = 0;
-
+    s_xY = 0,
+    s_yY = 0;
   for (let i = 0; i < n; i++) {
-    const x = photoPoints[i].x,
-      y = photoPoints[i].y;
-    const X = canvasPoints[i].x,
-      Y = canvasPoints[i].y;
+    const x = photoPoints[i].x - mx,
+      y = photoPoints[i].y - my;
+    const X = canvasPoints[i].x - mX,
+      Y = canvasPoints[i].y - mY;
     s_xx += x * x;
     s_xy += x * y;
-    s_x += x;
     s_yy += y * y;
-    s_y += y;
     s_xX += x * X;
     s_yX += y * X;
-    s_X += X;
     s_xY += x * Y;
     s_yY += y * Y;
-    s_Y += Y;
   }
 
-  // M = [[s_xx, s_xy, s_x], [s_xy, s_yy, s_y], [s_x, s_y, n]]
-  const m00 = s_xx,
-    m01 = s_xy,
-    m02 = s_x;
-  const m10 = s_xy,
-    m11 = s_yy,
-    m12 = s_y;
-  const m20 = s_x,
-    m21 = s_y,
-    m22 = n;
-
-  const det =
-    m00 * (m11 * m22 - m12 * m21) - m01 * (m10 * m22 - m12 * m20) + m02 * (m10 * m21 - m11 * m20);
-
-  // Relative singularity threshold based on normal matrix scale
-  const mScale = Math.max(Math.abs(m00), Math.abs(m11), m22, 1);
-  if (Math.abs(det) < 1e-10 * mScale * mScale * mScale) {
-    // Normal matrix is (near-)singular. This happens when the photo points
-    // are collinear or nearly so. Rather than failing outright, fall back
-    // to a similarity transform (scale+rotation+translation) computed from
-    // the most separated pair of points — this is sufficient to place the
-    // image when an affine (6-DOF) fit is underdetermined.
+  // det / trace² is about (spread across the points' line / spread along it)²: 0 when
+  // they are in a line, 1/4 when spread evenly. A test on the raw (uncentred) normal
+  // matrix flagged a well-spread triangle of stars as "in a line" once their pixel
+  // coordinates were in the thousands, and the similarity fallback below cannot mirror.
+  const det = s_xx * s_yy - s_xy * s_xy;
+  const trace = s_xx + s_yy;
+  if (!(det > 1e-6 * trace * trace)) {
+    // The photo points are in a line (or nearly so): an affine (6-DOF) fit is
+    // underdetermined. Rather than failing outright, fall back to a similarity
+    // transform (scale+rotation+translation) computed from the most separated pair
+    // of points — this is sufficient to place the image.
     let bestI = 0,
       bestJ = 1;
     let maxDist2 = 0;
@@ -246,19 +242,12 @@ export function computeAffineLSQ(photoPoints: Point[], canvasPoints: Point[]): A
     );
   }
 
-  // Solve M·x = rhs via Cramer's rule
-  function cramer(r0: number, r1: number, r2: number): [number, number, number] {
-    const d0 =
-      r0 * (m11 * m22 - m12 * m21) - m01 * (r1 * m22 - m12 * r2) + m02 * (r1 * m21 - m11 * r2);
-    const d1 =
-      m00 * (r1 * m22 - m12 * r2) - r0 * (m10 * m22 - m12 * m20) + m02 * (m10 * r2 - r1 * m20);
-    const d2 =
-      m00 * (m11 * r2 - r1 * m21) - m01 * (m10 * r2 - r1 * m20) + r0 * (m10 * m21 - m11 * m20);
-    return [d0 / det, d1 / det, d2 / det];
-  }
-
-  const [a, c, e] = cramer(s_xX, s_yX, s_X);
-  const [b, d, f] = cramer(s_xY, s_yY, s_Y);
+  const a = (s_yy * s_xX - s_xy * s_yX) / det;
+  const c = (s_xx * s_yX - s_xy * s_xX) / det;
+  const b = (s_yy * s_xY - s_xy * s_yY) / det;
+  const d = (s_xx * s_yY - s_xy * s_xY) / det;
+  const e = mX - a * mx - c * my;
+  const f = mY - b * mx - d * my;
 
   if (
     !isFinite(a) ||

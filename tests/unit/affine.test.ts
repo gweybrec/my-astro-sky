@@ -184,6 +184,25 @@ describe('computeAffineLSQ (N-point least squares)', () => {
     expect(m.f).toBeCloseTo(20, 4);
   });
 
+  it('fits a mirrored mapping exactly from 4 stars far from the photo corner', () => {
+    // The 4 stars of the Abell 24 test photo (2367 × 1349 px), two of them 10 px apart:
+    // a thin but real triangle. They were once taken for "in a line", and the
+    // similarity fallback, which cannot mirror, put the photo's centre off the frame.
+    const photo = [
+      { x: 1607.38, y: 412.76 },
+      { x: 1131.47, y: 255.62 },
+      { x: 2043.71, y: 646.17 },
+      { x: 2039.97, y: 637.79 },
+    ];
+    const mirrored = { a: 9e-6, b: 3e-6, c: 3e-6, d: -9e-6, e: 0.82, f: -0.45 };
+    const canvas = photo.map((p) => applyAffine(mirrored, p.x, p.y));
+    const m = computeAffineLSQ(photo, canvas);
+    const centre = applyAffine(m, 1184, 675);
+    const expected = applyAffine(mirrored, 1184, 675);
+    expect(centre.x).toBeCloseTo(expected.x, 9);
+    expect(centre.y).toBeCloseTo(expected.y, 9);
+  });
+
   it('throws for fewer than 2 points', () => {
     expect(() => computeAffineLSQ([{ x: 0, y: 0 }], [{ x: 0, y: 0 }])).toThrow();
   });
