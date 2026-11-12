@@ -1134,6 +1134,7 @@ export const views = [
     open: [{ click: 'ion-button.mob-btn--field' }, { wait: '.mob-sheet' }, { pause: 600 }],
     ...SHEET,
   },
+  { name: 'display-settings', path: '/settings/display', ready: 'ion-toggle.mob-toggle-row' },
   { name: 'about', path: '/settings/about', ready: '.mob-bullets li' },
   { name: 'privacy', path: '/settings/privacy', ready: '.mob-text-title' },
   { name: 'credits', path: '/settings/credits', ready: '.mob-credit' },
