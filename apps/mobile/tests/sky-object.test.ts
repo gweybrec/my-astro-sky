@@ -99,7 +99,7 @@ describe('the object sheet', () => {
     const time = useSkyTimeStore();
     time.setMode('date');
     const date = factsOf(mountSheet());
-    expect(date.map((f) => f[0])).toEqual(['Altitude', 'Transit', 'Magnitude', 'Taille']);
+    expect(date.map((f) => f[0])).toEqual(['Altitude', 'Au plus haut', 'Magnitude', 'Taille']);
     expect(date[0][1]).toMatch(/^-?\d+°$/);
     expect(date[1][1]).toMatch(/^\d{2}:\d{2}$/);
 
@@ -215,7 +215,7 @@ describe('the sheet of a star', () => {
     useSkyTimeStore().setMode('date');
     expect(factsOf(mountSheet(star())).map((f) => f[0])).toEqual([
       'Altitude',
-      'Transit',
+      'Au plus haut',
       'Magnitude',
     ]);
   });

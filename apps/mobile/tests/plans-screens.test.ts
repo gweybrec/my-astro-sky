@@ -464,7 +464,7 @@ describe('the plan detail page', () => {
     // the most used first, the observation window at the top and the difficulty last
     expect(sheetProps.options.map((o) => o.label)).toEqual([
       "Fenêtre d'observation",
-      'Heure de transit',
+      'Heure au plus haut',
       'Altitude max.',
       'Intérêt photo',
       'Taille',
@@ -639,7 +639,7 @@ describe('the plan entry page', () => {
     expect(text).toContain('CYG');
     for (const label of [
       'Alt. max',
-      'Transit',
+      'Au plus haut',
       'Magnitude',
       'Taille',
       'Distance Lune',
@@ -1031,7 +1031,7 @@ describe('the target page ("Cibles, détail d\'une cible")', () => {
   it("shows the target's figures, altitude and suggested filters for the search's night and setup", async () => {
     const { w } = await show(TargetDetailPage, '/targets/NGC7000');
     const labels = w.findAll('.mob-fact-label').map((l) => l.text());
-    expect(labels).toEqual(expect.arrayContaining(['Alt. max', 'Transit', 'Score', 'Champ']));
+    expect(labels).toEqual(expect.arrayContaining(['Alt. max', 'Au plus haut', 'Score', 'Champ']));
     // no frame on a target of the list, and the setup is the search's
     expect(labels).not.toContain('Angle');
     expect(w.find('.mob-alt-chart svg').attributes('aria-label')).toMatch(

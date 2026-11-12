@@ -1087,7 +1087,7 @@ const de: Translations = {
       empty:
         'Noch keine Ziele in diesem Plan. Füge welche aus den Vorschlägen oder der Suche hinzu.',
       noPlans: 'Noch keine Pläne',
-      transit: 'Transit',
+      transit: 'Am höchsten um',
       obsWindowAdd: '+ Beobachtungsfenster',
       obsWindowRemove: 'Beobachtungsfenster entfernen',
       obsWindowTitle: 'Beobachtungsfenster',
@@ -1284,12 +1284,12 @@ const de: Translations = {
     minAlt: 'Min.',
     maxAlt: 'Max.',
     altRangeTooltip:
-      'Objekte ausschließen, deren Transitalhöhe unter dem Minimum oder über dem Maximum liegt.',
+      'Objekte ausschließen, deren größte Höhe während der Nacht unter dem Minimum oder über dem Maximum liegt.',
     timeWindowLabel: 'Beobachtungsfenster',
     timeWindowStart: 'Von',
     timeWindowEnd: 'Bis',
     timeWindowTooltip:
-      'Nur in diesem Zeitfenster suchen (leer lassen für die ganze Nacht). Schränkt ein, welcher Teil des dunklen Fensters abgetastet wird — die angezeigte Transitzeit liegt ebenfalls darin.',
+      'Nur in diesem Zeitfenster suchen (leer lassen für die ganze Nacht). Schränkt ein, welcher Teil des dunklen Fensters abgetastet wird — die angezeigte Zeit des Höchststands liegt ebenfalls darin.',
     timeWindowNotSet: 'Nicht festgelegt',
     constellationFilter: 'Sternbilder',
     constellationSelect: 'Sternbilder auswählen',
@@ -1335,7 +1335,7 @@ const de: Translations = {
       label: 'Sortieren nach',
       score: 'Gesamtbewertung',
       altitude: 'Max. Höhe',
-      transit: 'Transitzeit',
+      transit: 'Zeit des Höchststands',
       magnitude: 'Helligkeit',
       size: 'Größe',
       fovFit: 'Gesichtsfeldanpassung',
@@ -1351,7 +1351,7 @@ const de: Translations = {
         'Heute Nacht keine astronomische Nacht bei dieser Breite (Sonne zu hoch). Ergebnisse basieren auf dem nautischen Dämmerfenster.',
       noWindowOverlap: 'Kein dunkler Himmel während des gewählten Zeitfensters.',
       maxAlt: 'Max. Höhe',
-      bestTime: 'Transit',
+      bestTime: 'Am höchsten um',
       size: 'Größe',
       fov: 'Gesichtsfeld',
       filtersTitle: 'Empfohlene Filter',
@@ -1366,7 +1366,8 @@ const de: Translations = {
     },
     tooltips: {
       maxAlt: 'Maximale Höhe über dem Horizont während des Beobachtungsfensters',
-      bestTime: 'Zeit des Meridiandurchgangs (wenn das Objekt seinen höchsten Punkt erreicht)',
+      bestTime:
+        'Wann das Objekt während der dunklen Nacht am höchsten steht (sein Meridiandurchgang, außer es kulminiert außerhalb der dunklen Nacht)',
       mag: 'Scheinbare Magnitude (niedriger = heller)',
       size: 'Winkeldurchmesser des Objekts (große Halbachse)',
       score: 'Gesamteignungsbewertung: Höhe + Gesichtsfeldanpassung + Helligkeit',

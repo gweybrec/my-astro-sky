@@ -150,7 +150,7 @@ Below the gear section you can narrow down which objects are recommended:
 
 ### Generating recommendations
 
-Click **Best** to show the highest-scoring objects for your gear and location — ranked by a combination of imaging interest, altitude, transit time, FOV fit, and difficulty match.
+Click **Best** to show the highest-scoring objects for your gear and location — ranked by a combination of imaging interest, altitude, FOV fit, and difficulty match.
 
 Click **Random** to explore a shuffled selection from the same pool, useful for finding less obvious targets.
 
@@ -159,12 +159,12 @@ Results show for each object:
 - Name and catalog identifier(s)
 - DSO type and constellation
 - Maximum altitude during the night
-- Best imaging time (local time of transit)
+- **Highest at**: the local time when the object is highest during the dark night (its meridian transit, unless it peaks outside the dark hours)
 - Magnitude, angular size, difficulty, and interest rating
 - Overall score and FOV-fit percentage
 - Suggested imaging recipe (total integration time and filter breakdown)
 
-Use the **sort** dropdown to reorder results by score, altitude, transit time, magnitude, size, FOV fit, name, rating, or difficulty. Use the **per-page** selector and pagination controls to browse through the full result set.
+Use the **sort** dropdown to reorder results by score, altitude, time at highest, magnitude, size, FOV fit, name, rating, or difficulty. Use the **per-page** selector and pagination controls to browse through the full result set.
 
 Click **Open on map** on any card to jump to that object's position on the sky map.
 
@@ -222,7 +222,7 @@ Click **+ New plan** in the My plans tab. A plan is named after the night by def
 
 Each plan has two optional settings, editable from the plan header:
 
-- **Night** — the observation date used to compute transit times and altitude curves.
+- **Night** — the observation date used to compute the "Highest at" times and altitude curves.
 - **Setup** — the gear setup (telescope + camera + accessory) used to size the FOV frames on the map.
 
 ### Adding targets
@@ -232,7 +232,7 @@ Targets can be added to a plan from two places:
 - **Suggestions tab** — click the bookmark icon on any recommendation card and choose a plan (or create a new one).
 - **Search results** — open a DSO info panel from the search box and use the same bookmark button.
 
-Each plan entry shows the object name, type, transit time, and a link to open it on the map.
+Each plan entry shows the object name, type, "Highest at" time, and a link to open it on the map.
 
 ### Viewing a plan on the map
 
@@ -242,11 +242,11 @@ Use the **Show on map / Hide from map** toggle in the plan header to show or hid
 
 ### Reordering and removing entries
 
-Entries cannot be reordered by hand: use the **Sort by** dropdown in the plan (transit time by default, or max altitude, interest, brightness, size, name, difficulty, observation window) — the choice is saved per plan and also sets the order of the exported PDF. Click the × button on an entry to remove it from the plan (the DSO itself is not deleted).
+Entries cannot be reordered by hand: use the **Sort by** dropdown in the plan (time at highest by default, or max altitude, interest, brightness, size, name, difficulty, observation window) — the choice is saved per plan and also sets the order of the exported PDF. Click the × button on an entry to remove it from the plan (the DSO itself is not deleted).
 
 ### Exporting a plan
 
-Click **Export as PDF** in the plan header to generate a printable observation sheet with the target list, transit times, and FOV sketches.
+Click **Export as PDF** in the plan header to generate a printable observation sheet with the target list, "Highest at" times, and FOV sketches.
 
 ---
 

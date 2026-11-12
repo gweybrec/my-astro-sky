@@ -902,7 +902,7 @@ describe('the search settings sheet', () => {
       'Intérêt photo',
       'Score global',
       'Altitude max.',
-      'Heure de transit',
+      'Heure au plus haut',
       'Luminosité',
       'Taille',
       'Remplissage du champ',
