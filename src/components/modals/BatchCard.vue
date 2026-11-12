@@ -460,12 +460,18 @@ async function openManual() {
     });
     if (result.action === 'validate') {
       props.item.solveCorrespondences = result.correspondences;
+      props.item.manualPlacement = null;
       props.item.wcsResult = null;
       props.item.status = 'success';
       manualLoaded.value = true;
     } else if (result.action === 'manual-placement') {
-      // The photo was handed off to free-drag placement (it self-saves & places).
-      emit('remove');
+      // Dragged into place on the map: the card keeps it, saved with its metadata on placing.
+      props.item.solveCorrespondences = result.correspondences;
+      props.item.manualPlacement = result.placement;
+      props.item.wcsResult = null;
+      if (props.item.dsoIds.length === 0) props.item.dsoIds = result.dsoIds;
+      props.item.status = 'success';
+      manualLoaded.value = true;
     }
   } finally {
     manualBusy.value = false;
@@ -486,6 +492,7 @@ async function handleReuse() {
       if (result.success && result.correspondences && result.correspondences.length >= 1) {
         props.item.wcsResult = result;
         props.item.solveCorrespondences = result.correspondences;
+        props.item.manualPlacement = null;
         props.item.status = 'success';
         props.item.dsoIds = result.dsoIds ?? [];
         reuseLoaded.value = true;

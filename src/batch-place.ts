@@ -4,6 +4,7 @@ import type {
   PhotoIntegration,
   PointOfInterest,
   CaptureDetails,
+  ManualPlacement,
 } from '@myastrosky/core/types';
 import type { BatchItem } from './batch-types';
 import { sanitizeIntegrationRows } from './batch-utils';
@@ -12,7 +13,7 @@ import { sanitizeCaptureDetails } from '@myastrosky/core/capture-fields';
 type UploadFn = (
   file: File,
   correspondences: PhotoCorrespondence[],
-  manualPlacement?: undefined,
+  manualPlacement?: ManualPlacement,
   onProgress?: undefined,
   metadata?: {
     dsoIds?: string[];
@@ -37,7 +38,10 @@ export async function placeBatchItem(
   item.status = 'placing';
   delete item.uploadError;
   try {
-    const photo = await uploadFn(item.file, item.solveCorrespondences!, undefined, undefined, {
+    const photo = await uploadFn(item.file, item.solveCorrespondences!,
+      item.manualPlacement ?? undefined,
+      undefined,
+      {
       dsoIds: item.dsoIds,
       labels: [...new Set([...item.labels, ...batchLabels])],
       pointsOfInterest: item.pointsOfInterest,

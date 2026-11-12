@@ -600,6 +600,7 @@ async function handleSolveSuccess(item: BatchItem, result: PlateSolveResult) {
   if (cancelled) return;
 
   item.solveCorrespondences = correspondences;
+  item.manualPlacement = null;
   item.status = 'success';
   if (autoPlace.value) autoPlaceItem(item);
 }

@@ -29,6 +29,7 @@ export function applyWcsResultToItem(
   const meta = wcsPhotoMetadata(result, imgWidth, imgHeight)!;
   item.wcsResult = result;
   item.solveCorrespondences = result.correspondences;
+  item.manualPlacement = null;
   item.status = 'success';
 
   // WCS solving doesn't return DSOs from the server; they are derived from the solved correspondences.

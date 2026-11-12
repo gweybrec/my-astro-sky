@@ -13,12 +13,10 @@ import {
   buildSyntheticCorrespondences,
   currentPlacement,
   photoSkyModel,
-  computeManualMatrix,
   withAngleOnSky,
   formatZoomPercent,
 } from '@myastrosky/core/photo-placement';
 import {
-  uploadPhoto,
   deletePhotoAPI,
   searchStarsAPI,
   searchStarsByPosition,
@@ -48,8 +46,16 @@ import { logDebug } from '@myastrosky/core/platform/log';
 /** Result of the manual star-identification sub-modal (see openManualIdentifyModal). */
 export type ManualIdentifyResult =
   | { action: 'validate'; correspondences: PhotoCorrespondence[] }
-  | { action: 'manual-placement' }
+  | ({ action: 'manual-placement' } & ManualPlacementResult)
   | { action: 'cancel' };
+
+/** A photo dragged into place on the map (see openManualPlacement), not saved yet. */
+export interface ManualPlacementResult {
+  correspondences: PhotoCorrespondence[];
+  placement: ManualPlacement;
+  /** The catalogue objects the placed photo covers. */
+  dsoIds: string[];
+}
 
 const MARKER_COLORS = ['#ff4444', '#44cc44', '#4488ff'];
 const DEFAULT_INTEGRATION_FILTERS = ['L', 'R', 'G', 'B', 'Ha', 'OIII', 'SII', 'RGB'];
@@ -722,8 +728,8 @@ export class PhotoOverlay extends PhotoLayer {
    * Resolves with:
    *  - `{ action: 'validate', correspondences }` when the user clicks Validate
    *    (enabled once 2+ points are identified),
-   *  - `{ action: 'manual-placement' }` if they hand off to free-drag placement
-   *    (which self-saves and places the photo), or
+   *  - `{ action: 'manual-placement', correspondences, placement, dsoIds }` once the
+   *    photo is dragged into place on the map and validated (not saved yet), or
    *  - `{ action: 'cancel' }` otherwise.
    */
   openManualIdentifyModal(
@@ -824,18 +830,14 @@ export class PhotoOverlay extends PhotoLayer {
       formSide.appendChild(manualBtn);
 
       manualBtn.addEventListener('click', () => {
-        const initialMeta = opts?.initialMeta ?? {
-          originalName: stripExtension(file.name),
-          dsoIds: [],
-          labels: [],
-          pointsOfInterest: [],
-          integrations: [],
-          observationDate: null,
-          notes: '',
-        };
-        // Hand off to the free-drag placement flow (it self-saves & places the photo).
-        finish({ action: 'manual-placement' });
-        this.openManualPlacement(file, initialMeta, opts?.hostBackdrop);
+        // Free-drag placement on the map: this dialog steps aside meanwhile. Validating
+        // hands the placement back to the caller (which saves it with its metadata);
+        // cancelling comes back here.
+        backdrop.style.display = 'none';
+        void this.openManualPlacement(file, opts?.hostBackdrop).then((placed) => {
+          if (placed) finish({ action: 'manual-placement', ...placed });
+          else backdrop.style.display = '';
+        });
       });
 
       // Divider between map placement and star identification
@@ -1590,21 +1592,20 @@ export class PhotoOverlay extends PhotoLayer {
   /**
    * Open manual placement mode: semi-transparent photo draggable on the map.
    * `hostBackdrop` (a dialog left open behind, e.g. the batch dialog) is hidden until it ends.
+   * Resolves with the placement when validated (nothing is saved here), or null when cancelled.
    */
   openManualPlacement(
     file: File,
-    initialMeta?: {
-      originalName?: string;
-      dsoIds: string[];
-      labels: string[];
-      pointsOfInterest?: PointOfInterest[];
-      integrations?: PhotoIntegration[];
-      observationDate?: string | null;
-      notes: string;
-    },
     hostBackdrop?: HTMLElement | null,
+  ): Promise<ManualPlacementResult | null> {
+    return new Promise((resolve) => this.runManualPlacement(file, hostBackdrop, resolve));
+  }
+
+  private runManualPlacement(
+    file: File,
+    hostBackdrop: HTMLElement | null | undefined,
+    resolve: (result: ManualPlacementResult | null) => void,
   ) {
-    const view = this.getView();
     if (hostBackdrop) hostBackdrop.style.display = 'none';
 
     // Create preview img element
@@ -1785,84 +1786,42 @@ export class PhotoOverlay extends PhotoLayer {
     };
 
     // Cancel
-    cancelBtn.addEventListener('click', cleanup);
+    cancelBtn.addEventListener('click', () => {
+      cleanup();
+      resolve(null);
+    });
 
-    // Validate
-    validateBtn.addEventListener('click', async () => {
+    // Validate: hand the placement back; the caller saves the photo with its metadata.
+    validateBtn.addEventListener('click', () => {
       if (!naturalWidth || !naturalHeight) return;
-      validateBtn.disabled = true;
-      validateBtn.textContent = t('manual.processing');
+      logDebug('Manual Validation', 'Placement', { placement });
+      logDebug('Manual Validation', `Photo dimensions: ${naturalWidth} x ${naturalHeight}`);
 
-      try {
-        logDebug('Manual Validation', 'Placement', { placement });
-        logDebug('Manual Validation', `Photo dimensions: ${naturalWidth} x ${naturalHeight}`);
-
-        const correspondences = buildSyntheticCorrespondences(
-          placement,
-          naturalWidth,
-          naturalHeight,
-          this.getView(),
-        );
-        if (!correspondences) {
-          showToast({ message: t('manual.noStarsFound'), type: 'error', duration: 5000 });
-          validateBtn.disabled = false;
-          validateBtn.textContent = t('manual.validate');
-          return;
-        }
-
-        logDebug('Manual Validation', 'Generated correspondences', { correspondences });
-
-        // Compute DSOs from placement geometry if not already provided
-        let metaToUpload = initialMeta;
-        if (!metaToUpload) {
-          metaToUpload = {
-            dsoIds: [],
-            labels: [],
-            pointsOfInterest: [],
-            integrations: [],
-            observationDate: null,
-            notes: '',
-          };
-        }
-        if (metaToUpload.dsoIds.length === 0) {
-          // The objects the photo covers, where its placement puts it on the sky.
-          const model = photoSkyModel({
-            width: naturalWidth,
-            height: naturalHeight,
-            correspondences: [],
-            manualPlacement: placement,
-          });
-          metaToUpload = {
-            ...metaToUpload,
-            dsoIds: model
-              ? findDSOsInImage(model, naturalWidth, naturalHeight).map((d) => d.id)
-              : [],
-          };
-        }
-
-        // Compute the manual CSS matrix for comparison
-        const view = this.getView();
-        const manualMatrix = computeManualMatrix(placement, view, naturalWidth, naturalHeight);
-        logDebug('Manual Validation', 'Manual CSS matrix', { manualMatrix, view });
-        (window as any).__manualMatrix = manualMatrix; // Store for comparison
-
-        const photo = await uploadPhoto(file, correspondences, placement, undefined, {
-          ...metaToUpload,
-          observationDate: metaToUpload.observationDate ?? null,
-          displayName: initialMeta?.originalName || stripExtension(file.name),
-        });
-        cleanup();
-        this.addPhotoToMap(photo);
-        this.fireOnPhotosChanged();
-      } catch (err: any) {
-        showToast({
-          message: t('modal.uploadError', { message: err.message }),
-          type: 'error',
-          duration: 5000,
-        });
-        validateBtn.disabled = false;
-        validateBtn.textContent = t('manual.validate');
+      const correspondences = buildSyntheticCorrespondences(
+        placement,
+        naturalWidth,
+        naturalHeight,
+        this.getView(),
+      );
+      if (!correspondences) {
+        showToast({ message: t('manual.noStarsFound'), type: 'error', duration: 5000 });
+        return;
       }
+      logDebug('Manual Validation', 'Generated correspondences', { correspondences });
+
+      // The objects the photo covers, where its placement puts it on the sky.
+      const model = photoSkyModel({
+        width: naturalWidth,
+        height: naturalHeight,
+        correspondences: [],
+        manualPlacement: placement,
+      });
+      const dsoIds = model
+        ? findDSOsInImage(model, naturalWidth, naturalHeight).map((d) => d.id)
+        : [];
+
+      cleanup();
+      resolve({ correspondences, placement: { ...placement }, dsoIds });
     });
   }
 

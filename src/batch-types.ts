@@ -4,6 +4,7 @@ import type {
   PhotoIntegration,
   PointOfInterest,
   CaptureDetails,
+  ManualPlacement,
   Photo,
 } from '@myastrosky/core/types';
 
@@ -34,6 +35,8 @@ export interface BatchItem {
   fovDeg: number | null;
   wcsResult: PlateSolveResult | null;
   solveCorrespondences: PhotoCorrespondence[] | null;
+  /** Set when the photo was dragged into place on the map (saved with the photo). */
+  manualPlacement?: ManualPlacement | null;
   status: BatchItemStatus;
   photo: Photo | null;
   error: string;

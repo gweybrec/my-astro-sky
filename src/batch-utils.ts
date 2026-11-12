@@ -26,6 +26,7 @@ export function sanitizeIntegrationRows(rows: PhotoIntegration[]): PhotoIntegrat
 export function clearWcsSolution(item: BatchItem): void {
   item.wcsResult = null;
   item.solveCorrespondences = null;
+  item.manualPlacement = null;
   if (item.status === 'success' || item.status === 'wcs-ready') {
     item.status = 'pending';
   }

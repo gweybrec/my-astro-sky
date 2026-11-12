@@ -46,6 +46,32 @@ function makeItem(overrides: Partial<BatchItem> = {}): BatchItem {
 }
 
 describe('placeBatchItem — state transitions', () => {
+  it('saves a photo dragged into place on the map with its placement and the card metadata', async () => {
+    const placement = {
+      centerRa: 83.8,
+      centerDec: -5.4,
+      rotationDeg: 10,
+      projPerPx: 0.001,
+      mirrorX: false,
+      mirrorY: false,
+      angleOnSky: true,
+    };
+    const item = makeItem({ manualPlacement: placement, customName: 'Orion', notes: 'edited' });
+    const uploadFn = vi.fn().mockResolvedValue(fakePhoto);
+
+    await placeBatchItem(item, [], uploadFn as any, vi.fn(), t);
+
+    const [, , sentPlacement, , meta] = uploadFn.mock.calls[0];
+    expect(sentPlacement).toEqual(placement);
+    expect(meta).toMatchObject({ displayName: 'Orion', notes: 'edited' });
+  });
+
+  it('sends no placement for a plate-solved photo', async () => {
+    const uploadFn = vi.fn().mockResolvedValue(fakePhoto);
+    await placeBatchItem(makeItem(), [], uploadFn as any, vi.fn(), t);
+    expect(uploadFn.mock.calls[0][2]).toBeUndefined();
+  });
+
   it('transitions success → placing → placed on successful upload', async () => {
     const item = makeItem();
     const onPlaced = vi.fn();
