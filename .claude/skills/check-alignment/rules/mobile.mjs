@@ -507,16 +507,6 @@ export const rules = [
     children: '.mob-fact-label, .mob-fact-value',
   },
   { id: 'ribbon-edge', type: 'sameStart', bars: '.mob-map-ribbon', children: 'ion-button' },
-  // The object sheet's facts and buttons start at the same edge as its title; its buttons end at the same edge too
-  // (facts are as wide as their text).
-  {
-    id: 'sheet-edges',
-    type: 'edges',
-    within: '.mob-map-sheet, .mob-sheet',
-    lefts:
-      '.mob-fact:first-child, .mob-icon-row > :first-child, .mob-pager-page:first-child > :first-child, .mob-slider-label',
-    rights: '.mob-icon-row:not(.mob-icon-row--start) > :last-child',
-  },
   // The gallery's tiles make columns between the same two edges: two in portrait, six in landscape. The first tile of
   // every sixth is in the first column in both, and the sixth of every six in the last.
   {
@@ -532,13 +522,6 @@ export const rules = [
     type: 'edges',
     within: '.mob-photo-card',
     lefts: '.mob-photo-card-name, .mob-tags > :first-child',
-  },
-  // On the map, the top row's last button and a photo's column of buttons end on the same line.
-  {
-    id: 'map-edges',
-    type: 'edges',
-    within: '.mob-map',
-    rights: '.mob-map-top > ion-button:last-child, .mob-map-ribbon > ion-button',
   },
   // Every button is a touch target of at least 48 by 48.
   {
