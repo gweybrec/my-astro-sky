@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
+import { useMapPortStore } from '@myastrosky/app-state/stores/map-port';
 import { SKY_TIME_SETTINGS_KEY, RATE_LADDER } from '@myastrosky/core/sky-time-settings';
 import { twilightWindow } from '@myastrosky/core/astro-time';
 
@@ -429,12 +430,44 @@ describe('sky-time store', () => {
       expect(store.localSkyMode).toBe(true);
     });
 
-    it('auto-disables when leaving date mode', () => {
+    it('is not applied outside date mode, but keeps its switch for the next return to date mode', () => {
       const store = useSkyTimeStore();
       store.toggleMode(); // -> date
       store.setLocation(45, 4);
       store.setLocalSkyMode(true);
       store.toggleMode(); // -> live
+      expect(store.localSkyMode).toBe(false);
+      expect(store.localSkyWanted).toBe(true);
+      expect(JSON.parse(localStorage.getItem(SKY_TIME_SETTINGS_KEY)!).localSkyMode).toBe(true);
+      store.toggleMode(); // -> date
+      expect(store.localSkyMode).toBe(true);
+    });
+
+    it('drives the map projection when date mode is left and re-entered', () => {
+      const setLocalSkyMode = vi.fn();
+      useMapPortStore().skyMap = {
+        setSkyTimeMode: vi.fn(),
+        setSimDate: vi.fn(),
+        setObserverLocation: vi.fn(),
+        setLocalSkyMode,
+      } as never;
+      const store = useSkyTimeStore();
+      store.toggleMode(); // -> date
+      store.setLocation(45, 4);
+      store.setLocalSkyMode(true);
+      store.toggleMode(); // -> live
+      store.toggleMode(); // -> date
+      expect(setLocalSkyMode.mock.calls).toEqual([[true], [false], [true]]);
+    });
+
+    it('a switch turned off stays off when date mode is re-entered', () => {
+      const store = useSkyTimeStore();
+      store.toggleMode(); // -> date
+      store.setLocation(45, 4);
+      store.setLocalSkyMode(true);
+      store.setLocalSkyMode(false);
+      store.toggleMode(); // -> live
+      store.toggleMode(); // -> date
       expect(store.localSkyMode).toBe(false);
     });
 

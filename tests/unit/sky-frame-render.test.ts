@@ -8,7 +8,10 @@ import {
   renderFovInstances,
   renderOverlay,
   renderSelectionRing,
+  renderTrajectory,
 } from '@myastrosky/render/sky-frame-render';
+import { computeTrajectory } from '@myastrosky/core/sky-trajectory';
+import { dateToJD, lstHours } from '@myastrosky/core/astro-time';
 import { setDsoCatalog } from '@myastrosky/core/catalog/dso-registry';
 import { setStarCatalog } from '@myastrosky/core/catalog/star-registry';
 import { SKY_THEME } from '@myastrosky/core/sky-themes';
@@ -197,5 +200,52 @@ describe('the selected DSO ring', () => {
     const none = mockCtx();
     renderOverlay(selectionScene(none, null));
     expect(none.stroke).not.toHaveBeenCalled();
+  });
+});
+
+describe('the selected object trajectory', () => {
+  const simDate = new Date('2026-10-15T22:00:00');
+  const lat = 48.58;
+  const lon = 7.75;
+  const horizon = { lstH: lstHours(dateToJD(simDate), lon), latDeg: lat };
+  const trajectoryScene = (ctx: ReturnType<typeof mockCtx>) =>
+    ({
+      ctx,
+      view: exportView,
+      theme: SKY_THEME,
+      highlightedDSO: null,
+      highlightedStar: null,
+      skyTimeMode: 'date',
+      horizon,
+      fovFrameSpecs: [],
+      frames: { frames: [] },
+      regionDrawActive: false,
+      regionDrawPoints: [],
+      activeRegionOverlay: null,
+      // The pole-centred projection: the trajectory no longer needs the local one.
+      localSkyMode: false,
+      trajectory: computeTrajectory(10.68, 41.27, lat, lon, simDate),
+      poiPins: [],
+      borderLatDeg: -30,
+      belowHorizonAlpha: 0.18,
+      showMountainHorizon: false,
+      showCardinalPoints: false,
+      cssVar: (_: string, fallback: string) => fallback,
+    }) as unknown as SkyScene;
+
+  it('is drawn in the pole-centred projection, its part below the horizon faded', () => {
+    const ctx = mockCtx();
+    const alphas: number[] = [];
+    ctx.stroke.mockImplementation(() => alphas.push(ctx.globalAlpha));
+    renderTrajectory(trajectoryScene(ctx));
+    // M31 at 48.6° N dips below the horizon: both parts are traced, then the hour markers.
+    expect(alphas.slice(0, 2)).toEqual([0.18, 1]);
+    expect(ctx.lineTo.mock.calls.length).toBeGreaterThan(100);
+  });
+
+  it('is part of the overlay pass in the sky of the day', () => {
+    const ctx = mockCtx();
+    renderOverlay(trajectoryScene(ctx));
+    expect(ctx.stroke).toHaveBeenCalled();
   });
 });

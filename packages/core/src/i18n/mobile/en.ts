@@ -207,7 +207,7 @@ const en: Translations['mobile'] = {
     cardinalPointsInfo:
       'Writes N, E, S and W on the horizon, so you know which way to look from your observing location.',
     trajectoryInfo:
-      'Draws the path the selected object follows across the sky during the night. Available in the local projection only.',
+      'Draws the path the selected object follows across the sky during the night. The observing location must be set first (Settings).',
     relief: 'Terrain horizon',
     reliefInfo:
       'Draws the line of the mountains and obstacles around your observing location. The terrain horizon must be computed or imported first (Settings).',

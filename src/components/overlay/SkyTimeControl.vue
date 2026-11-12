@@ -221,7 +221,7 @@
         type="button"
         class="sky-rotation-btn"
         :class="{ active: store.showTrajectory }"
-        :disabled="!store.localSkyMode"
+        :disabled="store.lat === null || store.lon === null"
         :title="t('skyTime.trajectoryButton')"
         :aria-label="t('skyTime.trajectoryButton')"
         @click="store.setShowTrajectory(!store.showTrajectory)"

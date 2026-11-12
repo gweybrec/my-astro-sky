@@ -207,7 +207,7 @@ const es: Translations['mobile'] = {
     cardinalPointsInfo:
       'Escribe N, E, S y O en el horizonte, para saber hacia dónde mirar desde tu lugar de observación.',
     trajectoryInfo:
-      'Traza el camino que sigue el objeto seleccionado en el cielo durante la noche. Disponible solo en la proyección local.',
+      'Traza el camino que sigue el objeto seleccionado en el cielo durante la noche. Primero hay que definir el lugar de observación (Ajustes).',
     relief: 'Horizonte del relieve',
     reliefInfo:
       'Dibuja la línea de las montañas y los obstáculos alrededor de tu lugar de observación. Primero hay que calcular o importar el horizonte del relieve (Ajustes).',

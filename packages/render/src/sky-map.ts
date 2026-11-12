@@ -1786,7 +1786,7 @@ export class SkyMap {
       if (scene.frames.frames.length > 0) {
         renderFovInstances(scene);
       }
-      if (scene.trajectory && scene.localSkyMode) {
+      if (scene.trajectory && scene.skyTimeMode === 'date') {
         renderTrajectory(scene);
       }
       if (scene.poiPins.length > 0) {
@@ -1834,14 +1834,14 @@ export class SkyMap {
   }
 
   /**
-   * The highlighted DSO's (or star's) arc across tonight's dome — null unless the
-   * overlay is on, Local Sky is active and something is selected. Only meaningful in
-   * the zenith projection: pole-centred, the object's RA/Dec never moves, so its
-   * "path" would collapse to a single point. `computeTrajectory` memoises, so calling
-   * this once per frame is cheap.
+   * The highlighted DSO's (or star's) path across tonight's sky — null unless the
+   * overlay is on, the sky is shown at a date with a location, and something is selected.
+   * Drawn in either projection: its alt/az samples are placed against the current horizon,
+   * so pole-centred it is the object's daily circle with the horizon cutting it.
+   * `computeTrajectory` memoises, so calling this once per frame is cheap.
    */
   private computeTrajectoryForSelection(): Trajectory | null {
-    if (!this.showTrajectory || !this.localSkyMode) return null;
+    if (!this.showTrajectory || this.skyTimeMode !== 'date') return null;
     if (this.obsLat === null || this.obsLon === null) return null;
     const target =
       (this.highlightedDSO ? getDSOById(this.highlightedDSO) : null) ??

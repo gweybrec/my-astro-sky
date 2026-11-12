@@ -41,7 +41,12 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
   const showPlanets = ref(s.showPlanets);
   const showAzimuthGrid = ref(s.showAzimuthGrid);
   const showCardinalPoints = ref(s.showCardinalPoints);
-  const localSkyMode = ref(s.localSkyMode);
+  // The local projection switch as the user left it, persisted. Like the other date-mode layers it survives leaving
+  // the sky of the day: the projection is only applied while date mode and a location make it meaningful.
+  const localSkyWanted = ref(s.localSkyMode);
+  const localSkyMode = computed(
+    () => mode.value === 'date' && localSkyWanted.value && lat.value !== null && lon.value !== null,
+  );
   const showTrajectory = ref(s.showTrajectory);
 
   let hasSeededLocation = lat.value !== null || lon.value !== null;
@@ -75,7 +80,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
       showPlanets: showPlanets.value,
       showAzimuthGrid: showAzimuthGrid.value,
       showCardinalPoints: showCardinalPoints.value,
-      localSkyMode: localSkyMode.value,
+      localSkyMode: localSkyWanted.value,
       showTrajectory: showTrajectory.value,
     };
   }
@@ -140,9 +145,9 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
 
   function setMode(next: 'live' | 'date') {
     if (next === mode.value) return;
-    // Local-sky mode needs date mode + a location; leaving date mode breaks that
-    // precondition, so disable it first (updates the persisted flag too).
-    if (next !== 'date' && localSkyMode.value) setLocalSkyMode(false);
+    // The local projection needs date mode: leaving it switches the projection off on the map, but the switch keeps
+    // its position, and coming back to date mode brings the projection back.
+    const localBefore = localSkyMode.value;
     mode.value = next;
     if (next === 'date') activateDateMode();
     // showMoon, showSun, showPlanets, and showAzimuthGrid are intentionally left as-is:
@@ -151,6 +156,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     // hides them while in live mode (they only make sense relative to a simulated
     // date/time), not this store.
     canvasStore.skyMap?.setSkyTimeMode(mode.value);
+    if (localSkyMode.value !== localBefore) applyLocalSky();
     updateTicker();
     persist();
   }
@@ -180,17 +186,19 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
   }
 
   function setLocation(newLat: number | null, newLon: number | null) {
-    if ((newLat === null || newLon === null) && localSkyMode.value) setLocalSkyMode(false);
+    const localBefore = localSkyMode.value;
+    if ((newLat === null || newLon === null) && localSkyWanted.value) localSkyWanted.value = false;
     lat.value = newLat;
     lon.value = newLon;
     hasSeededLocation = true;
     canvasStore.skyMap?.setObserverLocation(newLat, newLon);
+    if (localSkyMode.value !== localBefore) applyLocalSky();
     persist();
   }
 
   /**
    * The zenith-centered "local sky" view — only meaningful in date mode with an
-   * observer location set (alt/az is undefined otherwise); rejected otherwise.
+   * observer location set (alt/az is undefined otherwise); switching it on is rejected otherwise.
    * Hemisphere/border-lat have no effect while this is active (see
    * DisplayControlsSection.vue), but the Stereo/Fisheye radial-style pill stays
    * independent — it now picks the radial falloff around the zenith instead of
@@ -198,14 +206,18 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
    */
   function setLocalSkyMode(v: boolean) {
     if (v && !(mode.value === 'date' && lat.value !== null && lon.value !== null)) return;
-    localSkyMode.value = v;
-    const sm = canvasStore.skyMap;
+    localSkyWanted.value = v;
+    applyLocalSky();
+    persist();
+  }
+
+  /** Pushes whether the local projection is shown (`localSkyMode`) to the map and the photo layer. */
+  function applyLocalSky() {
     const ov = canvasStore.overlay;
     const displayStore = useDisplayStore();
-    sm?.setLocalSkyMode(v);
+    canvasStore.skyMap?.setLocalSkyMode(localSkyMode.value);
     ov?.setBorderParams(displayStore.hemisphere, displayStore.borderLatDeg);
     ov?.updateTransforms();
-    persist();
   }
 
   /**
@@ -375,6 +387,7 @@ export const useSkyTimeStore = defineStore('sky-time', () => {
     showAzimuthGrid,
     showCardinalPoints,
     localSkyMode,
+    localSkyWanted,
     showTrajectory,
     effectiveRate,
     // actions

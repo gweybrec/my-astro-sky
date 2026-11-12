@@ -19,14 +19,14 @@ import planetsIcon from '@icons/planets.svg?raw';
 
 // The board "Ciel, calques de la carte", opened by the calendar button: the switch between the live sky and the sky
 // at a date, then the layers of the map (the desktop's map toolbar, plus the cardinal points of its keyboard shortcut).
-// The layers show only with the sky at a date: without it they are greyed out. A layer that needs something else
-// (a location, the local projection, a terrain horizon) is greyed out too; its "i" says what it needs.
+// The layers show only with the sky at a date: without it they are greyed out, keeping their position for the next
+// time. A layer that needs something else (a location, a terrain horizon) is greyed out too; its "i" says what it needs.
 const emit = defineEmits<{ close: [] }>();
 const time = useSkyTimeStore();
 const horizon = useHorizonProfileStore();
 const {
   mode,
-  localSkyMode,
+  localSkyWanted,
   showAzimuthGrid,
   showCardinalPoints,
   showTrajectory,
@@ -53,7 +53,7 @@ const noLocation = computed(() => lat.value === null || lon.value === null);
     />
     <PhoneSectionHeader>{{ t('mobile.sky.layersSection') }}</PhoneSectionHeader>
     <PhoneToggleRow
-      :model-value="localSkyMode"
+      :model-value="localSkyWanted"
       :title="t('mobile.sky.localSky')"
       :info="t('mobile.sky.localSkyInfo')"
       :icon="localSkyIcon"
@@ -81,7 +81,7 @@ const noLocation = computed(() => lat.value === null || lon.value === null);
       :title="t('skyTime.trajectoryButton')"
       :info="t('mobile.sky.trajectoryInfo')"
       :icon="trajectoryIcon"
-      :disabled="!dateMode || !localSkyMode"
+      :disabled="!dateMode || noLocation"
       @update:model-value="time.setShowTrajectory"
     />
     <PhoneToggleRow

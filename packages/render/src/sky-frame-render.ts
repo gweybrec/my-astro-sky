@@ -78,7 +78,7 @@ export function renderOverlay(s: SkyScene): void {
   const hasFrames = s.fovFrameSpecs.length > 0 || s.frames.frames.length > 0;
   const hasRegionDraw = s.regionDrawActive && s.regionDrawPoints.length > 0;
   const hasRegionOverlay = s.activeRegionOverlay !== null && s.localSkyMode;
-  const hasTrajectory = s.trajectory !== null && s.localSkyMode && horizon !== null;
+  const hasTrajectory = s.trajectory !== null && horizon !== null;
   const hasPins = s.poiPins.length > 0;
   const hasSelection = s.highlightedDSO !== null || s.highlightedStar !== null;
   if (
@@ -256,12 +256,15 @@ export function renderRegionOverlay(s: SkyScene): void {
 }
 
 /**
- * Draws the highlighted object's night path across the local-sky dome: a bright
- * dotted arc plus a labelled dot every couple of hours (see sky-trajectory.ts).
+ * Draws the highlighted object's path across the night's sky: a bright dotted arc plus
+ * a labelled dot every couple of hours (see sky-trajectory.ts). Each alt/az sample is
+ * placed against the current horizon, so it works in both projections.
  *
- * Unlike `traceAltAzPath`, this pen-lifts on below-horizon samples instead of
- * connecting them — a region is a closed polygon, an arc is not, and without the lift
- * the object's rise and set points would be joined by a chord straight across the sky.
+ * In the local projection the horizon is the map's edge: below-horizon samples fall off
+ * the projection and the pen lifts there (a region is a closed polygon, an arc is not:
+ * without the lift the rise and set points would be joined by a chord across the sky).
+ * In the pole-centred projection the below-horizon part stays on the map and is drawn
+ * faded, like the rest of the sky under the horizon.
  */
 export function renderTrajectory(s: SkyScene): void {
   const { ctx, view } = s;
@@ -273,27 +276,38 @@ export function renderTrajectory(s: SkyScene): void {
   ctx.shadowColor = TRAJECTORY.halo;
   ctx.shadowBlur = TRAJECTORY.haloBlur;
 
-  ctx.beginPath();
-  let penDown = false;
-  for (const sample of traj.samples) {
+  // Canvas positions of the samples (null off the projection), traced twice: the part
+  // below the horizon faded, then the part above it.
+  const points = traj.samples.map((sample) => {
     const { raDeg, decDeg } = raDecFromAltAz(sample.altDeg, sample.azDeg, hp.lstH, hp.latDeg);
     const proj = project(raDeg, decDeg);
-    if (proj.x >= OFF_PROJECTION) {
-      penDown = false; // below the horizon — nothing to join to
-      continue;
+    if (proj.x >= OFF_PROJECTION) return null;
+    return { ...toCanvas(proj.x, proj.y, view), up: sample.altDeg > 0 };
+  });
+  const trace = (up: boolean): void => {
+    ctx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      if (!p || p.up !== up) continue;
+      // A horizon crossing starts this part at the previous sample, so the arc has no gap.
+      const prev = i > 0 ? points[i - 1] : null;
+      if (prev) {
+        if (prev.up !== up) ctx.moveTo(prev.x, prev.y);
+        ctx.lineTo(p.x, p.y);
+      } else {
+        ctx.moveTo(p.x, p.y);
+      }
     }
-    const c = toCanvas(proj.x, proj.y, view);
-    if (penDown) ctx.lineTo(c.x, c.y);
-    else {
-      ctx.moveTo(c.x, c.y);
-      penDown = true;
-    }
-  }
+    ctx.stroke();
+  };
   ctx.strokeStyle = TRAJECTORY.color;
   ctx.lineWidth = TRAJECTORY.lineWidth;
   ctx.lineCap = 'round';
   ctx.setLineDash(TRAJECTORY.dash);
-  ctx.stroke();
+  ctx.globalAlpha = s.belowHorizonAlpha;
+  trace(false);
+  ctx.globalAlpha = 1;
+  trace(true);
   ctx.setLineDash([]);
 
   for (const marker of traj.markers) {

@@ -208,7 +208,7 @@ const de: Translations['mobile'] = {
     cardinalPointsInfo:
       'Schreibt N, O, S und W an den Horizont, damit du weißt, wohin du von deinem Beobachtungsort aus schauen musst.',
     trajectoryInfo:
-      'Zeichnet den Weg, den das ausgewählte Objekt im Lauf der Nacht am Himmel nimmt. Nur in der lokalen Projektion verfügbar.',
+      'Zeichnet den Weg, den das ausgewählte Objekt im Lauf der Nacht am Himmel nimmt. Zuerst muss der Beobachtungsort festgelegt sein (Einstellungen).',
     relief: 'Geländehorizont',
     reliefInfo:
       'Zeichnet die Linie der Berge und Hindernisse um deinen Beobachtungsort. Zuerst muss der Geländehorizont berechnet oder importiert werden (Einstellungen).',

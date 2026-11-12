@@ -448,7 +448,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setShowAzimuthGrid(skyTimeSettings.showAzimuthGrid);
   skyMap.setShowCardinalPoints(skyTimeSettings.showCardinalPoints);
   skyMap.setShowTrajectory(skyTimeSettings.showTrajectory);
-  skyMap.setLocalSkyMode(skyTimeSettings.localSkyMode);
+  // The persisted switch is kept outside date mode; the store's localSkyMode is whether it applies now.
+  skyMap.setLocalSkyMode(useSkyTimeStore(pinia).localSkyMode);
   // Restore the persisted terrain (mountain) horizon profile onto the map.
   useHorizonStore(pinia).applyToCanvas();
 

@@ -206,7 +206,7 @@ const fr = {
     cardinalPointsInfo:
       "Écrit N, E, S et O sur l'horizon, pour savoir de quel côté regarder depuis votre lieu d'observation.",
     trajectoryInfo:
-      "Trace le chemin que suit l'objet sélectionné dans le ciel au cours de la nuit. Disponible en projection locale seulement.",
+      "Trace le chemin que suit l'objet sélectionné dans le ciel au cours de la nuit. Il faut avoir choisi le lieu d'observation (Réglages).",
     relief: 'Horizon du relief',
     reliefInfo:
       "Dessine la ligne des montagnes et des obstacles autour de votre lieu d'observation. Il faut d'abord calculer ou importer l'horizon du relief (Réglages).",

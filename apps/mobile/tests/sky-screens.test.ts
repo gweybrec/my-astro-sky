@@ -108,14 +108,27 @@ describe('the layers sheet ("Ciel, calques de la carte")', () => {
     expect(useSkyTimeStore().localSkyMode).toBe(true);
   });
 
-  it('keeps the trajectory greyed out until the local projection is on', async () => {
+  it('offers the trajectory with a location and the sky at a date, local projection or not', () => {
+    useSkyTimeStore().setMode('date');
+    const trajectory = (w: ReturnType<typeof mount>) =>
+      row(w, "Trajectoire de l'objet sélectionné");
+    expect(trajectory(mountSheet()).props('disabled')).toBe(true);
+    located();
+    expect(useSkyTimeStore().localSkyMode).toBe(false);
+    expect(trajectory(mountSheet()).props('disabled')).toBe(false);
+  });
+
+  it('keeps the local projection switch where it was while the live sky greys it out', async () => {
     located();
     const w = mountSheet();
-    const trajectory = () => row(w, "Trajectoire de l'objet sélectionné");
-    expect(trajectory().props('disabled')).toBe(true);
-    useSkyTimeStore().setLocalSkyMode(true);
+    const time = useSkyTimeStore();
+    time.setLocalSkyMode(true);
+    row(w, 'Ciel du jour').vm.$emit('update:modelValue', false);
     await w.vm.$nextTick();
-    expect(trajectory().props('disabled')).toBe(false);
+    expect(row(w, 'Projection locale').props('disabled')).toBe(true);
+    expect(row(w, 'Projection locale').props('modelValue')).toBe(true);
+    row(w, 'Ciel du jour').vm.$emit('update:modelValue', true);
+    expect(time.localSkyMode).toBe(true);
   });
 
   it('keeps the terrain horizon greyed out until there is a profile', async () => {
@@ -137,7 +150,7 @@ describe('the layers sheet ("Ciel, calques de la carte")', () => {
     await trajectory.find('.mob-toggle-info button').trigger('click');
     expect(showInfo).toHaveBeenCalledWith(
       "Trajectoire de l'objet sélectionné",
-      expect.stringContaining('projection locale'),
+      expect.stringContaining("lieu d'observation"),
     );
   });
 
