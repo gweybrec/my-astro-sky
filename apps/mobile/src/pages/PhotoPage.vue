@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewWillEnter, onIonViewWillLeave } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { Photo } from '@myastrosky/core/types';
 import { photoAsShown, quarterTurnsOf } from '@myastrosky/core/photo-rotation';
+import { photoOverlayCatalogs } from '@myastrosky/core/catalog/dso-registry';
 import { getGearSetups, getPhotos, photoFileUrl, rotatePhotoAPI } from '@myastrosky/app-state/api';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { useErrorToast } from '../composables/useErrorToast';
 import { useDisplayStore } from '@myastrosky/app-state/stores/display';
 import { usePhotoZoom } from '../composables/usePhotoZoom';
 import { usePhotoOverlay } from '../composables/usePhotoOverlay';
+import { catalogsReady } from '../catalogs';
 import { setStatusBarHidden } from '../platform-device';
 import { useLandscape } from '../composables/useLandscape';
 import {
@@ -184,10 +186,20 @@ function show(p: Photo) {
 }
 
 // What is drawn over the photo: off at first, as on the desktop; the catalogues start from the map's and are this
-// photo's own choice afterwards.
+// photo's own choice afterwards. Each photo shown adds the catalogues of the objects it lists, so that they are drawn.
 const showObjects = ref(false);
 const showPois = ref(false);
 const catalogs = ref([...useDisplayStore().dsoCatalogs]);
+watch(
+  () => photo.value?.id,
+  async () => {
+    const p = photo.value;
+    if (!p) return;
+    await catalogsReady();
+    if (photo.value === p) catalogs.value = photoOverlayCatalogs(catalogs.value, p.dsoIds);
+  },
+  { immediate: true },
+);
 const overlay = ref<HTMLCanvasElement | null>(null);
 const { canShowObjects, canShowPois } = usePhotoOverlay({
   canvas: overlay,

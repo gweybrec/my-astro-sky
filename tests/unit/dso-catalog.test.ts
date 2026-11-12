@@ -20,6 +20,7 @@ import {
   getDSOsNear,
   findDSOsInImage,
   findDsoPlacementsInImage,
+  photoOverlayCatalogs,
   findDSOIdsFromCorrespondences,
   getDSOCatalog,
   applyAndStoreSingleOverride,
@@ -592,6 +593,39 @@ describe('findDsoPlacementsInImage()', () => {
   it('returns empty array when the affine is singular', () => {
     const singular: AffineMatrix = { a: 1, b: 2, c: 3, d: 6, e: 0, f: 0 };
     expect(findDsoPlacementsInImage(singular, 100, 100, ALL_CATALOGS)).toEqual([]);
+  });
+});
+
+// ─── photoOverlayCatalogs ────────────────────────────────────────────────────
+
+describe('photoOverlayCatalogs()', () => {
+  it("adds the catalog of a listed object that the sky map's catalogs would not show", () => {
+    // LPN-1 is only in LPN, which the default sky map selection leaves off.
+    expect(photoOverlayCatalogs(['M', 'NGC', 'IC', 'SH2'], ['LPN-1'])).toEqual([
+      'M',
+      'NGC',
+      'IC',
+      'SH2',
+      'LPN',
+    ]);
+  });
+
+  it('adds nothing when an enabled alias already shows the object', () => {
+    // Abell 35 is also SH2-313, so Sharpless already draws it.
+    expect(photoOverlayCatalogs(['SH2'], ['Abell35'])).toEqual(['SH2']);
+  });
+
+  it("adds the object's own catalog when none of its aliases is enabled", () => {
+    expect(photoOverlayCatalogs(['M', 'NGC'], ['Abell35'])).toEqual(['M', 'NGC', 'Abell']);
+  });
+
+  it('resolves an object listed under an alias, and adds each catalog once', () => {
+    // NGC1952 is M1, whose own catalog is Messier.
+    expect(photoOverlayCatalogs(['IC'], ['NGC1952', 'M1'])).toEqual(['IC', 'M']);
+  });
+
+  it('ignores objects the catalog does not know', () => {
+    expect(photoOverlayCatalogs(['M'], ['NOT-A-DSO'])).toEqual(['M']);
   });
 });
 

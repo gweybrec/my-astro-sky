@@ -8,7 +8,11 @@ import { buildMetadataEditorPanel } from './metadata-editor';
 import { t } from './i18n';
 import { confirmPhotoDelete, confirmUnsavedChanges } from './photo-delete-confirm';
 import { createLazyObserver } from './lazy-image';
-import { findDsoPlacementsInImage, type PhotoDsoPlacement } from './dso-catalog';
+import {
+  findDsoPlacementsInImage,
+  photoOverlayCatalogs,
+  type PhotoDsoPlacement,
+} from './dso-catalog';
 import {
   filterGalleryPhotos,
   gallerySetupItems,
@@ -728,9 +732,9 @@ export class Gallery {
     let dsoPlacements: PhotoDsoPlacement[] = [];
     const dsoState = reactive({
       show: false,
-      // Seeded once from the sky map's current catalog selection; not kept in sync
-      // with it afterwards (this photo view's selection is its own).
-      catalogs: [...useDisplayStore(pinia).dsoCatalogs],
+      // Seeded once from the sky map's current catalog selection plus the catalogs of the
+      // objects the photo lists; not kept in sync afterwards (this photo view's selection is its own).
+      catalogs: photoOverlayCatalogs(useDisplayStore(pinia).dsoCatalogs, photo.dsoIds),
     });
 
     // Positioned POIs (identified asteroids, comets, supernovae) are pinned on the same canvas,

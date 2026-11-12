@@ -580,6 +580,28 @@ describe("a photo's own screen", () => {
       expect(w.find('button[aria-label^="Catalogues"]').exists()).toBe(false);
     });
 
+    it('also draws the objects the photo lists from a catalogue the map does not show', async () => {
+      // The real registry, holding Abell 24 alone.
+      const { setDsoCatalog } = await import('@myastrosky/core/catalog/dso-registry');
+      setDsoCatalog(
+        {
+          fields: ['id', 'ra', 'dec', 'type', 'nameFr', 'catalogs'],
+          data: [['Abell24', 117.908, 3.008, 'PN', 'Abell 24', ['Abell24', 'LPN-Abell24']]],
+        } as never,
+        {},
+        'fr',
+      );
+      useDisplayStore().setDsoCatalogs(['M']);
+      getPhotos.mockResolvedValue([photo({ dsoIds: ['Abell24'] })]);
+      const w = mountPage();
+      await flushPromises();
+      await button(w, 'Afficher les objets').trigger('click');
+      await flushPromises();
+      expect(findDsoPlacementsInImage.mock.lastCall![3]).toEqual(new Set(['M', 'Abell']));
+      // the map's own choice is not changed
+      expect(useDisplayStore().dsoCatalogs).toEqual(['M']);
+    });
+
     it('pins the points of interest that have a sky position', async () => {
       getPhotos.mockResolvedValue([
         photo({

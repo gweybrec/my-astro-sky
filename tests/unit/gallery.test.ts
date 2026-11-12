@@ -23,7 +23,13 @@ vi.mock('@myastrosky/render/poi-pins', async (importOriginal) => {
   return { ...real, poiPinsInImage: vi.fn(real.poiPinsInImage) };
 });
 
+vi.mock('../../src/dso-catalog', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../src/dso-catalog')>();
+  return { ...real, photoOverlayCatalogs: vi.fn(real.photoOverlayCatalogs) };
+});
+
 import { Gallery } from '../../src/gallery';
+import { photoOverlayCatalogs } from '../../src/dso-catalog';
 import { poiPinsInImage } from '@myastrosky/render/poi-pins';
 import { setCenterMode, setProjectionObserver } from '@myastrosky/core/projection';
 
@@ -334,6 +340,11 @@ describe('Gallery', () => {
         (document.querySelector('.gallery-cinematic-img') as HTMLImageElement).getAttribute('src'),
       ).toContain('d.jpg');
       expect(document.querySelectorAll('.gallery-cinematic-overlay')).toHaveLength(1);
+    });
+
+    it("starts the DSO overlay with the catalogs of the photo's listed objects", () => {
+      openDetail({ manualPlacement: placement, dsoIds: ['Abell24'] });
+      expect(photoOverlayCatalogs).toHaveBeenCalledWith(expect.any(Array), ['Abell24']);
     });
 
     it('disables the POI button with a reason when no POI has a position', () => {

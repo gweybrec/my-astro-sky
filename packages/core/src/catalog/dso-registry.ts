@@ -575,6 +575,26 @@ export function findDsoPlacementsInImage(
 }
 
 /**
+ * The catalog families a photo's "show DSOs" overlay starts with: the sky map's selection, plus the catalog of every
+ * object the photo lists (`dsoIds`) that none of those families would show. An object the photo is of — Abell 24 on
+ * a sky map that only shows Messier, NGC, IC and Sharpless — is then drawn on it; the viewer can still untick it.
+ */
+export function photoOverlayCatalogs(
+  skyCatalogs: readonly string[],
+  photoDsoIds: readonly string[],
+): string[] {
+  const result = [...skyCatalogs];
+  const enabled = new Set(result);
+  for (const id of photoDsoIds) {
+    const dso = getDSOById(id);
+    if (!dso?.catalog || pickVisibleCatalogAlias(dso, enabled) !== null) continue;
+    enabled.add(dso.catalog);
+    result.push(dso.catalog);
+  }
+  return result;
+}
+
+/**
  * Derive the catalog DSO IDs that fall within an image from plate-solve
  * correspondences (each carrying a photo pixel + its sky RA/Dec). Used as a
  * fallback for solvers that don't return DSOs directly (WCS, ASTAP). Fitted on every
