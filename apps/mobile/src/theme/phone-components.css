@@ -262,6 +262,24 @@ ion-item.mob-row.mob-row--roomy .mob-row-line {
   padding-top: 0;
   padding-bottom: 0;
 }
+/* A target's row (boards "Cibles" and "Ciel, recherche"): the name shares its baseline with the rating's stars at the
+   right end, and gives way to them; the figures follow the designation line, inside the row's gutters. */
+.mob-target-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.mob-target-head .mob-row-title {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.mob-target-head .mob-rating {
+  flex: none;
+}
+.mob-facts.mob-target-facts {
+  padding: var(--space-3) 0 0;
+}
 ion-item.mob-row--disabled .mob-row-title,
 ion-item.mob-row--disabled .mob-row-lead {
   opacity: 0.4;

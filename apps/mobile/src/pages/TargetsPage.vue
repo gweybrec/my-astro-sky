@@ -4,10 +4,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { getAccessories, getCameras, getTelescopes } from '@myastrosky/core/gear-catalog';
-import { formatAlt } from '@myastrosky/core/format-utils';
-import { formatMultiplicity } from '@myastrosky/core/targets/multiplicity';
 import { ALL_DSO_TYPES } from '@myastrosky/core/targets/filters';
-import { formatClock24, todayISO } from '@myastrosky/core/targets/format';
+import { todayISO } from '@myastrosky/core/targets/format';
 import { planSearchPrefs } from '@myastrosky/core/targets/night';
 import { matchesTargetQuery } from '@myastrosky/core/targets/query';
 import type { GearLists } from '@myastrosky/core/targets/plan-setup';
@@ -22,6 +20,7 @@ import { useHorizonProfileStore } from '@myastrosky/app-state/stores/horizon-pro
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
 import { catalogsReady } from '../catalogs';
+import { targetCard } from '../target-card';
 import { useErrorToast } from '../composables/useErrorToast';
 import { useLandscape } from '../composables/useLandscape';
 import { useGrowingList } from '../composables/useGrowingList';
@@ -128,24 +127,19 @@ const {
   reset: resetVisible,
 } = useGrowingList(() => shown.value, CHUNK);
 const rows = computed(() =>
-  visibleTargets.value.map((s) => {
-    const { dso } = s;
-    const mag = dso.mag !== null ? `${t('stars.magnitude')} ${dso.mag.toFixed(1)}` : undefined;
-    return {
-      id: dso.id,
-      title: dso.displayName || dso.catalogs[0] || dso.id,
-      designation: dso.displayName ? dso.catalogs[0] || dso.id : undefined,
-      typeLabel:
-        dso.type === 'MS' && dso.multiplicity
-          ? formatMultiplicity(dso.multiplicity, t)
-          : t(`dso.types.${dso.type}`),
-      constellation: dso.constellation?.toUpperCase(),
-      magnitude: mag,
-      rating: dso.rating !== null ? '★'.repeat(dso.rating) + '☆'.repeat(5 - dso.rating) : undefined,
-      altitude: formatAlt(s.maxAltDeg),
-      time: formatClock24(s.bestTimeUtc),
-    };
-  }),
+  visibleTargets.value.map((s) => ({
+    id: s.dso.id,
+    ...targetCard(
+      s.dso,
+      {
+        bestTimeUtc: s.bestTimeUtc,
+        maxAltDeg: s.maxAltDeg,
+        scorePct: Math.round(s.score * 100),
+        fovFitPct: Math.round(s.fovFitScore * 100),
+      },
+      search.value,
+    ),
+  })),
 );
 
 /** Lets the browser paint the spinner before the long computation blocks the page. */
@@ -382,10 +376,8 @@ function openTarget(id: string) {
             :designation="row.designation"
             :type-label="row.typeLabel"
             :constellation="row.constellation"
-            :magnitude="row.magnitude"
             :rating="row.rating"
-            :altitude="row.altitude"
-            :time="row.time"
+            :facts="row.facts"
             @click="openTarget(row.id)"
           />
         </div>

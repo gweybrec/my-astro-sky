@@ -115,6 +115,8 @@ const es: Translations['mobile'] = {
     fieldPlace: 'Lugar',
     fieldAria: '{name}: {value}',
     typesValue: '{n} tipos',
+    // The magnitude's short label in a target's figures.
+    mag: 'Mag',
     all: 'Todos',
     reset: 'Restablecer',
     apply: 'Aplicar',

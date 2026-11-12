@@ -53,6 +53,18 @@ import checkIcon from '@icons/check.svg?raw';
 import moonIcon from '@icons/moon.svg?raw';
 
 const search = ref('');
+const targetFacts = [
+  { label: 'Au plus haut', value: '21:38 (86°)' },
+  { label: 'Mag', value: '4.0' },
+  { label: 'Taille', value: '2.0°' },
+  { label: 'Score', value: '84 %' },
+  { label: 'Champ', value: '54 %' },
+];
+const targetFactsNoNight = [
+  { label: 'Mag', value: '3.4' },
+  { label: 'Taille', value: '3.2°' },
+  { label: 'Champ', value: '35 %' },
+];
 const color = ref('#4ea1ff');
 const lat = ref('48.58');
 const empty = ref('');
@@ -234,29 +246,30 @@ function raiseError() {
             designation="NGC7000"
             type-label="Nébuleuse en émission"
             constellation="CYG"
-            magnitude="Magnitude 4.0"
             rating="★★★★★"
-            altitude="86°"
-            time="21:38"
+            :facts="targetFacts"
           />
-          <!-- The variants the alignment check measures: a long name, no badge, a long type next to a long designation. -->
+          <!-- The variants the alignment check measures: a long name, no badge, a long type next to a long designation,
+               a searched designation, no night (no highest point nor score), a star. -->
           <PhoneTargetRow
             title="Nébuleuse de la Tête de Cheval et de la Flamme dans la constellation d'Orion"
             designation="Sh2-277 · Barnard 33 · IC 434"
             type-label="Nébuleuse en émission très étendue"
             constellation="ORI"
-            magnitude="Magnitude 6.8"
             rating="★★★☆☆"
-            altitude="52°"
-            time="01:12"
+            :facts="targetFacts"
           />
           <PhoneTargetRow
             title="Sans badge"
-            designation="M31"
-            magnitude="Magnitude 3.4"
+            designation="M31 · NGC224"
             rating="★★★★★"
-            altitude="70°"
-            time="23:05"
+            :facts="targetFactsNoNight"
+          />
+          <PhoneTargetRow
+            title="Véga"
+            designation="α LYR"
+            constellation="LYR"
+            magnitude="Magnitude 0.0"
           />
           <PhoneRow
             title="Un nom de ligne très long qui ne tient pas sur une seule ligne de l'écran du téléphone"

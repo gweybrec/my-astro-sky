@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, onIonViewDidEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
@@ -7,10 +7,16 @@ import { reportError } from '@myastrosky/core/platform/error-hook';
 import { searchUnified, type UnifiedSearchResult } from '@myastrosky/core/search';
 import { buildPhotoQueryMatches, smartSortPhotos } from '@myastrosky/core/photo-search';
 import type { Photo } from '@myastrosky/core/types';
-import { isOtherCatalogDso } from '@myastrosky/core/catalog/dso-registry';
-import { getPhotos } from '@myastrosky/app-state/api';
+import { getAccessories, getCameras, getTelescopes } from '@myastrosky/core/gear-catalog';
+import { presetForSetupId } from '@myastrosky/core/targets/plan-setup';
+import { targetFigures } from '@myastrosky/core/targets/figures';
+import type { GearPreset } from '@myastrosky/core/gear-presets';
+import { getGearSetups, getPhotos } from '@myastrosky/app-state/api';
+import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { catalogsReady } from '../catalogs';
+import { targetCard } from '../target-card';
+import { reloadTargetsPrefs, targetsPrefs } from '../composables/useTargets';
 import { isPlaced } from '../sky-map-setup';
 import { photoTags } from '../photo-tags';
 import { selectSearchResult, skyPhotoFocus, skySelection } from '../composables/useSkySelection';
@@ -24,8 +30,9 @@ import PhoneTags from '../components/PhoneTags.vue';
 import imageIcon from '@icons/image.svg?raw';
 
 // The boards "Ciel, recherche" and "Ciel, recherche, photos": the results in two tabs. "Ciel": a star or a deep-sky
-// object by name or catalogue number, listed as the targets of Cibles are (name, designation with the type and
-// constellation, magnitude). "Photos": the photos placed on the map, found as the desktop's photo field finds them (by
+// object by name or catalogue number. A deep-sky object is listed as the targets of Cibles are, its score and field fit
+// for the setup chosen in Cibles; its highest point and its score need the night, so they show only with the sky of
+// the day on and a location (the night of the map's date). A star keeps its magnitude line. "Photos": the photos placed on the map, found as the desktop's photo field finds them (by
 // name, notes, object, label or point of interest, in its order), each with the chips of what matched. A result is
 // chosen with a tap: the map goes to it and selects it.
 const router = useRouter();
@@ -90,48 +97,67 @@ const photoResults = computed(() => {
   });
 });
 
+// The setup chosen in Cibles, read when the page opens: the figures of a deep-sky object are scored with it.
+const preset = shallowRef<GearPreset | null>(null);
+async function readSetup() {
+  try {
+    reloadTargetsPrefs();
+    await catalogsReady();
+    const [setups, telescopes, cameras, accessories] = await Promise.all([
+      getGearSetups(),
+      getTelescopes(),
+      getCameras(),
+      getAccessories(),
+    ]);
+    const setupId = targetsPrefs.setupId ?? setups[0]?.id ?? null;
+    preset.value = presetForSetupId(setupId, { setups, telescopes, cameras, accessories });
+  } catch (error) {
+    reportError('SkySearchPage.setup', error);
+  }
+}
+void readSetup();
+
+/** The night of the map's date at its location: only with the sky of the day on. */
+const time = useSkyTimeStore();
+const place = computed(() =>
+  time.mode === 'date' && time.lat !== null && time.lon !== null
+    ? { lat: time.lat, lon: time.lon, date: time.simDate }
+    : null,
+);
+
 onIonViewDidEnter(() => field.value?.focus());
 onBeforeUnmount(() => clearTimeout(debounce));
 
-/** The designation line of a deep-sky object: its id and the other catalogues it is known as. */
-function designation(result: UnifiedSearchResult): string | undefined {
-  const { dso, star } = result;
-  if (dso) {
-    const others = dso.catalogs.slice(1);
-    const cross = others.length ? ` (${others.join(' · ')})` : '';
-    // In no named catalogue, the id is only a compact key: the name is the designation
-    return dso.displayName && !isOtherCatalogDso(dso)
-      ? `${dso.id}${cross}`
-      : cross.trim().replace(/^\(|\)$/g, '') || undefined;
-  }
-  if (star?.name) {
-    return star.bayer && star.constellation ? `${star.bayer} ${star.constellation}` : undefined;
-  }
-  return undefined;
+/** A star's designation under its name: its Bayer letter and constellation. */
+function starDesignation(result: UnifiedSearchResult): string | undefined {
+  const { star } = result;
+  return star?.name && star.bayer && star.constellation
+    ? `${star.bayer} ${star.constellation}`
+    : undefined;
 }
 
 function row(result: UnifiedSearchResult) {
   const { dso, star } = result;
-  const magnitude = Number.isFinite(result.mag)
-    ? `${t('stars.magnitude')} ${result.mag.toFixed(1)}`
-    : undefined;
   if (dso) {
-    return {
-      title: dso.displayName || dso.id,
-      designation: designation(result),
-      typeLabel: t(`dso.types.${dso.type}`),
-      constellation: dso.constellation?.toUpperCase(),
-      magnitude,
-    };
+    return targetCard(
+      dso,
+      targetFigures(dso, place.value, preset.value, targetsPrefs),
+      query.value,
+    );
   }
   return {
     title: star?.name || result.label,
-    designation: designation(result),
+    designation: starDesignation(result),
     typeLabel: undefined,
     constellation: star?.constellation?.toUpperCase(),
-    magnitude,
+    magnitude: Number.isFinite(result.mag)
+      ? `${t('stars.magnitude')} ${result.mag.toFixed(1)}`
+      : undefined,
   };
 }
+
+/** The rows of the "Ciel" tab, computed again when the results, the map's night or the setup change. */
+const skyRows = computed(() => results.value.map((result) => ({ result, row: row(result) })));
 
 function choose(result: UnifiedSearchResult) {
   selectSearchResult(result);
@@ -167,9 +193,9 @@ const cancel = () => router.back();
         </div>
         <template v-if="tab === 'sky'">
           <PhoneTargetRow
-            v-for="(result, index) in results"
+            v-for="({ result, row: r }, index) in skyRows"
             :key="`${result.type}-${index}-${result.label}`"
-            v-bind="row(result)"
+            v-bind="r"
             @click="choose(result)"
           />
         </template>

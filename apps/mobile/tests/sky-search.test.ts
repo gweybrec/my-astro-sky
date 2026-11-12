@@ -12,13 +12,27 @@ vi.mock('@myastrosky/app-state/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@myastrosky/app-state/api')>()),
   getPhotos: (...a: unknown[]) => getPhotos(...a),
   getPoiCategories: () => Promise.resolve([]),
+  getGearSetups: () => Promise.resolve([]),
+}));
+vi.mock('@myastrosky/core/gear-catalog', () => ({
+  getTelescopes: () => Promise.resolve([]),
+  getCameras: () => Promise.resolve([]),
+  getAccessories: () => Promise.resolve([]),
+}));
+// The setup chosen in Cibles: a refractor of 400 mm on an APS-C sensor, or none.
+const preset = vi.fn();
+vi.mock('@myastrosky/core/targets/plan-setup', () => ({
+  presetForSetupId: () => preset(),
 }));
 const searchUnified = vi.fn();
-vi.mock('@myastrosky/core/search', () => ({
+vi.mock('@myastrosky/core/search', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@myastrosky/core/search')>()),
   searchUnified: (...a: unknown[]) => searchUnified(...a),
 }));
 
 import SkySearchPage from '../src/pages/SkySearchPage.vue';
+import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
+import type { GearPreset } from '@myastrosky/core/gear-presets';
 import {
   clearSkySelection,
   skyFocus,
@@ -36,9 +50,20 @@ const M31 = {
   type: 'GxS',
   constellation: 'And',
   mag: 3.4,
+  majAxis: 190,
+  rating: 5,
   ra: 10.68,
   dec: 41.27,
 } as unknown as DSO;
+const REFRACTOR: GearPreset = {
+  apertureMm: 80,
+  focalLengthMm: 400,
+  sensorWidthMm: 23.5,
+  sensorHeightMm: 15.6,
+  pixelSizeUm: 3.76,
+  mono: false,
+  builtIn: false,
+} as GearPreset;
 const M32 = {
   id: 'M32',
   catalogs: ['M32', 'NGC221', 'Arp 168'],
@@ -74,10 +99,11 @@ function mountPage() {
     routes: [{ path: '/:p(.*)*', component: { template: '<div />' } }],
   });
   const back = vi.spyOn(router, 'back');
+  const pinia = createPinia();
   const wrapper = mount(SkySearchPage, {
-    global: { stubs: ionicStubs, plugins: [router, createPinia()] },
+    global: { stubs: ionicStubs, plugins: [router, pinia] },
   });
-  return { wrapper, back };
+  return { wrapper, back, time: useSkyTimeStore(pinia) };
 }
 
 const type = async (wrapper: ReturnType<typeof mount>, text: string) => {
@@ -88,9 +114,11 @@ const type = async (wrapper: ReturnType<typeof mount>, text: string) => {
 
 describe('the search page', () => {
   beforeEach(() => {
+    localStorage.clear();
     localStorage.setItem('lang', 'fr');
     vi.useFakeTimers();
     searchUnified.mockReset().mockResolvedValue(results);
+    preset.mockReset().mockReturnValue(REFRACTOR);
     getPhotos.mockReset().mockResolvedValue(photos);
     clearSkySelection();
     skyFocus.value = null;
@@ -109,16 +137,57 @@ describe('the search page', () => {
     expect(wrapper.findAll('.mob-row--roomy')).toHaveLength(3);
   });
 
-  it('writes a deep-sky result as the board does: name, designation, type, constellation, magnitude', async () => {
+  it('writes a deep-sky result as the board does: name and rating, designation, type, constellation, figures', async () => {
     const { wrapper } = mountPage();
     await type(wrapper, 'andro');
     const [m31, m32] = wrapper.findAll('.mob-row--roomy');
     expect(m31.find('.mob-row-title').text()).toBe("Galaxie d'Andromède");
-    expect(m31.find('.mob-meta').text()).toContain('M31 (NGC224)');
+    expect(m31.find('.mob-target-head .mob-rating').text()).toBe('★★★★★');
+    expect(m31.find('.mob-meta').text()).toContain('M31');
+    expect(m31.find('.mob-meta').text()).not.toContain('NGC224');
     expect(m31.find('.mob-badge--type').text()).toBe('Galaxie spirale');
     expect(m31.find('.mob-badge--const').text()).toBe('AND');
-    expect(m31.text()).toContain('Magnitude 3.4');
-    expect(m32.find('.mob-meta').text()).toContain('M32 (NGC221 · Arp 168)');
+    const labels = m31.findAll('.mob-fact-label').map((l) => l.text());
+    const values = m31.findAll('.mob-fact-value').map((v) => v.text());
+    expect(labels).toEqual(['Mag', 'Taille', 'Champ']);
+    expect(values.slice(0, 2)).toEqual(['3.4', '3.2°']);
+    expect(values[2]).toMatch(/^\d+ %$/);
+    expect(m32.find('.mob-meta').text()).toContain('M32');
+    expect(m32.find('.mob-target-head .mob-rating').exists()).toBe(false);
+  });
+
+  it('follows the main designation with the one searched when it is another', async () => {
+    const { wrapper } = mountPage();
+    await type(wrapper, 'NGC22');
+    const [m31, m32] = wrapper.findAll('.mob-row--roomy');
+    expect(m31.find('.mob-meta > span').text()).toBe('M31 · NGC224');
+    expect(m32.find('.mob-meta > span').text()).toBe('M32 · NGC221');
+  });
+
+  it('adds the highest point and the score with the sky of the day on and a location', async () => {
+    const { wrapper, time } = mountPage();
+    time.lat = 48.85;
+    time.lon = 2.35;
+    time.simDate = new Date('2026-10-15T20:00:00Z');
+    time.mode = 'date';
+    await type(wrapper, 'andro');
+    const m31 = wrapper.findAll('.mob-row--roomy')[0];
+    expect(m31.findAll('.mob-fact-label').map((l) => l.text())).toEqual([
+      'Au plus haut',
+      'Mag',
+      'Taille',
+      'Score',
+      'Champ',
+    ]);
+    expect(m31.findAll('.mob-fact-value')[0].text()).toMatch(/^\d\d:\d\d \(\d+°\)$/);
+  });
+
+  it('leaves the score and the field out without a setup', async () => {
+    preset.mockReturnValue(null);
+    const { wrapper } = mountPage();
+    await type(wrapper, 'andro');
+    const m31 = wrapper.findAll('.mob-row--roomy')[0];
+    expect(m31.findAll('.mob-fact-label').map((l) => l.text())).toEqual(['Mag', 'Taille']);
   });
 
   it('writes a star result with its name, designation and constellation, without a type badge', async () => {
@@ -129,6 +198,8 @@ describe('the search page', () => {
     expect(vega.find('.mob-meta').text()).toContain('α Lyr');
     expect(vega.find('.mob-badge--type').exists()).toBe(false);
     expect(vega.find('.mob-badge--const').text()).toBe('LYR');
+    expect(vega.text()).toContain('Magnitude 0.0');
+    expect(vega.find('.mob-facts').exists()).toBe(false);
   });
 
   it('selects the tapped result, asks the map to go to it and goes back', async () => {
@@ -196,9 +267,11 @@ const photos: Photo[] = [
 
 describe('the search page, Photos tab', () => {
   beforeEach(() => {
+    localStorage.clear();
     localStorage.setItem('lang', 'fr');
     vi.useFakeTimers();
     searchUnified.mockReset().mockResolvedValue(results);
+    preset.mockReset().mockReturnValue(REFRACTOR);
     getPhotos.mockReset().mockResolvedValue(photos);
     clearSkySelection();
     skyPhotoFocus.value = null;

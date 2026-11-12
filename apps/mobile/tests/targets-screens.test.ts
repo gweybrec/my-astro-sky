@@ -248,11 +248,23 @@ describe('the Cibles page', () => {
     expect(rows[0].text()).toContain('NGC7000');
     expect(rows[0].text()).toContain('Nébuleuse en émission');
     expect(rows[0].text()).toContain('CYG');
-    expect(rows[0].text()).toContain('Magnitude 4.0');
-    expect(rows[0].text()).toContain('★★★★★');
-    expect(rows[0].text()).toContain('86°');
-    expect(rows[0].text()).toContain('21:38');
-    expect(rows[1].text()).toContain('★★★★☆');
+    expect(rows[0].find('.mob-target-head .mob-rating').text()).toBe('★★★★★');
+    // The figures, label over value: the highest point with its altitude, magnitude, size, score and field fit.
+    expect(rows[0].findAll('.mob-fact-label').map((l) => l.text())).toEqual([
+      'Au plus haut',
+      'Mag',
+      'Taille',
+      'Score',
+      'Champ',
+    ]);
+    expect(rows[0].findAll('.mob-fact-value').map((v) => v.text())).toEqual([
+      '21:38 (86°)',
+      '4.0',
+      '2.0°',
+      '100 %',
+      '100 %',
+    ]);
+    expect(rows[1].find('.mob-target-head .mob-rating').text()).toBe('★★★★☆');
     // One row under the search field: the setup, and the number of types alone.
     const fields = w.findAll('.mob-context > button');
     expect(fields.map((b) => b.text())).toEqual(['Équipement 1', '1 types']);
@@ -399,6 +411,24 @@ describe('the Cibles page', () => {
     await w.find('input[type="search"]').setValue('m27');
     expect(w.findAll('.mob-row--roomy')).toHaveLength(1);
     expect(w.findAll('.mob-row--roomy')[0].text()).toContain('M27');
+  });
+
+  it('follows the main designation with the one searched when it is another', async () => {
+    search.mockResolvedValue(
+      ok([
+        suggestion(
+          dso({ id: 'M31', catalogs: ['M31', 'NGC224'], displayName: 'Andromède' }),
+          80,
+          23,
+        ),
+      ]),
+    );
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    const designation = () => w.find('.mob-row--roomy .mob-meta > span').text();
+    expect(designation()).toBe('M31');
+    await w.find('input[type="search"]').setValue('ngc 224');
+    expect(designation()).toBe('M31 · NGC224');
   });
 
   it("opens a target's page on a tap", async () => {

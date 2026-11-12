@@ -241,6 +241,26 @@ export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
   return results.slice(0, limit);
 }
 
+/**
+ * The designation a search was looking for when it is not the object's main one: searching "NGC224" finds M31 through
+ * its alias NGC224, which is returned. The alias the text names exactly comes first, else the first one it starts.
+ * Undefined when the main designation (`catalogs[0]`, else the id) matches the text itself, or no alias does.
+ */
+export function searchedAlias(dso: DSO, query: string): string | undefined {
+  const qIds = dsoQueryVariants(query)
+    .map((variant) => normCatId(normalizeGreekLetters(variant).trim()))
+    .filter(Boolean);
+  if (qIds.length === 0) return undefined;
+  const main = dso.catalogs[0] || dso.id;
+  const mainId = normCatId(main);
+  if (qIds.some((q) => mainId.startsWith(q)) || qIds.includes(normCatId(dso.id))) return undefined;
+  const aliases = dso.catalogs.filter((c) => c !== main);
+  return (
+    aliases.find((c) => qIds.includes(normCatId(c))) ??
+    aliases.find((c) => qIds.some((q) => normCatId(c).startsWith(q)))
+  );
+}
+
 export interface UnifiedSearchResult {
   type: 'star' | 'dso';
   label: string;

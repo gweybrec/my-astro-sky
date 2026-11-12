@@ -22,7 +22,13 @@ vi.mock('../../src/api', () => ({
 import { getStars, getStarByHip } from '@myastrosky/core/catalog/star-registry';
 import { getDSOs } from '@myastrosky/core/catalog/dso-registry';
 import { searchStarsAPI } from '../../src/api';
-import { searchStars, searchDSOs, getDSOTypeName, searchUnified } from '@myastrosky/core/search';
+import {
+  searchStars,
+  searchDSOs,
+  getDSOTypeName,
+  searchUnified,
+  searchedAlias,
+} from '@myastrosky/core/search';
 
 const mockGetStars = vi.mocked(getStars);
 const mockGetStarByHip = vi.mocked(getStarByHip);
@@ -539,5 +545,31 @@ describe('searchUnified()', () => {
     ] as any);
     const results = await searchUnified('m', 1);
     expect(results).toHaveLength(1);
+  });
+});
+
+describe('searchedAlias', () => {
+  const m31 = { id: 'M31', catalogs: ['M31', 'NGC224', 'UGC454'] } as unknown as DSO;
+
+  it('gives the alias the text names, exactly or as its start, spaces and case ignored', () => {
+    expect(searchedAlias(m31, 'NGC224')).toBe('NGC224');
+    expect(searchedAlias(m31, 'ngc 22')).toBe('NGC224');
+    expect(searchedAlias(m31, 'ugc')).toBe('UGC454');
+  });
+
+  it('gives nothing when the main designation matches, or no alias does', () => {
+    expect(searchedAlias(m31, 'M31')).toBeUndefined();
+    expect(searchedAlias(m31, 'm3')).toBeUndefined();
+    expect(searchedAlias(m31, 'andromeda')).toBeUndefined();
+    expect(searchedAlias(m31, '  ')).toBeUndefined();
+  });
+
+  it('prefers the alias named exactly over one the text only starts', () => {
+    const d = { id: 'X', catalogs: ['X', 'LBN9740', 'LBN974'] } as unknown as DSO;
+    expect(searchedAlias(d, 'LBN974')).toBe('LBN974');
+  });
+
+  it('reads a mistyped catalogue prefix as the search does', () => {
+    expect(searchedAlias(m31, 'ngv224')).toBe('NGC224');
   });
 });

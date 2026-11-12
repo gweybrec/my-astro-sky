@@ -114,6 +114,8 @@ const fr = {
     fieldPlace: 'Lieu',
     fieldAria: '{name} : {value}',
     typesValue: '{n} types',
+    // The magnitude's short label in a target's figures.
+    mag: 'Mag',
     all: 'Tous',
     reset: 'Réinitialiser',
     apply: 'Appliquer',

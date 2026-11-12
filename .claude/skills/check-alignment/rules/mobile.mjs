@@ -455,6 +455,8 @@ export const rules = [
     lines: '.mob-meta, .mob-credit-links',
     chips: 'ion-badge, ion-chip, .mob-badge, .mob-chip',
   },
+  // A target's name and the rating's stars at the right end of its line share a baseline.
+  { id: 'target-rating', type: 'baseline', lines: '.mob-target-head', chips: '.mob-rating' },
   // An icon, a switch or an "i" button is centred on its row.
   {
     id: 'icon-centre',
