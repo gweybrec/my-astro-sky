@@ -18,6 +18,14 @@ vi.mock('@myastrosky/app-state/api', () => ({
 }));
 
 const replace = vi.fn();
+// Ionic calls a page's "will enter" each time it shows again; a test calls the ones kept here to come back to the page.
+const enters: Array<() => unknown> = [];
+vi.mock('@ionic/vue', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@ionic/vue')>()),
+  onIonViewWillEnter: (fn: () => unknown) => {
+    enters.push(fn);
+  },
+}));
 const push = vi.fn();
 vi.mock('vue-router', () => ({
   useRouter: () => ({ replace, push, back: vi.fn() }),
@@ -642,23 +650,50 @@ describe("a photo's own screen", () => {
     const sized = (w: ReturnType<typeof mountPage>) =>
       Object.defineProperty(w.find('.mob-photo-area').element, 'clientWidth', { value: 400 });
 
+    /** The picture (not its thumbnail) of the pane on one side. */
+    const picture = (w: ReturnType<typeof mountPage>, side: 'previous' | 'current' | 'next') =>
+      w.find(`.mob-photo-pane--${side} img.mob-photo-view:last-of-type`);
+
     it("holds the neighbours in the gallery's order beside the photo, the next one with its thumbnail first", async () => {
       const w = mountPage();
       await flushPromises();
       const panes = w.findAll('.mob-photo-pane');
       expect(panes.map((p) => p.classes().find((c) => c.startsWith('mob-photo-pane--')))).toEqual([
         'mob-photo-pane--previous',
+        'mob-photo-pane--current',
         'mob-photo-pane--next',
       ]);
       expect(panes[0].findAll('img').map((i) => i.attributes('src'))).toEqual(['/uploads/a.jpg']);
-      expect(panes[1].findAll('img').map((i) => i.attributes('src'))).toEqual([
+      expect(panes[2].findAll('img').map((i) => i.attributes('src'))).toEqual([
         '/uploads/c-thumb.jpg',
         '/uploads/c.jpg',
       ]);
-      expect(panes[1].attributes('aria-hidden')).toBe('true');
+      expect(panes[2].attributes('aria-hidden')).toBe('true');
+      expect(panes[1].attributes('aria-hidden')).toBeUndefined();
     });
 
-    it('follows the finger, slides to the next photo once let go past a third, and replaces the address', async () => {
+    it('keeps the picture that slid in as the photo: it is neither loaded nor drawn again', async () => {
+      const w = mountPage();
+      await flushPromises();
+      sized(w);
+      const incoming = picture(w, 'next').element;
+      await drag(w, -200);
+      await slid(w);
+      expect(picture(w, 'current').element).toBe(incoming);
+      expect(picture(w, 'current').attributes('alt')).toBe('c.jpg');
+    });
+
+    it("drops a photo's thumbnail once its picture is loaded", async () => {
+      const w = mountPage();
+      await flushPromises();
+      expect(w.findAll('.mob-photo-pane--next img')).toHaveLength(2);
+      await picture(w, 'next').trigger('load');
+      expect(w.findAll('.mob-photo-pane--next img').map((i) => i.attributes('src'))).toEqual([
+        '/uploads/c.jpg',
+      ]);
+    });
+
+    it('follows the finger, slides to the next photo once let go past a third, on the same page and address', async () => {
       const w = mountPage();
       await flushPromises();
       sized(w);
@@ -669,12 +704,14 @@ describe("a photo's own screen", () => {
       expect(track(w).attributes('style')).toContain('calc(-1 * (100% + var(--photo-swipe-gap)))');
       await slid(w);
       expect(w.find('h1').text()).toBe('c.jpg');
-      expect(replace).toHaveBeenCalledWith('/gallery/photo/c');
-      expect(w.find('img.mob-photo-view').attributes('src')).toBe('/uploads/c.jpg');
+      // Another address would make Ionic open a new page, empty until it has loaded: the page stays.
+      expect(replace).not.toHaveBeenCalled();
+      expect(picture(w, 'current').attributes('src')).toBe('/uploads/c.jpg');
       expect(track(w).attributes('style') ?? '').not.toContain('translate');
       // c is the last photo the search keeps: no next one, the previous is b.
       expect(w.findAll('.mob-photo-pane').map((p) => p.classes())).toEqual([
         ['mob-photo-pane', 'mob-photo-pane--previous'],
+        ['mob-photo-pane', 'mob-photo-pane--current'],
       ]);
       expect(takeLastViewedPhoto()).toBe('c');
     });
@@ -686,7 +723,6 @@ describe("a photo's own screen", () => {
       await drag(w, 200);
       await slid(w);
       expect(w.find('h1').text()).toBe('a.jpg');
-      expect(replace).toHaveBeenCalledWith('/gallery/photo/a');
     });
 
     it('springs back when let go short of a third', async () => {
@@ -708,7 +744,7 @@ describe("a photo's own screen", () => {
       expect(track(w).attributes('style')).toContain('translateX(50px)');
       await fire(w, 'pointerup', 400, 1000);
       expect(track(w).attributes('style') ?? '').not.toContain('translate');
-      expect(replace).not.toHaveBeenCalled();
+      expect(w.find('h1').text()).toBe('b.jpg');
     });
 
     it('does not change photo on a zoomed photo: the finger moves it', async () => {
@@ -729,10 +765,27 @@ describe("a photo's own screen", () => {
       galleryFilters.query = 'nothing';
       const w = mountPage();
       await flushPromises();
-      expect(w.findAll('.mob-photo-pane')).toHaveLength(0);
+      expect(w.findAll('.mob-photo-pane').map((p) => p.classes())).toEqual([
+        ['mob-photo-pane', 'mob-photo-pane--current'],
+      ]);
       sized(w);
       await drag(w, -300);
-      expect(replace).not.toHaveBeenCalled();
+      expect(w.find('h1').text()).toBe('b.jpg');
+    });
+
+    it('reloads the photo shown, not the one first opened, when the page shows again (back from its editor)', async () => {
+      const before = enters.length;
+      const w = mountPage();
+      await flushPromises();
+      sized(w);
+      await drag(w, -200);
+      await slid(w);
+      getPhotos.mockResolvedValue(
+        three().map((p) => (p.id === 'c' ? { ...p, originalName: 'c, edited.jpg' } : p)),
+      );
+      for (const enter of enters.slice(before)) await enter();
+      await flushPromises();
+      expect(w.find('h1').text()).toBe('c, edited.jpg');
     });
   });
 });

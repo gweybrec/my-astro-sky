@@ -44,8 +44,8 @@ import resetIcon from '../icons/rotate-ccw.svg?raw';
 // On the whole photo (not zoomed), swiping sideways goes to the next or previous photo in the gallery's order, with its
 // search, filters and sort (board "Photo, glisser vers la suivante"): the photo follows the finger with its neighbour
 // beside it, which is loaded beforehand (its thumbnail until then); let go past a third of the width, or flicked, it
-// slides to the neighbour, else back. The address is replaced, so that Back goes to the gallery, which shows the last
-// photo seen.
+// slides to the neighbour, which stays as it is drawn and becomes the photo. The page and its address stay the same, so
+// that Back goes to the gallery, which shows the last photo seen.
 const route = useRoute();
 const router = useRouter();
 
@@ -72,9 +72,10 @@ const turns = computed(() =>
 const shown = computed(() =>
   photo.value ? photoAsShown({ ...photo.value, quarterTurns: turns.value }) : null,
 );
-const turnTransform = computed(() => (turns.value ? ` rotate(${turns.value * 90}deg)` : ''));
-// A picture that cannot be read leaves the stage with the photo's name.
-const broken = ref(false);
+// A picture that cannot be read leaves the stage with the photo's name (by photo id).
+const brokenPhotos = ref(new Set<string>());
+// The photos whose picture itself has loaded: their thumbnail, which stood in for it, is no longer needed.
+const loadedPhotos = ref(new Set<string>());
 
 // The part of the stage under the top bar: the whole photo is fitted in it.
 const area = ref<HTMLElement | null>(null);
@@ -98,18 +99,34 @@ const previous = computed(() => (place.value > 0 ? order.value[place.value - 1] 
 const next = computed(() =>
   place.value >= 0 && place.value < order.value.length - 1 ? order.value[place.value + 1] : null,
 );
-/** The neighbours there are, each in its pane beside the photo. */
-const neighbours = computed(() => {
-  const panes: { side: 'previous' | 'next'; photo: Photo }[] = [];
-  if (previous.value) panes.push({ side: 'previous', photo: previous.value });
-  if (next.value) panes.push({ side: 'next', photo: next.value });
-  return panes;
+/**
+ * The photo and the neighbours there are, each in its pane, keyed by the photo: when a neighbour has slid in, its pane
+ * (and its picture, already loaded and drawn) becomes the photo's, so nothing is loaded or drawn again.
+ */
+type Pane = { side: 'previous' | 'current' | 'next'; photo: Photo };
+const panes = computed(() => {
+  const out: Pane[] = [];
+  if (previous.value) out.push({ side: 'previous', photo: previous.value });
+  if (photo.value) out.push({ side: 'current', photo: photo.value });
+  if (next.value) out.push({ side: 'next', photo: next.value });
+  return out;
 });
-/** A neighbour as it is shown: whole, turned as the photo itself would be. */
-const neighbourTurns = (p: Photo) =>
-  shownQuarterTurns(p, { autoRotate: autoRotateLandscape.value, portrait: !landscape.value });
-/** The neighbours whose picture could not be read: their name is shown instead. */
-const brokenNeighbours = ref(new Set<string>());
+/** A pane's picture as it is shown: turned as its photo is, and the photo's zoomed and moved as the finger says. */
+function pictureTransform(pane: Pane): string {
+  const quarters = shownQuarterTurns(pane.photo, {
+    autoRotate: autoRotateLandscape.value,
+    portrait: !landscape.value,
+  });
+  const turn = quarters ? `rotate(${quarters * 90}deg)` : '';
+  return pane.side === 'current' ? `${transform.value} ${turn}`.trim() : turn;
+}
+const sideways = (pane: Pane) =>
+  shownQuarterTurns(pane.photo, {
+    autoRotate: autoRotateLandscape.value,
+    portrait: !landscape.value,
+  }) %
+    2 ===
+  1;
 
 /** How far the photos are slid: by the finger (px), or all the way to a neighbour. */
 const slide = ref<number | 'previous' | 'next'>(0);
@@ -157,15 +174,13 @@ function onSlid(event: TransitionEvent) {
   else if (slide.value === 'previous' && previous.value) show(previous.value);
 }
 
-/** Shows `p` whole, in the place of the photo, and puts its address in place of this one's. */
+/** Shows `p` whole, in the place of the photo, on this same page. */
 function show(p: Photo) {
   settling.value = false;
   slide.value = 0;
-  broken.value = brokenNeighbours.value.has(p.id);
   reset();
   photo.value = p;
   setLastViewedPhoto(p.id);
-  void router.replace(`/gallery/photo/${p.id}`);
 }
 
 // What is drawn over the photo: off at first, as on the desktop; the catalogues start from the map's and are this
@@ -188,7 +203,9 @@ const title = computed(() => photo.value?.originalName ?? '');
 
 async function load() {
   try {
-    const id = String(route.params.id);
+    // The photo shown, once there is one: a swipe changes it without changing the address (Ionic would make a new page,
+    // empty until loaded, for another address), and coming back from the editor reloads it.
+    const id = photo.value?.id ?? String(route.params.id);
     const photos = await getPhotos();
     const found = photos.find((p) => p.id === id);
     if (!found) {
@@ -196,7 +213,7 @@ async function load() {
       return;
     }
     if (found.id !== photo.value?.id) {
-      broken.value = false;
+      brokenPhotos.value.delete(found.id);
       reset();
     }
     photo.value = found;
@@ -237,7 +254,7 @@ async function rotate() {
     // A quarter further right than what is seen, which is ahead of the photo's own rotation when the screen turned it.
     const presses = turnsForNextQuarter(quarterTurnsOf(photo.value), turns.value);
     for (let i = 0; i < presses; i++) photo.value = await rotatePhotoAPI(photo.value.id);
-    broken.value = false;
+    brokenPhotos.value.delete(photo.value.id);
     reset();
   } catch (error) {
     await showError(error);
@@ -291,56 +308,42 @@ async function loadWcs() {
               :style="{ transform: slideTransform }"
               @transitionend="onSlid"
             >
-              <template v-if="photo">
-                <div v-if="broken" class="mob-stage-caption m-secondary">
-                  {{ photo.originalName }}
-                </div>
-                <img
-                  v-else
-                  class="mob-photo-view"
-                  :class="{ 'mob-photo-view--sideways': turns % 2 === 1 }"
-                  :src="photoFileUrl(photo.filename)"
-                  :alt="photo.originalName"
-                  :style="{ transform: transform + turnTransform }"
-                  draggable="false"
-                  @error="broken = true"
-                />
-              </template>
-              <canvas ref="overlay" class="mob-photo-overlay" aria-hidden="true" />
               <div
-                v-for="{ side, photo: neighbour } in neighbours"
-                :key="side"
+                v-for="pane in panes"
+                :key="pane.photo.id"
                 class="mob-photo-pane"
-                :class="`mob-photo-pane--${side}`"
-                aria-hidden="true"
+                :class="`mob-photo-pane--${pane.side}`"
+                :aria-hidden="pane.side === 'current' ? undefined : 'true'"
               >
-                <div
-                  v-if="brokenNeighbours.has(neighbour.id)"
-                  class="mob-stage-caption m-secondary"
-                >
-                  {{ neighbour.originalName }}
+                <div v-if="brokenPhotos.has(pane.photo.id)" class="mob-stage-caption m-secondary">
+                  {{ pane.photo.originalName }}
                 </div>
                 <template v-else>
                   <!-- The thumbnail stands in until the picture itself is loaded over it. -->
                   <img
-                    v-for="file in neighbour.thumbFilename
-                      ? [neighbour.thumbFilename, neighbour.filename]
-                      : [neighbour.filename]"
-                    :key="file"
+                    v-if="pane.photo.thumbFilename && !loadedPhotos.has(pane.photo.id)"
+                    key="thumb"
                     class="mob-photo-view"
-                    :class="{ 'mob-photo-view--sideways': neighbourTurns(neighbour) % 2 === 1 }"
-                    :src="photoFileUrl(file)"
+                    :class="{ 'mob-photo-view--sideways': sideways(pane) }"
+                    :src="photoFileUrl(pane.photo.thumbFilename)"
                     alt=""
-                    :style="{
-                      transform: neighbourTurns(neighbour)
-                        ? `rotate(${neighbourTurns(neighbour) * 90}deg)`
-                        : '',
-                    }"
+                    :style="{ transform: pictureTransform(pane) }"
                     draggable="false"
-                    @error="file === neighbour.filename && brokenNeighbours.add(neighbour.id)"
+                  />
+                  <img
+                    key="picture"
+                    class="mob-photo-view"
+                    :class="{ 'mob-photo-view--sideways': sideways(pane) }"
+                    :src="photoFileUrl(pane.photo.filename)"
+                    :alt="pane.side === 'current' ? pane.photo.originalName : ''"
+                    :style="{ transform: pictureTransform(pane) }"
+                    draggable="false"
+                    @load="loadedPhotos.add(pane.photo.id)"
+                    @error="brokenPhotos.add(pane.photo.id)"
                   />
                 </template>
               </div>
+              <canvas ref="overlay" class="mob-photo-overlay" aria-hidden="true" />
             </div>
           </div>
           <PhotoViewButtons
