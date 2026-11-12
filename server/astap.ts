@@ -338,22 +338,12 @@ ${fullOutput}`,
       };
     }
 
-    // Try to generate correspondences from catalog stars.
+    // Reference points spread over the photo, from the solution.
     // ASTAP is a FITS-native engine: its -wcs output uses the same pixel convention as
     // Siril/PixInsight metadata (verified: same CDELT sign for the same image). The
     // metadata path passes fitsYConvention=true (and places correctly), so ASTAP must
     // too. (solve-field and astrometry.net emit display-convention WCS and stay false.)
-    let correspondences = wcsToCorrespondences(wcs, width, height, true);
-
-    // If not enough catalog stars match (e.g., image has faint stars),
-    // generate synthetic correspondences from WCS corners
-    if (correspondences.length < 3) {
-      logDebug(
-        'ASTAP',
-        `Only ${correspondences.length} catalog matches, generating synthetic correspondences from WCS`,
-      );
-      correspondences = generateSyntheticCorrespondences(wcs, width, height);
-    }
+    const correspondences = wcsToCorrespondences(wcs, width, height, true);
 
     if (correspondences.length < 3) {
       return {
@@ -367,76 +357,4 @@ ${fullOutput}`,
   } finally {
     await fsp.rm(tmpDir, { recursive: true, force: true });
   }
-}
-
-/**
- * Generate synthetic correspondences from WCS solution
- * Used when catalog doesn't have matching stars (e.g., deep sky images with faint stars)
- */
-function generateSyntheticCorrespondences(wcs: WCSData, width: number, height: number) {
-  const DEG2RAD = Math.PI / 180;
-  const correspondences = [];
-
-  // Use 3 well-separated points near image center (not corners - projection breaks down far from CRPIX)
-  // Use 20% and 80% positions to stay well within image bounds
-  const points = [
-    { px: width * 0.2, py: height * 0.2 }, // Top-left quadrant
-    { px: width * 0.8, py: height * 0.2 }, // Top-right quadrant
-    { px: width * 0.5, py: height * 0.8 }, // Bottom center
-  ];
-
-  const ra0Rad = wcs.CRVAL1 * DEG2RAD;
-  const dec0Rad = wcs.CRVAL2 * DEG2RAD;
-  const cosDec0 = Math.cos(dec0Rad);
-  const sinDec0 = Math.sin(dec0Rad);
-
-  for (let i = 0; i < points.length; i++) {
-    const point = points[i];
-
-    // Convert display coordinates to FITS pixel coordinates
-    // Display: (0,0) at top-left, FITS: (1,1) at bottom-left
-    const fitsPx = point.px + 1;
-    const fitsPy = height - point.py;
-
-    // Pixel offset from reference pixel (in FITS coordinates)
-    const dx = fitsPx - wcs.CRPIX1;
-    const dy = fitsPy - wcs.CRPIX2;
-
-    // Apply CD matrix to get standard coordinates (degrees)
-    const xi = wcs.CD1_1 * dx + wcs.CD1_2 * dy;
-    const eta = wcs.CD2_1 * dx + wcs.CD2_2 * dy;
-
-    // TAN (gnomonic) deprojection: standard coords → celestial coords
-    // Standard formulas from FITS WCS Paper II
-    const xiRad = xi * DEG2RAD;
-    const etaRad = eta * DEG2RAD;
-
-    // RA calculation
-    const raRad = ra0Rad + Math.atan2(xiRad, cosDec0 - etaRad * sinDec0);
-
-    // Dec calculation
-    const rTheta = Math.sqrt(xiRad * xiRad + etaRad * etaRad);
-    const sinDec = (sinDec0 + etaRad * cosDec0) / Math.sqrt(1 + xiRad * xiRad + etaRad * etaRad);
-    const decRad = Math.asin(Math.max(-1, Math.min(1, sinDec)));
-
-    const ra = (raRad / DEG2RAD + 360) % 360;
-    const dec = decRad / DEG2RAD;
-
-    const raHours = Math.floor(ra / 15);
-    const raMin = Math.floor((ra / 15 - raHours) * 60);
-    const decDeg = Math.floor(Math.abs(dec));
-    const decSign = dec >= 0 ? '+' : '-';
-
-    correspondences.push({
-      pointIndex: i,
-      photoX: point.px,
-      photoY: point.py,
-      starHip: 0, // Synthetic point
-      starName: `${raHours}h${raMin}m ${decSign}${decDeg}°`,
-      starRa: ra, // RA in degrees
-      starDec: dec, // Dec in degrees
-    });
-  }
-
-  return correspondences;
 }

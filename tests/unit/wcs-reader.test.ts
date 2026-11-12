@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -8,14 +8,10 @@ import {
   wcsToCorrespondences,
   normalizeDateObs,
 } from '../../server/wcs-reader';
+import { checkReferencePoints } from '@myastrosky/core/reference-points';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES = path.join(__dirname, '../fixtures');
-
-// Point to minimal test catalog for wcsToCorrespondences tests
-beforeAll(() => {
-  process.env.STAR_CATALOG_PATH = path.join(FIXTURES, 'stars.test.json');
-});
 
 // ─── parseFITSHeader ──────────────────────────────────────────────────────────
 
@@ -188,64 +184,53 @@ describe('wcsToCorrespondences', () => {
     NAXIS2: 3239,
   };
 
-  it('returns at least 3 correspondences for a valid WCS (from test catalog)', () => {
+  it('returns 9 points spread over the whole photo, each with a sky position', () => {
     const corrs = wcsToCorrespondences(ldn1235Wcs, 5760, 3239, false);
-    expect(corrs.length).toBeGreaterThanOrEqual(3);
-  });
-
-  it('all returned correspondences have starRa and starDec set', () => {
-    const corrs = wcsToCorrespondences(ldn1235Wcs, 5760, 3239, false);
+    expect(corrs).toHaveLength(9);
+    expect(checkReferencePoints(corrs, 5760, 3239)).toEqual([]);
+    // The corners, 5 % inside the edges, and the centre are among them.
+    expect(corrs.map((c) => [c.photoX, c.photoY])).toEqual(
+      expect.arrayContaining([
+        [288, 3239 * 0.05],
+        [5760 * 0.95, 3239 * 0.95],
+        [2880, 3239 * 0.5],
+      ]),
+    );
     for (const c of corrs) {
-      expect(typeof c.starRa).toBe('number');
-      expect(typeof c.starDec).toBe('number');
       expect(isFinite(c.starRa!)).toBe(true);
       expect(isFinite(c.starDec!)).toBe(true);
     }
   });
 
-  it('reference star near CRVAL maps to pixel near CRPIX (fitsYConvention=false)', () => {
-    // Star 99001 is at exactly CRVAL coordinates in our test catalog
-    const corrs = wcsToCorrespondences(ldn1235Wcs, 5760, 3239, false);
-    const refStar = corrs.find((c) => c.starHip === 99001);
-    expect(refStar).toBeDefined();
-    // Display pixel = CRPIX - 1 (convert FITS 1-indexed to 0-indexed)
-    expect(refStar!.photoX).toBeCloseTo(ldn1235Wcs.CRPIX1 - 1, 0);
-    expect(refStar!.photoY).toBeCloseTo(ldn1235Wcs.CRPIX2 - 1, 0);
+  it('gives the reference pixel the reference sky position', () => {
+    // The centre point sits on CRPIX (display pixel = FITS pixel - 1, rows from the top).
+    const wcs = { ...ldn1235Wcs, CRPIX1: 2880 + 1, CRPIX2: 3239 * 0.5 + 1 };
+    const centre = wcsToCorrespondences(wcs, 5760, 3239, false).find(
+      (c) => c.photoX === 2880 && c.photoY === 3239 * 0.5,
+    )!;
+    expect(centre.starRa).toBeCloseTo(wcs.CRVAL1, 9);
+    expect(centre.starDec).toBeCloseTo(wcs.CRVAL2, 9);
   });
 
-  describe('fitsYConvention regression — false vs true produce different Y coordinates', () => {
-    it('fitsYConvention=false and fitsYConvention=true produce DIFFERENT pixel positions', () => {
-      const corrsFalse = wcsToCorrespondences(ldn1235Wcs, 5760, 3239, false);
-      const corrsTrue = wcsToCorrespondences(ldn1235Wcs, 5760, 3239, true);
+  it('counts rows from the bottom in the FITS convention', () => {
+    // The top row in the FITS convention is the bottom row in the display one (one pixel apart).
+    const fits = wcsToCorrespondences(ldn1235Wcs, 5760, 3239, true);
+    const display = wcsToCorrespondences(ldn1235Wcs, 5760, 3239, false);
+    const topLeftFits = fits.find((c) => c.photoX === 288 && c.photoY === 3239 * 0.05)!;
+    const bottomLeftDisplay = display.find((c) => c.photoX === 288 && c.photoY === 3239 * 0.95)!;
+    expect(topLeftFits.starRa).toBeCloseTo(bottomLeftDisplay.starRa!, 2);
+    expect(topLeftFits.starDec).toBeCloseTo(bottomLeftDisplay.starDec!, 2);
+    expect(topLeftFits.starDec).not.toBeCloseTo(
+      display.find((c) => c.photoX === 288 && c.photoY === 3239 * 0.05)!.starDec!,
+      2,
+    );
+  });
 
-      // Find corresponding entries by starHip
-      const hip = corrsFalse[0]?.starHip;
-      if (!hip) return;
-      const cf = corrsFalse.find((c) => c.starHip === hip);
-      const ct = corrsTrue.find((c) => c.starHip === hip);
-      if (!cf || !ct) return;
-
-      // X should be the same, Y should differ (Y-axis flip)
-      expect(cf.photoX).toBeCloseTo(ct.photoX, 0);
-      expect(Math.abs(cf.photoY - ct.photoY)).toBeGreaterThan(10);
-    });
-
-    it('fitsYConvention=false Y is consistent with display-origin convention (Y increases down)', () => {
-      // For a star below the reference point (higher Dec → higher CRPIX2 - offset),
-      // fitsYConvention=false should yield a LOWER photoY than stars above it
-      // This is a basic sanity check: just verify the convention flag makes a measurable difference
-      const corrsF = wcsToCorrespondences(ldn1235Wcs, 5760, 3239, false);
-      const corrsT = wcsToCorrespondences(ldn1235Wcs, 5760, 3239, true);
-      // The two sets of correspondences must not be identical
-      let anyDiff = false;
-      for (let i = 0; i < Math.min(corrsF.length, corrsT.length); i++) {
-        if (Math.abs(corrsF[i].photoY - corrsT[i].photoY) > 1) {
-          anyDiff = true;
-          break;
-        }
-      }
-      expect(anyDiff).toBe(true);
-    });
+  it('returns no points for a solution that cannot place the photo', () => {
+    // Every point at the same sky position: the photo would have no size on the sky.
+    const flat = { ...ldn1235Wcs, CD1_1: 0, CD1_2: 0, CD2_1: 0, CD2_2: 0 };
+    expect(wcsToCorrespondences(flat, 5760, 3239, false)).toEqual([]);
+    expect(wcsToCorrespondences({ ...ldn1235Wcs, CRVAL1: NaN }, 5760, 3239, false)).toEqual([]);
   });
 
   it('photoX/photoY are within image bounds', () => {

@@ -9,7 +9,6 @@ import { createSharpImageCodec } from './image-codec.js';
 import { createFetchHttpClient } from './http-client.js';
 import { logServerError } from './logger.js';
 import { loadDeepCatalog } from './star-search.js';
-import { loadServerCatalog } from './wcs-reader.js';
 
 /** The services on the server's adapters, over `db`. Does not load `db.ts`, which runs the database updates. */
 export function createServerServices(db: SqlDb) {
@@ -24,8 +23,6 @@ export function createServerServices(db: SqlDb) {
     blobs: createFsBlobStore(UPLOADS_DIR),
     // Read from disk on the first star request, as before.
     stars: loadDeepCatalog,
-    // The catalogue that solved files are matched against; read on first use, as before.
-    catalogStars: loadServerCatalog,
     http: createFetchHttpClient(),
     now: () => Date.now(),
     log: logServerError,

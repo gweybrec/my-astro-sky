@@ -626,8 +626,7 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
   const { buildFits } = await import('../fixtures/fits-builders');
   const { buildTiff } = await import('../fixtures/tiff-builders');
 
-  // A 40x30 mono FITS whose WCS (0.1 deg per pixel, centred on star 99001) holds the three
-  // northern stars of tests/fixtures/stars.test.json.
+  // A 40x30 mono FITS whose WCS is 0.1 deg per pixel.
   const WCS_CARDS = [
     'CRPIX1  = 20.5',
     'CRPIX2  = 15.5',
@@ -664,16 +663,6 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
       photometric: 1,
       pixels: Array.from({ length: 12 }, (_, i) => i * 20),
     });
-
-  let savedCatalog: string | undefined;
-  beforeAll(() => {
-    savedCatalog = process.env.STAR_CATALOG_PATH;
-    process.env.STAR_CATALOG_PATH = path.join(FIXTURES, 'stars.test.json');
-  });
-  afterAll(() => {
-    if (savedCatalog === undefined) delete process.env.STAR_CATALOG_PATH;
-    else process.env.STAR_CATALOG_PATH = savedCatalog;
-  });
 
   async function upload(
     url: string,
@@ -742,14 +731,14 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
       });
     });
 
-    it('falls back to synthetic points when the field holds no catalogue star', async () => {
+    it('gives reference points wherever the field is on the sky', async () => {
       const r = await upload('/api/solve-wcs', {
         name: 'a.fits',
         bytes: fits(EMPTY_SKY_CARDS),
       });
       expect(r.status).toBe(200);
       expect(r.body.success).toBe(true);
-      expect(r.body.correspondences.length).toBeGreaterThanOrEqual(3);
+      expect(r.body.correspondences).toHaveLength(9);
       expect(r.body.correspondences[0].starName).toBe('Synthetic 1');
       expect(r.body.correspondences[0].starHip).toBe(0);
     });
@@ -768,11 +757,11 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
       expect(r.body.expTime).toBe(300);
       expect(r.body.stackCnt).toBe(12);
       expect(r.body.filter).toBe('Ha');
-      const hips = r.body.correspondences.map((c: any) => c.starHip).sort();
-      expect(hips).toEqual([99001, 99002, 99003]);
-      const first = r.body.correspondences.find((c: any) => c.starHip === 99001);
-      expect(first.photoX).toBeCloseTo(19.5, 3);
-      expect(first.photoY).toBeCloseTo(14.5, 3);
+      // 9 points over the photo (its geometry is pinned by solved-import-service.test.ts).
+      expect(r.body.correspondences).toHaveLength(9);
+      expect(r.body.correspondences).toContainEqual(
+        expect.objectContaining({ photoX: 20, photoY: 15, starHip: 0 }),
+      );
       expect(Object.keys(r.body)).toEqual([
         'success',
         'correspondences',
@@ -798,9 +787,10 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
         targetH: 60,
         aspectMismatch: false,
       });
-      const c1 = same.body.correspondences.find((c: any) => c.starHip === 99001);
-      expect(c1.photoX).toBeCloseTo(39, 3);
-      expect(c1.photoY).toBeCloseTo(29, 3);
+      // The centre point (20, 15) of the 40 × 30 file moves to (40, 30).
+      expect(same.body.correspondences).toContainEqual(
+        expect.objectContaining({ photoX: 40, photoY: 30 }),
+      );
       const skew = await upload(
         '/api/solve-wcs',
         { name: 'a.fits', bytes: fits() },
@@ -903,9 +893,7 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
       expect(r.status).toBe(200);
       expect(r.body.success).toBe(true);
       expect(r.body.error).toBeUndefined();
-      expect(r.body.correspondences.map((c: any) => c.starHip).sort()).toEqual([
-        99001, 99002, 99003,
-      ]);
+      expect(r.body.correspondences).toHaveLength(9);
       expect([r.body.sourceWidth, r.body.sourceHeight, r.body.width, r.body.height]).toEqual([
         40, 30, 40, 30,
       ]);
@@ -931,7 +919,7 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
       ]);
     });
 
-    it('returns synthetic points with the PNG when the field holds no catalogue star', async () => {
+    it('returns reference points with the PNG wherever the field is on the sky', async () => {
       const r = await upload('/api/photos/convert', {
         name: 'x.fits',
         bytes: fits(EMPTY_SKY_CARDS),
@@ -959,12 +947,9 @@ describe('online solving routes (astrometry.net)', () => {
     path.join(FIXTURES, 'astrometry/10796000-calibration.json'),
     'utf8',
   );
-  let savedCatalog: string | undefined;
   let png: Uint8Array;
 
   beforeAll(async () => {
-    savedCatalog = process.env.STAR_CATALOG_PATH;
-    process.env.STAR_CATALOG_PATH = path.join(FIXTURES, 'stars.test.json');
     png = new Uint8Array(
       await sharp({
         create: {
@@ -978,11 +963,6 @@ describe('online solving routes (astrometry.net)', () => {
         .toBuffer(),
     );
   });
-  afterAll(() => {
-    if (savedCatalog === undefined) delete process.env.STAR_CATALOG_PATH;
-    else process.env.STAR_CATALOG_PATH = savedCatalog;
-  });
-
   async function post(
     url: string,
     file: { name: string; bytes: Uint8Array } | null,

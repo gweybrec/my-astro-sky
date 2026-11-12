@@ -143,7 +143,6 @@ export async function createPhoneBackend(
     images: platform.images ?? createBrowserImageCodec(),
     blobs,
     stars: catalogs.stars,
-    catalogStars: catalogs.catalogStars,
     http: createFetchHttpClient({ fetch: platform.fetch }),
     now,
   });

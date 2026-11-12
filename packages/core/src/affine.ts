@@ -144,6 +144,37 @@ export function invertAffine(m: AffineMatrix): AffineMatrix | null {
 }
 
 /**
+ * How spread out `points` are, from 0 (all in a line, or fewer than 2 distinct points) to 1/4
+ * (spread evenly in every direction): about (spread across their line / spread along it)². It
+ * does not depend on where the points are or on their scale.
+ */
+export function pointSpread(points: readonly Point[]): number {
+  const n = points.length;
+  if (n === 0) return 0;
+  let mx = 0,
+    my = 0;
+  for (const p of points) {
+    mx += p.x;
+    my += p.y;
+  }
+  mx /= n;
+  my /= n;
+  let s_xx = 0,
+    s_xy = 0,
+    s_yy = 0;
+  for (const p of points) {
+    s_xx += (p.x - mx) ** 2;
+    s_xy += (p.x - mx) * (p.y - my);
+    s_yy += (p.y - my) ** 2;
+  }
+  const trace = s_xx + s_yy;
+  return trace > 0 ? (s_xx * s_yy - s_xy * s_xy) / (trace * trace) : 0;
+}
+
+/** Below this {@link pointSpread}, points are taken to be in a line: an affine fit on them is underdetermined. */
+export const IN_A_LINE_SPREAD = 1e-6;
+
+/**
  * Least-squares affine fit for N ≥ 3 point pairs.
  * Falls back to the exact 3-point solver when N === 3.
  * Minimises sum of squared residuals over all N pairs.
@@ -203,13 +234,12 @@ export function computeAffineLSQ(photoPoints: Point[], canvasPoints: Point[]): A
     s_yY += y * Y;
   }
 
-  // det / trace² is about (spread across the points' line / spread along it)²: 0 when
-  // they are in a line, 1/4 when spread evenly. A test on the raw (uncentred) normal
+  // det / trace² is pointSpread(photoPoints). A test on the raw (uncentred) normal
   // matrix flagged a well-spread triangle of stars as "in a line" once their pixel
   // coordinates were in the thousands, and the similarity fallback below cannot mirror.
   const det = s_xx * s_yy - s_xy * s_xy;
   const trace = s_xx + s_yy;
-  if (!(det > 1e-6 * trace * trace)) {
+  if (!(det > IN_A_LINE_SPREAD * trace * trace)) {
     // The photo points are in a line (or nearly so): an affine (6-DOF) fit is
     // underdetermined. Rather than failing outright, fall back to a similarity
     // transform (scale+rotation+translation) computed from the most separated pair

@@ -1,10 +1,9 @@
 /**
  * The catalogues the app ships (the star files under `data/`, the four built-in gear lists under `gear/`),
  * loaded through `fetch` from the app's own address. Each file is fetched and parsed once, on first use, and
- * kept; the two star lists are built from one parse of the three star files.
+ * kept.
  */
 import {
-  buildCatalogStars,
   buildDeepStars,
   type StarMultiplesJson,
   type StarNamesJson,
@@ -12,7 +11,6 @@ import {
 } from '@myastrosky/core/catalog/star-lists';
 import type { DeepStar } from '@myastrosky/core/domain/stars';
 import type { GearCatalog } from '@myastrosky/core/domain/gear';
-import type { CatalogStar } from '@myastrosky/core/wcs';
 
 export interface BundledCatalogsOptions {
   fetch: (url: string) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
@@ -23,8 +21,6 @@ export interface BundledCatalogsOptions {
 export interface BundledCatalogs {
   /** The deep star catalogue (magnitude 11 and brighter), brightest first. */
   stars: () => Promise<readonly DeepStar[]>;
-  /** The catalogue that solved files are matched against, brightest first. */
-  catalogStars: () => Promise<readonly CatalogStar[]>;
   /** The four built-in equipment lists. */
   gearCatalog: () => Promise<GearCatalog>;
 }
@@ -71,10 +67,6 @@ export function createBundledCatalogs(options: BundledCatalogsOptions): BundledC
     stars: lazy(async () => {
       const f = await starFiles();
       return buildDeepStars(f.starsJson, f.namesJson, f.multiplesJson);
-    }),
-    catalogStars: lazy(async () => {
-      const f = await starFiles();
-      return buildCatalogStars(f.starsJson, f.namesJson);
     }),
     gearCatalog: lazy(async () => {
       const [telescopes, cameras, accessories, filters] = await Promise.all(

@@ -16,7 +16,6 @@ import { createFetchHttpClient } from '../../server/http-client';
 import { createSharpImageCodec } from '../../server/image-codec';
 import { createBetterSqliteDb } from '../../server/sqlite-adapter';
 import { loadDeepCatalog } from '../../server/star-search';
-import { loadServerCatalog } from '../../server/wcs-reader';
 import { buildFixtures, fileSource, resetFakeInternet } from './contract-shared';
 import { memoryBlobStore } from './fake-image-io';
 
@@ -49,7 +48,6 @@ export async function makeLocalContractSetup(
     images: createSharpImageCodec(),
     blobs: memoryBlobStore(),
     stars: loadDeepCatalog,
-    catalogStars: loadServerCatalog,
     http: createFetchHttpClient(),
     now: () => Date.now(),
   });

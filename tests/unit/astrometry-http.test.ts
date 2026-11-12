@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@myastrosky/core/wcs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@myastrosky/core/wcs')>()),
-  wcsToCorrespondencesWithCatalog: vi.fn(() => []),
+  wcsToCorrespondences: vi.fn(() => []),
   parseFITSHeader: vi.fn(() => ({
     CRPIX1: 960,
     CRPIX2: 540,
@@ -36,9 +36,9 @@ import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { HttpRequest, HttpResponse } from '@myastrosky/core/ports/http-client';
 import type { NovaSolveHints } from '@myastrosky/core/domain/solve';
 import { createNovaSolveService } from '@myastrosky/core/services/nova-solve';
-import { wcsToCorrespondencesWithCatalog, parseFITSHeader } from '@myastrosky/core/wcs';
+import { wcsToCorrespondences, parseFITSHeader } from '@myastrosky/core/wcs';
 
-const mockWcsCorrs = vi.mocked(wcsToCorrespondencesWithCatalog);
+const mockWcsCorrs = vi.mocked(wcsToCorrespondences);
 const mockParseFITSHeader = vi.mocked(parseFITSHeader);
 
 const API_BASE = 'https://nova.astrometry.net/api';
@@ -93,7 +93,6 @@ beforeEach(() => {
     http: fetchMock,
     settings: { get: getSetting },
     images: { probe } as never,
-    stars: [],
     now: () => clock,
     newId: () => `job-${++ids}`,
   });

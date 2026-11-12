@@ -1,25 +1,16 @@
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { calibrationToCorrespondences as calibrationToCorrespondencesWith } from '@myastrosky/core/astrometry-solution';
+import { calibrationToCorrespondences } from '@myastrosky/core/astrometry-solution';
 import {
   parseFITSHeader,
   extractFITSHeaderFromFITS,
   wcsToCorrespondences,
-  loadServerCatalog,
 } from '../../server/wcs-reader';
-
-// The calibration conversion moved to core, which takes the catalogue; the server's catalogue is the one used.
-const calibrationToCorrespondences = (cal: any, w: number, h: number) =>
-  calibrationToCorrespondencesWith(cal, w, h, loadServerCatalog());
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES = path.join(__dirname, '../fixtures');
-
-beforeAll(() => {
-  process.env.STAR_CATALOG_PATH = path.join(FIXTURES, 'stars.test.json');
-});
 
 // ─── calibrationToCorrespondences ─────────────────────────────────────────────
 
@@ -34,9 +25,11 @@ describe('calibrationToCorrespondences', () => {
 
     const corrs = calibrationToCorrespondences(cal, imageWidth, imageHeight);
 
-    expect(Array.isArray(corrs)).toBe(true);
-    // Should return some correspondences (may be 0 if no catalog stars in test fixture near M13)
-    // Main thing: function doesn't throw and returns an array
+    // 9 points over the whole photo; the centre one is at the calibration's centre (within a pixel).
+    expect(corrs).toHaveLength(9);
+    const centre = corrs.find((c) => c.photoX === 1920 && c.photoY === 1080)!;
+    expect(centre.starRa).toBeCloseTo(cal.ra, 2);
+    expect(centre.starDec).toBeCloseTo(cal.dec, 2);
   });
 
   it('returns array (possibly empty) without throwing for valid calibration data', () => {
@@ -54,12 +47,11 @@ describe('calibrationToCorrespondences', () => {
   it('pixel scale influences CD matrix magnitude', () => {
     const cal1 = { ra: 84.05, dec: -1.2, pixscale: 1.0, orientation: 0, parity: 1.0 };
     const cal2 = { ra: 84.05, dec: -1.2, pixscale: 2.0, orientation: 0, parity: 1.0 };
-    // We can't easily inspect the internal WCS, but we can verify the function doesn't throw
-    // and returns arrays for both inputs
+    // The same points span twice the sky at twice the pixel scale.
     const r1 = calibrationToCorrespondences(cal1, 1000, 1000);
     const r2 = calibrationToCorrespondences(cal2, 1000, 1000);
-    expect(Array.isArray(r1)).toBe(true);
-    expect(Array.isArray(r2)).toBe(true);
+    const span = (r: typeof r1) => Math.abs(r[8].starDec! - r[0].starDec!);
+    expect(span(r2) / span(r1)).toBeCloseTo(2, 3);
   });
 });
 
@@ -105,16 +97,12 @@ describe('astrometry.net WCS file pipeline (job 10796000 — M13 field)', () => 
       NAXIS2: 2160,
     };
 
-    // Star 99004 is placed at exactly CRVAL1/CRVAL2 in our test catalog
-    const corrs = wcsToCorrespondences(wcs, 3840, 2160, false);
-    const refStar = corrs.find((c) => c.starHip === 99004);
-
-    if (refStar) {
-      // The star at CRVAL should map to pixel ≈ (CRPIX1-1, CRPIX2-1)
-      expect(refStar.photoX).toBeCloseTo(wcs.CRPIX1 - 1, 0);
-      expect(refStar.photoY).toBeCloseTo(wcs.CRPIX2 - 1, 0);
-    }
-    // If no correspondences found (catalog too sparse), just verify no throw
-    expect(Array.isArray(corrs)).toBe(true);
+    // The reference pixel moved onto the centre point keeps its sky position: CRVAL.
+    const centred = { ...wcs, CRPIX1: 1920 + 1, CRPIX2: 1080 + 1 };
+    const centre = wcsToCorrespondences(centred, 3840, 2160, false).find(
+      (c) => c.photoX === 1920 && c.photoY === 1080,
+    )!;
+    expect(centre.starRa).toBeCloseTo(wcs.CRVAL1, 9);
+    expect(centre.starDec).toBeCloseTo(wcs.CRVAL2, 9);
   });
 });

@@ -1,27 +1,22 @@
 // @vitest-environment node
 /**
- * The solved-import service on a fake image codec and a small catalogue: the checks of each
+ * The solved-import service on a fake image codec: the checks of each
  * method, the results (a file with no usable solution is a result, not an error), the rescale,
  * and the codec calls. The routes that use it are pinned by server-app-network.test.ts.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { isDomainError } from '@myastrosky/core/domain/errors';
-import type { CatalogStar } from '@myastrosky/core/wcs';
-import {
-  createSolvedImportService,
-  type CatalogStarSource,
-} from '@myastrosky/core/services/solved-import';
+import { createSolvedImportService } from '@myastrosky/core/services/solved-import';
+import { checkReferencePoints } from '@myastrosky/core/reference-points';
+import { fitPhotoAffine } from '@myastrosky/core/photo-placement';
+import { applyAffine, invertAffine } from '@myastrosky/core/affine';
 import { createSharpImageCodec } from '../../server/image-codec';
 import { buildFits } from '../fixtures/fits-builders';
 import { buildTiff } from '../fixtures/tiff-builders';
 import { buildXisf } from '../fixtures/xisf-builders';
 import { fakeImageCodec } from '../helpers/fake-image-io';
 
-const STARS: CatalogStar[] = [
-  { hip: 99001, ra: 330.21217, dec: 73.08178, mag: 5 },
-  { hip: 99002, ra: 331.5, dec: 73.5, mag: 6 },
-  { hip: 99003, ra: 329, dec: 72.5, mag: 6.5 },
-];
+const CRVAL = { ra: 330.21217, dec: 73.08178 };
 
 const WCS_CARDS = [
   'CRPIX1  = 20.5',
@@ -94,11 +89,37 @@ const plainTiff = () =>
     }),
   );
 
-function setup(stars: CatalogStarSource = STARS) {
+function setup() {
   const images = fakeImageCodec();
   const probe = vi.spyOn(images, 'probe');
   const encode = vi.spyOn(images, 'encode');
-  return { service: createSolvedImportService({ images, stars }), images, probe, encode };
+  return { service: createSolvedImportService({ images }), images, probe, encode };
+}
+
+type Points = { photoX: number; photoY: number; starRa?: number; starDec?: number }[];
+
+/**
+ * The pixel of the picture whose sky position is `sky`: the points go onto the plane tangent to the sky at `sky`
+ * (gnomonic), where a plate solution is linear in pixels, and the fitted affine is inverted at its origin.
+ */
+function pixelOf(points: Points, sky: { ra: number; dec: number }) {
+  const r = Math.PI / 180;
+  const tangent = (ra: number, dec: number) => {
+    const d = Math.sin(dec * r) * Math.sin(sky.dec * r);
+    const c = Math.cos(dec * r) * Math.cos(sky.dec * r) * Math.cos((ra - sky.ra) * r);
+    return {
+      x: (Math.cos(dec * r) * Math.sin((ra - sky.ra) * r)) / (d + c),
+      y:
+        (Math.cos(sky.dec * r) * Math.sin(dec * r) -
+          Math.sin(sky.dec * r) * Math.cos(dec * r) * Math.cos((ra - sky.ra) * r)) /
+        (d + c),
+    };
+  };
+  const m = fitPhotoAffine(
+    points.map((p) => ({ x: p.photoX, y: p.photoY })),
+    points.map((p) => tangent(p.starRa!, p.starDec!)),
+  );
+  return applyAffine(invertAffine(m)!, { x: 0, y: 0 });
 }
 
 async function codeOf(p: Promise<unknown>): Promise<string | undefined> {
@@ -141,10 +162,12 @@ describe('solveWcs()', () => {
     if (!r.success) return;
     expect([r.sourceWidth, r.sourceHeight]).toEqual([40, 30]);
     expect(r.dimensionWarning).toBeUndefined();
-    expect(r.correspondences.map((c) => c.starHip).sort()).toEqual([99001, 99002, 99003]);
-    const first = r.correspondences.find((c) => c.starHip === 99001)!;
-    expect(first.photoX).toBeCloseTo(19.5, 3);
-    expect(first.photoY).toBeCloseTo(14.5, 3);
+    expect(r.correspondences).toHaveLength(9);
+    expect(checkReferencePoints(r.correspondences, 40, 30)).toEqual([]);
+    // The reference sky position is on the reference pixel: FITS (20.5, 15.5), rows from the bottom.
+    const ref = pixelOf(r.correspondences, CRVAL);
+    expect(ref.x).toBeCloseTo(19.5, 1);
+    expect(ref.y).toBeCloseTo(14.5, 1);
     expect(r.dateObs).toBe('2025-09-04T21:30:00Z');
     expect([r.expTime, r.stackCnt, r.filter]).toEqual([300, 12, 'Ha']);
     expect(probe).not.toHaveBeenCalled();
@@ -192,8 +215,9 @@ describe('solveWcs()', () => {
       targetH: 60,
       aspectMismatch: false,
     });
-    const c = same.correspondences.find((x) => x.starHip === 99001)!;
-    expect([c.photoX, c.photoY].map((v) => Math.round(v * 1000) / 1000)).toEqual([39, 29]);
+    const ref = pixelOf(same.correspondences, CRVAL);
+    expect(ref.x).toBeCloseTo(39, 1);
+    expect(ref.y).toBeCloseTo(29, 1);
 
     const skew = await service.solveWcs({ ...file, targetWidth: 80, targetHeight: 30 });
     expect(skew.success && skew.dimensionWarning?.aspectMismatch).toBe(true);
@@ -209,37 +233,11 @@ describe('solveWcs()', () => {
     }
   });
 
-  it('falls back to synthetic points when the field holds no catalogue star (so NOT_ENOUGH_CATALOG_STARS is only a guard)', async () => {
-    const empty = WCS_CARDS.map((c) =>
-      c.startsWith('CRVAL1') ? 'CRVAL1  = 10' : c.startsWith('CRVAL2') ? 'CRVAL2  = -40' : c,
-    );
-    const { service } = setup([]);
-    const r = await service.solveWcs({ fileName: 'a.fits', bytes: fits(empty) });
-    expect(r.success && r.correspondences[0].starName).toBe('Synthetic 1');
-  });
-
-  it('takes the catalogue as a list, a loader or an asynchronous loader, loaded when a solution is read and again on each call', async () => {
-    const loader = vi.fn(() => STARS);
-    const { service } = setup(loader);
-    expect(loader).not.toHaveBeenCalled();
-    await service.solveWcs({ fileName: 'a.fits', bytes: fits([]) });
-    expect(loader).not.toHaveBeenCalled(); // no solution, no catalogue
-    await service.solveWcs({ fileName: 'a.fits', bytes: fits() });
-    await service.solveWcs({ fileName: 'a.fits', bytes: fits() });
-    expect(loader).toHaveBeenCalledTimes(2);
-
-    const asyncOne = setup(async () => STARS).service;
-    const r = await asyncOne.solveWcs({ fileName: 'a.fits', bytes: fits() });
-    expect(r.success && r.correspondences.length).toBe(3);
-  });
-
-  it('passes on the error of a catalogue that cannot be loaded', async () => {
-    const { service } = setup(() => {
-      throw new Error('Star catalog not found');
-    });
-    await expect(service.solveWcs({ fileName: 'a.fits', bytes: fits() })).rejects.toThrow(
-      'Star catalog not found',
-    );
+  it('answers NOT_ENOUGH_CATALOG_STARS for a solution that cannot place the photo', async () => {
+    const flat = WCS_CARDS.map((c) => (/^CD/.test(c) ? `${c.slice(0, 8)}= 0` : c));
+    const { service } = setup();
+    const r = await service.solveWcs({ fileName: 'a.fits', bytes: fits(flat) });
+    expect(r).toMatchObject({ success: false, code: 'NOT_ENOUGH_CATALOG_STARS' });
   });
 });
 
@@ -315,7 +313,7 @@ describe('convert()', () => {
     expect(encode.mock.calls[0][0]).toMatchObject({ width: 40, height: 30, channels: 1 });
     expect(r.success).toBe(true);
     expect(r.code).toBeUndefined();
-    expect(r.correspondences?.map((c) => c.starHip).sort()).toEqual([99001, 99002, 99003]);
+    expect(r.correspondences).toHaveLength(9);
     expect([r.sourceWidth, r.sourceHeight, r.width, r.height]).toEqual([40, 30, 40, 30]);
     expect([r.dateObs, r.expTime, r.stackCnt, r.filter]).toEqual([
       '2025-09-04T21:30:00Z',
@@ -326,25 +324,23 @@ describe('convert()', () => {
     expect([...r.png]).toEqual([1]);
   });
 
-  it('returns the picture with NO_WCS_DATA when the file holds no solution, and does not load the catalogue', async () => {
-    const loader = vi.fn(() => STARS);
-    const { service } = setup(loader);
+  it('returns the picture with NO_WCS_DATA when the file holds no solution', async () => {
+    const { service } = setup();
     const r = await service.convert({ fileName: 'a.tiff', bytes: plainTiff() });
     expect(r.success).toBe(false);
     expect(r.code).toBe('NO_WCS_DATA');
     expect(r.correspondences).toBeUndefined();
     expect([r.width, r.height]).toEqual([4, 3]);
-    expect(loader).not.toHaveBeenCalled();
   });
 
   // Regression: a TOP-DOWN file was drawn with its first stored row at the top while its stars
   // were placed with that row at the bottom, so every overlay came out mirrored top to bottom.
   it.each(['TOP-DOWN', 'BOTTOM-UP', undefined] as const)(
-    'puts each star on its own pixel of the picture it makes (ROWORDER %s)',
+    'puts the reference sky position on its own pixel of the picture it makes (ROWORDER %s)',
     async (roworder) => {
       const sharp = (await import('sharp')).default;
       const [W, H] = [40, 30];
-      // The first star sits exactly on the reference pixel: FITS pixel (6, 4), i.e. stored
+      // The reference pixel is FITS pixel (6, 4), i.e. stored
       // column 5 of stored row 3, far from the middle row so a mirror would miss it.
       const cards = WCS_CARDS.map((c) =>
         c.startsWith('CRPIX1') ? 'CRPIX1  = 6' : c.startsWith('CRPIX2') ? 'CRPIX2  = 4' : c,
@@ -361,25 +357,19 @@ describe('convert()', () => {
           extraCards: cards,
         }),
       );
-      // Two more stars 5 and 10 rows above it (0.1° per pixel) keep the field above three stars.
-      const stars = [
-        STARS[0],
-        { ...STARS[0], hip: 99101, dec: STARS[0].dec + 0.5 },
-        { ...STARS[0], hip: 99102, dec: STARS[0].dec + 1 },
-      ];
-      const service = createSolvedImportService({ images: createSharpImageCodec(), stars });
+      const service = createSolvedImportService({ images: createSharpImageCodec() });
       const r = await service.convert({ fileName: 'a.fits', bytes });
-      const star = r.correspondences!.find((c) => c.starHip === 99001)!;
+      const ref = pixelOf(r.correspondences!, CRVAL);
       const raw = await sharp(Buffer.from(r.png)).greyscale().raw().toBuffer();
-      expect([star.photoX, star.photoY]).toEqual([5, 26]);
-      expect(r.correspondences!.map((c) => c.starHip).sort()).toEqual([99001, 99101, 99102]);
-      expect(raw[Math.round(star.photoY) * W + Math.round(star.photoX)]).toBe(255);
+      expect(ref.x).toBeCloseTo(5, 0);
+      expect(ref.y).toBeCloseTo(26, 0);
+      expect(raw[Math.round(ref.y) * W + Math.round(ref.x)]).toBe(255);
     },
   );
 
   it('makes a single-channel PNG through the real codec, pixel for pixel', async () => {
     const sharp = (await import('sharp')).default;
-    const service = createSolvedImportService({ images: createSharpImageCodec(), stars: STARS });
+    const service = createSolvedImportService({ images: createSharpImageCodec() });
     const r = await service.convert({ fileName: 'a.tiff', bytes: plainTiff() });
     const png = Buffer.from(r.png);
     expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');

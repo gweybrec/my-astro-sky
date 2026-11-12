@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildCatalogStars,
   buildDeepStars,
   forEachStar,
   type StarsColumnsJson,
@@ -63,11 +62,5 @@ describe('star lists from either form', () => {
     expect(fromCols).toEqual(buildDeepStars(geo, names));
     expect(fromCols.map((s) => s.hip)).toEqual([3, 2]);
     expect(fromCols[0]).toMatchObject({ ra: 355, name: 'Test', constellation: 'Lyr', bv: -0.019 });
-  });
-
-  it('builds the same matching catalogue (every magnitude, brightest first)', () => {
-    const fromCols = buildCatalogStars(cols, names);
-    expect(fromCols).toEqual(buildCatalogStars(geo, names));
-    expect(fromCols.map((s) => s.hip)).toEqual([3, 2, 7]);
   });
 });

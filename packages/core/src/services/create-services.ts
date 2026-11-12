@@ -14,7 +14,7 @@ import { createNovaSolveService } from './nova-solve';
 import { createPhotoService } from './photos';
 import { createPlanService } from './plans';
 import { createPoiCategoryService } from './poi-categories';
-import { createSolvedImportService, type CatalogStarSource } from './solved-import';
+import { createSolvedImportService } from './solved-import';
 import { createSettingsService } from './settings';
 import { createStarSearchService, type StarCatalogSource } from './star-search';
 import { createVersionService } from './version';
@@ -32,8 +32,6 @@ export interface ServiceDeps {
   blobs: BlobStore;
   /** The deep star catalogue, or a function that loads it on first use. */
   stars: StarCatalogSource;
-  /** The catalogue (every magnitude, with names) that solved files are matched against, or a function that loads it on first use. */
-  catalogStars: CatalogStarSource;
   http: HttpClient;
   /** The clock, in milliseconds since the epoch. */
   now: () => number;
@@ -55,7 +53,6 @@ export function createServices(deps: ServiceDeps) {
     images,
     blobs,
     stars,
-    catalogStars,
     http,
     now,
     log,
@@ -81,7 +78,6 @@ export function createServices(deps: ServiceDeps) {
     http,
     settings,
     images,
-    stars: catalogStars,
     now,
     newId,
     log,
@@ -109,7 +105,7 @@ export function createServices(deps: ServiceDeps) {
     }),
     stars: createStarSearchService({ stars }),
     identify: createIdentifyService({ http, now }),
-    solvedImport: createSolvedImportService({ images, stars: catalogStars }),
+    solvedImport: createSolvedImportService({ images }),
     version: createVersionService({ http, now }),
     horizon: createHorizonService({ db, http, images, now, log, sleep }),
     novaSolve,

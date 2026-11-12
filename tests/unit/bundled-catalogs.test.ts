@@ -4,10 +4,9 @@ import fs from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { createBundledCatalogs } from '@myastrosky/backend-local/bundled-catalogs';
-import { buildCatalogStars, buildDeepStars } from '@myastrosky/core/catalog/star-lists';
+import { buildDeepStars } from '@myastrosky/core/catalog/star-lists';
 import { loadBuiltInGearCatalog } from '../../server/gear-catalog';
 import { loadDeepCatalog } from '../../server/star-search';
-import { loadServerCatalog } from '../../server/wcs-reader';
 
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -36,23 +35,18 @@ function setup(missing: string[] = []) {
 }
 
 describe('createBundledCatalogs', () => {
-  it('builds the same two star lists as the server', async () => {
+  it('builds the same star list as the server', async () => {
     const { catalogs } = setup();
     const deep = await catalogs.stars();
     const server = loadDeepCatalog();
     expect(deep.length).toBe(server.length);
     expect(deep.slice(0, 50)).toEqual(server.slice(0, 50));
-    const catalog = await catalogs.catalogStars();
-    const serverCatalog = loadServerCatalog();
-    expect(catalog.length).toBe(serverCatalog.length);
-    expect(catalog.slice(0, 50)).toEqual(serverCatalog.slice(0, 50));
   }, 60_000);
 
-  it('fetches each star file once for both lists, and each list once', async () => {
+  it('fetches each star file once', async () => {
     const { catalogs, calls } = setup();
-    await Promise.all([catalogs.stars(), catalogs.catalogStars()]);
+    await Promise.all([catalogs.stars(), catalogs.stars()]);
     await catalogs.stars();
-    await catalogs.catalogStars();
     expect([...calls].sort()).toEqual(
       [
         'http://app.test/data/star-multiples.json',
@@ -98,6 +92,5 @@ describe('createBundledCatalogs', () => {
       bv: 0.5,
       multiplicity: { components: 2 },
     });
-    expect(buildCatalogStars(stars).map((s) => s.hip)).toEqual([1, 2]);
   });
 });

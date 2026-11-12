@@ -22,21 +22,10 @@ import {
   UnsupportedXisfError,
 } from '../raw-decode/index';
 import { parseXisfHeader } from '../raw-decode/xisf';
-import {
-  extractWCS,
-  wcsFromHeader,
-  wcsToCorrespondencesWithCatalog,
-  type CatalogStar,
-  type WCSData,
-} from '../wcs';
-
-/** The catalogue stars used to match a solution (every magnitude), or a function that returns them. */
-export type CatalogStarSource =
-  readonly CatalogStar[] | (() => readonly CatalogStar[] | Promise<readonly CatalogStar[]>);
+import { extractWCS, wcsFromHeader, wcsToCorrespondences, type WCSData } from '../wcs';
 
 export interface SolvedImportServiceDeps {
   images: ImageCodec;
-  stars: CatalogStarSource;
 }
 
 export interface SolvedImportService {
@@ -112,16 +101,11 @@ function metadataOf(wcs: WCSData | null): SolvedCaptureMetadata {
 export function createSolvedImportService(deps: SolvedImportServiceDeps): SolvedImportService {
   const { images } = deps;
 
-  // Resolved on every call: a loader caches its own result, and one that failed is retried.
-  const catalog = async (): Promise<CatalogStar[]> => [
-    ...(await (typeof deps.stars === 'function' ? deps.stars() : deps.stars)),
-  ];
-
   // Standard FITS files from PixInsight/Siril use the FITS Y convention (Y=1 is the bottom row,
   // Y increases upward), opposite to the display convention (Y=0 is the top row), hence `true`.
   // The FITS keywords of a TIFF or an XISF are read the same way.
-  const correspondencesOf = async (wcs: WCSData, width: number, height: number) =>
-    wcsToCorrespondencesWithCatalog(wcs, await catalog(), width, height, true);
+  const correspondencesOf = (wcs: WCSData, width: number, height: number) =>
+    wcsToCorrespondences(wcs, width, height, true);
 
   return {
     async solveWcs(request) {

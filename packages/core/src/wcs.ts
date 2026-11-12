@@ -1,5 +1,6 @@
 import { bytesToAscii7 } from './raw-decode/ascii';
 import { logDebug } from './platform/log';
+import { checkReferencePoints } from './reference-points';
 
 export interface WCSData {
   CRPIX1: number;
@@ -12,12 +13,55 @@ export interface WCSData {
   CD2_2: number;
   NAXIS1: number;
   NAXIS2: number;
+  /** The SIP distortion of the solution, when it has one (pixel to sky: A for axis 1, B for axis 2). */
+  sip?: SipDistortion;
   // Optional observation metadata from FITS headers
   dateObs?: string; // DATE-OBS (or DATE fallback), normalised to UTC ISO 8601 (Z suffix)
   expTime?: number; // EXPTIME in seconds
   stackCnt?: number; // STACKCNT, number of stacked frames
   filter?: string; // FILTER name (feeds the integration row)
   captureDetails?: Record<string, number | string>; // parsed capture fields (see CAPTURE_FITS_MAP)
+}
+
+/**
+ * SIP polynomials (Shupe et al. 2005): pixel offsets (u, v) from CRPIX become (u + f(u, v), v + g(u, v)) before
+ * the CD matrix, with f = Σ a[`i_j`]·u^i·v^j and g the same with `b`.
+ */
+export interface SipDistortion {
+  a: Record<string, number>;
+  b: Record<string, number>;
+}
+
+/** The SIP distortion of a parsed header (A_ORDER, A_i_j, B_ORDER, B_i_j), or undefined when it has none. */
+function sipFromHeader(
+  parsed: Record<string, number | string | boolean>,
+): SipDistortion | undefined {
+  const terms = (prefix: 'A' | 'B') => {
+    const order = parsed[`${prefix}_ORDER`];
+    const out: Record<string, number> = {};
+    if (typeof order !== 'number' || !(order > 0)) return out;
+    for (let i = 0; i <= order; i++) {
+      for (let j = 0; i + j <= order; j++) {
+        const value = parsed[`${prefix}_${i}_${j}`];
+        if (typeof value === 'number' && Number.isFinite(value) && value !== 0)
+          out[`${i}_${j}`] = value;
+      }
+    }
+    return out;
+  };
+  const a = terms('A');
+  const b = terms('B');
+  return Object.keys(a).length > 0 || Object.keys(b).length > 0 ? { a, b } : undefined;
+}
+
+/** Σ terms[`i_j`]·u^i·v^j. */
+function sipSum(terms: Record<string, number>, u: number, v: number): number {
+  let sum = 0;
+  for (const [key, coef] of Object.entries(terms)) {
+    const [i, j] = key.split('_').map(Number);
+    sum += coef * u ** i * v ** j;
+  }
+  return sum;
 }
 
 /** Append 'Z' to a FITS DATE-OBS value that has no timezone designator. */
@@ -124,16 +168,6 @@ export function extractCaptureDetails(
     }
   }
   return out;
-}
-
-export interface CatalogStar {
-  hip: number;
-  ra: number;
-  dec: number;
-  mag: number;
-  name?: string;
-  bayer?: string;
-  constellation?: string;
 }
 
 export interface Correspondence {
@@ -310,347 +344,65 @@ export function extractFITSHeaderFromFITS(buffer: Uint8Array): string {
 
 const DEG2RAD = Math.PI / 180;
 
-function starDisplayLabel(star: CatalogStar): string {
-  if (star.name) {
-    if (star.bayer && star.constellation) {
-      return `${star.name} (${star.bayer} ${star.constellation})`;
-    }
-    return star.name;
-  }
-  if (star.bayer && star.constellation) {
-    return `${star.bayer} ${star.constellation}`;
-  }
-  return `HIP ${star.hip}`;
-}
+/**
+ * Where a plate solution's reference points are taken, as fractions of the photo's width and height: the corners,
+ * the middles of the edges and the centre, 5 % inside the edges.
+ */
+const REFERENCE_FRACTIONS = [0.05, 0.5, 0.95];
 
-// Generate synthetic correspondences from WCS when catalog stars are unavailable
-// This creates reference points by sampling the image and computing their RA/Dec
-function generateSyntheticCorrespondences(
+/**
+ * The reference points a plate-solved photo is stored with: points spread over the whole photo, each with the sky
+ * position its plate solution gives. They are exact wherever they are, so they are taken where they place the photo
+ * best rather than on catalogue stars, which may be few, close together or in one corner. Empty when the solution
+ * gives no usable points (see {@link checkReferencePoints}).
+ *
+ * @param fitsYConvention - true when the solution counts rows from the bottom (Siril, PixInsight, ASTAP); false when
+ *   from the top (solve-field, astrometry.net).
+ */
+export function wcsToCorrespondences(
   wcs: WCSData,
   imageWidth: number,
   imageHeight: number,
   fitsYConvention = false,
 ): Correspondence[] {
+  const ra0Rad = wcs.CRVAL1 * DEG2RAD;
+  const dec0Rad = wcs.CRVAL2 * DEG2RAD;
+  const sinDec0 = Math.sin(dec0Rad);
+  const cosDec0 = Math.cos(dec0Rad);
+
   const result: Correspondence[] = [];
-
-  // Sample points in a grid pattern (corners + center + mid-edges)
-  const samplePoints: [number, number][] = [
-    [imageWidth * 0.25, imageHeight * 0.25], // Top-left quadrant
-    [imageWidth * 0.75, imageHeight * 0.25], // Top-right quadrant
-    [imageWidth * 0.5, imageHeight * 0.5], // Center
-    [imageWidth * 0.25, imageHeight * 0.75], // Bottom-left quadrant
-    [imageWidth * 0.75, imageHeight * 0.75], // Bottom-right quadrant
-    [imageWidth * 0.5, imageHeight * 0.25], // Top-center
-    [imageWidth * 0.5, imageHeight * 0.75], // Bottom-center
-    [imageWidth * 0.25, imageHeight * 0.5], // Left-center
-    [imageWidth * 0.75, imageHeight * 0.5], // Right-center
-  ];
-
-  // Convert each sample point from pixel to RA/Dec using WCS
-  for (let i = 0; i < samplePoints.length; i++) {
-    const [px, py] = samplePoints[i];
-
-    // Convert display coords (0-indexed, origin top-left) to WCS coords
-    // FITS convention (PixInsight/Siril): Y=1 is the bottom row, Y increases upward
-    // Display convention (solve-field/astrometry.net): Y=1 is the top row, Y increases downward
-    const wcsX = px + 1;
-    const wcsY = fitsYConvention ? imageHeight - py : py + 1;
-
-    // Compute pixel offset from reference pixel
-    const dx = wcsX - wcs.CRPIX1;
-    const dy = wcsY - wcs.CRPIX2;
-
-    // Apply CD matrix to get standard coordinates (in degrees)
-    const xi = wcs.CD1_1 * dx + wcs.CD1_2 * dy;
-    const eta = wcs.CD2_1 * dx + wcs.CD2_2 * dy;
-
-    // Convert standard coordinates to RA/Dec using inverse TAN projection
-    const ra0Rad = wcs.CRVAL1 * DEG2RAD;
-    const dec0Rad = wcs.CRVAL2 * DEG2RAD;
-    const xiRad = xi * DEG2RAD;
-    const etaRad = eta * DEG2RAD;
-
-    const sinDec0 = Math.sin(dec0Rad);
-    const cosDec0 = Math.cos(dec0Rad);
-
-    const denom = cosDec0 - etaRad * sinDec0;
-    const raRad = ra0Rad + Math.atan2(xiRad, denom);
-    const decRad = Math.atan2(sinDec0 + etaRad * cosDec0, Math.sqrt(xiRad * xiRad + denom * denom));
-
-    let ra = raRad * (180 / Math.PI);
-    const dec = decRad * (180 / Math.PI);
-
-    // Normalize RA to [0, 360)
-    while (ra < 0) ra += 360;
-    while (ra >= 360) ra -= 360;
-
-    result.push({
-      pointIndex: i,
-      photoX: px,
-      photoY: py,
-      starHip: 0, // No catalog star
-      starName: `Synthetic ${i + 1}`,
-      starRa: ra,
-      starDec: dec,
-    });
-  }
-
-  logDebug('WCS', `Generated ${result.length} synthetic correspondences from WCS`);
-  for (let i = 0; i < Math.min(result.length, 3); i++) {
-    const c = result[i];
-    logDebug(
-      'WCS',
-      `  [${i}] ${c.starName} at pixel (${c.photoX.toFixed(1)}, ${c.photoY.toFixed(1)}) → RA=${c.starRa?.toFixed(4)}°, Dec=${c.starDec?.toFixed(4)}°`,
-    );
-  }
-
-  return result;
-}
-
-/** Pure core of wcsToCorrespondences: the star catalog is injected (no fs access). */
-export function wcsToCorrespondencesWithCatalog(
-  wcs: WCSData,
-  catalog: CatalogStar[],
-  imageWidth: number,
-  imageHeight: number,
-  fitsYConvention = false,
-): Correspondence[] {
-  // Compute approximate field of view from CD matrix
-  const pixscaleX = Math.sqrt(wcs.CD1_1 * wcs.CD1_1 + wcs.CD2_1 * wcs.CD2_1); // deg/pixel
-  const pixscaleY = Math.sqrt(wcs.CD1_2 * wcs.CD1_2 + wcs.CD2_2 * wcs.CD2_2);
-  const fovX = pixscaleX * imageWidth; // degrees
-  const fovY = pixscaleY * imageHeight;
-  const searchRadius = Math.max(fovX, fovY) * 0.7; // slightly less than diagonal/2
-
-  const centerRA = wcs.CRVAL1;
-  const centerDec = wcs.CRVAL2;
-
-  // Find stars within the field of view
-  const starsInField: CatalogStar[] = [];
-  for (const star of catalog) {
-    const dRA = (star.ra - centerRA) * Math.cos(centerDec * DEG2RAD);
-    const dDec = star.dec - centerDec;
-    const dist = Math.sqrt(dRA * dRA + dDec * dDec);
-    if (dist < searchRadius) {
-      starsInField.push(star);
+  for (const fy of REFERENCE_FRACTIONS) {
+    for (const fx of REFERENCE_FRACTIONS) {
+      const px = imageWidth * fx;
+      const py = imageHeight * fy;
+      // Display pixel (0-based, from the top) to the solution's pixel (1-based; from the bottom in the FITS convention).
+      const u = px + 1 - wcs.CRPIX1;
+      const v = (fitsYConvention ? imageHeight - py : py + 1) - wcs.CRPIX2;
+      const dx = wcs.sip ? u + sipSum(wcs.sip.a, u, v) : u;
+      const dy = wcs.sip ? v + sipSum(wcs.sip.b, u, v) : v;
+      // Standard coordinates, then the inverse TAN projection.
+      const xi = (wcs.CD1_1 * dx + wcs.CD1_2 * dy) * DEG2RAD;
+      const eta = (wcs.CD2_1 * dx + wcs.CD2_2 * dy) * DEG2RAD;
+      const denom = cosDec0 - eta * sinDec0;
+      const ra = (ra0Rad + Math.atan2(xi, denom)) / DEG2RAD;
+      const dec = Math.atan2(sinDec0 + eta * cosDec0, Math.hypot(xi, denom)) / DEG2RAD;
+      result.push({
+        pointIndex: result.length,
+        photoX: px,
+        photoY: py,
+        starHip: 0,
+        starName: `Synthetic ${result.length + 1}`,
+        starRa: ((ra % 360) + 360) % 360,
+        starDec: dec,
+      });
     }
   }
 
-  // Sort by brightness
-  starsInField.sort((a, b) => a.mag - b.mag);
-
-  // Invert the CD matrix to convert from sky to pixel
-  const det = wcs.CD1_1 * wcs.CD2_2 - wcs.CD1_2 * wcs.CD2_1;
-
-  // Check parity: CD1_1 < 0 typically means RA increases left (astronomical convention)
-  // CD1_1 > 0 means RA increases right (mirrored, needs flip)
-  const needsFlip = wcs.CD1_1 > 0;
-  logDebug(
-    'WCS',
-    `CD matrix: CD1_1=${wcs.CD1_1.toExponential(3)}, CD1_2=${wcs.CD1_2.toExponential(3)}, CD2_1=${wcs.CD2_1.toExponential(3)}, CD2_2=${wcs.CD2_2.toExponential(3)}`,
-  );
-  logDebug('WCS', `CD matrix determinant: ${det.toExponential(3)}`);
-  logDebug(
-    'WCS',
-    `Image orientation: ${needsFlip ? 'MIRRORED (needs X flip)' : 'NORMAL (astronomical standard)'}`,
-  );
-  logDebug(
-    'WCS',
-    `SIP distortion: ${(wcs as any).AP_ORDER ? `order ${(wcs as any).AP_ORDER}` : 'none'}`,
-  );
-
-  if (Math.abs(det) < 1e-20) return [];
-
-  const invCD = {
-    a: wcs.CD2_2 / det,
-    b: -wcs.CD1_2 / det,
-    c: -wcs.CD2_1 / det,
-    d: wcs.CD1_1 / det,
-  };
-
-  // Convert star RA/Dec to pixel coords using TAN projection
-  logDebug(
-    'WCS',
-    `Converting ${starsInField.length} stars in field to image pixels (image: ${imageWidth}x${imageHeight})`,
-  );
-  const starsWithPixels: { star: CatalogStar; px: number; py: number }[] = [];
-
-  for (const star of starsInField) {
-    const raRad = star.ra * DEG2RAD;
-    const decRad = star.dec * DEG2RAD;
-    const ra0Rad = centerRA * DEG2RAD;
-    const dec0Rad = centerDec * DEG2RAD;
-
-    const sinDec = Math.sin(decRad);
-    const cosDec = Math.cos(decRad);
-    const sinDec0 = Math.sin(dec0Rad);
-    const cosDec0 = Math.cos(dec0Rad);
-    const cosDRA = Math.cos(raRad - ra0Rad);
-    const sinDRA = Math.sin(raRad - ra0Rad);
-
-    const denom = sinDec0 * sinDec + cosDec0 * cosDec * cosDRA;
-    if (denom < 0.01) continue; // behind projection
-
-    // Standard coordinates (gnomonic/TAN projection) in degrees
-    const xi = ((cosDec * sinDRA) / denom) * (180 / Math.PI);
-    const eta = ((cosDec0 * sinDec - sinDec0 * cosDec * cosDRA) / denom) * (180 / Math.PI);
-
-    // Pixel coordinates via inverse CD matrix
-    const dx = invCD.a * xi + invCD.b * eta;
-    const dy = invCD.c * xi + invCD.d * eta;
-
-    // Apply inverse SIP distortion if present (AP and BP polynomials)
-    // SIP distortion is applied to (dx, dy) before adding to CRPIX
-    const applyInverseSIP = (parsed: any, u: number, v: number): { du: number; dv: number } => {
-      let du = 0,
-        dv = 0;
-      const apOrder = parsed.AP_ORDER || 0;
-      const bpOrder = parsed.BP_ORDER || 0;
-
-      if (apOrder > 0) {
-        for (let i = 0; i <= apOrder; i++) {
-          for (let j = 0; j <= apOrder; j++) {
-            const coef = parsed[`AP_${i}_${j}`];
-            if (typeof coef === 'number') {
-              du += coef * Math.pow(u, i) * Math.pow(v, j);
-            }
-          }
-        }
-      }
-
-      if (bpOrder > 0) {
-        for (let i = 0; i <= bpOrder; i++) {
-          for (let j = 0; j <= bpOrder; j++) {
-            const coef = parsed[`BP_${i}_${j}`];
-            if (typeof coef === 'number') {
-              dv += coef * Math.pow(u, i) * Math.pow(v, j);
-            }
-          }
-        }
-      }
-
-      return { du, dv };
-    };
-
-    // Apply SIP correction (note: we need the full parsed WCS header for SIP coefficients)
-    // For now, skip SIP if not available in wcs object
-    const sipCorr = (wcs as any).AP_ORDER ? applyInverseSIP(wcs, dx, dy) : { du: 0, dv: 0 };
-    const dx_corrected = dx + sipCorr.du;
-    const dy_corrected = dy + sipCorr.dv;
-
-    // FITS pixel coordinates (1-indexed from bottom-left)
-    const fitsPx = wcs.CRPIX1 + dx_corrected;
-    const fitsPy = wcs.CRPIX2 + dy_corrected;
-
-    // Convert WCS pixel coords to display coords (0-indexed, origin top-left)
-    // FITS convention (PixInsight/Siril): Y=1 is the bottom row → flip Y
-    // Display convention (solve-field/astrometry.net): Y=1 is the top row → just subtract 1
-    const px = fitsPx - 1;
-    const py = fitsYConvention ? imageHeight - fitsPy : fitsPy - 1;
-
-    // Debug first few stars
-    if (starsWithPixels.length < 3) {
-      logDebug(
-        'WCS',
-        `Star ${star.name || 'HIP ' + star.hip}: RA=${star.ra.toFixed(2)}° Dec=${star.dec.toFixed(2)}°`,
-      );
-      logDebug(
-        'WCS',
-        `      → WCS pixel (${fitsPx.toFixed(1)}, ${fitsPy.toFixed(1)}) → Display pixel (${px.toFixed(1)}, ${py.toFixed(1)})`,
-      );
-    }
-
-    // Check bounds - must be strictly within image (no negative margin for star selection)
-    if (px >= 0 && px <= imageWidth && py >= 0 && py <= imageHeight) {
-      starsWithPixels.push({ star, px, py });
-    }
+  const problems = checkReferencePoints(result, imageWidth, imageHeight);
+  if (problems.length > 0) {
+    logDebug('WCS', `The plate solution gives no usable reference points: ${problems.join(', ')}`);
+    return [];
   }
-
-  logDebug(
-    'WCS',
-    `${starsWithPixels.length} stars within image bounds (out of ${starsInField.length} in field)`,
-  );
-
-  // If we found fewer than 3 catalog stars, generate synthetic correspondences from WCS
-  if (starsWithPixels.length < 3) {
-    logDebug(
-      'WCS',
-      `Only ${starsWithPixels.length} catalog stars found, generating synthetic correspondences from WCS`,
-    );
-    return generateSyntheticCorrespondences(wcs, imageWidth, imageHeight, fitsYConvention);
-  }
-
-  // Filter to stars well within bounds (avoid edges for better accuracy)
-  const margin = Math.min(50, imageWidth * 0.05, imageHeight * 0.05);
-  const interiorStars = starsWithPixels.filter(
-    ({ px, py }) =>
-      px >= margin && px <= imageWidth - margin && py >= margin && py <= imageHeight - margin,
-  );
-
-  // Use interior stars if we have enough, otherwise fall back to all stars
-  const candidates = (interiorStars.length >= 3 ? interiorStars : starsWithPixels).slice(0, 20);
-
-  logDebug(
-    'WCS',
-    `Found ${starsWithPixels.length} stars in bounds, ${interiorStars.length} interior stars, using ${candidates.length} candidates`,
-  );
-
-  // Choose 3 well-separated bright stars forming the largest triangle
-  let bestArea = 0;
-  let bestTriple: [number, number, number] = [0, 1, 2];
-
-  for (let i = 0; i < candidates.length - 2; i++) {
-    for (let j = i + 1; j < candidates.length - 1; j++) {
-      for (let k = j + 1; k < candidates.length; k++) {
-        const a = candidates[i],
-          b = candidates[j],
-          c = candidates[k];
-        // Shoelace area
-        const area = Math.abs((b.px - a.px) * (c.py - a.py) - (c.px - a.px) * (b.py - a.py)) / 2;
-        if (area > bestArea) {
-          bestArea = area;
-          bestTriple = [i, j, k];
-        }
-      }
-    }
-  }
-
-  const result: Correspondence[] = bestTriple.map((idx, pointIndex) => {
-    const { star, px, py } = candidates[idx];
-    return {
-      pointIndex,
-      photoX: px,
-      photoY: py,
-      starHip: star.hip,
-      starName: starDisplayLabel(star),
-      starRa: star.ra,
-      starDec: star.dec,
-    };
-  });
-
-  // Add extra well-spread stars for a least-squares fit in the frontend
-  const usedSet = new Set(bestTriple);
-  for (let i = 0; i < candidates.length && result.length < 15; i++) {
-    if (usedSet.has(i)) continue;
-    const { px, py, star } = candidates[i];
-    // Candidates are already filtered to be interior stars, so just add them
-    result.push({
-      pointIndex: result.length,
-      photoX: px,
-      photoY: py,
-      starHip: star.hip,
-      starName: starDisplayLabel(star),
-      starRa: star.ra,
-      starDec: star.dec,
-    });
-  }
-
-  logDebug('WCS', `Returning ${result.length} correspondences for transform`);
-  for (let i = 0; i < Math.min(result.length, 5); i++) {
-    const c = result[i];
-    logDebug('WCS', `  [${i}] ${c.starName} at (${c.photoX.toFixed(1)}, ${c.photoY.toFixed(1)})`);
-  }
-
   return result;
 }
 
@@ -718,6 +470,8 @@ export function wcsFromHeader(parsed: Record<string, number | string | boolean>)
     NAXIS1: (parsed.NAXIS1 as number) || 0,
     NAXIS2: (parsed.NAXIS2 as number) || 0,
   };
+  const sip = sipFromHeader(parsed);
+  if (sip) wcs.sip = sip;
 
   // DATE-OBS is preferred; fall back to the DATE card only when both are sane.
   // Siril writes the placeholder YYYY-01-01T00:00:00 for multi-session stacks.

@@ -17,8 +17,7 @@ export function loadDeepCatalog(): DeepStar[] {
   if (deepStars) return deepStars;
 
   const publicDataDir = process.env.PUBLIC_DATA_DIR || path.join(__dirname, '..', 'public', 'data');
-  // The shipped deep catalog (stars.14.json, ~118k stars), shared with WCS matching
-  // via STAR_CATALOG_PATH.
+  // The shipped deep catalog (stars.14.json, ~118k stars), or the one STAR_CATALOG_PATH names.
   const catalogPath = process.env.STAR_CATALOG_PATH
     ? path.resolve(process.env.STAR_CATALOG_PATH)
     : path.join(publicDataDir, 'stars.14.json');

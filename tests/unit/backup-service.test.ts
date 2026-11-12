@@ -98,7 +98,6 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       images,
       blobs,
       stars: [],
-      catalogStars: [],
       http: async () => {
         throw new Error('no network in this test');
       },

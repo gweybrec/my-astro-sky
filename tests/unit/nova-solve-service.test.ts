@@ -12,21 +12,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { HttpRequest, HttpResponse } from '@myastrosky/core/ports/http-client';
 import { createNovaSolveService } from '@myastrosky/core/services/nova-solve';
-import type { CatalogStar } from '@myastrosky/core/wcs';
 import { buildFits } from '../fixtures/fits-builders';
 
 const FIXTURES = path.join(__dirname, '../fixtures/astrometry');
 const WCS_TEXT = fs.readFileSync(path.join(FIXTURES, '10796000-wcs.fits'), 'latin1');
 const OBJECTS = fs.readFileSync(path.join(FIXTURES, '10796000-objects.json'), 'utf8');
 const CALIBRATION = fs.readFileSync(path.join(FIXTURES, '10796000-calibration.json'), 'utf8');
-
-/** Stars around the reference point of the fixture solution (M13), so the solution finds some. */
-const STARS: CatalogStar[] = [
-  { hip: 99004, ra: 251.072257, dec: 36.213791, mag: 5 },
-  { hip: 99005, ra: 250.9, dec: 36.3, mag: 6 },
-  { hip: 99006, ra: 251.2, dec: 36.1, mag: 6.5 },
-  { hip: 99007, ra: 250.7, dec: 36.4, mag: 7 },
-];
 
 const API = 'https://nova.astrometry.net/api';
 const BIG = { width: 3840, height: 2160 };
@@ -45,7 +36,6 @@ function setup(
   options: {
     key?: string | undefined;
     size?: { width: number; height: number } | 'unreadable';
-    stars?: CatalogStar[];
     route?: Route;
   } = {},
 ) {
@@ -72,7 +62,6 @@ function setup(
     http,
     settings,
     images: { probe } as never,
-    stars: options.stars ?? STARS,
     now: () => clock,
     newId: () => `job-${++ids}`,
     log,
@@ -286,8 +275,7 @@ describe('the polling of a submitted job', () => {
     const id = await t.service.submit(t.file);
     await t.pump(3);
     const job = await t.service.getJob(id);
-    // The catalogue may hold too few stars for the calibration; either way the job is final.
-    expect(['solved', 'failed']).toContain(job.status);
+    expect(job.status).toBe('solved');
     expect(t.calls.some((c) => c.url === `${API}/jobs/10796000/calibration/`)).toBe(true);
   });
 
@@ -414,6 +402,29 @@ describe('reuse()', () => {
     expect(r.success).toBe(true);
     expect(r.correspondences!.length).toBeGreaterThanOrEqual(3);
     expect(r.dsoIds!.length).toBeGreaterThan(0);
+  });
+
+  it('keeps the sky size of a solution reused for a smaller picture of the same shape', async () => {
+    const route: Route = (r) =>
+      r.url === `${API}/jobs/10796000`
+        ? json({ status: 'success' })
+        : r.url === 'https://nova.astrometry.net/wcs_file/10796000/'
+          ? reply(WCS_TEXT)
+          : r.url === `${API}/jobs/10796000/objects_in_field/`
+            ? reply(OBJECTS)
+            : reply('', 404);
+    const big = setup({ route });
+    const full = await big.service.reuse(big.file, 10796000);
+    const half = setup({ size: { width: 1920, height: 1080 }, route });
+    const r = await half.service.reuse(half.file, 10796000);
+    // The same points, at half the pixel position, on the same sky: the photo keeps its size on the sky.
+    expect(r.correspondences).toHaveLength(9);
+    r.correspondences!.forEach((c, i) => {
+      const f = full.correspondences![i];
+      expect([c.photoX, c.photoY]).toEqual([f.photoX / 2, f.photoY / 2]);
+      expect(c.starRa).toBeCloseTo(f.starRa!, 9);
+      expect(c.starDec).toBeCloseTo(f.starDec!, 9);
+    });
   });
 
   it('refuses a solution of another shape, with the message the route sends', async () => {

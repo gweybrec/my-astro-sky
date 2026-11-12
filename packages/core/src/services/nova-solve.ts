@@ -27,9 +27,7 @@ import type {
 } from '../domain/solve';
 import type { HttpClient, HttpResponse } from '../ports/http-client';
 import type { ImageCodec } from '../ports/image-codec';
-import { extractWCS, parseFITSHeader, wcsToCorrespondencesWithCatalog } from '../wcs';
-import type { CatalogStar } from '../wcs';
-import type { CatalogStarSource } from './solved-import';
+import { extractWCS, parseFITSHeader, wcsToCorrespondences } from '../wcs';
 
 const API_BASE = 'https://nova.astrometry.net/api';
 const WCS_FILE_BASE = 'https://nova.astrometry.net/wcs_file';
@@ -45,8 +43,6 @@ export interface NovaSolveServiceDeps {
   settings: { get(key: string): Promise<string | undefined> };
   /** Reads the size of a picture. */
   images: ImageCodec;
-  /** The catalogue (every magnitude) that solutions are matched against, or a function that loads it. */
-  stars: CatalogStarSource;
   /** The clock, in milliseconds since the epoch; it dates the jobs. */
   now: () => number;
   /** A new unique id for a job. */
@@ -114,13 +110,10 @@ function extensionOf(fileName: string): string {
 }
 
 export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveService {
-  const { http, settings, images, stars, now, newId, log } = deps;
+  const { http, settings, images, now, newId, log } = deps;
   const sleep = deps.sleep ?? defaultSleep;
   const jobs = new Map<string, Job>();
   let sessionKey: string | null = null;
-
-  const catalog = async (): Promise<CatalogStar[]> =>
-    (typeof stars === 'function' ? await stars() : stars) as CatalogStar[];
 
   function evictStaleJobs(): void {
     const t = now();
@@ -345,9 +338,8 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
           try {
             const parsed = await fetchWcsHeader(job.jobId);
             if (parsed && hasAllWcsKeys(parsed)) {
-              const correspondences = wcsToCorrespondencesWithCatalog(
+              const correspondences = wcsToCorrespondences(
                 solutionToWcs(parsed, job.imageWidth, job.imageHeight),
-                await catalog(),
                 job.imageWidth,
                 job.imageHeight,
               );
@@ -368,7 +360,6 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
             cal,
             job.imageWidth,
             job.imageHeight,
-            await catalog(),
           );
           if (correspondences.length >= 3) {
             job.status = 'solved';
@@ -376,7 +367,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
             job.dsoIds = await fetchObjectsInField(job.jobId);
           } else {
             job.status = 'failed';
-            job.error = 'Calibration obtained but no catalog stars found in the field';
+            job.error = 'Calibration obtained but it gives no usable reference points';
           }
           return;
         } else if (jobData.status === 'failure') {
@@ -517,20 +508,15 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
             };
           }
 
-          // Scale the reference pixel to the new size and keep the CD matrix.
-          const wcs = solutionToWcs(
-            parsed,
-            imageWidth,
-            imageHeight,
-            imageWidth / originalWidth,
-            imageHeight / originalHeight,
-          );
-          const correspondences = wcsToCorrespondencesWithCatalog(
-            wcs,
-            await catalog(),
-            imageWidth,
-            imageHeight,
-          );
+          // The points are taken on the solved picture, then moved onto this one: the solution's pixel scale and
+          // distortion are in the solved picture's pixels.
+          const scaleX = imageWidth / originalWidth;
+          const scaleY = imageHeight / originalHeight;
+          const correspondences = wcsToCorrespondences(
+            solutionToWcs(parsed, originalWidth, originalHeight),
+            originalWidth,
+            originalHeight,
+          ).map((c) => ({ ...c, photoX: c.photoX * scaleX, photoY: c.photoY * scaleY }));
           if (correspondences.length >= 3) {
             return { success: true, correspondences, dsoIds: await fetchObjectsInField(jobId) };
           }
@@ -541,12 +527,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
 
       // Fallback: the calibration.
       const cal = await fetchCalibration(jobId);
-      const correspondences = calibrationToCorrespondences(
-        cal,
-        imageWidth,
-        imageHeight,
-        await catalog(),
-      );
+      const correspondences = calibrationToCorrespondences(cal, imageWidth, imageHeight);
       if (correspondences.length >= 3) {
         return { success: true, correspondences, dsoIds: await fetchObjectsInField(jobId) };
       }

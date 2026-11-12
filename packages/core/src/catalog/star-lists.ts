@@ -1,11 +1,10 @@
 /**
- * Turns the star catalogue files (already parsed from JSON) into the two lists the services use. The host
+ * Turns the star catalogue files (already parsed from JSON) into the list the services use. The host
  * reads the files: the server from disk, the phone from its bundled data.
  */
 import { normalizeRA } from '../angles';
 import type { DeepStar } from '../domain/stars';
 import type { StarMultiplicity } from '../types';
-import type { CatalogStar } from '../wcs';
 
 /** A star catalogue in the GeoJSON form, one feature per star (`id` is the HIP number). Still read: a catalogue set by `STAR_CATALOG_PATH` may be one. */
 export interface StarsGeoJson {
@@ -87,28 +86,6 @@ export function buildDeepStars(
       constellation: info?.c || undefined,
       desig: info?.desig || undefined,
       multiplicity: multByHip.get(hip),
-    });
-  });
-  stars.sort((a, b) => a.mag - b.mag);
-  return stars;
-}
-
-/** The catalogue that solved files are matched against (every magnitude), brightest first. */
-export function buildCatalogStars(
-  starsJson: StarsJson,
-  namesJson: StarNamesJson = {},
-): CatalogStar[] {
-  const stars: CatalogStar[] = [];
-  forEachStar(starsJson, (hip, ra, dec, mag) => {
-    const info = namesJson[String(hip)];
-    stars.push({
-      hip,
-      ra: normalizeRA(ra),
-      dec,
-      mag,
-      name: info?.name || undefined,
-      bayer: info?.bayer || undefined,
-      constellation: info?.c || undefined,
     });
   });
   stars.sort((a, b) => a.mag - b.mag);

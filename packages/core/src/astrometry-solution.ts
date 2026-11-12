@@ -4,7 +4,7 @@
  * reports, and the guard that stops a solution being reused for a picture of another shape.
  */
 import type { NovaCorrespondence } from './domain/solve';
-import { wcsToCorrespondencesWithCatalog, type CatalogStar, type WCSData } from './wcs';
+import { wcsFromHeader, wcsToCorrespondences, type WCSData } from './wcs';
 
 /** The numeric keys a WCS header must hold to be usable. */
 const REQUIRED_WCS_KEYS = [
@@ -26,41 +26,15 @@ export function hasAllWcsKeys(parsed: ParsedHeader): boolean {
 }
 
 /**
- * The WCS of an astrometry.net `wcs_file` header for a picture of `imageWidth` x `imageHeight`.
- * `scaleX` and `scaleY` rescale the reference pixel when the picture is not the solved one;
- * the CD matrix is kept. The SIP inverse terms are copied when the header has them.
+ * The WCS of an astrometry.net `wcs_file` header (with its SIP distortion) for the picture it solved, of
+ * `imageWidth` x `imageHeight`. The header must hold every key of `REQUIRED_WCS_KEYS` (see {@link hasAllWcsKeys}).
  */
 export function solutionToWcs(
   parsed: ParsedHeader,
   imageWidth: number,
   imageHeight: number,
-  scaleX = 1,
-  scaleY = 1,
 ): WCSData {
-  const wcs: Record<string, unknown> = {
-    CRPIX1: (parsed.CRPIX1 as number) * scaleX,
-    CRPIX2: (parsed.CRPIX2 as number) * scaleY,
-    CRVAL1: parsed.CRVAL1 as number,
-    CRVAL2: parsed.CRVAL2 as number,
-    CD1_1: parsed.CD1_1 as number,
-    CD1_2: parsed.CD1_2 as number,
-    CD2_1: parsed.CD2_1 as number,
-    CD2_2: parsed.CD2_2 as number,
-    NAXIS1: imageWidth,
-    NAXIS2: imageHeight,
-  };
-  for (const prefix of ['AP', 'BP']) {
-    const order = parsed[`${prefix}_ORDER`];
-    if (!order) continue;
-    wcs[`${prefix}_ORDER`] = order;
-    for (let i = 0; i <= Number(order); i++) {
-      for (let j = 0; j <= Number(order); j++) {
-        const key = `${prefix}_${i}_${j}`;
-        if (parsed[key] !== undefined) wcs[key] = parsed[key];
-      }
-    }
-  }
-  return wcs as unknown as WCSData;
+  return { ...(wcsFromHeader(parsed) as WCSData), NAXIS1: imageWidth, NAXIS2: imageHeight };
 }
 
 /** What `/api/jobs/:id/calibration/` returns. */
@@ -104,16 +78,14 @@ export function calibrationToWcs(
   };
 }
 
-/** The correspondences of a calibration against `catalog`. */
+/** The reference points of a calibration (see {@link wcsToCorrespondences}). */
 export function calibrationToCorrespondences(
   cal: NovaCalibration,
   imageWidth: number,
   imageHeight: number,
-  catalog: CatalogStar[],
 ): NovaCorrespondence[] {
-  return wcsToCorrespondencesWithCatalog(
+  return wcsToCorrespondences(
     calibrationToWcs(cal, imageWidth, imageHeight),
-    catalog,
     imageWidth,
     imageHeight,
   );

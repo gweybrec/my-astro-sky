@@ -3,9 +3,9 @@
  *  - extractFITSHeaderFromTIFF  (lines 165-225) — entirely untested
  *  - extractFITSHeaderFromFITS  edge cases (no-END block, multi-block)
  *  - extractWCS                 CDELT+PC form and error paths
- *  - wcsToCorrespondences       SIP distortion code path
+ *  - wcsToCorrespondences       SIP distortion
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -13,16 +13,13 @@ import {
   extractFITSHeaderFromTIFF,
   extractFITSHeaderFromFITS,
   parseFITSHeader,
+  wcsFromHeader,
   wcsToCorrespondences,
   extractWCS,
 } from '../../server/wcs-reader';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES = path.join(__dirname, '../fixtures');
-
-beforeAll(() => {
-  process.env.STAR_CATALOG_PATH = path.join(FIXTURES, 'stars.test.json');
-});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -273,56 +270,42 @@ describe('extractWCS() — CDELT+PC matrix form', () => {
   });
 });
 
-// ─── wcsToCorrespondences — SIP distortion path ───────────────────────────────
+// ─── wcsToCorrespondences — SIP distortion ─────────────────────────────────────
 
-describe('wcsToCorrespondences() — SIP distortion coefficients', () => {
-  it('applies AP/BP SIP correction coefficients when AP_ORDER is set', () => {
-    // Use real M13 WCS fixture which was produced by astrometry.net (has SIP)
-    const wcsFile = path.join(FIXTURES, 'astrometry/10796000-wcs.fits');
-    const buf = fs.readFileSync(wcsFile);
-    const header = extractFITSHeaderFromFITS(buf);
-    const h = parseFITSHeader(header);
+describe('wcsToCorrespondences() — SIP distortion', () => {
+  // Real M13 solution by astrometry.net: order-2 SIP, 3840 × 2160.
+  const header = parseFITSHeader(
+    extractFITSHeaderFromFITS(fs.readFileSync(path.join(FIXTURES, 'astrometry/10796000-wcs.fits'))),
+  );
 
-    // Build the WCS object and include SIP coefficients
-    const wcs: any = {
-      CRPIX1: h.CRPIX1 as number,
-      CRPIX2: h.CRPIX2 as number,
-      CRVAL1: h.CRVAL1 as number,
-      CRVAL2: h.CRVAL2 as number,
-      CD1_1: h.CD1_1 as number,
-      CD1_2: h.CD1_2 as number,
-      CD2_1: h.CD2_1 as number,
-      CD2_2: h.CD2_2 as number,
-      NAXIS1: 3840,
-      NAXIS2: 2160,
-    };
+  it('reads the SIP terms of the header', () => {
+    const wcs = wcsFromHeader(header)!;
+    expect(wcs.sip?.a).toEqual({
+      '0_2': 8.28609032191e-8,
+      '1_1': -1.56145936951e-7,
+      '2_0': 2.2860920409e-7,
+    });
+    expect(Object.keys(wcs.sip!.b)).toEqual(['0_2', '1_1', '2_0']);
+  });
 
-    // Attach SIP coefficients if present in the fixture
-    if (h.AP_ORDER) {
-      wcs.AP_ORDER = h.AP_ORDER;
-      for (let i = 0; i <= (h.AP_ORDER as number); i++) {
-        for (let j = 0; j <= (h.AP_ORDER as number); j++) {
-          const k = `AP_${i}_${j}`;
-          if (h[k] !== undefined) wcs[k] = h[k];
-        }
-      }
-    }
-    if (h.BP_ORDER) {
-      wcs.BP_ORDER = h.BP_ORDER;
-      for (let i = 0; i <= (h.BP_ORDER as number); i++) {
-        for (let j = 0; j <= (h.BP_ORDER as number); j++) {
-          const k = `BP_${i}_${j}`;
-          if (h[k] !== undefined) wcs[k] = h[k];
-        }
-      }
-    }
-
-    // Whether or not SIP is in the fixture, the function should not throw
-    const corrs = wcsToCorrespondences(wcs, 3840, 2160, false);
-    expect(Array.isArray(corrs)).toBe(true);
-    // If SIP was present and exercised, verify the result is still valid
-    if (h.AP_ORDER) {
-      expect(typeof h.AP_ORDER).toBe('number');
-    }
+  it('moves a corner point by the SIP shift', () => {
+    const withSip = wcsFromHeader(header)!;
+    const without = { ...withSip, sip: undefined };
+    const a = wcsToCorrespondences(withSip, 3840, 2160, false);
+    const b = wcsToCorrespondences(without, 3840, 2160, false);
+    // Degrees between the two sky positions of a point.
+    const apart = (i: number) =>
+      Math.hypot(
+        (a[i].starRa! - b[i].starRa!) * Math.cos((a[i].starDec! * Math.PI) / 180),
+        a[i].starDec! - b[i].starDec!,
+      );
+    const scale = Math.hypot(withSip.CD1_1, withSip.CD2_1); // degrees per pixel
+    // Corner (0.05, 0.05): u, v from CRPIX, then the shift f(u, v), g(u, v) of the terms above.
+    const u = 3840 * 0.05 + 1 - withSip.CRPIX1;
+    const v = 2160 * 0.05 + 1 - withSip.CRPIX2;
+    const f = 8.28609032191e-8 * v * v - 1.56145936951e-7 * u * v + 2.2860920409e-7 * u * u;
+    const g = 3.12126986089e-7 * v * v - 4.26348787719e-8 * u * v - 1.97393184059e-7 * u * u;
+    expect(apart(0) / scale).toBeCloseTo(Math.hypot(f, g), 1);
+    expect(Math.hypot(f, g)).toBeGreaterThan(0.1); // a real shift, not a rounding
   });
 });

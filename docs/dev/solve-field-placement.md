@@ -2,7 +2,7 @@
 
 ## How placement works
 
-When solve-field solves a JPEG/PNG, it writes a `.wcs` FITS file containing the WCS (World Coordinate System) solution. `server/wcs-reader.ts` then inverts this solution to produce **star correspondences**: pairs of `(photoX, photoY)` ↔ `(RA, Dec)` that tell the frontend affine transform where to place the image on the sky map.
+When solve-field solves a JPEG/PNG, it writes a `.wcs` FITS file containing the WCS (World Coordinate System) solution. `wcsToCorrespondences` (core, re-exported by `server/wcs-reader.ts`) then turns this solution into **reference points**: 9 pairs of `(photoX, photoY)` ↔ `(RA, Dec)` at the corners, the edge middles and the centre of the photo, which tell the frontend affine transform where to place the image on the sky map.
 
 Two independent coordinate-system issues must be handled correctly:
 
@@ -13,7 +13,7 @@ Two independent coordinate-system issues must be handled correctly:
 
 ## 1. Y-axis convention: `fitsYConvention=false`
 
-`wcsToCorrespondences(wcs, w, h, fitsYConvention)` converts sky coordinates back to image pixels. The `fitsYConvention` flag controls how FITS pixel coordinates map to display (screen) coordinates:
+`wcsToCorrespondences(wcs, w, h, fitsYConvention)` converts display pixels to the solution's FITS pixels, then to sky coordinates. The `fitsYConvention` flag controls how FITS pixel coordinates map to display (screen) coordinates:
 
 | Convention              | Y=1 at…             | Who uses it                                                |
 | ----------------------- | ------------------- | ---------------------------------------------------------- |
