@@ -6,6 +6,7 @@ import AppIcon from './AppIcon.vue';
 import PhoneIconButton from './PhoneIconButton.vue';
 import PhoneSheetGrab from './PhoneSheetGrab.vue';
 import { useSheetStops } from '../composables/useSheetStops';
+import { useLandscape } from '../composables/useLandscape';
 import backIcon from '../icons/arrow-left.svg?raw';
 
 // A bottom sheet (`.mob-sheet`) on Ionic's modal. It takes the height of its content (60 % of the screen at most, 70 %
@@ -58,6 +59,15 @@ watch(
   { immediate: true },
 );
 const shown = computed(() => props.open && (!props.third || measured.value));
+// Its stops are the room's of one orientation (Ionic reads them only as it opens): when the phone turns, an open sheet
+// held to a third slides out and opens again, measured anew. That closing is not the user's.
+const landscape = useLandscape();
+let reopening = false;
+watch(landscape, () => {
+  if (!props.third || !shown.value) return;
+  reopening = true;
+  measured.value = false;
+});
 const modalStyle = computed(() =>
   props.third && stops.value?.height ? { '--height': `${stops.value.height}px` } : undefined,
 );
@@ -65,6 +75,15 @@ const sheetStyle = computed(() =>
   props.third && stops.value?.max ? { '--sheet-stop-max': `${stops.value.max}px` } : undefined,
 );
 function dismissed() {
+  if (reopening) {
+    reopening = false;
+    if (props.open)
+      void nextTick(() => {
+        measure();
+        measured.value = true;
+      });
+    return;
+  }
   emit('update:open', false);
 }
 </script>

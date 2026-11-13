@@ -294,6 +294,31 @@ describe('the shared phone components', () => {
     expect(w.emitted('update:open')?.[0]).toEqual([false]);
   });
 
+  it('PhoneSheet third opens again, measured anew, when the phone turns, without closing for the user', async () => {
+    const window_ = turnable();
+    const w = mount(PhoneSheet, { props: { open: false, title: 'x', third: true }, global });
+    const modal = () => w.find('.mob-sheet-modal');
+    await w.setProps({ open: true });
+    await nextTick();
+    await nextTick();
+    expect(modal().attributes('is-open')).toBe('true');
+    window_.turn(true);
+    await nextTick();
+    expect(modal().attributes('is-open')).toBe('false');
+    // Ionic tells it has slid out: it opens again, and the page is not told it closed.
+    w.findComponent(ionicStubs.IonModal).vm.$emit('didDismiss');
+    await nextTick();
+    await nextTick();
+    expect(modal().attributes('is-open')).toBe('true');
+    expect(w.emitted('update:open')).toBeUndefined();
+    // A sheet not held to a third keeps its place: its stops do not depend on the room.
+    const plain = mount(PhoneSheet, { props: { open: true, title: 'y' }, global });
+    window_.turn(false);
+    await nextTick();
+    expect(plain.find('.mob-sheet-modal').attributes('is-open')).toBe('true');
+    window_.restore();
+  });
+
   it('PhoneSheet third keeps its content mounted and opens once it has measured its stops', async () => {
     const restore = portrait();
     const w = mount(PhoneSheet, { props: { open: false, title: 'x', third: true }, global });
@@ -446,6 +471,24 @@ describe('the map sheets', () => {
     expect(sheet().emitted('close')).toHaveLength(1);
     modal.vm.$emit('didDismiss', { detail: { role: 'gesture' } });
     expect(sheet().emitted('close')).toHaveLength(2);
+  });
+
+  it('slides out and opens again, measured anew, when the phone turns, without closing for the page', async () => {
+    const window_ = turnable();
+    const w = page();
+    const isOpen = () => w.find('.mob-sheet-modal--map').attributes('is-open');
+    await new Promise((r) => setTimeout(r));
+    await nextTick();
+    expect(isOpen()).toBe('true');
+    window_.turn(true);
+    await nextTick();
+    expect(isOpen()).toBe('false');
+    w.findComponent(ionicStubs.IonModal).vm.$emit('didDismiss', { detail: {} });
+    await new Promise((r) => setTimeout(r, 600));
+    await nextTick();
+    expect(isOpen()).toBe('true');
+    expect(w.findComponent(PhoneMapSheet).emitted('close')).toBeUndefined();
+    window_.restore();
   });
 
   it('is slid out by Ionic when the page removes it', async () => {
@@ -611,6 +654,27 @@ describe('the progress row', () => {
     expect(w.find('.mob-progress-label').attributes('title')).toBeUndefined();
   });
 });
+
+/** A window that can be turned: `turn(true)` makes it landscape and tells the listeners. Returns the turn and the undo. */
+function turnable() {
+  const media = window.matchMedia;
+  let landscape = false;
+  const listeners = new Set<() => void>();
+  window.matchMedia = ((q: string) => ({
+    get matches() {
+      return q.includes('landscape') ? landscape : false;
+    },
+    addEventListener: (_: string, fn: () => void) => listeners.add(fn),
+    removeEventListener: (_: string, fn: () => void) => listeners.delete(fn),
+  })) as unknown as typeof window.matchMedia;
+  return {
+    turn(toLandscape: boolean) {
+      landscape = toLandscape;
+      listeners.forEach((fn) => fn());
+    },
+    restore: () => (window.matchMedia = media),
+  };
+}
 
 /** Makes the window portrait (or landscape) for `(orientation: landscape)`; returns the undo. */
 function portrait(isPortrait = true) {

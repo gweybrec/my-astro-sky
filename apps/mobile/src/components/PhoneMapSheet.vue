@@ -3,6 +3,7 @@ import { computed, inject, nextTick, provide, ref, useId, watch } from 'vue';
 import { IonModal } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { useSheetStops } from '../composables/useSheetStops';
+import { useLandscape } from '../composables/useLandscape';
 import { MAP_SHEET_HOST, SHEET_HOLD } from './map-sheet';
 import PhoneSheetGrab from './PhoneSheetGrab.vue';
 
@@ -88,6 +89,15 @@ watch(
   { immediate: true },
 );
 const open = computed(() => pageShown.value && ready.value);
+// Its place over the map and its stops are those of one orientation (Ionic reads the stops only as it opens): when
+// the phone turns, an open sheet slides out and opens again, measured anew. That closing is not the user's.
+const landscape = useLandscape();
+let reopening = false;
+watch(landscape, () => {
+  if (!open.value) return;
+  reopening = true;
+  ready.value = false;
+});
 const modalStyle = computed(() => {
   const box = place.value;
   if (!box) return undefined;
@@ -102,6 +112,11 @@ const sheetStyle = computed(() =>
   stops.value?.max ? { '--sheet-stop-max': `${stops.value.max}px` } : undefined,
 );
 function dismissed(event: CustomEvent<{ role?: string }>) {
+  if (reopening) {
+    reopening = false;
+    settle();
+    return;
+  }
   if (event.detail.role === 'gesture') emit('close');
 }
 </script>

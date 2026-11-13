@@ -9,7 +9,13 @@ export function useLandscape(): Ref<boolean> {
     typeof window.matchMedia === 'function' ? window.matchMedia('(orientation: landscape)') : null;
   const landscape = ref(query?.matches ?? false);
   const onTurn = () => (landscape.value = query?.matches ?? false);
-  query?.addEventListener('change', onTurn);
-  onBeforeUnmount(() => query?.removeEventListener('change', onTurn));
+  // Older WebViews have only `addListener`; a query without either is read once.
+  if (typeof query?.addEventListener === 'function') {
+    query.addEventListener('change', onTurn);
+    onBeforeUnmount(() => query.removeEventListener('change', onTurn));
+  } else if (typeof query?.addListener === 'function') {
+    query.addListener(onTurn);
+    onBeforeUnmount(() => query.removeListener(onTurn));
+  }
   return landscape;
 }
