@@ -325,7 +325,8 @@ export async function runActions(page, actions = []) {
         await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
         if (!action.until) break;
         if (await page.locator(action.until).first().isVisible()) break;
-        if (Date.now() > deadline) throw new Error(`"${action.until}" did not show after tapping "${action.tapCentre}"`);
+        if (Date.now() > deadline)
+          throw new Error(`"${action.until}" did not show after tapping "${action.tapCentre}"`);
         await page.waitForTimeout(500);
       }
     } else if (action.tapAt) {
