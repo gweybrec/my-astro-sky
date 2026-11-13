@@ -1913,6 +1913,18 @@ ion-tab-bar.mob-tabbar-hidden {
   padding-top: var(--space-4);
 }
 
+/* A fact on a line of its own, its value kept to one line and cut with "…" when too long (a visited photo's author,
+   boards "Photo d'un ciel visité" and "Ciel, photo d'un ciel visité"): the facts after it start on the next line. */
+.mob-facts .mob-fact.mob-fact--line {
+  flex-basis: 100%;
+  min-width: 0;
+}
+.mob-fact--line .mob-fact-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* The objects and points of interest drawn over a photo (board "Photo, objets affichés"): a canvas over the photo's
    area; it never takes a touch, the photo under it zooms and moves. */
 .mob-photo-overlay {

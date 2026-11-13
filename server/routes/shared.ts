@@ -1,4 +1,7 @@
+import { randomUUID } from 'crypto';
+import fs from 'fs';
 import multer from 'multer';
+import { INCOMING_DIR } from '../server-paths.js';
 
 export { ALLOWED_PHOTO_EXTENSIONS } from '@myastrosky/core/services/photos';
 
@@ -55,10 +58,21 @@ export const uploadWCS = multer({
   limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB for raw FITS/TIFF
 });
 
-// Separate multer instance for import bundles (ZIP/JSON — not image MIME types)
+/** The largest archive taken: far above any real one, so that an upload cannot fill the disk without end. */
+export const MAX_BUNDLE_BYTES = 64 * 1024 * 1024 * 1024;
+/** The largest `.json` backup (a photo list), which is read whole. */
+export const MAX_JSON_BUNDLE_BYTES = 200 * 1024 * 1024;
+
+// Import archives (ZIP/JSON, not image MIME types) are written to a file in INCOMING_DIR and read from there by
+// pieces: an archive of several gigabytes never sits in memory. The route removes the file when it has answered.
 export const uploadBundle = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 200 * 1024 * 1024 },
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      fs.mkdir(INCOMING_DIR, { recursive: true }, (err) => cb(err, INCOMING_DIR));
+    },
+    filename: (_req, _file, cb) => cb(null, `${randomUUID()}.part`),
+  }),
+  limits: { fileSize: MAX_BUNDLE_BYTES },
 });
 
 // Separate multer instance for raw astro image conversion (FITS/TIFF, arrives as

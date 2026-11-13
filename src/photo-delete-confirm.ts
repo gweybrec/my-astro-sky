@@ -147,6 +147,14 @@ export function confirmPlanDelete(planName: string): Promise<boolean> {
   );
 }
 
+export function confirmSharedSkyDelete(name: string, photoCount: number): Promise<boolean> {
+  return confirmDeleteDialog(
+    t('sharedSky.deleteTitle'),
+    t('sharedSky.deleteMessage', { name, count: String(photoCount) }),
+    t('photos.delete'),
+  );
+}
+
 export function confirmSetupDelete(name: string): Promise<boolean> {
   return confirmDeleteDialog(
     t('fovOverlay.deleteSetupTitle'),

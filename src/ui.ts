@@ -151,7 +151,13 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   // Clicking a photo on the sky map selects it in the photos panel
   skyMap.setOnPhotoClick((photoName) => {
     const placed = overlay.getPlacedPhotos().find((p) => p.photo.originalName === photoName);
-    if (placed) usePhotosStore(pinia).selectPhoto(placed.photo.id);
+    if (placed) {
+      usePhotosStore(pinia).selectPhoto(placed.photo.id);
+      return;
+    }
+    // A visited sky's photo is not in the photos panel (it lists the user's own): it opens in the photo view.
+    const visited = overlay.getVisitPhotos().find((p) => p.photo.originalName === photoName);
+    if (visited) gallery.openPhoto(visited.photo.id);
   });
 
   // Clicking a DSO on the sky map triggers the same search-display flow as the search box

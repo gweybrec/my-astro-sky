@@ -36,6 +36,7 @@ const photo = (over: Partial<Photo> = {}): Photo =>
 function fakeLayer(state = { opacity: 1, visible: true }) {
   return {
     getPlacedPhotos: () => [{ photo: { id: 'p1' }, ...state }],
+    getVisitPhotos: () => [],
     setPhotoOpacity: vi.fn((_id: string, v: number) => (state.opacity = v)),
     toggleVisibility: vi.fn(() => (state.visible = !state.visible)),
     removePhotosFromMap: vi.fn(),
@@ -257,6 +258,20 @@ describe('the photo sheet', () => {
       "Ordre d'affichage",
       'Modifier les métadonnées',
       'Supprimer',
+    ]);
+  });
+
+  it("keeps only the display actions for a visited sky's photo, which is never changed", () => {
+    const { w } = mountSheet(photo({ sharedSkyId: 's1', author: 'Marie Dupont' }));
+    // Its author first, on a line of its own (board "Ciel, photo d'un ciel visité").
+    const first = w.find('.mob-fact');
+    expect(first.classes()).toContain('mob-fact--line');
+    expect(first.find('.mob-fact-label').text()).toBe('Auteur');
+    expect(first.find('.mob-fact-value').text()).toBe('Marie Dupont');
+    expect(first.attributes('title')).toBe('Marie Dupont');
+    expect(w.findAll('.mob-icon-row button').map((b) => b.attributes('aria-label'))).toEqual([
+      'Masquer',
+      'Ouvrir dans la galerie',
     ]);
   });
 

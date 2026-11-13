@@ -16,6 +16,8 @@
 
   <!-- Display controls section teleported into #vue-display-section -->
   <Teleport to="#vue-display-section">
+    <!-- "Ciel affiché" (once a sky has been visited), above the display controls -->
+    <SkyViewSection />
     <DisplayControlsSection />
   </Teleport>
 
@@ -31,6 +33,14 @@
   <!-- Export / import modals -->
   <ExportModal v-if="activeModal === 'export'" @close="closeModal()" />
   <ImportModal v-if="activeModal === 'import'" @close="closeModal()" />
+
+  <!-- Shared skies: the visits and "Open a shared sky"; "Share my sky" opens from it and comes back to it -->
+  <SharedSkiesModal
+    v-if="activeModal === 'sharedSkies'"
+    @close="closeModal()"
+    @share="openModal('shareSky')"
+  />
+  <ShareSkyModal v-if="activeModal === 'shareSky'" @close="closeModal()" />
 
   <!-- Delete all data modal -->
   <DeleteAllDataModal v-if="activeModal === 'deleteAll'" @close="closeModal()" />
@@ -118,10 +128,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts';
 import PanelHeader from './components/panels/PanelHeader.vue';
 import PhotosSection from './components/panels/PhotosSection.vue';
+import SkyViewSection from './components/panels/SkyViewSection.vue';
 import DisplayControlsSection from './components/panels/DisplayControlsSection.vue';
 import PerformanceSection from './components/panels/PerformanceSection.vue';
 import UnifiedSearch from './components/panels/UnifiedSearch.vue';
@@ -145,6 +156,9 @@ import AsteroidIdentifyModal from './components/modals/AsteroidIdentifyModal.vue
 import SupernovaIdentifyModal from './components/modals/SupernovaIdentifyModal.vue';
 import CometIdentifyModal from './components/modals/CometIdentifyModal.vue';
 import PoiAddModal from './components/modals/PoiAddModal.vue';
+import SharedSkiesModal from './components/modals/SharedSkiesModal.vue';
+import ShareSkyModal from './components/modals/ShareSkyModal.vue';
+import { holdDroppedSharedSky, sharedSkyFileOf } from './shared-sky-drop';
 import { useUiStore } from './stores/ui';
 import type { Photo, PointOfInterest } from '@myastrosky/core/types';
 
@@ -153,6 +167,8 @@ type ModalName =
   | 'solverSettings'
   | 'export'
   | 'import'
+  | 'sharedSkies'
+  | 'shareSky'
   | 'deleteAll'
   | 'batchUpload'
   | 'about'
@@ -204,6 +220,28 @@ function closeModal() {
   activeModal.value = previousModal.value;
   previousModal.value = null;
 }
+
+// A shared-sky package dropped anywhere on the window opens the shared skies window, which reads it. Any other file
+// is left to whatever handles it.
+function onWindowDragOver(e: DragEvent) {
+  if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
+}
+function onWindowDrop(e: DragEvent) {
+  const file = sharedSkyFileOf(e.dataTransfer?.files);
+  if (!file) return;
+  e.preventDefault();
+  if (activeModal.value !== null) return;
+  holdDroppedSharedSky(file);
+  openModal('sharedSkies');
+}
+onMounted(() => {
+  window.addEventListener('dragover', onWindowDragOver);
+  window.addEventListener('drop', onWindowDrop);
+});
+onUnmounted(() => {
+  window.removeEventListener('dragover', onWindowDragOver);
+  window.removeEventListener('drop', onWindowDrop);
+});
 
 defineExpose({ openModal });
 </script>

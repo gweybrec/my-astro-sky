@@ -3,6 +3,8 @@ export interface DeleteOptions {
   dsoOverrides: boolean;
   customGear: boolean;
   gearSetups: boolean;
+  /** How many visited skies are deleted (0 or absent: none). */
+  sharedSkies?: number;
   photoIds: string[];
   /** Total number of photos in the map (used for "all N" vs "N of total" wording). */
   totalPhotos: number;
@@ -28,6 +30,10 @@ export function buildDeleteSummaryLines(
 
   if (opts.gearSetups) {
     lines.push(t('settings.deleteSummaryGearSetups'));
+  }
+
+  if (opts.sharedSkies) {
+    lines.push(t('settings.deleteSummarySharedSkies').replace('{n}', String(opts.sharedSkies)));
   }
 
   if (opts.photoIds.length > 0) {

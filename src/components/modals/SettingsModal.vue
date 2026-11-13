@@ -38,6 +38,14 @@
 
     <hr class="settings-separator" />
 
+    <!-- Shared skies -->
+    <div class="settings-section-label">{{ t('sharedSky.title') }}</div>
+    <button class="btn-action btn-action--full" @click="onSharedSkies">
+      {{ t('sharedSky.title') }}…
+    </button>
+
+    <hr class="settings-separator" />
+
     <!-- Solver / API -->
     <div class="settings-section-label">{{ t('settings.solverSection') }}</div>
     <button class="btn-action btn-action--full" @click="openSolverSettings">
@@ -154,6 +162,10 @@ function onExport() {
 
 function onImport() {
   openVueModal('import');
+}
+
+function onSharedSkies() {
+  openVueModal('sharedSkies');
 }
 
 function onDeleteAll() {

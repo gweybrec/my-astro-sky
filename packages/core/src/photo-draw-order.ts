@@ -7,6 +7,8 @@ export interface PhotoCanvasQuad {
   corners: Point[];
   /** The photo's edges as drawn (see `PhotoOutline.edge`). */
   edge?: Point[];
+  /** The visited sky the photo belongs to; absent for the user's own photos. */
+  sharedSkyId?: string;
 }
 
 function pointInPolygon(point: Point, polygon: Point[]): boolean {

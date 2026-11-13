@@ -16,6 +16,7 @@ import { createPlanService } from './plans';
 import { createPoiCategoryService } from './poi-categories';
 import { createSolvedImportService } from './solved-import';
 import { createSettingsService } from './settings';
+import { createSharedSkyService } from './shared-skies';
 import { createStarSearchService, type StarCatalogSource } from './star-search';
 import { createVersionService } from './version';
 import { createSkyRegionService } from './sky-regions';
@@ -39,6 +40,8 @@ export interface ServiceDeps {
   log?: (event: string, error: unknown, context?: Record<string, unknown>) => void;
   /** Waits between retries of a network call; the services own timer when absent. */
   sleep?: (ms: number) => Promise<void>;
+  /** The room left where the pictures are stored, in bytes; null or absent when it cannot be known. */
+  freeBytes?: () => Promise<number | null>;
 }
 
 /** Builds every service on one database. Later service cards add theirs here. */
@@ -57,6 +60,7 @@ export function createServices(deps: ServiceDeps) {
     now,
     log,
     sleep,
+    freeBytes,
   } = deps;
   // The settings service is built before the online-solving one, which reads settings: a holder breaks the cycle.
   let resetNovaSession: () => void = () => {};
@@ -102,6 +106,18 @@ export function createServices(deps: ServiceDeps) {
       blobs,
       images,
       newId,
+    }),
+    sharedSkies: createSharedSkyService({
+      db,
+      blobs,
+      images,
+      photos,
+      gear,
+      poiCategories,
+      settings,
+      newId,
+      now,
+      freeBytes,
     }),
     stars: createStarSearchService({ stars }),
     identify: createIdentifyService({ http, now }),

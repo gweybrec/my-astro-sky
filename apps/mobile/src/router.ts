@@ -77,6 +77,9 @@ const routes: RouteRecordRaw[] = [
     path: '/settings/backup/restore/:step(photos|setups|plans|other)',
     component: () => import('./pages/RestorePage.vue'),
   },
+  // The shared skies (boards "Ciels visités", "Ouvrir un ciel partagé…") and "Partager mon ciel".
+  { path: '/settings/shared-skies', component: () => import('./pages/SharedSkiesPage.vue') },
+  { path: '/settings/shared-skies/share', component: () => import('./pages/ShareSkyPage.vue') },
   { path: '/settings/delete', component: () => import('./pages/DeleteDataPage.vue') },
   { path: '/settings/display', component: () => import('./pages/DisplaySettingsPage.vue') },
   { path: '/settings/about', component: () => import('./pages/AboutPage.vue') },

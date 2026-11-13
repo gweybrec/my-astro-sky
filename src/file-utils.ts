@@ -15,6 +15,16 @@ export function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+/** Lets the browser download `url` itself as `filename`, without the page holding the file. */
+export function downloadFromUrl(url: string, filename: string): void {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 /** Resolve the pixel dimensions of an image File. Returns {width:0, height:0} if unreadable. */
 export function getFileDimensions(file: File): Promise<{ width: number; height: number }> {
   return new Promise((resolve) => {

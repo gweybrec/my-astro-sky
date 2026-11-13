@@ -28,6 +28,7 @@ describe('PrivacyModal', () => {
       t('settings.privacyAstrometryTitle'),
       t('settings.privacyHorizonTitle'),
       t('settings.privacyIdentifyTitle'),
+      t('settings.privacySharedTitle'),
     ]);
     expect(document.body.textContent).toContain(t('settings.privacyHorizon'));
     expect(document.body.textContent).toContain(t('settings.privacyIdentify'));

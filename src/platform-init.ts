@@ -11,7 +11,7 @@ import { createHttpBackend } from '@myastrosky/backend-http/http-backend';
 import { setBackend } from '@myastrosky/app-state/backend';
 import { getLang } from '@myastrosky/core/i18n/index';
 import { reportUnknownRendererError } from './error-reporter';
-import { downloadBlob } from './file-utils';
+import { downloadBlob, downloadFromUrl } from './file-utils';
 
 /**
  * The browser's localStorage, which can throw (private window, blocked site data). Reads and removals swallow it;
@@ -66,5 +66,10 @@ configureConstellationStyleLoader(async (style) =>
 
 // The desktop and the web build run on the HTTP backend; the phone installs its own at start-up.
 setBackend(
-  createHttpBackend({ lang: getLang, saveFile: (name, blob) => downloadBlob(blob, name) }),
+  createHttpBackend({
+    lang: getLang,
+    saveFile: (name, blob) => downloadBlob(blob, name),
+    // A shared sky can weigh gigabytes: the browser downloads it itself, straight to disk.
+    downloadUrl: (url, name) => downloadFromUrl(url, name),
+  }),
 );

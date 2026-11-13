@@ -14,6 +14,7 @@ import type {
   ImportResult,
 } from './domain/backup';
 import type { UploadFields } from './domain/photos';
+import type { SharedSky, SharedSkyPreview, ShareRequest } from './domain/shared-sky';
 import type { ConvertSolvedResult, SolveWcsResult } from './domain/solved-import';
 import type { DsoOverrideService } from './services/dso-overrides';
 import type { GearService } from './services/gear';
@@ -24,6 +25,7 @@ import type { PhotoService } from './services/photos';
 import type { PlanService } from './services/plans';
 import type { PoiCategoryService } from './services/poi-categories';
 import type { SettingsService } from './services/settings';
+import type { SharedSkyService } from './services/shared-skies';
 import type { SkyRegionService } from './services/sky-regions';
 import type { StarSearchService } from './services/star-search';
 import type { VersionService } from './services/version';
@@ -135,6 +137,30 @@ export interface Backend {
     exportToUser(request: ExportRequest): Promise<void>;
     preview(file: FileSource): Promise<ImportPreviewResult>;
     restore(file: FileSource, options: ImportOptions): Promise<ImportResult>;
+  };
+  /** Sharing a sky by file, and the skies of other people kept as visits (never mixed with the user's own photos). */
+  sharedSkies: Pick<
+    SharedSkyService,
+    'senderName' | 'list' | 'listPhotos' | 'remove' | 'makeMissingMediums'
+  > & {
+    /** Builds the package and hands it to the user: a download on the desktop, the share sheet on the phone. */
+    exportToUser(request: ShareRequest): Promise<void>;
+    /**
+     * Reads what a package holds, writing nothing. The package is held under `ticket` until it is opened or
+     * discarded; `onProgress` follows the transfer of the file where there is one.
+     */
+    inspect(
+      file: FileSource,
+      options?: TransferOptions,
+    ): Promise<{ ticket: string; preview: SharedSkyPreview }>;
+    /**
+     * Keeps an inspected package as a visit; `onProgress` follows the photos. The ticket is used up, whatever the
+     * outcome. Rejects with `notFound` (`SHARED_SKY_TICKET_EXPIRED`) for an unknown ticket; a cancelled one leaves
+     * nothing behind.
+     */
+    open(ticket: string, options?: TransferOptions): Promise<SharedSky>;
+    /** Lets go of an inspected package that will not be opened. An unknown ticket is not an error. */
+    discard(ticket: string): Promise<void>;
   };
   /** The solvers installed next to the server. Absent on a backend without them. */
   localSolvers?: LocalSolverApi;

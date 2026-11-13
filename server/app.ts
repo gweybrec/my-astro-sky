@@ -3,7 +3,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import path from 'path';
 import fs from 'fs';
-import { UPLOADS_DIR, DIST_DIR, SWAGGER_JSON_PATH } from './server-paths.js';
+import { UPLOADS_DIR, INCOMING_DIR, DIST_DIR, SWAGGER_JSON_PATH } from './server-paths.js';
 import { isElectron, API_LIMIT, checkRateLimit } from './routes/shared.js';
 import { logServerError } from './logger.js';
 import { INSTANCE_HEADER } from './ports.js';
@@ -22,6 +22,7 @@ import { solvedImportRouter } from './routes/solved-import.js';
 import { localSolveRouter } from './routes/local-solve.js';
 import { novaSolveRouter } from './routes/nova-solve.js';
 import { backupRouter } from './routes/backup.js';
+import { sharedSkiesRouter } from './routes/shared-skies.js';
 import { configureLogSink, consoleLogSink, logInfo } from '@myastrosky/core/platform/log';
 
 // In case we need to clear the cache during development, we can do it from the main process before loading the app.
@@ -33,6 +34,8 @@ import { configureLogSink, consoleLogSink, logInfo } from '@myastrosky/core/plat
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
+// An uploaded archive left behind by a run that was stopped while reading it.
+fs.rmSync(INCOMING_DIR, { recursive: true, force: true });
 
 const app = express();
 
@@ -140,6 +143,7 @@ app.use(solvedImportRouter);
 app.use(localSolveRouter);
 app.use(novaSolveRouter);
 app.use(backupRouter);
+app.use(sharedSkiesRouter);
 
 // createApp is async so swagger routes are always registered before the SPA catch-all,
 // guaranteeing correct ordering regardless of dist/ presence. It does not listen: the

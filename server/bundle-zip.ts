@@ -1,12 +1,8 @@
-import { createRequire } from 'module';
+import fsp from 'fs/promises';
 import type { Writable } from 'stream';
 import { ZipArchive } from 'archiver';
 import type { BundleReader, BundleWriter } from '@myastrosky/core/ports/bundle';
-
-// unzipper is CommonJS-only and has no ESM export, so it can't be `import`ed under
-// "type": "module" — createRequire is a permanent interop shim for it, unrelated to archiver.
-const _require = createRequire(import.meta.url);
-const unzipper = _require('unzipper') as typeof import('unzipper');
+import { openZipRanges } from '@myastrosky/core/zip-ranges';
 
 export interface ZipResponseWriter extends BundleWriter {
   /** Ends the archive; the response ends when everything is flushed. */
@@ -53,7 +49,8 @@ export function createZipResponseWriter(output: Writable, onStart: () => void): 
         };
         pending.add(reject);
         zip.on('entry', onEntry);
-        zip.append(Buffer.from(bytes), { name });
+        // Pictures are already compressed: stored as they are, which is much faster; the JSON files are deflated.
+        zip.append(Buffer.from(bytes), { name, store: name.startsWith('images/') });
       });
     },
     async finalize() {
@@ -65,36 +62,35 @@ export function createZipResponseWriter(output: Writable, onStart: () => void): 
   };
 }
 
-/** A reader over a ZIP held in memory (the uploaded bundle). */
-export async function openZipBundle(buffer: Buffer): Promise<BundleReader> {
-  const dir = await unzipper.Open.buffer(buffer);
-  const files = dir.files;
-  // The first entry of a name, as `find` gave before (the backup service refuses an archive with two).
-  const byName = new Map<string, (typeof files)[number]>();
-  for (const f of files) if (!byName.has(f.path)) byName.set(f.path, f);
-  const find = (name: string) => byName.get(name);
-  return {
-    async names() {
-      return files.map((f) => f.path);
-    },
-    async read(name) {
-      const entry = find(name);
-      if (!entry) return null;
-      // Never more than the size the archive declares, which the backup service has checked: a crafted entry could
-      // otherwise unpack to gigabytes.
-      const chunks: Buffer[] = [];
-      let total = 0;
-      for await (const chunk of entry.stream() as AsyncIterable<Buffer>) {
-        total += chunk.length;
-        if (total > entry.uncompressedSize) {
-          throw new Error(`Invalid backup archive: ${name} is larger than it declares`);
+/** A reader that holds a file open: `close` it when done. */
+export interface ZipFileReader extends BundleReader {
+  close(): Promise<void>;
+}
+
+/**
+ * A reader over a ZIP file on disk, read by pieces: its end and its directory when opened, then one entry per
+ * `read`. The archive is never held whole in memory, so its size has no limit.
+ */
+export async function openZipFile(filePath: string): Promise<ZipFileReader> {
+  const handle = await fsp.open(filePath, 'r');
+  try {
+    const { size } = await handle.stat();
+    const reader = await openZipRanges({
+      size,
+      async read(start, end) {
+        const out = Buffer.allocUnsafeSlow(end - start);
+        let done = 0;
+        while (done < out.length) {
+          const { bytesRead } = await handle.read(out, done, out.length - done, start + done);
+          if (bytesRead === 0) throw new Error('Invalid backup archive: truncated');
+          done += bytesRead;
         }
-        chunks.push(chunk);
-      }
-      return new Uint8Array(Buffer.concat(chunks, total));
-    },
-    async size(name) {
-      return find(name)?.uncompressedSize ?? null;
-    },
-  };
+        return new Uint8Array(out.buffer, out.byteOffset, out.length);
+      },
+    });
+    return { ...reader, close: () => handle.close() };
+  } catch (err) {
+    await handle.close();
+    throw err;
+  }
 }

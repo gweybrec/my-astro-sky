@@ -12,6 +12,8 @@ type ModalName =
   | 'settings'
   | 'export'
   | 'import'
+  | 'sharedSkies'
+  | 'shareSky'
   | 'deleteAll'
   | 'batchUpload'
   | 'solverSettings'

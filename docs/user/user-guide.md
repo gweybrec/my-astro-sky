@@ -18,6 +18,7 @@ MyAstroSky overlays your astrophotographs onto an interactive sky map using auto
 - [Targets tab](#targets-tab)
 - [Terrain horizon (mountains)](#terrain-horizon-mountains)
 - [Observing plans](#observing-plans)
+- [Sharing your sky](#sharing-your-sky)
 - [Search](#search)
 - [Display settings](#display-settings)
 - [Desktop error logs](#desktop-error-logs)
@@ -247,6 +248,55 @@ Entries cannot be reordered by hand: use the **Sort by** dropdown in the plan (t
 ### Exporting a plan
 
 Click **Export as PDF** in the plan header to generate a printable observation sheet with the target list, "Highest at" times, and FOV sketches.
+
+---
+
+## Sharing your sky
+
+You can give your sky to people you know, and look at theirs. Nothing is published: you make a file,
+and you hand it over the way you like (a messaging app, a USB stick, a shared folder).
+
+Open **Settings → Shared skies…**.
+
+**Share my sky…**
+
+1. Type the **display name** your friends will see (it is remembered).
+2. Tick the photos to share. The estimated size of the file is shown below the list.
+3. Leave **Include gear and capture details** ticked to share your equipment and capture settings as
+   text, or untick it.
+4. Click **Create the file**: a file named `<your name>.myastrosky` is downloaded.
+
+The file holds the chosen photos at full size, where they sit on the sky, and their targets, labels,
+notes, date, exposures and points of interest. Each photo carries your display name as its **author**:
+the people who open the file see it and cannot change it. GPS coordinates stored inside the images are removed.
+Your observing site, horizon, settings and plans are never in it. **Anyone who gets the file can see
+these photos.**
+
+**Open a shared sky…**
+
+Pick a `.myastrosky` file (or drop it on the window). The app shows whose sky it is, its date, the
+number of photos, its size and the free space left; confirm to keep it. A sky you opened is a
+**visited sky**: it stays until you delete it.
+
+Opening a newer file of a sky you already visited **updates** it: photos no longer in the file
+disappear, new ones appear. The app tells you when a file is older than the one you have.
+
+**Visited skies**
+
+The list shows each visited sky under its sender's name, with its date, photo count and size. Click
+the bin to delete it and free its space. **Settings → Delete all data** can also delete every visited
+sky at once: tick **Delete visited skies** (it is never ticked by default).
+
+**Looking at a visited sky**
+
+Once you have a visited sky, a **Skies shown** section appears in the side panel above **Display**,
+and the same list at the start of the gallery's filters: tick **My sky** and any visited skies, in any
+combination (with nothing ticked, no photo is shown). On the map a visited sky's photos are outlined in
+blue. Click one of them, or open it from the gallery, to see it at full size with its information,
+which starts with its **author**.
+
+A visited sky is read-only and stays apart from yours: its photos are not in your backups, your
+statistics or your target recommendations, and you cannot edit or delete them one by one.
 
 ---
 

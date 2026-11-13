@@ -37,6 +37,7 @@ const backend = {
   dsoOverrides: { removeAll: vi.fn(), getAll: vi.fn() },
   gear: { removeAllCustom: vi.fn(), removeAllSetups: vi.fn() },
   backup: { exportToUser: vi.fn() },
+  sharedSkies: { list: vi.fn(), listPhotos: vi.fn(), remove: vi.fn() },
 };
 
 async function open() {
@@ -79,6 +80,9 @@ beforeEach(() => {
   backend.gear.removeAllCustom.mockImplementation(track('gear.removeAllCustom'));
   backend.gear.removeAllSetups.mockImplementation(track('gear.removeAllSetups'));
   backend.backup.exportToUser.mockResolvedValue(undefined);
+  backend.sharedSkies.list.mockResolvedValue([]);
+  backend.sharedSkies.listPhotos.mockResolvedValue([]);
+  backend.sharedSkies.remove.mockImplementation(track('sharedSkies.remove', { bytesFreed: 1 }));
   setBackend(backend as never);
 });
 
@@ -157,6 +161,26 @@ describe('the delete data page', () => {
     ]);
     expect(showNotice).toHaveBeenCalledWith('Données supprimées avec succès');
     expect(router.currentRoute.value.path).toBe('/tabs/settings');
+  });
+
+  it('offers to delete the visited skies once there are some, and deletes each of them', async () => {
+    const visit = (id: string) => ({ id, senderName: id, poiCategories: [] });
+    const none = await open();
+    expect(none.w.text()).not.toContain('Supprimer les ciels visités');
+    expect(pageBoxes(none.w)).toHaveLength(4);
+
+    backend.sharedSkies.list.mockResolvedValue([visit('sky-marie'), visit('sky-club')]);
+    confirm.mockResolvedValueOnce(true);
+    const { w } = await open();
+    expect(w.text()).toContain('Supprimer les ciels visités');
+    // Unticked at first, like the other kinds of data.
+    expect(button(w, 'Supprimer').attributes('disabled')).toBeDefined();
+    backend.sharedSkies.list.mockResolvedValue([]);
+    await pageBoxes(w)[4].trigger('click');
+    await button(w, 'Supprimer').trigger('click');
+    await flushPromises();
+    expect(confirm.mock.calls[0][0].message).toBe('• Tous les ciels visités (2)');
+    expect(calls).toEqual(['sharedSkies.remove("sky-marie")', 'sharedSkies.remove("sky-club")']);
   });
 
   it('deletes every photo at once when the photo metadata is ticked', async () => {

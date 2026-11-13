@@ -13,7 +13,7 @@
 import type { SqlDb } from '../ports/sql-db';
 
 /** Schema version produced by `BASELINE_SCHEMA` (the latest migration it includes). */
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 20;
 
 /** The columns of the photos table at version 17, in their order (migration 17 copies them). */
 const PHOTO_COLUMNS_V17 =
@@ -45,6 +45,53 @@ function photosTable(name: string, atVersion17 = false): string {
     quarter_turns INTEGER NOT NULL DEFAULT 0${atVersion17 ? '' : ',\n    medium_filename TEXT'}
   )`;
 }
+
+/**
+ * A sky someone shared, kept as a visit, and its photos. They are apart from `photos` so that nothing that reads the
+ * user's own photos can see a visit. A visit photo's correspondences are JSON in its row; `source_id` is the photo's id
+ * on the sender's device, `id` and the file names are made here.
+ */
+const SHARED_SKIES_TABLE = `CREATE TABLE shared_skies (
+    id TEXT PRIMARY KEY,
+    sender_name TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    shared_at TEXT NOT NULL,
+    received_at TEXT NOT NULL,
+    photo_count INTEGER NOT NULL DEFAULT 0,
+    bytes INTEGER NOT NULL DEFAULT 0,
+    poi_categories TEXT NOT NULL DEFAULT '[]',
+    source_url TEXT,
+    source_etag TEXT
+  )`;
+/** The visit photos table; at version 19 it had no `author` (migration 20 adds it, last). */
+function sharedSkyPhotosTable(atVersion19: boolean): string {
+  return `CREATE TABLE shared_sky_photos (
+    id TEXT PRIMARY KEY,
+    shared_sky_id TEXT NOT NULL REFERENCES shared_skies(id) ON DELETE CASCADE,
+    source_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    manual_placement TEXT,
+    dso_ids TEXT NOT NULL DEFAULT '[]',
+    labels TEXT NOT NULL DEFAULT '[]',
+    notes TEXT NOT NULL DEFAULT '',
+    integrations TEXT NOT NULL DEFAULT '[]',
+    thumb_filename TEXT,
+    observation_date TEXT,
+    points_of_interest TEXT NOT NULL DEFAULT '[]',
+    capture_details TEXT NOT NULL DEFAULT '{}',
+    quarter_turns INTEGER NOT NULL DEFAULT 0,
+    medium_filename TEXT,
+    correspondences TEXT NOT NULL DEFAULT '[]',
+    gear TEXT${atVersion19 ? '' : ",\n    author TEXT NOT NULL DEFAULT ''"}
+  )`;
+}
+const SHARED_SKY_PHOTOS_INDEX =
+  'CREATE INDEX idx_shared_sky_photos_sky ON shared_sky_photos(shared_sky_id)';
 
 /**
  * The schema at `SCHEMA_VERSION`, one statement per entry (tables first, then indexes).
@@ -122,6 +169,8 @@ export const BASELINE_SCHEMA: readonly string[] = [
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   )`,
+  SHARED_SKIES_TABLE,
+  sharedSkyPhotosTable(false),
   `CREATE TABLE sky_regions (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -142,6 +191,7 @@ export const BASELINE_SCHEMA: readonly string[] = [
     UNIQUE(photo_id, point_index)
   )`,
   `CREATE INDEX idx_corr_photo_id ON star_correspondences(photo_id)`,
+  SHARED_SKY_PHOTOS_INDEX,
 ];
 
 /** A schema change from version 15 on: SQL statements only, no program logic. */
@@ -186,6 +236,16 @@ export const MIGRATIONS: readonly DataMigration[] = [
   {
     version: 18,
     statements: ['ALTER TABLE photos ADD COLUMN medium_filename TEXT'],
+  },
+  // The skies other people shared, kept as visits, and their photos.
+  {
+    version: 19,
+    statements: [SHARED_SKIES_TABLE, sharedSkyPhotosTable(true), SHARED_SKY_PHOTOS_INDEX],
+  },
+  // A visited photo's author: the name its sender shared it under, never changed on this device.
+  {
+    version: 20,
+    statements: ["ALTER TABLE shared_sky_photos ADD COLUMN author TEXT NOT NULL DEFAULT ''"],
   },
 ];
 

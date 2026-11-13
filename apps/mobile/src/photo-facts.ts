@@ -5,13 +5,14 @@ import { formatPlanDate } from '@myastrosky/core/targets/plan';
 import type { Photo } from '@myastrosky/core/types';
 
 /**
- * One read-only figure of a photo: a `mono` one is drawn in the mono face; a map sheet first stops under the line of
- * the `stop` one (the equipment).
+ * One read-only figure of a photo: a `mono` one is drawn in the mono face; a `line` one takes a line of its own, cut
+ * with "…" when too long; a map sheet first stops under the line of the `stop` one (the equipment).
  */
 export interface PhotoFact {
   label: string;
   value: string;
   mono?: boolean;
+  line?: boolean;
   stop?: boolean;
 }
 
@@ -32,6 +33,9 @@ export function photoFacts(
   options: { setupName?: string; fileName?: boolean; brief?: boolean } = {},
 ): PhotoFact[] {
   const out: PhotoFact[] = [];
+  // A visited sky's photo: its author first, on a line of its own (boards "Photo d'un ciel visité" and "Ciel,
+  // photo d'un ciel visité"), as the sender named themselves; never editable here.
+  if (photo.author) out.push({ label: t('sharedSky.author'), value: photo.author, line: true });
   if (options.fileName) {
     out.push({ label: t('modal.metadataFilename'), value: photo.originalName });
   }
@@ -58,6 +62,22 @@ export function photoFacts(
   }
   if (options.setupName) {
     out.push({ label: t('modal.metadataGearSetup'), value: options.setupName, stop: true });
+  }
+  // A visited sky's photo carries its gear as the sender named it (board "Photo d'un ciel visité").
+  const gear = photo.sharedGear;
+  if (gear) {
+    const gearFacts: [string, string | undefined][] = [
+      ['modal.metadataGearSetup', gear.setup],
+      ['targets.gear.telescope', gear.telescope],
+      ['targets.gear.camera', gear.camera],
+      ['targets.gear.accessory', gear.accessory],
+    ];
+    let first = true;
+    for (const [label, value] of gearFacts) {
+      if (!value) continue;
+      out.push({ label: t(label), value, ...(first ? { stop: true } : {}) });
+      first = false;
+    }
   }
   if (rows.length) {
     out.push({

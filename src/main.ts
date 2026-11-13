@@ -11,6 +11,7 @@ import {
   getLatestVersion,
   repairPhotoSizes,
   makeMissingPhotoMediums,
+  makeMissingSharedSkyMediums,
 } from './api';
 import { isUpdateAvailable, DISMISSED_UPDATE_KEY } from '@myastrosky/core/version-check';
 import { buildFovFrameSpecs } from './fov-overlay';
@@ -27,6 +28,7 @@ import { watch } from 'vue';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { createTargetPreview } from './target-preview';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
 import { showToast } from './toast';
 import { getLang, t } from './i18n';
 import { reportRendererError, reportUnknownRendererError } from './error-reporter';
@@ -244,6 +246,26 @@ async function init() {
   poiCategoriesStore.$subscribe(pushPoiCategories);
   poiCategoriesStore.load().then(pushPoiCategories);
 
+  // The visited skies shown, if any: their photos go to the map and the gallery beside (or instead of) the user's
+  // own, and follow the skies ticked and a visit opened, updated or deleted.
+  const sharedSkies = useSharedSkiesStore(pinia);
+  watch(
+    () => [sharedSkies.visitPhotos, sharedSkies.ownShown] as const,
+    () => {
+      overlay.setOwnPhotosShown(sharedSkies.ownShown);
+      overlay.setVisitPhotos(sharedSkies.visitPhotos, sharedSkies.visitPoiCategories);
+      overlay.updateTransforms();
+      gallery.setVisit({
+        photos: sharedSkies.visitPhotos,
+        ownShown: sharedSkies.ownShown,
+        poiCategories: sharedSkies.visitPoiCategories,
+      });
+      skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));
+      skyMap.render();
+    },
+  );
+  void sharedSkies.load();
+
   // Load existing photos from backend
   try {
     const [photos, setups] = await Promise.all([
@@ -304,6 +326,13 @@ async function repairStoredPhotos() {
     if ((await makeMissingPhotoMediums()) > 0) await reloadPhotos();
   } catch (err) {
     reportUnknownRendererError('photo_medium_failure', err);
+  }
+  try {
+    // The same for the visited skies: the sky shown is read again when a copy was made.
+    if ((await makeMissingSharedSkyMediums()) > 0)
+      await useSharedSkiesStore(pinia).loadVisitPhotos();
+  } catch (err) {
+    reportUnknownRendererError('shared_sky_medium_failure', err);
   }
 }
 

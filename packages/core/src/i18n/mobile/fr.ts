@@ -260,6 +260,10 @@ const fr = {
     overlapLess: 'Moins de chevauchement',
     overlapMore: 'Plus de chevauchement',
   },
+  sharedSky: {
+    openTitle: 'Ouvrir un ciel partagé',
+    deleteSky: 'Supprimer {name}',
+  },
   backup: {
     exportSection: 'Exporter',
     importSection: 'Importer',

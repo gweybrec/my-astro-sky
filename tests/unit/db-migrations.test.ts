@@ -3,6 +3,9 @@ import Database from 'better-sqlite3';
 import { DatabaseUpdateError, SCHEMA_VERSION } from '@myastrosky/core/db/schema';
 import { applyMigrations } from '../../server/db-migrations';
 
+/** The tables version 19 creates: a test that sets the version back removes them, since the updates create them again. */
+const DROP_VISIT_TABLES = 'DROP TABLE shared_sky_photos; DROP TABLE shared_skies';
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Create an in-memory DB with the base tables that existed before migrations. */
@@ -446,6 +449,7 @@ describe('applyMigrations — v9 supernova type + ISS recolor', () => {
     applyMigrations(db); // brings to latest, creates poi_categories
     db.exec('DELETE FROM poi_categories');
     db.prepare('UPDATE schema_version SET version = 8').run();
+    db.exec(DROP_VISIT_TABLES);
     // Migration 15 on is plain SQL, run once: what it added goes too.
     db.exec('ALTER TABLE photos DROP COLUMN quarter_turns');
     const ins = db.prepare(
@@ -877,6 +881,7 @@ describe('applyMigrations — v15 photo quarter turns', () => {
     // back to v14, with a photo
     db.exec('ALTER TABLE photos DROP COLUMN quarter_turns');
     db.prepare('UPDATE schema_version SET version = 14').run();
+    db.exec(DROP_VISIT_TABLES);
     db.prepare(
       'INSERT INTO photos (id, filename, original_name, width, height) VALUES (?, ?, ?, ?, ?)',
     ).run('p1', 'p1.jpg', 'p1.jpg', 30, 20);
@@ -892,6 +897,7 @@ describe('applyMigrations — v16 photo dates in ISO form', () => {
     const db = freshBaseDb();
     applyMigrations(db);
     db.prepare('UPDATE schema_version SET version = 15').run();
+    db.exec(DROP_VISIT_TABLES);
     const ins = db.prepare(
       'INSERT INTO photos (id, filename, original_name, width, height, created_at) VALUES (?, ?, ?, ?, ?, ?)',
     );
@@ -976,5 +982,28 @@ describe('applyMigrations — v17 photos table rebuilt with an ISO date default'
     db.pragma('foreign_keys = OFF'); // better-sqlite3 opens with them on
     applyMigrations(db);
     expect(db.pragma('foreign_keys', { simple: true })).toBe(0);
+  });
+});
+
+describe('applyMigrations — v20 author of a visited photo', () => {
+  it('keeps the visited photos of a v19 database, with no author of their own yet', () => {
+    const db = freshBaseDb();
+    applyMigrations(db);
+    // back to v19, with a visit and its photo
+    db.exec('ALTER TABLE shared_sky_photos DROP COLUMN author');
+    db.prepare('UPDATE schema_version SET version = 19').run();
+    db.prepare(
+      `INSERT INTO shared_skies (id, sender_name, display_name, shared_at, received_at)
+       VALUES ('sky-0001', 'Paul', 'Paul', '2026-11-01T00:00:00.000Z', '2026-11-02T00:00:00.000Z')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO shared_sky_photos (id, shared_sky_id, source_id, position, filename, original_name, width, height, created_at)
+       VALUES ('v1', 'sky-0001', 's1', 0, 'v1.jpg', 'M42.jpg', 30, 20, '2026-11-02T00:00:00.000Z')`,
+    ).run();
+    expect(applyMigrations(db)).toBe(SCHEMA_VERSION);
+    // The service reads an empty author as the sky's sender.
+    expect(db.prepare('SELECT author FROM shared_sky_photos WHERE id = ?').get('v1')).toEqual({
+      author: '',
+    });
   });
 });

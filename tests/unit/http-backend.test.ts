@@ -412,3 +412,127 @@ describe('local solvers', () => {
     ]);
   });
 });
+
+describe('shared skies', () => {
+  const sky = { id: 'sky-1', senderName: 'Paul' };
+
+  it('lets the browser download the package itself when it can, without fetching it', async () => {
+    const sent: Sent[] = [];
+    const downloads: [string, string][] = [];
+    const backend = createHttpBackend({
+      baseUrl: 'http://app',
+      fetch: (async (input: string, init?: RequestInit) => {
+        sent.push({ url: String(input), method: init?.method ?? 'GET', body: init?.body });
+        return json({ token: 'tok/1', fileName: 'Paul.myastrosky' });
+      }) as typeof fetch,
+      lang: () => 'fr',
+      saveFile: () => {
+        throw new Error('the package must not be held in memory');
+      },
+      downloadUrl: (url, name) => downloads.push([url, name]),
+    });
+    await backend.sharedSkies.exportToUser({ senderName: 'Paul', includeGear: false, ids: ['a'] });
+    expect(sent).toHaveLength(1);
+    expect([sent[0].method, sent[0].url]).toEqual(['POST', 'http://app/api/shared-skies/export']);
+    expect(JSON.parse(sent[0].body as string)).toEqual({
+      senderName: 'Paul',
+      includeGear: false,
+      ids: ['a'],
+    });
+    expect(downloads).toEqual([['http://app/api/shared-skies/export/tok%2F1', 'Paul.myastrosky']]);
+  });
+
+  /** A backend whose import answers the given states in turn; `sleep` does not wait. */
+  function importing(states: object[], onSleep: () => void = () => undefined) {
+    const sent: Sent[] = [];
+    let next = 0;
+    const backend = createHttpBackend({
+      baseUrl: 'http://app',
+      fetch: (async (input: string, init?: RequestInit) => {
+        const method = init?.method ?? 'GET';
+        sent.push({ url: String(input), method });
+        if (method === 'DELETE') return json({ success: true });
+        return json(states[Math.min(next++, states.length - 1)], method === 'POST' ? 202 : 200);
+      }) as typeof fetch,
+      lang: () => 'fr',
+      saveFile: () => undefined,
+      sleep: async () => onSleep(),
+    });
+    return { backend, sent };
+  }
+
+  it('starts the import, follows it until it is done, then lets go of the ticket', async () => {
+    const { backend, sent } = importing([
+      { state: 'running', done: 0, total: 4 },
+      { state: 'running', done: 2, total: 4 },
+      { state: 'done', done: 4, total: 4, sky },
+    ]);
+    const fractions: number[] = [];
+    expect(await backend.sharedSkies.open('t 1', { onProgress: (f) => fractions.push(f) })).toEqual(
+      sky,
+    );
+    expect(fractions).toEqual([0, 0.5, 1]);
+    expect(sent.map((s) => s.method)).toEqual(['POST', 'GET', 'GET', 'DELETE']);
+    expect(new Set(sent.map((s) => s.url))).toEqual(
+      new Set(['http://app/api/shared-skies/open/t%201']),
+    );
+  });
+
+  it('rejects with the error the import ended on', async () => {
+    const { backend, sent } = importing([
+      { state: 'running', done: 0, total: 1 },
+      {
+        state: 'failed',
+        done: 0,
+        total: 1,
+        error: { kind: 'invalid', code: 'NOT_ENOUGH_SPACE', message: 'Not enough free space' },
+      },
+    ]);
+    const e = await rejection(backend.sharedSkies.open('t'));
+    expect([e.kind, e.code, e.message]).toEqual([
+      'invalid',
+      'NOT_ENOUGH_SPACE',
+      'Not enough free space',
+    ]);
+    expect(sent.at(-1)!.method).toBe('DELETE');
+  });
+
+  it('cancels the import on the server when it is cancelled here', async () => {
+    const cancel = {
+      aborted: false,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    };
+    const { backend, sent } = importing([{ state: 'running', done: 0, total: 9 }], () => {
+      cancel.aborted = true;
+    });
+    await expect(backend.sharedSkies.open('t', { cancel })).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    expect(sent.map((s) => s.method)).toEqual(['POST', 'GET', 'DELETE']);
+  });
+
+  it('reads the list, the photos and a deletion from their routes', async () => {
+    const { backend, sent } = makeBackend((url) =>
+      url.endsWith('/sender')
+        ? json({ senderName: 'Paul' })
+        : url.endsWith('/make-mediums')
+          ? json({ made: 2 })
+          : json([]),
+    );
+    expect(await backend.sharedSkies.senderName()).toBe('Paul');
+    expect(await backend.sharedSkies.makeMissingMediums()).toBe(2);
+    await backend.sharedSkies.list();
+    await backend.sharedSkies.listPhotos('a/b');
+    await backend.sharedSkies.remove('a/b');
+    await backend.sharedSkies.discard('t');
+    expect(sent.map((s) => `${s.method} ${s.url.replace('http://app', '')}`)).toEqual([
+      'GET /api/shared-skies/sender',
+      'POST /api/shared-skies/make-mediums',
+      'GET /api/shared-skies',
+      'GET /api/shared-skies/a%2Fb/photos',
+      'DELETE /api/shared-skies/a%2Fb',
+      'DELETE /api/shared-skies/open/t',
+    ]);
+  });
+});

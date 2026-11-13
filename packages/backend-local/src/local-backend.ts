@@ -10,7 +10,8 @@ import { reportError } from '@myastrosky/core/platform/error-hook';
 import type { BundleReader, BundleWriter } from '@myastrosky/core/ports/bundle';
 import type { BackupFile } from '@myastrosky/core/services/backup';
 import type { Services } from '@myastrosky/core/services/create-services';
-import type { RangeSource } from './bundle-fflate';
+import { shareFileName } from '@myastrosky/core/domain/shared-sky';
+import type { RangeSource } from '@myastrosky/core/zip-ranges';
 
 export interface LocalBackendDeps {
   /** What `createServices` returns, built on the phone's database, blob store and image codec. */
@@ -27,10 +28,11 @@ export interface LocalBackendDeps {
   /** The largest photo file (a picture, or a FITS / TIFF / XISF read to convert or solve it); larger is refused
    *  with `PHOTO_TOO_LARGE` before it is read. No limit when absent. */
   maxPhotoBytes?: number;
-  /** Builds a ZIP archive in memory. */
-  newZip(): { writer: BundleWriter; finish(): Promise<Uint8Array> };
-  /** Hands a file to the user (the share sheet on the phone). */
-  saveFile(name: string, bytes: Uint8Array): Promise<void>;
+  /**
+   * Builds the ZIP archive `name` from the files `write` adds, then hands it to the user (the share sheet on the
+   * phone). The archive goes to a file as it is written; nothing is handed over when `write` fails.
+   */
+  saveArchive(name: string, write: (writer: BundleWriter) => Promise<void>): Promise<void>;
   now: () => Date;
 }
 
@@ -90,8 +92,7 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
     files,
     starCatalogUrl,
     openZip,
-    newZip,
-    saveFile,
+    saveArchive,
     now,
     maxWholeFileBytes,
     maxPhotoBytes,
@@ -125,6 +126,23 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
     fileName: file.name,
     bytes: await readPhoto(file),
   });
+
+  /** The packages inspected and not yet opened, by ticket: the file stays where it is and is read again to open it. */
+  const inspected = new Map<string, BundleReader>();
+  let tickets = 0;
+  /** A file that is no ZIP at all is, for the user, a file that is not a shared sky. */
+  const openPackage = async (file: FileSource): Promise<BundleReader> => {
+    try {
+      return await openZip(await rangesOf(file));
+    } catch (err) {
+      if (err instanceof Error && /Invalid backup archive/.test(err.message)) {
+        throw new DomainError('invalid', 'This file is not a shared sky', {
+          code: 'NOT_A_SHARED_SKY',
+        });
+      }
+      throw err;
+    }
+  };
 
   return withDomainErrors({
     capabilities: { localSolvers: false },
@@ -181,11 +199,51 @@ export function createLocalBackend(deps: LocalBackendDeps): Backend {
         return result;
       },
     },
+    sharedSkies: {
+      senderName: () => services.sharedSkies.senderName(),
+      list: () => services.sharedSkies.list(),
+      listPhotos: (skyId) => services.sharedSkies.listPhotos(skyId),
+      remove: (skyId) => services.sharedSkies.remove(skyId),
+      makeMissingMediums: () => services.sharedSkies.makeMissingMediums(),
+      async exportToUser(request) {
+        // Refused before a file is made and handed over.
+        await services.sharedSkies.checkShare(request);
+        await saveArchive(shareFileName(request.senderName), (writer) =>
+          services.sharedSkies.exportTo(writer, request),
+        );
+      },
+      async inspect(file, options) {
+        throwIfCancelled(options?.cancel);
+        const reader = await openPackage(file);
+        const preview = await services.sharedSkies.inspect(reader);
+        // Nothing is transferred here: the file is read where it is.
+        options?.onProgress?.(1);
+        const ticket = `package-${++tickets}`;
+        inspected.set(ticket, reader);
+        return { ticket, preview };
+      },
+      async open(ticket, options) {
+        const reader = inspected.get(ticket);
+        if (!reader) {
+          throw new DomainError('notFound', 'This shared sky must be opened again', {
+            code: 'SHARED_SKY_TICKET_EXPIRED',
+          });
+        }
+        inspected.delete(ticket);
+        return services.sharedSkies.open(reader, {
+          cancel: options?.cancel,
+          onProgress: (done, total) => options?.onProgress?.(total > 0 ? done / total : 1),
+        });
+      },
+      async discard(ticket) {
+        inspected.delete(ticket);
+      },
+    },
     backup: {
       async exportToUser(request) {
-        const zip = newZip();
-        await services.backup.exportTo(zip.writer, request);
-        await saveFile(backupFileName(now()), await zip.finish());
+        await saveArchive(backupFileName(now()), (writer) =>
+          services.backup.exportTo(writer, request),
+        );
       },
       async preview(file) {
         return services.backup.previewFile(backupFileOf(file));

@@ -106,6 +106,9 @@ export interface Photo {
   thumbFilename?: string | null; // Low-res thumbnail filename (generated on upload)
   mediumFilename?: string | null; // Medium-sized copy of a large picture, shown between the thumbnail and the full picture
   quarterTurns?: QuarterTurns; // Quarters to the right the picture is shown turned (absent = 0); the file and everything measured in its pixels stay as stored
+  sharedSkyId?: string; // Set on a photo of a visited sky (someone else's, read-only); absent on the user's own photos
+  sharedGear?: { setup?: string; telescope?: string; camera?: string; accessory?: string }; // A visited photo's gear, as text
+  author?: string; // A visited photo's author: the name its sender shared it under, never editable here
 }
 
 export type QuarterTurns = 0 | 1 | 2 | 3;

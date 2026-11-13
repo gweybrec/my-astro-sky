@@ -23,7 +23,12 @@ import {
   turnsForNextQuarter,
 } from '../photo-display';
 import { skyPhotoFocus } from '../composables/useSkySelection';
-import { galleryFilters, galleryShownPhotos, setLastViewedPhoto } from '../gallery-display';
+import {
+  galleryFilters,
+  galleryShownPhotos,
+  photosWithVisit,
+  setLastViewedPhoto,
+} from '../gallery-display';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneIconButton from '../components/PhoneIconButton.vue';
@@ -218,7 +223,7 @@ async function load() {
     // The photo shown, once there is one: a swipe changes it without changing the address (Ionic would make a new page,
     // empty until loaded, for another address), and coming back from the editor reloads it.
     const id = photo.value?.id ?? String(route.params.id);
-    const photos = await getPhotos();
+    const photos = await photosWithVisit(await getPhotos());
     const found = photos.find((p) => p.id === id);
     if (!found) {
       await router.replace('/tabs/gallery');
@@ -365,6 +370,7 @@ async function loadWcs() {
             :can-show-objects="canShowObjects"
             :can-show-pois="canShowPois"
             :turning="!photo || turning"
+            :read-only="!!photo?.sharedSkyId"
             @pointerdown.stop
             @touchstart.stop
             @map="showOnMap"

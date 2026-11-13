@@ -8,6 +8,7 @@ import type { Photo } from '@myastrosky/core/types';
 import { quarterTurnsOf } from '@myastrosky/core/photo-rotation';
 import { getGearSetups, getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneSearch from '../components/PhoneSearch.vue';
@@ -86,19 +87,29 @@ const poiCategories = usePoiCategoriesStore();
 function tagsOf(photo: Photo): PhotoTag[] {
   return photoTags(
     {
-      setupName: photo.gearSetupId ? setupNames.value.get(photo.gearSetupId) : undefined,
+      // A visited sky's photo: the setup as the sender named it, and the sender's kinds of points of interest.
+      setupName:
+        photo.sharedGear?.setup ??
+        (photo.gearSetupId ? setupNames.value.get(photo.gearSetupId) : undefined),
       pois: photo.pointsOfInterest,
       labels: photo.labels,
       dsoIds: photo.dsoIds,
     },
-    poiCategories.categories,
+    photo.sharedSkyId ? sharedSkies.visitPoiCategories : poiCategories.categories,
   );
 }
 
 // The photos the search and the filters of the "Affichage" sheet keep, in the order of the "Trier par" sheet (the
 // desktop gallery's).
+// The user's own photos and those of the visited sky shown (board "Galerie, choix du ciel affiché").
+const sharedSkies = useSharedSkiesStore();
+const listed = computed(() =>
+  photos.value === null
+    ? null
+    : [...(sharedSkies.ownShown ? photos.value : []), ...sharedSkies.visitPhotos],
+);
 const shownPhotos = computed(() =>
-  galleryShownPhotos(photos.value ?? [], {
+  galleryShownPhotos(listed.value ?? [], {
     knownSetupIds: new Set(setupNames.value.keys()),
     poiCategories: poiCategories.categories,
   }),
@@ -156,13 +167,16 @@ const PENDING_TEXT: Record<PendingState, string> = {
   offline: 'mobile.gallery.solvingOffline',
   failed: 'batch.statusFailed',
 };
+// The waiting photos are the user's own: shown only while "Mon ciel" is ticked, like the placed ones.
 const waiting = computed(() =>
-  pendingPhotos.value.map((p) => ({
-    id: p.id,
-    name: p.name,
-    busy: p.state === 'solving',
-    state: t(PENDING_TEXT[p.state]),
-  })),
+  sharedSkies.ownShown
+    ? pendingPhotos.value.map((p) => ({
+        id: p.id,
+        name: p.name,
+        busy: p.state === 'solving',
+        state: t(PENDING_TEXT[p.state]),
+      }))
+    : [],
 );
 
 function chooseMethod(tile: { id: string; busy: boolean }) {
@@ -206,13 +220,13 @@ function solveOnline() {
   if (placingId.value) void solvePendingOnline(placingId.value);
 }
 const isEmpty = computed(
-  () => photos.value !== null && photos.value.length === 0 && waiting.value.length === 0,
+  () => listed.value !== null && listed.value.length === 0 && waiting.value.length === 0,
 );
 /** Photos there are, but the search or the filters keep none of them. */
 const noMatch = computed(
   () =>
     !isEmpty.value &&
-    !!photos.value?.length &&
+    !!listed.value?.length &&
     shownPhotos.value.length === 0 &&
     !waiting.value.length,
 );
@@ -237,6 +251,8 @@ function load() {
 async function loadPhotos() {
   try {
     const read = await getPhotos();
+    // The visited sky shown is read once; the store keeps it up to date afterwards.
+    if (!sharedSkies.loaded) await sharedSkies.load();
     // Unchanged photos keep their cards as they are, already drawn.
     if (active.value && JSON.stringify(read) !== JSON.stringify(photos.value)) photos.value = read;
   } catch (error) {

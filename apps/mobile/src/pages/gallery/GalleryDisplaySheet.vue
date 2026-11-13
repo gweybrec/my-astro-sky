@@ -20,6 +20,7 @@ import { dsoCatalogOptions } from '../../catalog-options';
 import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneSectionHeader from '../../components/PhoneSectionHeader.vue';
 import PhoneSegmented from '../../components/PhoneSegmented.vue';
+import SkyViewField from '../sky/SkyViewField.vue';
 import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneNativePicker from '../../components/PhoneNativePicker.vue';
 import AppIcon from '../../components/AppIcon.vue';
@@ -213,6 +214,7 @@ function setFrom(day: string | null) {
 
 <template>
   <PhoneSheet :open="open" :title="t('display.section')" @update:open="emit('update:open', $event)">
+    <SkyViewField />
     <PhoneSectionHeader>{{ t('mobile.gallery.perLine') }}</PhoneSectionHeader>
     <PhoneSegmented v-model="chosen" :options="options" :label="t('mobile.gallery.perLine')" />
 

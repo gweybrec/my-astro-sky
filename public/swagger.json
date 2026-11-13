@@ -350,6 +350,434 @@
         }
       }
     },
+    "/api/shared-skies/sender": {
+      "get": {
+        "summary": "The display name last shared under",
+        "responses": {
+          "200": {
+            "description": "The name ('' before the first share)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "senderName": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shared-skies/export": {
+      "post": {
+        "summary": "Prepare a shared-sky package for download",
+        "description": "Checks the request and keeps it for a few minutes under a token. The package itself is then downloaded with `GET /api/shared-skies/export/{token}`, so the browser writes it straight to disk.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "senderName": {
+                    "type": "string",
+                    "description": "The display name written in the package"
+                  },
+                  "includeGear": {
+                    "type": "boolean",
+                    "description": "Whether gear and capture details travel (default true)"
+                  },
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The photos to share; all of them when absent or empty"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The token and the file name of the package",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "fileName": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A blank name (`SHARED_SKY_NAME_REQUIRED`) or no photo to share (`SHARED_SKY_NOTHING_TO_SHARE`)"
+          }
+        }
+      }
+    },
+    "/api/shared-skies/export/{token}": {
+      "get": {
+        "summary": "Download a prepared shared-sky package",
+        "description": "A ZIP named `<name>.myastrosky`, streamed. The token works once.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The package"
+          },
+          "404": {
+            "description": "Unknown or used token"
+          }
+        }
+      }
+    },
+    "/api/shared-skies/inspect": {
+      "post": {
+        "summary": "Upload a shared-sky package and read what it holds",
+        "description": "The package is written to a file on the server and nothing is imported. The answer carries a ticket for `POST /api/shared-skies/open/{ticket}`; discard it with `DELETE` when the package is not opened.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bundle": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The `.myastrosky` (or `.zip`) package"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The ticket and the preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ticket": {
+                      "type": "string"
+                    },
+                    "preview": {
+                      "type": "object",
+                      "properties": {
+                        "skyId": {
+                          "type": "string"
+                        },
+                        "senderName": {
+                          "type": "string"
+                        },
+                        "sharedAt": {
+                          "type": "string"
+                        },
+                        "photoCount": {
+                          "type": "integer"
+                        },
+                        "bytes": {
+                          "type": "integer"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "new",
+                            "update",
+                            "same",
+                            "older"
+                          ]
+                        },
+                        "existing": {
+                          "type": "object",
+                          "properties": {
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "sharedAt": {
+                              "type": "string"
+                            },
+                            "photoCount": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "freeBytes": {
+                          "type": "integer",
+                          "nullable": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No file, or not a usable package (`NOT_A_SHARED_SKY`, `SHARED_SKY_UNSUPPORTED`, `INVALID_ENTRY_PATH`, `BACKUP_TOO_LARGE`)"
+          }
+        }
+      }
+    },
+    "/api/shared-skies/open/{ticket}": {
+      "post": {
+        "summary": "Start keeping an inspected package as a visit",
+        "description": "The import runs on the server; follow it with `GET` on the same address.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Started (or already running)"
+          },
+          "404": {
+            "description": "Unknown ticket (`SHARED_SKY_TICKET_EXPIRED`)"
+          }
+        }
+      },
+      "get": {
+        "summary": "Where the import of a package stands",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The state; `sky` once done, `error` once failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "ready",
+                        "running",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "done": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "sky": {
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown ticket (`SHARED_SKY_TICKET_EXPIRED`)"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Give up or forget a package",
+        "description": "A running import is cancelled and leaves nothing behind; the uploaded file is removed.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done (also for an unknown ticket)"
+          }
+        }
+      }
+    },
+    "/api/shared-skies/make-mediums": {
+      "post": {
+        "summary": "Make the missing medium-sized copies of visited photos",
+        "responses": {
+          "200": {
+            "description": "How many copies were made",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "made": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shared-skies": {
+      "get": {
+        "summary": "The visited skies",
+        "responses": {
+          "200": {
+            "description": "The visits, the most recently received first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "senderName": {
+                        "type": "string"
+                      },
+                      "displayName": {
+                        "type": "string"
+                      },
+                      "sharedAt": {
+                        "type": "string"
+                      },
+                      "receivedAt": {
+                        "type": "string"
+                      },
+                      "photoCount": {
+                        "type": "integer"
+                      },
+                      "bytes": {
+                        "type": "integer"
+                      },
+                      "poiCategories": {
+                        "type": "array",
+                        "items": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shared-skies/{id}/photos": {
+      "get": {
+        "summary": "The photos of a visited sky",
+        "description": "The same shape as `GET /api/photos`, each with `sharedSkyId`. They are read-only.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The photos, in the sender's order"
+          },
+          "404": {
+            "description": "Unknown sky (`SHARED_SKY_NOT_FOUND`)"
+          }
+        }
+      }
+    },
+    "/api/shared-skies/{id}": {
+      "delete": {
+        "summary": "Delete a visited sky and its files",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bytesFreed": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown sky (`SHARED_SKY_NOT_FOUND`)"
+          }
+        }
+      }
+    },
     "/api/version/latest": {
       "get": {
         "summary": "Get the latest published GitHub release",

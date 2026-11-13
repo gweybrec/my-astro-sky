@@ -40,7 +40,12 @@ const emit = defineEmits<{
 const { confirm } = useConfirm();
 const { showError } = useErrorToast();
 
-const placed = () => props.layer.getPlacedPhotos().find((p) => p.photo.id === props.photo.id);
+const placed = () =>
+  [...props.layer.getPlacedPhotos(), ...props.layer.getVisitPhotos()].find(
+    (p) => p.photo.id === props.photo.id,
+  );
+// A visited sky's photo is someone else's: it is looked at, never changed (no reposition, order, edit or delete).
+const visited = !!props.photo.sharedSkyId;
 const opacity = ref(placed()?.opacity ?? 1);
 const visible = ref(placed()?.visible ?? true);
 watch(opacity, (value) => props.layer.setPhotoOpacity(props.photo.id, value));
@@ -101,18 +106,20 @@ const ids = sortDsoIdsByImportance(props.photo.dsoIds ?? []);
       <PhoneIconButton :label="t('photos.openInGallery')" @click="emit('gallery')"
         ><AppIcon :svg="imageIcon"
       /></PhoneIconButton>
-      <PhoneIconButton :label="t('photos.reposition')" @click="emit('reposition')"
-        ><AppIcon :svg="moveIcon"
-      /></PhoneIconButton>
-      <PhoneIconButton :label="t('photos.zOrder')" @click="emit('order')"
-        ><AppIcon :svg="stackIcon"
-      /></PhoneIconButton>
-      <PhoneIconButton :label="t('gallery.editMetadata')" @click="emit('edit')"
-        ><AppIcon :svg="penIcon"
-      /></PhoneIconButton>
-      <PhoneIconButton danger :label="t('photos.delete')" @click="remove">
-        <AppIcon :svg="trashIcon" />
-      </PhoneIconButton>
+      <template v-if="!visited">
+        <PhoneIconButton :label="t('photos.reposition')" @click="emit('reposition')"
+          ><AppIcon :svg="moveIcon"
+        /></PhoneIconButton>
+        <PhoneIconButton :label="t('photos.zOrder')" @click="emit('order')"
+          ><AppIcon :svg="stackIcon"
+        /></PhoneIconButton>
+        <PhoneIconButton :label="t('gallery.editMetadata')" @click="emit('edit')"
+          ><AppIcon :svg="penIcon"
+        /></PhoneIconButton>
+        <PhoneIconButton danger :label="t('photos.delete')" @click="remove">
+          <AppIcon :svg="trashIcon" />
+        </PhoneIconButton>
+      </template>
     </div>
   </PhoneMapSheet>
 </template>

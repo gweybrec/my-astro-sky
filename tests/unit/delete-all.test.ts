@@ -8,6 +8,7 @@ function t(key: string): string {
     'settings.deleteSummaryDsoOverrides': 'All DSO overrides',
     'settings.deleteSummaryCustomGear': 'All custom gear',
     'settings.deleteSummaryPhotosAll': 'All {n} photo(s)',
+    'settings.deleteSummarySharedSkies': 'All visited skies ({n})',
     'settings.deleteSummaryPhotosPartial': '{n} of {total} photo(s)',
   };
   return map[key] ?? key;
@@ -42,6 +43,12 @@ describe('buildDeleteSummaryLines', () => {
   it('returns custom gear line only', () => {
     const lines = buildDeleteSummaryLines(opts({ customGear: true }), t);
     expect(lines).toEqual(['All custom gear']);
+  });
+
+  it('returns the visited skies line, with how many there are', () => {
+    const lines = buildDeleteSummaryLines(opts({ sharedSkies: 2 }), t);
+    expect(lines).toEqual(['All visited skies (2)']);
+    expect(buildDeleteSummaryLines(opts({ sharedSkies: 0 }), t)).toEqual([]);
   });
 
   it('returns "all N photos" when all photos selected', () => {

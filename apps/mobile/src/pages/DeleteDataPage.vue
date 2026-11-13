@@ -19,6 +19,7 @@ import {
   getDsoOverrides,
   getPhotos,
 } from '@myastrosky/app-state/api';
+import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
 import { gallerySort } from '../gallery-display';
@@ -43,6 +44,9 @@ const flags = reactive({
   customGear: false,
   gearSetups: false,
 });
+/** The skies other people shared, kept as visits: never deleted unless ticked. */
+const sharedSkies = useSharedSkiesStore();
+const deleteVisits = ref(false);
 const ROWS: { flag: keyof typeof flags; label: string }[] = [
   { flag: 'photoMetadata', label: 'settings.deletePhotoMeta' },
   { flag: 'dsoOverrides', label: 'settings.deleteDsoOverrides' },
@@ -71,12 +75,15 @@ async function loadPhotos() {
 }
 onMounted(loadPhotos);
 onIonViewWillEnter(loadPhotos);
+onMounted(() => void sharedSkies.load());
 
 const allPhotosTicked = computed(
   () => photos.value.length > 0 && photos.value.every((p) => selected.value.has(p.id)),
 );
 const somePhotosTicked = computed(() => selected.value.size > 0 && !allPhotosTicked.value);
-const canDelete = computed(() => selected.value.size > 0 || Object.values(flags).some(Boolean));
+const canDelete = computed(
+  () => selected.value.size > 0 || deleteVisits.value || Object.values(flags).some(Boolean),
+);
 
 function tickPhoto(id: string, on: boolean) {
   const next = new Set(selected.value);
@@ -108,7 +115,12 @@ async function remove() {
   if (deleting.value || !canDelete.value) return;
   const photoIds = sortedPhotos.value.filter((p) => selected.value.has(p.id)).map((p) => p.id);
   const lines = buildDeleteSummaryLines(
-    { ...flags, photoIds, totalPhotos: photos.value.length },
+    {
+      ...flags,
+      sharedSkies: deleteVisits.value ? sharedSkies.skies.length : 0,
+      photoIds,
+      totalPhotos: photos.value.length,
+    },
     t,
   );
   const yes = await confirm({
@@ -134,6 +146,9 @@ async function remove() {
     }
     if (flags.customGear) await deleteAllCustomGear();
     if (flags.gearSetups) await deleteAllGearSetupsAPI();
+    if (deleteVisits.value) {
+      for (const sky of [...sharedSkies.skies]) await sharedSkies.remove(sky.id);
+    }
     void showNotice(t('settings.deleteSuccess'));
     router.back();
   } catch (error) {
@@ -168,6 +183,12 @@ async function remove() {
             :key="row.flag"
             v-model="flags[row.flag]"
             :title="t(row.label)"
+          />
+          <!-- Board "Réglages, supprimer des données": once a sky has been visited. -->
+          <PhoneCheckRow
+            v-if="sharedSkies.skies.length > 0"
+            v-model="deleteVisits"
+            :title="t('settings.deleteSharedSkies')"
           />
         </IonList>
         <div class="mob-section-gap-sm"></div>

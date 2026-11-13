@@ -28,6 +28,7 @@ This repository has two doc audiences with separate folders. **Never mix them.**
 | `docs/dev/ci.md`                    | Developers               | GitHub Actions workflows: CI, tests, Docker image build/smoke-test, Electron release builds; also documents the (workflow-free) GitHub Pages docs deployment                      |
 | `docs/dev/mobile-architecture.md`   | Developers               | How the desktop and phone apps share code: packages and dependency rules, the backend seam, services, ports and platform adapters, the phone app, constraints measured on a phone |
 | `docs/dev/working-on-both-apps.md`  | Developers               | How the desktop and phone UIs are kept apart, how the phone app adapts to portrait and landscape, where to start a change and what to test for each kind of change                |
+| `docs/dev/shared-sky.md`            | Developers               | Sharing a sky by file: the package format, the visit tables and the rule that keeps a visit apart from the user's photos, how both backends open a package                        |
 
 **Rules:**
 

@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   BLOB_PIECE_BYTES,
   createCapacitorBlobStore,
+  createFileSink,
   ensureDirectory,
   toBase64,
   toBase64Js,
@@ -92,6 +93,28 @@ describe('createCapacitorBlobStore', () => {
   it('refuses names that leave the folder', async () => {
     const store = await openPhoneStore();
     await expect(store.put('../x.jpg', new Uint8Array(1))).rejects.toThrow();
+  });
+});
+
+describe('createFileSink', () => {
+  it('writes what it is given in pieces of the size asked, whatever the size of each append', async () => {
+    const fake = createFakeFilesystem();
+    const sink = createFileSink(fake, 'CACHE', 'exports/a.zip', 3000);
+    const bytes = new Uint8Array(10_000).map((_, i) => i % 251);
+    await sink.append(bytes.subarray(0, 10));
+    await sink.append(bytes.subarray(10, 7000));
+    await sink.append(bytes.subarray(7000));
+    await sink.close();
+    expect(fake.maxDataLength).toBeLessThanOrEqual(4000);
+    expect(Buffer.from(fake.files.get('exports/a.zip')!).equals(bytes)).toBe(true);
+  });
+
+  it('replaces a file of the same name, and creates an empty file when given nothing', async () => {
+    const fake = createFakeFilesystem();
+    fake.files.set('exports/a.zip', new Uint8Array([1, 2, 3]));
+    const sink = createFileSink(fake, 'CACHE', 'exports/a.zip', 3000);
+    await sink.close();
+    expect(fake.files.get('exports/a.zip')!.length).toBe(0);
   });
 });
 

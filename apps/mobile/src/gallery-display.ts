@@ -1,6 +1,7 @@
 import { reactive, ref } from 'vue';
 import { storage } from '@myastrosky/core/platform/storage';
 import type { Photo } from '@myastrosky/core/types';
+import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
 import {
   DEFAULT_GALLERY_SORT,
   emptyGalleryFilters,
@@ -56,6 +57,16 @@ export function setGallerySort(sort: GallerySort): void {
 /** The search and the filters of the gallery, kept while the app runs (not stored). A list is null while every value
  * is shown. */
 export const galleryFilters = reactive<GalleryFilters>(emptyGalleryFilters());
+
+/**
+ * The photos the gallery lists (board "Galerie, choix du ciel affiché"): the user's own, unless a visited sky is shown
+ * alone, then those of the visited sky shown. A visited sky is never mixed into the user's own photos elsewhere.
+ */
+export async function photosWithVisit(own: Photo[]): Promise<Photo[]> {
+  const sharedSkies = useSharedSkiesStore();
+  if (!sharedSkies.loaded) await sharedSkies.load();
+  return [...(sharedSkies.ownShown ? own : []), ...sharedSkies.visitPhotos];
+}
 
 /**
  * The photos as the gallery shows them: those its search and filters keep, in the order of its "Trier par" sheet. A

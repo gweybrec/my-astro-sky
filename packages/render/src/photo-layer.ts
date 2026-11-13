@@ -37,6 +37,7 @@ import {
 } from '@myastrosky/core/photo-placement';
 import { PhotoGlRenderer, type GlPhoto } from './photo-gl';
 import type { PhotoCanvasQuad } from '@myastrosky/core/photo-draw-order';
+import type { PhotoOutline } from '@myastrosky/core/photo-outline';
 import { resolveCategory, isPoiVisible } from '@myastrosky/core/poi';
 import { hasPosition, type SkyPoiPin } from './poi-pins';
 
@@ -275,9 +276,59 @@ export class PhotoLayer {
     return labelAllowed(placed.photo, this.visibleLabels);
   }
 
+  /**
+   * Whether the user's own photos are shown. Off while a visited sky is looked at alone: its photos are then the only
+   * ones on the map.
+   */
+  private ownShown = true;
+
+  /** A photo hidden because only a visited sky is shown. */
+  private hiddenByVisit(placed: PlacedPhoto): boolean {
+    return !this.ownShown && !placed.photo.sharedSkyId;
+  }
+
+  /** Shows or hides the user's own photos, their outlines and their pins; a visited sky's photos stay. */
+  setOwnPhotosShown(show: boolean) {
+    if (this.ownShown === show) return;
+    this.ownShown = show;
+    this.applyPhotoVisibility();
+    this.fireOnPhotosChanged();
+  }
+
+  /**
+   * The photos of the visited sky shown on the map (none: an empty list). They are drawn like the user's own, in the
+   * order given, above them, and are in none of the lists the user's photos are read from (`getPlacedPhotos`).
+   * `poiCategories` are the sender's: a visit's points of interest take their colour from them, not from the user's.
+   */
+  setVisitPhotos(photos: Photo[], poiCategories: PoiCategory[] = []) {
+    this.visitPoiCategories = poiCategories;
+    const wanted = new Set(photos.map((p) => p.id));
+    const gone = this.placedPhotos.filter((p) => p.photo.sharedSkyId && !wanted.has(p.photo.id));
+    for (const placed of gone) {
+      placed.imgEl.remove();
+      this.gl?.release(placed.imgEl);
+    }
+    this.placedPhotos = this.placedPhotos.filter((p) => !gone.includes(p));
+    for (const photo of photos) this.addPhotoToMap(photo);
+    this.applyPhotoVisibility();
+    this.fireOnPhotosChanged();
+  }
+
+  /** The categories of the visited sky's points of interest (see `setVisitPhotos`). */
+  private visitPoiCategories: PoiCategory[] = [];
+
+  /** The photos of the visited sky shown on the map. */
+  getVisitPhotos(): PlacedPhoto[] {
+    return this.placedPhotos.filter((p) => !!p.photo.sharedSkyId);
+  }
+
   protected applyPhotoVisibility() {
     for (const placed of this.placedPhotos) {
-      const shouldDisplay = this.showPhotos && placed.visible && this.isLabelAllowed(placed);
+      const shouldDisplay =
+        this.showPhotos &&
+        placed.visible &&
+        this.isLabelAllowed(placed) &&
+        !this.hiddenByVisit(placed);
       placed.imgEl.style.display = shouldDisplay ? 'block' : 'none';
     }
     this.requestPhotoDraw();
@@ -296,15 +347,18 @@ export class PhotoLayer {
     if (!this.showPhotos || !this.showPois) return pins;
     for (const placed of this.placedPhotos) {
       if (!placed.visible || placed.pendingDelete || placed.borderHidden) continue;
-      if (!this.isLabelAllowed(placed)) continue;
+      if (!this.isLabelAllowed(placed) || this.hiddenByVisit(placed)) continue;
+      // A visited photo's points are the sender's: their categories too, and the user's own filter does not list them.
+      const visit = !!placed.photo.sharedSkyId;
+      const categories = visit ? this.visitPoiCategories : this.poiCategories;
       for (const poi of placed.photo.pointsOfInterest ?? []) {
         if (!hasPosition(poi)) continue;
-        if (!isPoiVisible(poi, this.poiCategories, this.visiblePois)) continue;
+        if (!visit && !isPoiVisible(poi, categories, this.visiblePois)) continue;
         pins.push({
           ra: poi.ra,
           dec: poi.dec,
           label: poi.name,
-          color: resolveCategory(poi.categoryId, this.poiCategories).color,
+          color: resolveCategory(poi.categoryId, categories).color,
         });
       }
     }
@@ -418,8 +472,9 @@ export class PhotoLayer {
     }
   }
 
+  /** The user's own photos on the map. A visited sky's photos are never among them (see `getVisitPhotos`). */
   getPlacedPhotos(): PlacedPhoto[] {
-    return this.placedPhotos.filter((p) => !p.pendingDelete);
+    return this.placedPhotos.filter((p) => !p.pendingDelete && !p.photo.sharedSkyId);
   }
 
   /**
@@ -469,6 +524,7 @@ export class PhotoLayer {
 
     for (const placed of this.placedPhotos) {
       if (!placed.visible || placed.borderHidden || placed.viewportCulled) continue;
+      if (this.hiddenByVisit(placed)) continue;
 
       const g = this.geometryOf(placed);
       if (!g) continue; // < 2 correspondences or colinear points
@@ -478,6 +534,7 @@ export class PhotoLayer {
         name: placed.photo.originalName,
         corners: meshCorners(g.coarse).map(toView),
         edge: meshOutline(g.coarse).map(toView),
+        ...(placed.photo.sharedSkyId ? { sharedSkyId: placed.photo.sharedSkyId } : {}),
       });
     }
 
@@ -485,11 +542,12 @@ export class PhotoLayer {
   }
 
   /** Compute canvas-space outlines for sky-map hit testing. */
-  getPhotoCanvasOutlines(view: ViewState): { name: string; corners: Point[]; edge?: Point[] }[] {
-    return this.getPhotoCanvasQuads(view).map(({ name, corners, edge }) => ({
+  getPhotoCanvasOutlines(view: ViewState): PhotoOutline[] {
+    return this.getPhotoCanvasQuads(view).map(({ name, corners, edge, sharedSkyId }) => ({
       name,
       corners,
       edge,
+      ...(sharedSkyId ? { visit: true } : {}),
     }));
   }
 
@@ -523,7 +581,7 @@ export class PhotoLayer {
     const placed = this.placedPhotos.find((p) => p.photo.id === photoId);
     if (!placed) return;
     placed.visible = !placed.visible;
-    const shouldDisplay = this.showPhotos && placed.visible;
+    const shouldDisplay = this.showPhotos && placed.visible && !this.hiddenByVisit(placed);
     placed.imgEl.style.display = shouldDisplay ? 'block' : 'none';
     if (shouldDisplay) {
       this.applyTransform(placed, this.getView());
@@ -538,7 +596,7 @@ export class PhotoLayer {
       const placed = this.placedPhotos.find((p) => p.photo.id === id);
       if (!placed) continue;
       placed.visible = visible;
-      const shouldDisplay = this.showPhotos && visible;
+      const shouldDisplay = this.showPhotos && visible && !this.hiddenByVisit(placed);
       placed.imgEl.style.display = shouldDisplay ? 'block' : 'none';
       if (shouldDisplay) {
         this.applyTransform(placed, view);
@@ -583,6 +641,7 @@ export class PhotoLayer {
   setPhotoOrder(photoIds: string[]) {
     if (photoIds.length === 0) return;
 
+    // A visited sky's photos keep their place above the user's own, which are the ones reordered.
     const placedById = new Map(this.placedPhotos.map((placed) => [placed.photo.id, placed]));
     const reordered: PlacedPhoto[] = [];
     const seen = new Set<string>();
@@ -627,7 +686,7 @@ export class PhotoLayer {
     const placed = this.placedPhotos.find((p) => p.photo.id === photoId);
     if (!placed) return;
     placed.pendingDelete = false;
-    placed.imgEl.style.display = placed.visible ? 'block' : 'none';
+    placed.imgEl.style.display = placed.visible && !this.hiddenByVisit(placed) ? 'block' : 'none';
     if (placed.visible) {
       this.applyTransform(placed, this.getView());
     }
@@ -667,13 +726,14 @@ export class PhotoLayer {
     }
   }
 
-  /** Remove all photos from the in-memory overlay without calling the API. */
+  /** Remove all the user's photos from the in-memory overlay without calling the API; a visited sky's stay. */
   clearAllPhotos() {
-    this.placedPhotos.forEach((p) => {
+    const own = this.placedPhotos.filter((p) => !p.photo.sharedSkyId);
+    own.forEach((p) => {
       p.imgEl.remove();
       this.gl?.release(p.imgEl);
     });
-    this.placedPhotos = [];
+    this.placedPhotos = this.placedPhotos.filter((p) => !!p.photo.sharedSkyId);
     this.requestPhotoDraw();
     this.fireOnPhotosChanged();
   }
@@ -794,7 +854,10 @@ export class PhotoLayer {
       return;
     }
     placed.borderHidden = false;
-    imgEl.style.display = this.showPhotos && this.isLabelAllowed(placed) ? 'block' : 'none';
+    imgEl.style.display =
+      this.showPhotos && this.isLabelAllowed(placed) && !this.hiddenByVisit(placed)
+        ? 'block'
+        : 'none';
 
     const matrix = meshCanvasAffine(coarse, photo.width, photo.height, view);
     if (!this.gl || placed.domFallback) imgEl.style.transform = affineToCSS(matrix);

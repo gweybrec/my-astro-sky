@@ -29,6 +29,10 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 const nodeRequire = createRequire(import.meta.url);
 const unzipper = nodeRequire('unzipper') as typeof import('unzipper');
 
+/** The files of an uploads folder, without the folder an uploaded archive is written to while it is read. */
+const photoFilesIn = (dir: string): string[] =>
+  fs.readdirSync(dir).filter((name) => name !== '.incoming');
+
 // ─── Instance harness ────────────────────────────────────────────────────────
 
 interface Instance {
@@ -569,7 +573,9 @@ describe('export and import round trip', () => {
     }
 
     // B's uploads folder holds the two images and their thumbnails.
-    expect(fs.readdirSync(instanceB.uploadsDir).sort()).toEqual(Object.keys(aImages).sort());
+    expect(photoFilesIn(instanceB.uploadsDir).sort()).toEqual(Object.keys(aImages).sort());
+    // The uploaded archive, written to disk while it was read, is gone.
+    expect(fs.readdirSync(path.join(instanceB.uploadsDir, '.incoming'))).toEqual([]);
     for (const [name, bytes] of Object.entries(aImages)) {
       const got = fs.readFileSync(path.join(instanceB.uploadsDir, name));
       if (name.endsWith('_thumb.jpg')) {
@@ -642,7 +648,7 @@ describe('export and import round trip', () => {
     expect((await c.call('GET', '/api/dso-overrides')).body).toEqual({});
     expect((await c.call('GET', '/api/poi-categories')).body).toHaveLength(5);
     // No photo record is imported, so no image file is written either.
-    expect(fs.readdirSync(c.uploadsDir)).toEqual([]);
+    expect(photoFilesIn(c.uploadsDir)).toEqual([]);
   }, 30_000);
 
   it('imports every photo and its files when importMetadata is set without selectedImages', async () => {
@@ -657,7 +663,7 @@ describe('export and import round trip', () => {
     expect((await d.call('GET', '/api/photos')).body.map((p: any) => p.id).sort()).toEqual(
       [...photoIds].sort(),
     );
-    expect(fs.readdirSync(d.uploadsDir).sort()).toEqual(Object.keys(aImages).sort());
+    expect(photoFilesIn(d.uploadsDir).sort()).toEqual(Object.keys(aImages).sort());
   }, 30_000);
 
   it('writes no file when selectedImages is empty', async () => {
@@ -673,7 +679,7 @@ describe('export and import round trip', () => {
       body: { imported: 0, skipped: 2, dsoOverridesImported: 0, failed: [] },
     });
     expect((await e.call('GET', '/api/photos')).body).toEqual([]);
-    expect(fs.readdirSync(e.uploadsDir)).toEqual([]);
+    expect(photoFilesIn(e.uploadsDir)).toEqual([]);
   }, 30_000);
 
   // ─── A plan's setup, and the setups that differ from a local one ───────────
@@ -1123,6 +1129,6 @@ describe('file names of a backup that leave the uploads folder', () => {
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ imported: 0, failed: [{ kind: 'photo', name: 'evil2.png' }] });
     expect(fs.existsSync(outside)).toBe(false);
-    expect(fs.readdirSync(inst.uploadsDir)).toEqual([]);
+    expect(photoFilesIn(inst.uploadsDir)).toEqual([]);
   });
 });

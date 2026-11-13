@@ -143,7 +143,13 @@ async function main() {
         }
       },
       [
-        { ...seeded.storage, ...job.view.storage },
+        {
+          ...seeded.storage,
+          // A view's own entries, or a function of the seeded ids that returns them.
+          ...(typeof job.view.storage === 'function'
+            ? job.view.storage(seeded.ids)
+            : job.view.storage),
+        },
         app.language.key,
         job.lang,
         job.view.clearStorage ?? [],

@@ -5,10 +5,11 @@ import {
   type ImportOptions,
 } from '@myastrosky/core/domain/backup';
 import type { BackupFile } from '@myastrosky/core/services/backup';
-import { uploadBundle } from './shared.js';
+import fsp from 'fs/promises';
+import { MAX_JSON_BUNDLE_BYTES, uploadBundle } from './shared.js';
 import { backup as backupService } from '../services.js';
-import { createZipResponseWriter, openZipBundle } from '../bundle-zip.js';
-import { isDomainError } from '@myastrosky/core/domain/errors';
+import { createZipResponseWriter, openZipFile, type ZipFileReader } from '../bundle-zip.js';
+import { DomainError, isDomainError } from '@myastrosky/core/domain/errors';
 import { sendError } from './http-errors.js';
 
 export const backupRouter = express.Router();
@@ -19,12 +20,28 @@ function fail(res: express.Response, err: unknown): void {
   else res.status(500).json({ error: (err as Error)?.message ?? String(err) });
 }
 
-/** The uploaded file as the service reads it; the ZIP is only opened if the service asks. */
-function backupFileOf(file: Express.Multer.File): BackupFile {
+/**
+ * The uploaded file, which is on disk, as the service reads it; the ZIP is only opened if the service asks.
+ * `dispose` closes it and removes the file: call it once the request is answered.
+ */
+function backupFileOf(file: Express.Multer.File): BackupFile & { dispose(): Promise<void> } {
+  let zip: ZipFileReader | null = null;
   return {
     name: file.originalname,
-    read: async () => file.buffer,
-    openZip: () => openZipBundle(file.buffer),
+    async read() {
+      if (file.size > MAX_JSON_BUNDLE_BYTES) {
+        throw new DomainError('invalid', 'Backup too large', { code: 'BACKUP_TOO_LARGE' });
+      }
+      return new Uint8Array(await fsp.readFile(file.path));
+    },
+    async openZip() {
+      zip = await openZipFile(file.path);
+      return zip;
+    },
+    async dispose() {
+      await zip?.close().catch(() => undefined);
+      await fsp.rm(file.path, { force: true }).catch(() => undefined);
+    },
   };
 }
 
@@ -136,16 +153,18 @@ backupRouter.post('/api/export', async (req, res) => {
  */
 // Import preview (dry-run) — inspect ZIP contents and report what can be imported
 backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) => {
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ error: 'Aucun fichier fourni' });
+    return;
+  }
+  const bundle = backupFileOf(file);
   try {
-    const file = req.file;
-    if (!file) {
-      res.status(400).json({ error: 'Aucun fichier fourni' });
-      return;
-    }
-
-    res.json(await backupService.previewFile(backupFileOf(file)));
+    res.json(await backupService.previewFile(bundle));
   } catch (err: any) {
     fail(res, err);
+  } finally {
+    await bundle.dispose();
   }
 });
 
@@ -228,13 +247,13 @@ backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (r
 //              setupConflicts (JSON object: bundle setup id -> replace | keepBoth | skip),
 //              setupNames (JSON object: bundle setup id kept with keepBoth -> its name)
 backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ error: 'Aucun fichier fourni' });
+    return;
+  }
+  const bundle = backupFileOf(file);
   try {
-    const file = req.file;
-    if (!file) {
-      res.status(400).json({ error: 'Aucun fichier fourni' });
-      return;
-    }
-
     // An absent field means "import none of that category"; a list means "import only these ids".
     const parseIdList = (raw: unknown): string[] =>
       typeof raw === 'string' ? (JSON.parse(raw) as string[]) : [];
@@ -256,8 +275,10 @@ backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res)
       setupNames: typeof req.body?.setupNames === 'string' ? JSON.parse(req.body.setupNames) : {},
     };
 
-    res.json(await backupService.importFile(backupFileOf(file), selection));
+    res.json(await backupService.importFile(bundle, selection));
   } catch (err: any) {
     fail(res, err);
+  } finally {
+    await bundle.dispose();
   }
 });

@@ -18,6 +18,22 @@ vi.mock('@myastrosky/app-state/api', () => ({
   uploadPhoto: vi.fn(),
 }));
 
+// The visited sky shown: none unless a test shows one.
+const sharedSkies = vi.hoisted(() => ({
+  loaded: true,
+  skies: [] as unknown[],
+  shown: ['mine'] as string[],
+  ownShown: true,
+  visitPhotos: [] as unknown[],
+  visitPoiCategories: [] as unknown[],
+  load: () => Promise.resolve(),
+}));
+vi.mock('@myastrosky/app-state/stores/shared-skies', async () => {
+  const { reactive } = await import('vue');
+  const store = reactive(sharedSkies);
+  return { useSharedSkiesStore: () => store };
+});
+
 vi.mock('@myastrosky/app-state/stores/poi-categories', () => ({
   usePoiCategoriesStore: () => ({
     categories: [
@@ -124,6 +140,37 @@ describe('the gallery page', () => {
     expect(wrapper.find('.mob-empty').exists()).toBe(false);
     await flushPromises();
     expect(wrapper.find('.mob-empty').exists()).toBe(false);
+  });
+
+  it("adds the visited sky shown after the user's own photos, or shows it alone", async () => {
+    getPhotos.mockResolvedValue([
+      { id: 'p1', originalName: 'Mine.jpg', filename: 'a.jpg', dsoIds: [] },
+    ]);
+    sharedSkies.visitPhotos = [
+      {
+        id: 'v1',
+        originalName: 'Theirs.jpg',
+        filename: 'v.jpg',
+        dsoIds: [],
+        sharedSkyId: 's1',
+        sharedGear: { setup: 'Lunette 80' },
+      },
+    ];
+    try {
+      const wrapper = mountPage();
+      await flushPromises();
+      const names = () => wrapper.findAll('.mob-photo-card-name').map((n) => n.text());
+      expect(names().sort()).toEqual(['Mine.jpg', 'Theirs.jpg']);
+      const theirs = wrapper.findAll('.mob-photo').find((t) => t.text().includes('Theirs.jpg'))!;
+      expect(theirs.text()).toContain('Lunette 80');
+      sharedSkies.ownShown = false;
+      const alone = mountPage();
+      await flushPromises();
+      expect(alone.findAll('.mob-photo-card-name').map((n) => n.text())).toEqual(['Theirs.jpg']);
+    } finally {
+      sharedSkies.visitPhotos = [];
+      sharedSkies.ownShown = true;
+    }
   });
 
   it('shows a card per photo with its thumbnail and its file name', async () => {
@@ -323,6 +370,25 @@ describe('the gallery page', () => {
     online = await openMethods(second);
     expect(online.classes()).toContain('mob-row--disabled');
     expect(online.text()).toContain('Clé API non configurée');
+  });
+
+  it('hides the waiting photos with the user own ones when "Mon ciel" is not ticked', async () => {
+    getPhotos.mockResolvedValue([{ id: 'p1', originalName: 'Mine.jpg', filename: 'a.jpg' }]);
+    await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
+    sharedSkies.visitPhotos = [
+      { id: 'v1', originalName: 'Theirs.jpg', filename: 'v.jpg', dsoIds: [], sharedSkyId: 's1' },
+    ];
+    sharedSkies.ownShown = false;
+    try {
+      const wrapper = mountPage();
+      await flushPromises();
+      expect(wrapper.findAll('.mob-photo-card').map((t) => t.attributes('aria-label'))).toEqual([
+        'Theirs.jpg',
+      ]);
+    } finally {
+      sharedSkies.visitPhotos = [];
+      sharedSkies.ownShown = true;
+    }
   });
 
   it('shows the grid, not the empty state, when the only photos are waiting ones', async () => {

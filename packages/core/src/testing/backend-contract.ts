@@ -1040,6 +1040,171 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     }
   });
 
+  // ── Shared skies ─────────────────────────────────────────────────────────
+
+  add('shared skies: share a sky, visit it elsewhere, update and delete the visit', async () => {
+    const { backend: b, fixtures } = await makeBackend();
+    const mine = await b.photos.upload(fixtures.jpeg(), {
+      correspondences: JSON.stringify(CORRESPONDENCES),
+      notes: 'shared',
+    });
+    try {
+      await expectDomainError(
+        b.sharedSkies.exportToUser({ senderName: '  ', includeGear: true }),
+        'invalid',
+        'SHARED_SKY_NAME_REQUIRED',
+        'a share without a name',
+      );
+      await expectDomainError(
+        b.sharedSkies.exportToUser({ senderName: 'Paul', includeGear: true, ids: ['no-such'] }),
+        'invalid',
+        'SHARED_SKY_NOTHING_TO_SHARE',
+        'a share of no photo',
+      );
+
+      await b.sharedSkies.exportToUser({ senderName: 'Paul', includeGear: true });
+      const file = await fixtures.lastExport();
+      if (!file) fail('the package was not handed to the user');
+      expectEqual(file.name, 'Paul.myastrosky', 'the name of the package file');
+      expectEqual(await b.sharedSkies.senderName(), 'Paul', 'the name is remembered');
+
+      const other = await makeBackend({ isolated: true });
+      const o = other.backend;
+      expectEqual(await o.sharedSkies.list(), [], 'the second backend has no visit');
+      const fractions: number[] = [];
+      const inspected = await o.sharedSkies.inspect(file, {
+        onProgress: (f) => fractions.push(f),
+      });
+      expectEqual(
+        [
+          inspected.preview.senderName,
+          inspected.preview.photoCount,
+          inspected.preview.status,
+          inspected.preview.existing,
+        ],
+        ['Paul', 1, 'new', undefined],
+        'what the package holds',
+      );
+      expectEqual(fractions[fractions.length - 1], 1, 'the transfer ends at 1');
+      expectEqual(await o.sharedSkies.list(), [], 'inspecting writes nothing');
+
+      const opened: number[] = [];
+      const sky = await o.sharedSkies.open(inspected.ticket, { onProgress: (f) => opened.push(f) });
+      expectEqual(
+        [sky.id, sky.senderName, sky.photoCount],
+        [inspected.preview.skyId, 'Paul', 1],
+        'the visit kept',
+      );
+      expectEqual(opened[opened.length - 1], 1, 'the import ends at 1');
+      await expectDomainError(
+        o.sharedSkies.open(inspected.ticket),
+        'notFound',
+        'SHARED_SKY_TICKET_EXPIRED',
+        'a ticket used twice',
+      );
+      expectEqual(await o.sharedSkies.list(), [sky], 'the visit listed');
+
+      const photos = await o.sharedSkies.listPhotos(sky.id);
+      expectEqual(
+        photos.map((p) => [p.originalName, p.notes, p.width, p.height, p.sharedSkyId, p.author]),
+        [['contract.jpg', 'shared', 64, 48, sky.id, 'Paul']],
+        'the photos of the visit',
+      );
+      expectEqual(photos[0].correspondences, CORRESPONDENCES, 'the correspondences of a visit');
+      expectTrue(photos[0].id !== mine.id, 'a visit photo has an id made here');
+      expectTrue((photos[0].fileSize ?? 0) > 0, 'a visit photo has its picture');
+      expectTrue(o.files.url(photos[0].filename).length > 0, 'a visit picture has an address');
+
+      // A visit is not among the visitor's photos, and its photos cannot be changed.
+      expectEqual(await o.photos.listWithSizes(), [], 'the visitor has no photo of their own');
+      await expectDomainError(
+        o.photos.updateMetadata(photos[0].id, { notes: 'changed' }),
+        'notFound',
+        'PHOTO_NOT_FOUND',
+        'changing a visit photo',
+      );
+      await expectDomainError(
+        o.photos.remove(photos[0].id),
+        'notFound',
+        'PHOTO_NOT_FOUND',
+        'deleting a visit photo',
+      );
+      expectEqual(await o.photos.removeAll(), 0, 'deleting every photo deletes no visit photo');
+      expectEqual((await o.sharedSkies.listPhotos(sky.id)).length, 1, 'the visit is still there');
+
+      // The same package again: recognised, and opening it replaces the visit.
+      const again = await o.sharedSkies.inspect(file);
+      expectEqual(
+        [again.preview.status, again.preview.existing?.senderName],
+        ['same', 'Paul'],
+        'the same package, already kept',
+      );
+      await o.sharedSkies.discard(again.ticket);
+      await expectDomainError(
+        o.sharedSkies.open(again.ticket),
+        'notFound',
+        'SHARED_SKY_TICKET_EXPIRED',
+        'a discarded ticket',
+      );
+
+      const kept = await o.sharedSkies.inspect(file);
+      const replaced = await o.sharedSkies.open(kept.ticket);
+      expectEqual(
+        [replaced.id, replaced.senderName, (await o.sharedSkies.list()).length],
+        [sky.id, 'Paul', 1],
+        'opening it again keeps one visit',
+      );
+      const replacedPhotos = await o.sharedSkies.listPhotos(sky.id);
+      expectEqual(replacedPhotos.length, 1, 'the visit has its photo once');
+      expectTrue(replacedPhotos[0].id !== photos[0].id, 'the photos of a visit are replaced');
+
+      expectEqual(await o.sharedSkies.makeMissingMediums(), 0, 'a small picture gets no copy');
+
+      const { bytesFreed } = await o.sharedSkies.remove(sky.id);
+      expectTrue(bytesFreed > 0, 'deleting a visit frees room');
+      expectEqual(await o.sharedSkies.list(), [], 'the visit is deleted');
+      await expectDomainError(
+        o.sharedSkies.listPhotos(sky.id),
+        'notFound',
+        'SHARED_SKY_NOT_FOUND',
+        'the photos of a deleted visit',
+      );
+      await expectDomainError(
+        o.sharedSkies.remove(sky.id),
+        'notFound',
+        'SHARED_SKY_NOT_FOUND',
+        'deleting a visit twice',
+      );
+    } finally {
+      await b.photos.removeAll();
+    }
+  });
+
+  add('shared skies: a file that is not a shared sky is refused', async () => {
+    const { backend: b, fixtures } = await makeBackend();
+    await expectDomainError(
+      b.sharedSkies.inspect({ ...fixtures.text(), name: 'notes.myastrosky' }),
+      'invalid',
+      'NOT_A_SHARED_SKY',
+      'a text file',
+    );
+    await b.photos.upload(fixtures.jpeg(), { correspondences: JSON.stringify(CORRESPONDENCES) });
+    try {
+      await b.backup.exportToUser({ options: { includeImages: true, includeMetadata: true } });
+      const backup = await fixtures.lastExport();
+      if (!backup) fail('the backup was not handed to the user');
+      await expectDomainError(
+        b.sharedSkies.inspect(backup),
+        'invalid',
+        'NOT_A_SHARED_SKY',
+        'a backup',
+      );
+      expectEqual(await b.sharedSkies.list(), [], 'nothing was kept');
+    } finally {
+      await b.photos.removeAll();
+    }
+  });
+
   // ── Errors: one per kind ─────────────────────────────────────────────────
 
   add('errors: invalid, notFound and conflict carry their kind and code', async () => {

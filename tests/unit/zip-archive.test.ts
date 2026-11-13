@@ -1,16 +1,38 @@
 // @vitest-environment node
-/** The in-memory ZIP of the phone and the server's archiver/unzipper read each other's archives. */
+/**
+ * The ZIP writer of the phone (`zip-writer`) and the server's archiver read each other's archives, through the reader
+ * by pieces both use (`zip-ranges`); `fflate` and `unzipper` read what the writer makes too.
+ */
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { createRequire } from 'module';
 import { PassThrough } from 'stream';
 import { unzipSync, zipSync } from 'fflate';
 import { describe, it, expect } from 'vitest';
 import { ZipArchive } from 'archiver';
-import {
-  newZipBundle,
-  openZipBundle,
-  openZipRanges,
-  type RangeSource,
-} from '@myastrosky/backend-local/bundle-fflate';
-import { createZipResponseWriter, openZipBundle as openServerZip } from '../../server/bundle-zip';
+import { openZipRanges, type RangeSource } from '@myastrosky/core/zip-ranges';
+import { crc32, createZipWriter, type ZipWriterOptions } from '@myastrosky/core/zip-writer';
+import { createZipResponseWriter, openZipFile } from '../../server/bundle-zip';
+
+const unzipper = createRequire(import.meta.url)('unzipper') as typeof import('unzipper');
+
+/** The writer over memory: `add` every file, then `finish` for the bytes. */
+function newZipBundle(options?: ZipWriterOptions) {
+  const pieces: Uint8Array[] = [];
+  const zip = createZipWriter({ append: async (piece) => void pieces.push(piece) }, options);
+  return {
+    writer: zip.writer,
+    finish: async () => {
+      await zip.finish();
+      return new Uint8Array(Buffer.concat(pieces));
+    },
+  };
+}
+
+/** The reader by pieces over bytes held in memory. */
+const openZipBundle = (bytes: Uint8Array) =>
+  openZipRanges({ size: bytes.byteLength, read: async (start, end) => bytes.subarray(start, end) });
 
 const text = (s: string) => new TextEncoder().encode(s);
 const FILES: [string, Uint8Array][] = [
@@ -19,7 +41,7 @@ const FILES: [string, Uint8Array][] = [
   ['plans.json', text('[]')],
 ];
 
-describe('bundle-fflate', () => {
+describe('zip archives', () => {
   it('reads an archive written by the server', async () => {
     const output = new PassThrough();
     const chunks: Buffer[] = [];
@@ -43,15 +65,34 @@ describe('bundle-fflate', () => {
   it('writes an archive the server reads', async () => {
     const zip = newZipBundle();
     for (const [name, bytes] of FILES) await zip.writer.add(name, bytes);
-    const reader = await openServerZip(Buffer.from(await zip.finish()));
-    expect((await reader.names()).sort()).toEqual(FILES.map(([name]) => name).sort());
-    for (const [name, bytes] of FILES) {
-      expect(await reader.read(name)).toEqual(bytes);
-      expect(await reader.size(name)).toBe(bytes.length);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'myastrosky-zip-'));
+    const file = path.join(dir, 'bundle.zip');
+    fs.writeFileSync(file, await zip.finish());
+    const reader = await openZipFile(file);
+    try {
+      expect((await reader.names()).sort()).toEqual(FILES.map(([name]) => name).sort());
+      for (const [name, bytes] of FILES) {
+        expect(await reader.read(name)).toEqual(bytes);
+        expect(await reader.size(name)).toBe(bytes.length);
+      }
+      expect(await reader.read('missing')).toBeNull();
+    } finally {
+      await reader.close();
+      fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it('never unpacks more than an entry declares, in either reader', async () => {
+  it('refuses a file on disk that is not an archive, and leaves it closed', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'myastrosky-zip-'));
+    const file = path.join(dir, 'not-a-zip.zip');
+    fs.writeFileSync(file, 'not a zip');
+    await expect(openZipFile(file)).rejects.toThrow(/Invalid backup archive/);
+    // Removing it fails on Windows while a handle is open.
+    fs.rmSync(dir, { recursive: true });
+    expect(fs.existsSync(dir)).toBe(false);
+  });
+
+  it('never unpacks more than an entry declares', async () => {
     // 4 MB of zeros deflate to a few kilobytes; the central directory is edited to declare 1,000 bytes.
     const zip = zipSync({ 'manifest.json': [new Uint8Array(4 * 1024 * 1024), { level: 9 }] });
     const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
@@ -59,17 +100,65 @@ describe('bundle-fflate', () => {
     while (view.getUint32(at, true) !== 0x02014b50) at--;
     view.setUint32(at + 24, 1000, true);
 
-    const server = await openServerZip(Buffer.from(zip));
-    expect(await server.size('manifest.json')).toBe(1000);
-    await expect(server.read('manifest.json')).rejects.toThrow('larger than it declares');
-    const phone = await openZipBundle(zip);
-    expect((await phone.read('manifest.json'))!.length).toBeLessThanOrEqual(1000);
+    const reader = await openZipBundle(zip);
+    expect(await reader.size('manifest.json')).toBe(1000);
+    expect((await reader.read('manifest.json'))!.length).toBeLessThanOrEqual(1000);
   });
 
-  it('refuses an entry name that could leave its folder', async () => {
+  it('refuses an entry name that could leave its folder, and a name added twice', async () => {
     const zip = newZipBundle();
     await expect(zip.writer.add('images/../secret', text('x'))).rejects.toThrow(/Invalid/);
     await expect(zip.writer.add('/etc/passwd', text('x'))).rejects.toThrow(/Invalid/);
+    await zip.writer.add('plans.json', text('[]'));
+    await expect(zip.writer.add('plans.json', text('[]'))).rejects.toThrow(/twice/);
+  });
+
+  it('computes the CRC-32 the format asks for', () => {
+    expect(crc32(text('123456789'))).toBe(0xcbf43926);
+    expect(crc32(new Uint8Array(0))).toBe(0);
+  });
+
+  it('sends each file out as it is added, keeping only the directory for the end', async () => {
+    const sizes: number[] = [];
+    const zip = createZipWriter({ append: async (piece) => void sizes.push(piece.length) });
+    await zip.writer.add('images/a.jpg', new Uint8Array(5000));
+    // The entry's header, then its bytes: already out before the next file or the end.
+    expect(sizes).toEqual([30 + 'images/a.jpg'.length, 5000]);
+    await zip.finish();
+    expect(sizes).toHaveLength(3);
+  });
+
+  it('writes the zip64 records past the 4 GB mark, which both readers and unzipper follow', async () => {
+    // The mark is lowered: every entry but the first is "far", and the directory is "past the mark".
+    const zip = newZipBundle({ zip64Above: { offset: 1 } });
+    for (const [name, bytes] of FILES) await zip.writer.add(name, bytes);
+    const archive = await zip.finish();
+
+    const reader = await openZipBundle(archive);
+    expect(await reader.names()).toEqual(FILES.map(([name]) => name));
+    for (const [name, bytes] of FILES) expect(await reader.read(name)).toEqual(bytes);
+
+    const dir = await unzipper.Open.buffer(Buffer.from(archive));
+    expect(dir.files.map((f) => f.path)).toEqual(FILES.map(([name]) => name));
+    for (const [i, [, bytes]] of FILES.entries()) {
+      expect(new Uint8Array(await dir.files[i].buffer())).toEqual(bytes);
+    }
+  });
+
+  it('writes the zip64 records past 65,535 files', async () => {
+    const zip = newZipBundle({ zip64Above: { count: 2 } });
+    for (const [name, bytes] of FILES) await zip.writer.add(name, bytes);
+    const archive = await zip.finish();
+    expect(await (await openZipBundle(archive)).names()).toEqual(FILES.map(([name]) => name));
+    expect((await unzipper.Open.buffer(Buffer.from(archive))).files).toHaveLength(FILES.length);
+  });
+
+  it('writes an archive unzipper reads', async () => {
+    const dir = await unzipper.Open.buffer(Buffer.from(await openableArchive()));
+    expect(dir.files.map((f) => f.path)).toEqual(FILES.map(([name]) => name));
+    for (const [i, [, bytes]] of FILES.entries()) {
+      expect(new Uint8Array(await dir.files[i].buffer())).toEqual(bytes);
+    }
   });
 
   it('writes an empty archive that reads back empty', async () => {

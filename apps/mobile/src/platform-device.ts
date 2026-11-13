@@ -71,6 +71,15 @@ export const BACKUP_FILE_TYPES: FileTypes = {
   extensions: ['.zip', '.json'],
 };
 
+/**
+ * A shared sky: a `.myastrosky` file, or a ZIP a messaging app renamed (the content decides). The extension has no
+ * MIME type, so the phone's picker offers every file.
+ */
+export const SHARED_SKY_FILE_TYPES: FileTypes = {
+  mimeTypes: [],
+  extensions: ['.myastrosky', '.zip'],
+};
+
 /** A horizon file: CSV or the planetarium's polygonal text. */
 export const HORIZON_FILE_TYPES: FileTypes = {
   mimeTypes: ['text/csv', 'text/plain', 'text/comma-separated-values', 'application/octet-stream'],

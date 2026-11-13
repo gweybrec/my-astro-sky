@@ -38,6 +38,10 @@
           <input type="checkbox" class="checkbox-danger" v-model="deleteSetups" />
           {{ t('settings.deleteGearSetups') }}
         </label>
+        <label v-if="sharedSkies.skies.length > 0" class="export-checkbox-row">
+          <input type="checkbox" class="checkbox-danger" v-model="deleteVisits" />
+          {{ t('settings.deleteSharedSkies') }}
+        </label>
 
         <div class="modal-divider"></div>
 
@@ -93,6 +97,7 @@ import { ref, computed, reactive } from 'vue';
 import { t } from '../../i18n';
 import { usePhotosStore } from '../../stores/photos';
 import { useCanvasStore } from '../../stores/canvas';
+import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
 import {
   exportData,
   deleteBulkPhotos,
@@ -112,6 +117,7 @@ const emit = defineEmits<{ close: [] }>();
 
 const photosStore = usePhotosStore();
 const canvasStore = useCanvasStore();
+const sharedSkies = useSharedSkiesStore();
 
 const photos = computed(() => photosStore.placedPhotos.map((p) => p.photo));
 
@@ -119,6 +125,8 @@ const deleteMeta = ref(false);
 const deleteDso = ref(false);
 const deleteGear = ref(false);
 const deleteSetups = ref(false);
+/** The skies other people shared, kept as visits: never deleted unless ticked. */
+const deleteVisits = ref(false);
 const busy = ref(false);
 const backingUp = ref(false);
 
@@ -135,6 +143,7 @@ const canDelete = computed(
     deleteDso.value ||
     deleteGear.value ||
     deleteSetups.value ||
+    deleteVisits.value ||
     somePhotoChecked.value,
 );
 
@@ -177,6 +186,7 @@ function onDelete() {
       dsoOverrides: deleteDso.value,
       customGear: deleteGear.value,
       gearSetups: deleteSetups.value,
+      sharedSkies: deleteVisits.value ? sharedSkies.skies.length : 0,
       photoIds: selectedPhotoIds,
       totalPhotos: photos.value.length,
     },
@@ -208,6 +218,9 @@ async function onConfirmed() {
     }
     if (deleteSetups.value) {
       await deleteAllGearSetupsAPI();
+    }
+    if (deleteVisits.value) {
+      for (const sky of [...sharedSkies.skies]) await sharedSkies.remove(sky.id);
     }
     emit('close');
     showToast({ message: t('settings.deleteSuccess'), type: 'info' });

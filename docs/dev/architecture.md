@@ -77,25 +77,26 @@ Express 5 server with multiple modules:
 
 - **`index.ts`**: The entry point. Loads `dotenv`, calls `createApp()` and listens on `PORT` (default 3002). Port 3001 is reserved for the installed desktop app: the server refuses it unless it runs in Electron or with `NODE_ENV=production` (Docker), and fails to start instead of carrying on when its port is taken. It holds no route.
 - **`app.ts`**: Builds the Express app: helmet/CSP, compression, JSON body parsing, static serving of `dist/` and `/uploads`, the `/api` rate limiter, the mount block of the domain routers, then (inside the async `createApp()`) the dev-only Swagger UI, the SPA fallback and the global error handler. It does not listen.
-- **`server-paths.ts`**: Exports `SERVER_DIR`, `UPLOADS_DIR`, `RESOURCES_DIR`, `DIST_DIR` and `SWAGGER_JSON_PATH` (`UPLOADS_DIR`, `RESOURCES_DIR` and `DIST_DIR` are overridable by env var).
+- **`server-paths.ts`**: Exports `SERVER_DIR`, `UPLOADS_DIR`, `INCOMING_DIR`, `RESOURCES_DIR`, `DIST_DIR` and `SWAGGER_JSON_PATH` (`UPLOADS_DIR`, `INCOMING_DIR`, `RESOURCES_DIR` and `DIST_DIR` are overridable by env var).
 - **`routes/`**: One Express router per domain, each exported as `<name>Router` and mounted without a prefix in `app.ts`. The `@swagger` comment of each route sits next to it.
 
-  | File                | Router                | Serves                                                                                                                        |
-  | ------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-  | `stars.ts`          | `starsRouter`         | `/api/stars/search`, `/api/stars/nearby`, `/api/stars/:hip` (server star catalog)                                             |
-  | `identify.ts`       | `identifyRouter`      | `/api/skybot/conesearch`, `/api/tns/conesearch`, `/api/comets/elements` (object identification)                               |
-  | `horizon.ts`        | `horizonRouter`       | `/api/horizon` (horizon profile lookup)                                                                                       |
-  | `settings.ts`       | `settingsRouter`      | `/api/version/latest`, `/api/config`, `/api/settings`, the `/api/settings/probe-*` solver/dir checks                          |
-  | `gear.ts`           | `gearRouter`          | telescopes, cameras, accessories, filters, custom gear and gear setups                                                        |
-  | `dso-overrides.ts`  | `dsoOverridesRouter`  | `/api/dso-overrides` CRUD                                                                                                     |
-  | `poi-categories.ts` | `poiCategoriesRouter` | `/api/poi-categories` CRUD                                                                                                    |
-  | `sky-regions.ts`    | `skyRegionsRouter`    | `/api/sky-regions` CRUD                                                                                                       |
-  | `plans.ts`          | `plansRouter`         | `/api/plans` and their entries and mosaics                                                                                    |
-  | `photos.ts`         | `photosRouter`        | `/api/photos` upload, list, order, delete, manual placement and metadata; `DELETE /api/photo-metadata`                        |
-  | `solved-import.ts`  | `solvedImportRouter`  | `POST /api/solve-wcs` (WCS from FITS/TIFF headers) and `POST /api/photos/convert` (TIFF/FITS to PNG)                          |
-  | `local-solve.ts`    | `localSolveRouter`    | `/api/solve-astap` and `/api/solve-field` (local solvers: submit, poll, cancel)                                               |
-  | `nova-solve.ts`     | `novaSolveRouter`     | `/api/solve-plate`, `/api/solve-plate/resume`, `/api/astrometry/submissions`, `/api/astrometry/reuse` (astrometry.net online) |
-  | `backup.ts`         | `backupRouter`        | `POST /api/export`, `POST /api/import/preview`, `POST /api/import`                                                            |
+  | File                | Router                | Serves                                                                                                                                      |
+  | ------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `stars.ts`          | `starsRouter`         | `/api/stars/search`, `/api/stars/nearby`, `/api/stars/:hip` (server star catalog)                                                           |
+  | `identify.ts`       | `identifyRouter`      | `/api/skybot/conesearch`, `/api/tns/conesearch`, `/api/comets/elements` (object identification)                                             |
+  | `horizon.ts`        | `horizonRouter`       | `/api/horizon` (horizon profile lookup)                                                                                                     |
+  | `settings.ts`       | `settingsRouter`      | `/api/version/latest`, `/api/config`, `/api/settings`, the `/api/settings/probe-*` solver/dir checks                                        |
+  | `gear.ts`           | `gearRouter`          | telescopes, cameras, accessories, filters, custom gear and gear setups                                                                      |
+  | `dso-overrides.ts`  | `dsoOverridesRouter`  | `/api/dso-overrides` CRUD                                                                                                                   |
+  | `poi-categories.ts` | `poiCategoriesRouter` | `/api/poi-categories` CRUD                                                                                                                  |
+  | `sky-regions.ts`    | `skyRegionsRouter`    | `/api/sky-regions` CRUD                                                                                                                     |
+  | `plans.ts`          | `plansRouter`         | `/api/plans` and their entries and mosaics                                                                                                  |
+  | `photos.ts`         | `photosRouter`        | `/api/photos` upload, list, order, delete, manual placement and metadata; `DELETE /api/photo-metadata`                                      |
+  | `solved-import.ts`  | `solvedImportRouter`  | `POST /api/solve-wcs` (WCS from FITS/TIFF headers) and `POST /api/photos/convert` (TIFF/FITS to PNG)                                        |
+  | `local-solve.ts`    | `localSolveRouter`    | `/api/solve-astap` and `/api/solve-field` (local solvers: submit, poll, cancel)                                                             |
+  | `nova-solve.ts`     | `novaSolveRouter`     | `/api/solve-plate`, `/api/solve-plate/resume`, `/api/astrometry/submissions`, `/api/astrometry/reuse` (astrometry.net online)               |
+  | `backup.ts`         | `backupRouter`        | `POST /api/export`, `POST /api/import/preview`, `POST /api/import`                                                                          |
+  | `shared-skies.ts`   | `sharedSkiesRouter`   | `/api/shared-skies/…`: preparing and downloading a share, inspecting and opening a package, the visits (see [shared-sky.md](shared-sky.md)) |
 
   `routes/shared.ts` holds what several routers share (allowed file extensions, `sanitizeIntegrationRows`, `isElectron`, the in-memory rate limiter and its limits, the multer setup).
 
@@ -203,9 +204,15 @@ The Electron entry point (`electron/main.ts`) runs as follows:
 class rather than a callable factory: `server/routes/backup.ts` does
 `import { ZipArchive } from 'archiver'` and `new ZipArchive({ zlib: { level: 1 } })`.
 
-`unzipper` (used for import) is still CommonJS-only, so it can't be `import`ed directly
-under `"type": "module"`. It's loaded via `createRequire(import.meta.url)` instead — this
-is a permanent interop shim for `unzipper`, not a leftover from an older archiver API.
+Pictures (`images/…`) are stored in the archive without compression; the JSON files are deflated.
+
+An uploaded archive is never held in memory: multer writes it to a file in `INCOMING_DIR`
+(`<uploads>/.incoming` by default), `openZipFile` in `server/bundle-zip.ts` reads it by pieces through
+`openZipRanges` (`@myastrosky/core/zip-ranges`, the reader the phone uses too), and the route removes
+the file once it has answered. The folder is emptied at start-up.
+
+`unzipper` is only used by the tests, to check the archives the server writes with a second reader.
+It is CommonJS-only, so they load it via `createRequire(import.meta.url)`.
 
 ## Performance Architecture
 

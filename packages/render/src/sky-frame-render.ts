@@ -36,7 +36,13 @@ import {
   drawResizeDraftRect,
   drawElasticSnapLine,
 } from './frame-draw';
-import { FRAME, PHOTO_OUTLINE, SELECTION_RING, TRAJECTORY } from '@myastrosky/core/canvas-theme';
+import {
+  FRAME,
+  PHOTO_OUTLINE,
+  SELECTION_RING,
+  TRAJECTORY,
+  VISIT_OUTLINE,
+} from '@myastrosky/core/canvas-theme';
 import { getDSOById } from '@myastrosky/core/catalog/dso-registry';
 import { getStarByHip } from '@myastrosky/core/catalog/star-registry';
 import { computeStarPaint } from '@myastrosky/core/star-render-math';
@@ -359,15 +365,16 @@ export function renderPhotoOutlines(s: SkyScene): void {
   for (const outline of s.photoOutlines) {
     const { corners, name, edge } = outline;
     if (corners.length < 4) continue;
+    const colors = outline.visit ? VISIT_OUTLINE : PHOTO_OUTLINE;
 
     ctx.save();
-    ctx.strokeStyle = PHOTO_OUTLINE.stroke;
+    ctx.strokeStyle = colors.stroke;
     ctx.lineWidth = PHOTO_OUTLINE.lineWidth;
     ctx.setLineDash(PHOTO_OUTLINE.dash);
     drawFramePolyline(ctx, edge ?? corners);
 
     // Label along the longest edge, always readable (not upside-down)
-    drawEdgeLabel(ctx, corners, name, PHOTO_OUTLINE.label);
+    drawEdgeLabel(ctx, corners, name, colors.label);
     ctx.restore();
   }
 }

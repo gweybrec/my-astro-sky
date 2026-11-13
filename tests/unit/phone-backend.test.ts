@@ -79,6 +79,17 @@ describe('createPhoneBackend', () => {
     expect(fake.files.has('uploads/kept.jpg')).toBe(true);
   });
 
+  it('an export that fails while it is written leaves no file and shares nothing', async () => {
+    const { platform, fake, shared } = await makePhonePlatform();
+    const backend = await createPhoneBackend(platform);
+    fake.failOnWrite = 1;
+    await expect(
+      backend.backup.exportToUser({ options: { includeSetups: true } }),
+    ).rejects.toMatchObject({ code: 'INTERNAL_ERROR' });
+    expect([...fake.files.keys()].filter((path) => path.startsWith('exports/'))).toEqual([]);
+    expect(shared).toEqual([]);
+  });
+
   it('closing the share sheet without a choice is not a failure; another share error is', async () => {
     const { platform } = await makePhonePlatform();
     let rejection = new Error(SHARE_CANCELED);

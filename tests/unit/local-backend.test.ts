@@ -31,10 +31,7 @@ function backendOf(members: Record<string, unknown>, maxPhotoBytes?: number) {
     files: { url: (fileName) => `/uploads/${fileName}` },
     starCatalogUrl: '/data/stars-deep.json',
     openZip: () => Promise.reject(new Error('unused')),
-    newZip: () => {
-      throw new Error('unused');
-    },
-    saveFile: async () => undefined,
+    saveArchive: async () => undefined,
     now: () => new Date(),
   });
 }

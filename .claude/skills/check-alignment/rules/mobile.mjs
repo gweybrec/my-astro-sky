@@ -148,6 +148,31 @@ async function uploadPhoto(base, fileName = 'Cygnus_wide_2025-08-23.jpg', frame 
   return res.json();
 }
 
+// A visited sky (the seed's own photos, shared under another name and opened again): the display sheets of the map
+// and the gallery then start with their "Ciels affichés" section. Returns the visit's id and its first photo's.
+async function visitSharedSky(base, senderName) {
+  const { token } = await api(base, 'POST', '/api/shared-skies/export', { senderName });
+  const pkg = await fetch(`${base}/api/shared-skies/export/${token}`);
+  if (!pkg.ok) throw new Error(`GET /api/shared-skies/export answered ${pkg.status}`);
+  const form = new FormData();
+  form.append('bundle', new Blob([await pkg.arrayBuffer()]), 'sky.myastrosky');
+  const inspected = await fetch(`${base}/api/shared-skies/inspect`, { method: 'POST', body: form });
+  if (!inspected.ok) throw new Error(`POST /api/shared-skies/inspect answered ${inspected.status}`);
+  const { ticket } = await inspected.json();
+  await api(base, 'POST', `/api/shared-skies/open/${ticket}`);
+  for (let i = 0; i < 300; i++) {
+    const status = await api(base, 'GET', `/api/shared-skies/open/${ticket}`);
+    if (status.state === 'done') {
+      const photos = await api(base, 'GET', `/api/shared-skies/${status.sky.id}/photos`);
+      return { sky: status.sky.id, photo: photos[0].id };
+    }
+    if (status.state === 'failed' || status.state === 'cancelled')
+      throw new Error(`opening the shared sky ${status.state}: ${status.error?.message ?? ''}`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error('opening the shared sky took more than 30 s');
+}
+
 const api = async (base, method, route, body) => {
   const res = await fetch(`${base}${route}`, {
     method,
@@ -293,12 +318,16 @@ export async function seed({ ports }) {
     ],
   });
 
+  const visit = await visitSharedSky(base, 'Marie Dupont');
+
   const prefs = { setupId: setup1.id, lastDateISO: null, lat, lon };
   return {
     ids: {
       setup: setup1.id,
       photo: photoId,
       cometPhoto: cometPhotoId,
+      visitSky: visit.sky,
+      visitPhoto: visit.photo,
       plan: summer.id,
       entry: summer.entries.NGC7000,
       longEntry: summer.entries['SH2-308'],
@@ -689,6 +718,22 @@ export const views = [
     open: [{ click: '.mob-map-top ion-button:nth-of-type(1)' }, { wait: '.mob-sheet' }],
     ...SHEET,
   },
+  // The skies shown, ticked in a list opened from the display sheet's first field (board "Ciel, choix des ciels
+  // affichés").
+  {
+    name: 'sky-skies-shown',
+    path: '/tabs/sky',
+    ready: '.mob-map-top',
+    open: [
+      { click: '.mob-map-top ion-button:nth-of-type(1)' },
+      { wait: '.mob-sheet' },
+      { pause: 400 },
+      { click: `${OPEN_SHEET} [aria-label^="Ciels"]` },
+      { wait: 'ion-modal.show-modal:has(.mob-sheet-title:text-is("Ciels affichés"))' },
+      { pause: 600 },
+    ],
+    scope: '.mob-sheet:has(ion-checkbox.mob-check-row)',
+  },
   {
     name: 'sky-first-start',
     path: '/tabs/sky',
@@ -1054,6 +1099,22 @@ export const views = [
     ],
     scope: OPEN_SHEET,
   },
+  // A visited sky's photo, its sky ticked: its information starts with its author, on a line of its own (board
+  // "Photo d'un ciel visité").
+  {
+    name: 'photo-info-visit',
+    path: (ids) => `/gallery/photo/${ids.visitPhoto}`,
+    ready: '.mob-photo-view',
+    storage: (ids) => ({ sharedSkyView: JSON.stringify({ shown: ['mine', ids.visitSky] }) }),
+    open: [
+      { click: '.mob-topbar--overlay ion-button.mob-icon-btn:last-of-type' },
+      { wait: '.mob-photo-buttons ion-button' },
+      { click: '.mob-photo-buttons ion-button:last-of-type' },
+      { wait: '.mob-sheet .mob-fact--line' },
+      { pause: 600 },
+    ],
+    ...SHEET,
+  },
   { name: 'poi-types', path: '/gallery/poi-types', ready: '.mob-type-row' },
   { name: 'plans', path: '/tabs/plans', ready: 'ion-item.mob-row' },
   { name: 'plan', path: (ids) => `/plans/${ids.plan}`, ready: '.mob-list .mob-row' },
@@ -1108,6 +1169,7 @@ export const views = [
   },
   { name: 'backup', path: '/settings/backup', ready: 'ion-checkbox.mob-row' },
   { name: 'delete-data', path: '/settings/delete', ready: 'ion-checkbox.mob-row' },
+  { name: 'shared-skies', path: '/settings/shared-skies', ready: '.mob-list .mob-row' },
   {
     name: 'delete-data-photos',
     path: '/settings/delete',

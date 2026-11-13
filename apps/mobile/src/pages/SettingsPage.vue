@@ -70,6 +70,10 @@ const sections: { title: string; rows: RowDef[] }[] = [
     ],
   },
   {
+    title: 'sharedSky.title',
+    rows: [{ title: 'sharedSky.title', to: '/settings/shared-skies' }],
+  },
+  {
     title: 'mobile.settings.computerSection',
     rows: [{ title: 'mobile.settings.exportImport', to: '/settings/backup' }],
   },

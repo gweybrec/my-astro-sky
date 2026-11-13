@@ -1,3 +1,4 @@
+import fsp from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import { createServices } from '@myastrosky/core/services/create-services';
 import type { SqlDb } from '@myastrosky/core/ports/sql-db';
@@ -26,5 +27,10 @@ export function createServerServices(db: SqlDb) {
     http: createFetchHttpClient(),
     now: () => Date.now(),
     log: logServerError,
+    // The room left on the disk of the photo folder, for a user who is not root.
+    freeBytes: async () => {
+      const stats = await fsp.statfs(UPLOADS_DIR);
+      return stats.bavail * stats.bsize;
+    },
   });
 }

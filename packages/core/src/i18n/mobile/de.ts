@@ -264,6 +264,10 @@ const de: Translations['mobile'] = {
     overlapLess: 'Weniger Überlappung',
     overlapMore: 'Mehr Überlappung',
   },
+  sharedSky: {
+    openTitle: 'Geteilten Himmel öffnen',
+    deleteSky: '{name} löschen',
+  },
   backup: {
     exportSection: 'Exportieren',
     importSection: 'Importieren',

@@ -27,6 +27,7 @@ import { drawPhotoOverlay } from '@myastrosky/render/photo-dso-overlay-render';
 import { createImageZoomPan } from './image-zoom';
 import { setPictureTurn, turnedPictureFrame } from './photo-turn';
 import { showToast } from './toast';
+import { buildVisitPhotoInfo } from './visit-photo-info';
 import { buildPoiFilterGroups, resolveCategory, type PoiFilterGroup } from '@myastrosky/core/poi';
 import { poiPinsInImage, type PhotoPoiPin } from '@myastrosky/render/poi-pins';
 import { poiTypeIcon } from './poi-icons';
@@ -62,7 +63,15 @@ export class Gallery {
   private container: HTMLElement;
   private hero: HTMLElement;
   private grid: HTMLElement;
+  /** The photos shown: the user's own (when their sky is ticked) and those of the visited skies ticked. */
   private photos: Photo[] = [];
+  private ownPhotos: Photo[] = [];
+  /** The visited skies shown: their photos are read-only and resolve their points of interest with their categories. */
+  private visit: {
+    photos: Photo[];
+    ownShown: boolean;
+    poiCategories: PoiCategory[];
+  } = { photos: [], ownShown: true, poiCategories: [] };
   private filteredPhotos: Photo[] = [];
   /** Closes the open detail view (asking about unsaved edits) — resolves false if kept.
    * Only one detail view may exist: each owns a metadata editor, keydown handler and
@@ -109,10 +118,33 @@ export class Gallery {
     });
   }
 
+  /** The user's own photos. */
   loadPhotos(photos: Photo[]) {
-    this.photos = smartSortPhotos(photos);
+    this.ownPhotos = photos;
+    this.refreshPhotos();
+  }
+
+  /**
+   * The visited skies shown (`photos` empty: none): their photos join the user's own, or replace them when the
+   * user's sky is not ticked (`ownShown` false). `poiCategories` are the senders'.
+   */
+  setVisit(visit: { photos: Photo[]; ownShown: boolean; poiCategories: PoiCategory[] }) {
+    this.visit = visit;
+    this.refreshPhotos();
+  }
+
+  private refreshPhotos() {
+    this.photos = smartSortPhotos([
+      ...(this.visit.ownShown ? this.ownPhotos : []),
+      ...this.visit.photos,
+    ]);
     this.renderCarousel();
     this.applyFilters();
+  }
+
+  /** The categories a photo's points of interest belong to: the sender's for a visited photo. */
+  private poiCategoriesOf(photo: Photo): PoiCategory[] {
+    return photo.sharedSkyId ? this.visit.poiCategories : this.poiCategories;
   }
 
   /** The order of the grid (the hero carousel stays shuffled). */
@@ -247,6 +279,7 @@ export class Gallery {
     labels: string[],
     pois: import('@myastrosky/core/types').PointOfInterest[] = [],
     setupName?: string,
+    poiCategories: PoiCategory[] = this.poiCategories,
   ): HTMLElement {
     const wrap = document.createElement('div');
     wrap.className = 'gallery-item-chips';
@@ -258,7 +291,7 @@ export class Gallery {
       wrap.appendChild(chip);
     }
     for (const poi of pois) {
-      const cat = this.poiCategories.find((c) => c.id === poi.categoryId);
+      const cat = poiCategories.find((c) => c.id === poi.categoryId);
       const icon = poiTypeIcon(poi.categoryId);
       const chip = document.createElement('span');
       chip.className = icon ? 'tag-chip poi-chip poi-chip--icon' : 'tag-chip poi-chip';
@@ -361,7 +394,10 @@ export class Gallery {
       nameEl.textContent = photo.originalName;
       caption.appendChild(nameEl);
 
-      const setupName = this.resolveSetupName(photo.gearSetupId);
+      // A visited photo's setup is the name the sender gave it.
+      const setupName = photo.sharedSkyId
+        ? photo.sharedGear?.setup
+        : this.resolveSetupName(photo.gearSetupId);
       if (
         setupName ||
         photo.dsoIds.length > 0 ||
@@ -369,7 +405,13 @@ export class Gallery {
         (photo.pointsOfInterest?.length ?? 0) > 0
       ) {
         caption.appendChild(
-          this.buildChips(photo.dsoIds, photo.labels, photo.pointsOfInterest ?? [], setupName),
+          this.buildChips(
+            photo.dsoIds,
+            photo.labels,
+            photo.pointsOfInterest ?? [],
+            setupName,
+            this.poiCategoriesOf(photo),
+          ),
         );
       }
 
@@ -739,7 +781,7 @@ export class Gallery {
     let poiPins: PhotoPoiPin[] = [];
     const poiState = { show: false };
     // Arrow-captured: redrawDsoOverlay below is a plain function (no `this`).
-    const getPoiCategories = () => this.poiCategories;
+    const getPoiCategories = () => this.poiCategoriesOf(photo);
     const recomputePoiPins = (pois: PointOfInterest[]) => {
       const model = photoSkyModel(shown);
       poiPins = model ? poiPinsInImage(pois, model, shown.width, shown.height) : [];
@@ -858,7 +900,9 @@ export class Gallery {
     btnRow.appendChild(showDsosBtn);
     btnRow.appendChild(showPoisBtn);
     btnRow.appendChild(showOnMapBtn);
-    btnRow.appendChild(rotateBtn);
+    // A visited photo is someone else's: it is looked at, never changed.
+    const visited = !!photo.sharedSkyId;
+    if (!visited) btnRow.appendChild(rotateBtn);
 
     const dsoFilterEl = document.createElement('div');
     dsoFilterApp = createApp({
@@ -886,31 +930,51 @@ export class Gallery {
 
     const formContainer = document.createElement('div');
     formContainer.className = 'gallery-detail-form';
-    const metaPanel = buildMetadataEditorPanel(
-      formContainer,
-      photo,
-      (updated) => {
-        const idx = this.photos.findIndex((p) => p.id === updated.id);
-        if (idx !== -1) this.photos[idx] = updated;
-        onPoisChanged(updated.pointsOfInterest ?? []);
-        this.renderCarousel();
-        this.applyFilters();
-        this.onPhotoMetadataUpdated?.(updated);
-      },
-      rawClose,
-      [...new Set(this.photos.flatMap((p) => p.labels))],
-      [
-        ...new Set(
-          this.photos.flatMap((p) => (p.integrations ?? []).map((r) => r.filter)).filter(Boolean),
-        ),
-      ],
-      // Pins follow the editor's unsaved POI list, so a POI added from an
-      // identification modal (or a POI removed) shows on the photo immediately.
-      onPoisChanged,
-    );
-    metaPanelTeardown = metaPanel.teardown;
-    metaPanelIsDirty = metaPanel.isDirty;
-    meta.appendChild(formContainer);
+    if (visited) {
+      formContainer.appendChild(
+        buildVisitPhotoInfo(photo, {
+          chips: this.buildChips(
+            photo.dsoIds,
+            photo.labels,
+            photo.pointsOfInterest ?? [],
+            undefined,
+            this.poiCategoriesOf(photo),
+          ),
+        }),
+      );
+      meta.appendChild(formContainer);
+    }
+    const metaPanel = visited
+      ? null
+      : buildMetadataEditorPanel(
+          formContainer,
+          photo,
+          (updated) => {
+            const idx = this.photos.findIndex((p) => p.id === updated.id);
+            if (idx !== -1) this.photos[idx] = updated;
+            onPoisChanged(updated.pointsOfInterest ?? []);
+            this.renderCarousel();
+            this.applyFilters();
+            this.onPhotoMetadataUpdated?.(updated);
+          },
+          rawClose,
+          [...new Set(this.photos.flatMap((p) => p.labels))],
+          [
+            ...new Set(
+              this.photos
+                .flatMap((p) => (p.integrations ?? []).map((r) => r.filter))
+                .filter(Boolean),
+            ),
+          ],
+          // Pins follow the editor's unsaved POI list, so a POI added from an
+          // identification modal (or a POI removed) shows on the photo immediately.
+          onPoisChanged,
+        );
+    if (metaPanel) {
+      metaPanelTeardown = metaPanel.teardown;
+      metaPanelIsDirty = metaPanel.isDirty;
+      meta.appendChild(formContainer);
+    }
 
     // Action row: save + delete
     const actionRow = document.createElement('div');
@@ -947,7 +1011,7 @@ export class Gallery {
       actionRow.insertBefore(wcsLoadRow, actionRow.firstChild);
     }
 
-    meta.appendChild(actionRow);
+    if (!visited) meta.appendChild(actionRow);
 
     // ── Zoom / pan ────────────────────────────────────────────────────────────
     zoom = createImageZoomPan(img, imgWrap, {

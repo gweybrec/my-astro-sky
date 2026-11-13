@@ -371,6 +371,21 @@ describe('the Réglages page', () => {
     expect(router.currentRoute.value.path).toBe('/settings/privacy');
   });
 
+  it('has its own "Ciels partagés" section, before "Ordinateur et données", whose row opens the shared skies', async () => {
+    const { global, router } = app();
+    const w = mount(SettingsPage, { global });
+    await flushPromises();
+    const headers = w.findAll('.mob-section-header').map((h) => h.text());
+    expect(headers.indexOf('Ciels partagés')).toBe(headers.indexOf('Ordinateur et données') - 1);
+    const crumbs = w.findAll('.mob-section-header, .mob-row').map((e) => e.text());
+    const at = crumbs.indexOf('Ciels partagés');
+    expect(crumbs[at + 1]).toBe('Ciels partagés');
+    const row = w.findAll('.mob-row').find((r) => r.text() === 'Ciels partagés')!;
+    await row.trigger('click');
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/settings/shared-skies');
+  });
+
   it('ends with the danger zone, whose red row opens the delete data page', async () => {
     const { global, router } = app();
     const w = mount(SettingsPage, { global });
@@ -1208,13 +1223,15 @@ describe('the privacy page', () => {
       'Solveur astrometry.net',
       "Calcul de l'horizon",
       'Identification des astéroïdes, comètes et supernovae',
+      'Ciels partagés',
     ]);
     const texts = w.findAll('.mob-text').map((p) => p.text());
-    expect(texts).toHaveLength(4);
+    expect(texts).toHaveLength(5);
     expect(texts[0]).toContain('stockées localement sur votre appareil');
     expect(texts[1]).toContain('nova.astrometry.net');
     expect(texts[2]).toContain('seule fonction qui envoie votre position');
     expect(texts[3]).toContain('IMCCE SkyBoT');
+    expect(texts[4]).toContain('Les coordonnées GPS enregistrées dans les images en sont retirées');
   });
 
   it('leaves out the IP geolocation block: the phone takes its position from the device', async () => {

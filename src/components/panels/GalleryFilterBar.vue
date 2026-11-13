@@ -1,5 +1,8 @@
 <template>
   <div v-show="viewMode === 'gallery'" class="gallery-filter-bar">
+    <!-- Which skies the gallery shows (once a sky has been visited) -->
+    <SkyViewSelect />
+
     <!-- Search input -->
     <div class="gallery-filter-search-wrap">
       <input
@@ -321,6 +324,7 @@ import { useI18n } from '../../composables/useI18n';
 import { DSO_TYPES_ALL } from '@myastrosky/core/display-settings';
 import { DSO_CATALOGS_ALL } from '../../dso-catalog';
 import DropdownPanel from '../base/DropdownPanel.vue';
+import SkyViewSelect from './SkyViewSelect.vue';
 import PoiFilterDropdown from './PoiFilterDropdown.vue';
 import BatchPhotoEditModal from '../modals/BatchPhotoEditModal.vue';
 import type { BatchEditMode } from '@myastrosky/core/batch-photo-edit';

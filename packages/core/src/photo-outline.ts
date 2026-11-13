@@ -11,6 +11,8 @@ export interface PhotoOutline {
   corners: Point[];
   /** The photo's edges as drawn, through more points than its corners (a wide field's edges bow); drawn when given. */
   edge?: Point[];
+  /** The photo is of a visited sky, not the user's own: drawn in another colour. */
+  visit?: boolean;
 }
 
 /** Returns true if (px, py) is inside the convex polygon defined by pts (winding order irrelevant). */

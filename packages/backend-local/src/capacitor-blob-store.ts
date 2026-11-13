@@ -103,6 +103,44 @@ export async function writeFileInPieces(
   }
 }
 
+/**
+ * A file written as its bytes arrive: they are gathered into pieces of `pieceBytes`, the first of which creates (or
+ * replaces) the file and the next ones are appended. `close` writes what is left; a file given no byte is created empty.
+ */
+export function createFileSink(
+  filesystem: Pick<CapacitorFilesystem, 'writeFile' | 'appendFile'>,
+  directory: string,
+  path: string,
+  pieceBytes: number = BLOB_PIECE_BYTES,
+): { append(bytes: Uint8Array): Promise<void>; close(): Promise<void> } {
+  let piece = new Uint8Array(pieceBytes);
+  let filled = 0;
+  let created = false;
+  const flush = async (): Promise<void> => {
+    const data = toBase64(piece.subarray(0, filled));
+    if (created) await filesystem.appendFile({ path, data, directory });
+    else await filesystem.writeFile({ path, data, directory });
+    created = true;
+    filled = 0;
+  };
+  return {
+    async append(bytes) {
+      let at = 0;
+      while (at < bytes.length) {
+        const taken = Math.min(pieceBytes - filled, bytes.length - at);
+        piece.set(bytes.subarray(at, at + taken), filled);
+        filled += taken;
+        at += taken;
+        if (filled === pieceBytes) await flush();
+      }
+    },
+    async close() {
+      if (filled > 0 || !created) await flush();
+      piece = new Uint8Array(0);
+    },
+  };
+}
+
 export function createCapacitorBlobStore(options: CapacitorBlobStoreOptions): CapacitorBlobStore {
   const { filesystem, convertFileSrc, directory, folder } = options;
   const pieceBytes = options.pieceBytes ?? BLOB_PIECE_BYTES;

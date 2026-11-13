@@ -39,30 +39,7 @@
 
         <div class="modal-divider"></div>
 
-        <div v-if="photos.length > 0" class="export-photo-section">
-          <label class="export-select-all-row">
-            <input
-              type="checkbox"
-              :checked="allChecked"
-              :indeterminate.prop="someChecked && !allChecked"
-              @change="toggleAll"
-            />
-            <span class="export-select-all-label">{{ t('settings.exportSelectAll') }}</span>
-          </label>
-          <div class="export-scroll-list">
-            <label v-for="photo in photos" :key="photo.id" class="export-photo-row">
-              <input
-                type="checkbox"
-                :checked="selected.has(photo.id)"
-                @change="togglePhoto(photo.id)"
-              />
-              <span class="text-ellipsis">{{ photo.originalName }}</span>
-              <span class="text-dim-xs">{{
-                photo.fileSize ? formatBytes(photo.fileSize) : '—'
-              }}</span>
-            </label>
-          </div>
-        </div>
+        <PhotoPickList v-if="photos.length > 0" :photos="photos" :selected="selected" />
 
         <div v-if="sizeLabel" class="export-size-info">{{ sizeLabel }}</div>
       </div>
@@ -88,6 +65,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive } from 'vue';
 import { t } from '../../i18n';
+import PhotoPickList from '../base/PhotoPickList.vue';
 import { usePhotosStore } from '../../stores/photos';
 import { useShortcutsStore } from '../../stores/shortcuts';
 import { exportData } from '../../api';
@@ -121,9 +99,6 @@ const selected = reactive(new Set<string>());
 // Init: select all photos
 photosStore.placedPhotos.forEach((p) => selected.add(p.photo.id));
 
-const allChecked = computed(
-  () => photos.value.length > 0 && photos.value.every((p) => selected.has(p.id)),
-);
 const someChecked = computed(() => photos.value.some((p) => selected.has(p.id)));
 
 const totalBytes = computed(() => selectedPhotoBytes(photos.value, selected));
@@ -147,17 +122,6 @@ const canExport = computed(() => canExportBackup(flags.value, someChecked.value 
 
 function update() {
   /* reactivity via v-model */
-}
-
-function toggleAll(e: Event) {
-  const checked = (e.target as HTMLInputElement).checked;
-  if (checked) photos.value.forEach((p) => selected.add(p.id));
-  else selected.clear();
-}
-
-function togglePhoto(id: string) {
-  if (selected.has(id)) selected.delete(id);
-  else selected.add(id);
 }
 
 function onClose() {

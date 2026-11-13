@@ -547,6 +547,24 @@ function raiseError() {
             },
           ]"
         />
+        <!-- A fact on a line of its own, short and cut with "…" (a visited photo's author). -->
+        <PhoneFacts
+          :facts="[
+            { label: 'Auteur', value: 'Marie Dupont', line: true },
+            { label: 'Gain', value: '100' },
+          ]"
+        />
+        <PhoneFacts
+          :facts="[
+            {
+              label: 'Auteur',
+              value: 'Club d\'astronomie amateur des Hautes-Vosges et de la vallée de la Moselle',
+              line: true,
+            },
+            { label: 'Date d\'observation', value: '23 août 2025' },
+            { label: 'Exposition totale', value: '6h' },
+          ]"
+        />
         <PhoneHelper>Ligne d'état</PhoneHelper>
         <PhoneHelper class="mob-status--warn">Ligne d'avertissement</PhoneHelper>
         <PhoneHelper small>Ligne d'aide en petit</PhoneHelper>

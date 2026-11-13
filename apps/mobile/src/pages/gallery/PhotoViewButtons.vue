@@ -15,6 +15,8 @@ defineProps<{
   canShowObjects?: boolean;
   canShowPois?: boolean;
   turning?: boolean;
+  /** A visited sky's photo: it is looked at, never changed, so it has no quarter turn. */
+  readOnly?: boolean;
 }>();
 const objects = defineModel<boolean>('objects', { default: false });
 const pois = defineModel<boolean>('pois', { default: false });
@@ -49,6 +51,7 @@ const emit = defineEmits<{ map: []; rotate: []; info: [] }>();
       <AppIcon :svg="poiIcon" />
     </PhoneIconButton>
     <PhoneIconButton
+      v-if="!readOnly"
       float
       :disabled="turning"
       :label="t('gallery.rotatePhotoRight')"

@@ -18,7 +18,13 @@ import type { TnsCandidate } from '@myastrosky/core/supernova-identify';
 import type { CometElements } from '@myastrosky/core/comet-ephemeris';
 
 // ─── Shared domain types (live in @myastrosky/core; re-exported so importers are unchanged) ───
-import type { FileSource } from '@myastrosky/core/backend';
+import type { FileSource, TransferOptions } from '@myastrosky/core/backend';
+import type {
+  SharedSky,
+  SharedSkyPhoto,
+  SharedSkyPreview,
+  ShareRequest,
+} from '@myastrosky/core/domain/shared-sky';
 import { DomainError } from '@myastrosky/core/domain/errors';
 import type {
   LatestRelease,
@@ -486,6 +492,63 @@ export async function importPreview(file: File): Promise<ImportPreviewResult> {
 /** Import a sky bundle (.zip or .json) with the given options. */
 export async function importData(file: File, opts: ImportOptions): Promise<ImportResult> {
   return guard('settings.importError', () => getBackend().backup.restore(fileSource(file), opts));
+}
+
+// ─── Shared skies ─────────────────────────────────────────────────────────────
+
+/** The display name the user last shared under ('' before the first share). */
+export async function getShareSenderName(): Promise<string> {
+  return guard('errors.shareSky', () => getBackend().sharedSkies.senderName());
+}
+
+/** Writes a package of the user's sky and hands it over (a download on the desktop, the share sheet on the phone). */
+export async function shareMySky(request: ShareRequest): Promise<void> {
+  return guard('errors.shareSky', () => getBackend().sharedSkies.exportToUser(request));
+}
+
+/** Reads what a shared-sky package holds, writing nothing; `onProgress` follows the transfer of the file. */
+export async function inspectSharedSky(
+  file: File,
+  options?: TransferOptions,
+): Promise<{ ticket: string; preview: SharedSkyPreview }> {
+  return guard('errors.openSharedSky', () =>
+    getBackend().sharedSkies.inspect(fileSource(file), options),
+  );
+}
+
+/** Keeps an inspected package as a visit; `onProgress` follows its photos. A cancelled one rejects with an `AbortError`. */
+export async function openSharedSky(ticket: string, options?: TransferOptions): Promise<SharedSky> {
+  try {
+    return await getBackend().sharedSkies.open(ticket, options);
+  } catch (err) {
+    if ((err as { name?: string } | null)?.name === 'AbortError') throw err;
+    throw toUserError(err, 'errors.openSharedSky');
+  }
+}
+
+/** Lets go of an inspected package that will not be opened. */
+export async function discardSharedSky(ticket: string): Promise<void> {
+  return guard('errors.openSharedSky', () => getBackend().sharedSkies.discard(ticket));
+}
+
+/** The visited skies, the most recently received first. */
+export async function getSharedSkies(): Promise<SharedSky[]> {
+  return guard('errors.loadSharedSkies', () => getBackend().sharedSkies.list());
+}
+
+/** The photos of a visited sky: read-only, and never among the user's own. */
+export async function getSharedSkyPhotos(skyId: string): Promise<SharedSkyPhoto[]> {
+  return guard('errors.loadSharedSkies', () => getBackend().sharedSkies.listPhotos(skyId));
+}
+
+/** Deletes a visited sky and its files; returns the bytes freed. */
+export async function removeSharedSky(skyId: string): Promise<{ bytesFreed: number }> {
+  return guard('errors.updateSharedSky', () => getBackend().sharedSkies.remove(skyId));
+}
+
+/** Makes the missing medium-sized copies of the visited skies' large photos; returns how many were made. */
+export async function makeMissingSharedSkyMediums(): Promise<number> {
+  return guard('errors.loadSharedSkies', () => getBackend().sharedSkies.makeMissingMediums());
 }
 
 /** A solver is considered available if the user explicitly provided a path (or API key). */

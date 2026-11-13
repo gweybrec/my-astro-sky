@@ -202,7 +202,7 @@ export interface PhotoService {
   makeMissingMediums(): Promise<number>;
 }
 
-interface PhotoRow {
+export interface PhotoRow {
   id: string;
   filename: string;
   original_name: string;
@@ -219,11 +219,11 @@ interface PhotoRow {
   medium_filename: string | null;
   observation_date: string | null;
   capture_details: string | null;
-  gear_setup_id: string | null;
+  gear_setup_id?: string | null;
   quarter_turns: number | null;
 }
 
-interface CorrespondenceRow {
+export interface CorrespondenceRow {
   photo_id: string;
   point_index: number;
   photo_x: number;
@@ -261,9 +261,6 @@ const UPDATE_METADATA_WITH_NAME =
 const UPDATE_DRAW_ORDER = 'UPDATE photos SET display_order = ? WHERE id = ?';
 const SELECT_UNSIZED = 'SELECT id, filename FROM photos WHERE width <= 0 OR height <= 0';
 const UPDATE_SIZE = 'UPDATE photos SET width = ?, height = ? WHERE id = ?';
-const SELECT_WITHOUT_MEDIUM = `SELECT id, filename FROM photos
-   WHERE medium_filename IS NULL AND MAX(width, height) > ${MEDIUM_MIN_SOURCE}`;
-const UPDATE_MEDIUM = 'UPDATE photos SET medium_filename = ? WHERE id = ?';
 /** The `medium_filename` of a picture whose copy could not be made: not NULL, so start-up does not decode it again. */
 const NO_MEDIUM = '';
 
@@ -382,8 +379,9 @@ function parseSanitized<T>(val: string | null, sanitize: (v: unknown) => T, empt
  * The one place that turns a `photos` row (plus its correspondence rows) into the API shape: the list, the
  * single read and the upload response all go through here, so they can never drift. A new metadata column is
  * wired in here once.
+ * The rows of a visited sky's photos go through here too (`services/shared-skies.ts`).
  */
-function rowToPhoto(p: PhotoRow, corr: readonly CorrespondenceRow[]): Photo {
+export function rowToPhoto(p: PhotoRow, corr: readonly CorrespondenceRow[]): Photo {
   return {
     id: p.id,
     filename: p.filename,
@@ -956,28 +954,43 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       return statements.length;
     },
 
-    async makeMissingMediums() {
-      let made = 0;
-      for (const r of await db.all<{ id: string; filename: string }>(SELECT_WITHOUT_MEDIUM)) {
-        if (!isSafeBlobName(r.filename)) continue;
-        const bytes = await blobs.get(r.filename);
-        if (!bytes) continue;
-        const name = mediumNameOf(r.filename);
-        try {
-          await blobs.put(name, await images.thumbnail(bytes, MEDIUM_SIZE, MEDIUM_QUALITY));
-        } catch (error) {
-          console.warn(`[Photos] The medium-sized copy of ${r.filename} could not be made`, error);
-          await db.run(UPDATE_MEDIUM, [NO_MEDIUM, r.id]);
-          continue;
-        }
-        // Stored at once rather than in one batch at the end: each copy takes seconds, and the app may be closed.
-        await db.run(UPDATE_MEDIUM, [name, r.id]);
-        made++;
-      }
-      return made;
-    },
+    makeMissingMediums: () => makeMissingMediumsIn('photos', { db, blobs, images }),
   };
   return service;
+}
+
+/**
+ * Makes the medium-sized copy of each large picture of `table` that has none, one at a time, and stores its name. A
+ * picture that cannot be shrunk is left without one and not tried again. Returns the number of copies made.
+ */
+export async function makeMissingMediumsIn(
+  table: 'photos' | 'shared_sky_photos',
+  deps: Pick<PhotoServiceDeps, 'db' | 'blobs' | 'images'>,
+): Promise<number> {
+  const { db, blobs, images } = deps;
+  const update = `UPDATE ${table} SET medium_filename = ? WHERE id = ?`;
+  const rows = await db.all<{ id: string; filename: string }>(
+    `SELECT id, filename FROM ${table}
+     WHERE medium_filename IS NULL AND MAX(width, height) > ${MEDIUM_MIN_SOURCE}`,
+  );
+  let made = 0;
+  for (const r of rows) {
+    if (!isSafeBlobName(r.filename)) continue;
+    const bytes = await blobs.get(r.filename);
+    if (!bytes) continue;
+    const name = mediumNameOf(r.filename);
+    try {
+      await blobs.put(name, await images.thumbnail(bytes, MEDIUM_SIZE, MEDIUM_QUALITY));
+    } catch (error) {
+      console.warn(`[Photos] The medium-sized copy of ${r.filename} could not be made`, error);
+      await db.run(update, [NO_MEDIUM, r.id]);
+      continue;
+    }
+    // Stored at once rather than in one batch at the end: each copy takes seconds, and the app may be closed.
+    await db.run(update, [name, r.id]);
+    made++;
+  }
+  return made;
 }
 
 /** The size the picture is shown at: the browser applies its EXIF rotation, and orientations 5 to 8 swap width and height. */

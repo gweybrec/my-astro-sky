@@ -18,6 +18,10 @@
       <div class="privacy-warning-title">{{ t('settings.privacyIdentifyTitle') }}</div>
       <p class="text-para">{{ t('settings.privacyIdentify') }}</p>
     </div>
+    <div class="privacy-warning-block">
+      <div class="privacy-warning-title">{{ t('settings.privacySharedTitle') }}</div>
+      <p class="text-para">{{ t('settings.privacyShared') }}</p>
+    </div>
     <div v-if="isElectron" class="privacy-warning-block">
       <div class="privacy-warning-title">{{ t('settings.privacyGeolocTitle') }}</div>
       <p class="text-para">{{ t('settings.privacyGeoloc') }}</p>

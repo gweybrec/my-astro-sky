@@ -15,6 +15,7 @@ import PhoneBadge from '../../components/PhoneBadge.vue';
 import PhotoFacts from '../../components/PhotoFacts.vue';
 import PhoneChipPager from '../../components/PhoneChipPager.vue';
 import PhoneButton from '../../components/PhoneButton.vue';
+import PhoneHelper from '../../components/PhoneHelper.vue';
 import SkyCheckSheet from '../sky/SkyCheckSheet.vue';
 import { dsoCatalogOptions } from '../../catalog-options';
 import caretIcon from '../../icons/chevron-down.svg?raw';
@@ -42,6 +43,9 @@ const emit = defineEmits<{
   removed: [];
 }>();
 const { confirm } = useConfirm();
+// A visited sky's photo (board "Photo d'un ciel visité"): its author first among its facts, and nothing that
+// changes it.
+const visited = computed(() => !!props.photo.sharedSkyId);
 const { showError } = useErrorToast();
 
 // The photo's objects, the most important first (Messier, NGC, IC, …).
@@ -121,6 +125,7 @@ async function remove() {
     </div>
     <!-- The sheet stops above these buttons before it shows everything. -->
     <div
+      v-if="!visited"
       class="mob-photo-actions"
       role="group"
       :aria-label="t('mobile.photo.actions')"

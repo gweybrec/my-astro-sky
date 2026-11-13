@@ -91,6 +91,17 @@ const EXPECTED_API_ROUTES = [
   'POST /api/export',
   'POST /api/import/preview',
   'POST /api/import',
+  'GET /api/shared-skies/sender',
+  'POST /api/shared-skies/export',
+  'GET /api/shared-skies/export/:token',
+  'POST /api/shared-skies/inspect',
+  'POST /api/shared-skies/open/:ticket',
+  'GET /api/shared-skies/open/:ticket',
+  'DELETE /api/shared-skies/open/:ticket',
+  'POST /api/shared-skies/make-mediums',
+  'GET /api/shared-skies',
+  'GET /api/shared-skies/:id/photos',
+  'DELETE /api/shared-skies/:id',
   'DELETE /api/photos/:id',
   'DELETE /api/photos',
   'DELETE /api/photo-metadata',
@@ -198,10 +209,10 @@ describe('route table', () => {
     ]);
   });
 
-  it('registers exactly the 80 documented /api routes', () => {
+  it('registers exactly the 91 documented /api routes', () => {
     const all = listRoutes(app);
     const api = all.filter((r) => r.split(' ')[1].startsWith('/api/'));
-    expect(EXPECTED_API_ROUTES).toHaveLength(80);
+    expect(EXPECTED_API_ROUTES).toHaveLength(91);
     expect([...api].sort()).toEqual([...EXPECTED_API_ROUTES].sort());
   });
 

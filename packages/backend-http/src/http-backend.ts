@@ -17,6 +17,7 @@ import type {
 } from '@myastrosky/core/domain/solve';
 import type { ConvertSolvedResult, SolveWcsResult } from '@myastrosky/core/domain/solved-import';
 import type { ImportOptions } from '@myastrosky/core/domain/backup';
+import type { SharedSky, SharedSkyPhoto } from '@myastrosky/core/domain/shared-sky';
 import type { Photo } from '@myastrosky/core/types';
 
 /** One multipart upload to send, with progress and cancel. */
@@ -46,6 +47,13 @@ export interface HttpBackendOptions {
   lang: () => string;
   /** Hands a downloaded file to the user (the browser's save dialog). */
   saveFile(name: string, blob: Blob): void;
+  /**
+   * Lets the browser download `url` itself, straight to disk, as `name`: a shared sky can weigh several gigabytes.
+   * When absent the file is fetched whole, then handed to `saveFile`.
+   */
+  downloadUrl?(url: string, name: string): void;
+  /** Waits between two looks at an import that runs on the server; a timer when absent. */
+  sleep?(ms: number): Promise<void>;
   /** Sends the two uploads that report progress (`photos.upload`, `solvedImport.convert`). `XMLHttpRequest` when absent. */
   upload?: UploadFn;
 }
@@ -94,6 +102,18 @@ const CATALOG_ROUTE = {
 } as const;
 
 const abortError = () => new DOMException('Aborted', 'AbortError');
+
+/** How often the import of a shared sky, which runs on the server, is looked at. */
+const IMPORT_POLL_MS = 500;
+
+/** What the server answers about a running import (`server/shared-sky-imports.ts`). */
+interface ImportStatus {
+  state: 'ready' | 'running' | 'done' | 'failed' | 'cancelled';
+  done: number;
+  total: number;
+  sky?: SharedSky;
+  error?: { kind: DomainErrorKind; code: ErrorCode; message: string };
+}
 
 const networkError = () => new DomainError('upstream', 'Network error', { code: 'NETWORK_ERROR' });
 
@@ -556,6 +576,80 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
         const png = new Uint8Array(text.length);
         for (let i = 0; i < text.length; i++) png[i] = text.charCodeAt(i);
         return { ...rest, png } as ConvertSolvedResult;
+      },
+    },
+
+    sharedSkies: {
+      async senderName() {
+        return (await call<{ senderName: string }>('GET', '/api/shared-skies/sender')).senderName;
+      },
+      list: () => call<SharedSky[]>('GET', '/api/shared-skies'),
+      listPhotos: (skyId) => call<SharedSkyPhoto[]>('GET', `/api/shared-skies/${id(skyId)}/photos`),
+      remove: (skyId) => call<{ bytesFreed: number }>('DELETE', `/api/shared-skies/${id(skyId)}`),
+      async makeMissingMediums() {
+        return (await call<{ made: number }>('POST', '/api/shared-skies/make-mediums')).made;
+      },
+      async exportToUser(request) {
+        const { token, fileName } = await call<{ token: string; fileName: string }>(
+          'POST',
+          '/api/shared-skies/export',
+          request,
+        );
+        const url = `${baseUrl}/api/shared-skies/export/${id(token)}`;
+        if (options.downloadUrl) {
+          options.downloadUrl(url, fileName);
+          return;
+        }
+        let res: Response;
+        try {
+          res = await doFetch(url);
+        } catch {
+          throw networkError();
+        }
+        if (!res.ok) {
+          throw failure({ status: res.status, statusText: res.statusText, text: await res.text() });
+        }
+        options.saveFile(fileName, await res.blob());
+      },
+      async inspect(file, opts) {
+        const form = await formOf('bundle', file, {});
+        return jsonOf(
+          await sendUpload({
+            url: `${baseUrl}/api/shared-skies/inspect`,
+            form,
+            onProgress: opts?.onProgress,
+            cancel: opts?.cancel,
+          }),
+        );
+      },
+      async open(ticket, opts) {
+        const path = `/api/shared-skies/open/${id(ticket)}`;
+        const wait = options.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
+        let status = await call<ImportStatus>('POST', path);
+        try {
+          while (status.state === 'ready' || status.state === 'running') {
+            if (opts?.cancel?.aborted) throw abortError();
+            opts?.onProgress?.(status.total > 0 ? status.done / status.total : 0);
+            await wait(IMPORT_POLL_MS);
+            status = await call<ImportStatus>('GET', path);
+          }
+        } finally {
+          // Also cancels the import when this was left before its end; the server then removes what it wrote.
+          await raw('DELETE', path).catch(() => undefined);
+        }
+        if (status.state === 'done' && status.sky) {
+          opts?.onProgress?.(1);
+          return status.sky;
+        }
+        if (status.state === 'cancelled') throw abortError();
+        throw new DomainError(
+          status.error?.kind ?? 'upstream',
+          status.error?.message ?? 'Import failed',
+          { code: status.error?.code ?? 'INTERNAL_ERROR' },
+        );
+      },
+      async discard(ticket) {
+        await raw('DELETE', `/api/shared-skies/open/${id(ticket)}`);
       },
     },
 

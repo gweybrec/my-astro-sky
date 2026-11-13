@@ -26,6 +26,7 @@ import PhoneButton from '../../components/PhoneButton.vue';
 import { dsoCatalogOptions } from '../../catalog-options';
 import SkyCheckSheet, { type CheckGroup, type CheckOption } from './SkyCheckSheet.vue';
 import PhoneRadioSheet from '../../components/PhoneRadioSheet.vue';
+import SkyViewField from './SkyViewField.vue';
 import AppIcon from '../../components/AppIcon.vue';
 import caretIcon from '../../icons/chevron-down.svg?raw';
 
@@ -197,6 +198,7 @@ const dsoDensity = computed({
 
 <template>
   <PhoneSheet v-model:open="open" :title="t('display.section')" tall>
+    <SkyViewField />
     <PhoneSectionHeader>{{ t('display.photos') }}</PhoneSectionHeader>
     <PhoneToggleRow
       :model-value="showPhotos"

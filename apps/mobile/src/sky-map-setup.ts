@@ -27,6 +27,7 @@ import { getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { THEME_CHANGED_EVENT } from '@myastrosky/core/theme';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
 import { connectFrames } from './sky-frames';
 import { catalogsReady } from './catalogs';
 
@@ -183,7 +184,9 @@ export function createPhoneSkyMap(
   const disconnectFrames = connectFrames(map);
   // A tap on a photo selects it, by the name the map hit-tests.
   map.setOnPhotoClick((name) => {
-    const placed = layer.getPlacedPhotos().find((p) => p.photo.originalName === name);
+    const placed = [...layer.getPlacedPhotos(), ...layer.getVisitPhotos()].find(
+      (p) => p.photo.originalName === name,
+    );
     if (placed) skySelection.value = { kind: 'photo', photo: placed.photo };
   });
 
@@ -279,6 +282,22 @@ export function createPhoneSkyMap(
     { immediate: true },
   );
 
+  // The visited skies shown, if any (board "Ciel, choix des ciels affichés"): their photos join the user's own, or
+  // replace them when the user's sky is not ticked, and follow the skies ticked and a visit opened, updated or deleted.
+  const sharedSkies = useSharedSkiesStore();
+  const stopSharedSkies = watch(
+    () => [sharedSkies.visitPhotos, sharedSkies.ownShown] as const,
+    () => {
+      layer.setOwnPhotosShown(sharedSkies.ownShown);
+      layer.setVisitPhotos(sharedSkies.visitPhotos, sharedSkies.visitPoiCategories);
+      layer.updateTransforms();
+      map.setPhotoOutlines(layer.getPhotoCanvasOutlines(map.getView()));
+      map.requestRender();
+    },
+    { immediate: true },
+  );
+  void sharedSkies.load();
+
   // Frames, the horizon line and the danger colour are read from the theme's tokens at each draw.
   const redraw = () => map.requestRender();
   window.addEventListener(THEME_CHANGED_EVENT, redraw);
@@ -351,6 +370,7 @@ export function createPhoneSkyMap(
       window.removeEventListener(THEME_CHANGED_EVENT, redraw);
       disconnectFrames();
       stopHorizon();
+      stopSharedSkies();
       stopCategories();
       if (frozenTimer) clearTimeout(frozenTimer);
       port.skyMap = null;

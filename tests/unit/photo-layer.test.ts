@@ -355,4 +355,96 @@ describe('PhotoLayer', () => {
     layer.setShowPhotos(false);
     expect(requestRender).toHaveBeenCalledTimes(3);
   });
+  describe('a visited sky', () => {
+    const visit = (id: string, over: Partial<Photo> = {}) =>
+      placedPhoto(id, { sharedSkyId: 'sky-1', ...over });
+    const shown = (container: HTMLElement) =>
+      [...container.querySelectorAll('img')]
+        .filter((img) => img.style.display !== 'none')
+        .map((img) => img.getAttribute('src'));
+
+    it('draws its photos above the user own, and keeps them out of the list of the user photos', () => {
+      const { container, layer } = make();
+      layer.loadPhotos([placedPhoto('1'), placedPhoto('2')]);
+      const changed = vi.fn();
+      layer.addOnPhotosChanged(changed);
+      layer.setVisitPhotos([visit('v1'), visit('v2')]);
+      expect(changed).toHaveBeenCalled();
+      expect(layer.getPlacedPhotos().map((p) => p.photo.id)).toEqual(['1', '2']);
+      expect(layer.getVisitPhotos().map((p) => p.photo.id)).toEqual(['v1', 'v2']);
+      expect(shown(container)).toEqual([
+        '/files/1.jpg',
+        '/files/2.jpg',
+        '/files/v1.jpg',
+        '/files/v2.jpg',
+      ]);
+    });
+
+    it('shows the visited sky alone when the user photos are hidden, outlines included', () => {
+      const { container, layer } = make();
+      layer.loadPhotos([placedPhoto('1')]);
+      layer.setVisitPhotos([visit('v1')]);
+      layer.updateTransforms();
+      expect(layer.getPhotoCanvasOutlines(VIEW).map((o) => [o.name, o.visit])).toEqual([
+        ['photo-1', undefined],
+        ['photo-v1', true],
+      ]);
+      layer.setOwnPhotosShown(false);
+      expect(shown(container)).toEqual(['/files/v1.jpg']);
+      // Placing the photos again (a pan, a zoom) or showing one again does not bring the user's photos back.
+      layer.updateTransforms();
+      layer.toggleVisibility('1');
+      layer.toggleVisibility('1');
+      layer.setMultiplePhotosVisible(['1'], true);
+      expect(shown(container)).toEqual(['/files/v1.jpg']);
+      expect(layer.getPhotoCanvasOutlines(VIEW).map((o) => o.name)).toEqual(['photo-v1']);
+      expect(layer.getPhotoCanvasQuads(VIEW)).toMatchObject([{ id: 'v1', sharedSkyId: 'sky-1' }]);
+      // The user's photos are still there for everything that lists them.
+      expect(layer.getPlacedPhotos().map((p) => p.photo.id)).toEqual(['1']);
+      layer.setOwnPhotosShown(true);
+      expect(shown(container)).toEqual(['/files/1.jpg', '/files/v1.jpg']);
+    });
+
+    it('replaces the visited sky shown by another, and removes it with an empty list', () => {
+      const { container, layer } = make();
+      layer.loadPhotos([placedPhoto('1')]);
+      layer.setVisitPhotos([visit('v1'), visit('v2')]);
+      const kept = layer.getVisitPhotos()[1].imgEl;
+      layer.setVisitPhotos([visit('v2'), visit('w1', { sharedSkyId: 'sky-2' })]);
+      expect(layer.getVisitPhotos().map((p) => p.photo.id)).toEqual(['v2', 'w1']);
+      // A photo that stays is not loaded again.
+      expect(layer.getVisitPhotos()[0].imgEl).toBe(kept);
+      layer.setVisitPhotos([]);
+      expect(layer.getVisitPhotos()).toEqual([]);
+      expect(shown(container)).toEqual(['/files/1.jpg']);
+    });
+
+    it('is left alone by what reorders, clears or removes the user photos', () => {
+      const { layer } = make();
+      layer.loadPhotos([placedPhoto('1'), placedPhoto('2')]);
+      layer.setVisitPhotos([visit('v1')]);
+      layer.setPhotoOrder(['2', '1']);
+      expect(layer.getPlacedPhotos().map((p) => p.photo.id)).toEqual(['2', '1']);
+      expect(layer.getVisitPhotos().map((p) => p.photo.id)).toEqual(['v1']);
+      layer.clearAllPhotos();
+      expect(layer.getPlacedPhotos()).toEqual([]);
+      expect(layer.getVisitPhotos().map((p) => p.photo.id)).toEqual(['v1']);
+    });
+
+    it('pins its points of interest in the sender colours, whatever the user own filter', () => {
+      const { layer } = make();
+      const poi = { name: 'SN 2026x', categoryId: 'theirs', ra: 10, dec: 60 };
+      layer.setPoiCategories([{ id: 'mine', name: 'Mine', color: '#111111', position: 0 }]);
+      layer.setVisiblePois({});
+      layer.setVisitPhotos(
+        [visit('v1', { pointsOfInterest: [poi] })],
+        [{ id: 'theirs', name: 'Supernova', color: '#abcdef', position: 0 }],
+      );
+      expect(layer.getPoiPins()).toEqual([
+        { ra: 10, dec: 60, label: 'SN 2026x', color: '#abcdef' },
+      ]);
+      layer.setOwnPhotosShown(false);
+      expect(layer.getPoiPins()).toHaveLength(1);
+    });
+  });
 });

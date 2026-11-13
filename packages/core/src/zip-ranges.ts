@@ -1,27 +1,10 @@
 /**
- * Backup archives in memory, over `fflate`: the phone has no streams to write to, so the archive is built
- * from the files added and handed back as bytes; an archive to read is read by pieces. Entry names are the
- * ones the server's archiver writes (`manifest.json`, `images/…`, …); a name that could leave its folder is refused.
+ * A ZIP archive read by pieces, over `fflate`'s inflate: the end of the file and its central directory when opened,
+ * then one entry per `read`. Used by the phone (a picked file) and the desktop server (an uploaded file on disk), so
+ * an archive is never held whole in memory.
  */
-import { inflateSync, zipSync, type Zippable } from 'fflate';
-import { isValidZipEntryPath } from '@myastrosky/core/domain/backup';
-import type { BundleReader, BundleWriter } from '@myastrosky/core/ports/bundle';
-
-/** Builds an archive in memory: `add` every file, then `finish` for the bytes. */
-export function newZipBundle(): { writer: BundleWriter; finish(): Promise<Uint8Array> } {
-  const files: Zippable = {};
-  return {
-    writer: {
-      async add(name, bytes) {
-        if (!isValidZipEntryPath(name)) throw new Error(`Invalid archive entry name: ${name}`);
-        // Pictures are already compressed: stored as they are (level 0); the JSON files are deflated.
-        files[name] = name.startsWith('images/') ? [bytes, { level: 0 }] : bytes;
-      },
-    },
-    // Level 1, like the server, for the entries that are not pictures.
-    finish: async () => zipSync(files, { level: 1 }),
-  };
-}
+import { inflateSync } from 'fflate';
+import type { BundleReader } from './ports/bundle';
 
 /** A file read by pieces: bytes `start` to `end` (excluded). */
 export interface RangeSource {
@@ -148,12 +131,4 @@ export async function openZipRanges(source: RangeSource): Promise<BundleReader> 
       return entries.get(name)?.size ?? null;
     },
   };
-}
-
-/** Opens an archive held in memory, by the same reader. */
-export async function openZipBundle(bytes: Uint8Array): Promise<BundleReader> {
-  return openZipRanges({
-    size: bytes.byteLength,
-    read: async (start, end) => bytes.subarray(start, end),
-  });
 }

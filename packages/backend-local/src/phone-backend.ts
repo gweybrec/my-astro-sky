@@ -7,11 +7,14 @@ import type { Backend } from '@myastrosky/core/backend';
 import { initSchema } from '@myastrosky/core/db/schema';
 import type { ImageCodec } from '@myastrosky/core/ports/image-codec';
 import { createServices } from '@myastrosky/core/services/create-services';
-import { newZipBundle, openZipRanges } from './bundle-fflate';
+import { openZipRanges } from '@myastrosky/core/zip-ranges';
+import type { BundleWriter } from '@myastrosky/core/ports/bundle';
+import { createZipWriter } from '@myastrosky/core/zip-writer';
 import { createBrowserImageCodec } from './browser-image-codec';
 import { createBundledCatalogs } from './bundled-catalogs';
 import {
   createCapacitorBlobStore,
+  createFileSink,
   writeFileInPieces,
   ensureDirectory,
   type CapacitorFilesystem,
@@ -45,21 +48,60 @@ export const SHARE_CANCELED = 'Share canceled';
  * The earlier exports are removed first, not after the share: the receiving app may still read the file then.
  */
 export async function shareFile(
-  platform: Pick<PhonePlatform, 'filesystem' | 'share' | 'blobPieceBytes'> & {
-    directories: Pick<PhonePlatform['directories'], 'cache'>;
-  },
+  platform: SharePlatform,
   name: string,
   bytes: Uint8Array,
 ): Promise<void> {
+  const { filesystem, directories } = platform;
+  const path = await emptiedExportPath(platform, name);
+  await writeFileInPieces(filesystem, directories.cache, path, bytes, platform.blobPieceBytes);
+  await shareExport(platform, name, path);
+}
+
+/**
+ * Hands a ZIP archive to the user like `shareFile`, written to its file as `write` adds its entries: the archive is
+ * never held in memory, so its size is only limited by the phone's free space. When `write` fails the file is removed
+ * and nothing is shared.
+ */
+export async function shareArchive(
+  platform: SharePlatform,
+  name: string,
+  write: (writer: BundleWriter) => Promise<void>,
+): Promise<void> {
+  const { filesystem, directories } = platform;
+  const path = await emptiedExportPath(platform, name);
+  const sink = createFileSink(filesystem, directories.cache, path, platform.blobPieceBytes);
+  try {
+    const zip = createZipWriter(sink);
+    await write(zip.writer);
+    await zip.finish();
+    await sink.close();
+  } catch (error) {
+    await filesystem.deleteFile({ path, directory: directories.cache }).catch(() => undefined);
+    throw error;
+  }
+  await shareExport(platform, name, path);
+}
+
+/** What sharing a file needs of the platform. */
+type SharePlatform = Pick<PhonePlatform, 'filesystem' | 'share' | 'blobPieceBytes'> & {
+  directories: Pick<PhonePlatform['directories'], 'cache'>;
+};
+
+/** The path of the export `name` in the cache directory, once the earlier exports are removed. */
+async function emptiedExportPath(platform: SharePlatform, name: string): Promise<string> {
   const { filesystem, directories } = platform;
   await ensureDirectory(filesystem, directories.cache, 'exports');
   const { files } = await filesystem.readdir({ path: 'exports', directory: directories.cache });
   for (const file of files) {
     await filesystem.deleteFile({ path: `exports/${file.name}`, directory: directories.cache });
   }
-  const path = `exports/${name}`;
-  await writeFileInPieces(filesystem, directories.cache, path, bytes, platform.blobPieceBytes);
-  const { uri } = await filesystem.getUri({ path, directory: directories.cache });
+  return `exports/${name}`;
+}
+
+/** Opens the share sheet on a written export. */
+async function shareExport(platform: SharePlatform, name: string, path: string): Promise<void> {
+  const { uri } = await platform.filesystem.getUri({ path, directory: platform.directories.cache });
   try {
     await platform.share.share({ title: name, url: uri, dialogTitle: name });
   } catch (error) {
@@ -156,8 +198,7 @@ export async function createPhoneBackend(
     openZip: openZipRanges,
     maxWholeFileBytes: MAX_WHOLE_FILE_BYTES,
     maxPhotoBytes: MAX_PHOTO_BYTES,
-    newZip: newZipBundle,
-    saveFile: (name, bytes) => shareFile(platform, name, bytes),
+    saveArchive: (name, write) => shareArchive(platform, name, write),
     now: () => new Date(now()),
   });
 }

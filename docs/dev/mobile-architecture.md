@@ -99,7 +99,7 @@ Rules for a service method:
 | `ImageCodec`                    | `image-codec.ts` over sharp                       | `browser-image-codec.ts`: `createImageBitmap` and `OffscreenCanvas`                       |
 | `HttpClient`                    | `http-client.ts` over Node's `fetch`              | `fetch-http-client.ts` over the WebView's `fetch`, which Capacitor routes natively        |
 | `SecretCodec`                   | `secret-codec.ts`, AES-256-GCM, key from env      | `webcrypto-secret-codec.ts`, AES-GCM with a non-extractable key kept in IndexedDB         |
-| `BundleWriter` / `BundleReader` | `bundle-zip.ts`, streaming ZIP                    | `bundle-fflate.ts`, ZIP in memory                                                         |
+| `BundleWriter` / `BundleReader` | `bundle-zip.ts`: streamed out, read from disk     | `core/zip-writer` into a cache file (`shareArchive`); both read by `core/zip-ranges`      |
 | `KeyValueStore`                 | (desktop: `localStorage`, `src/platform-init.ts`) | `preferences-store.ts` over the Preferences plugin, loaded in memory at start-up          |
 | `EnvSource`                     | `process.env`                                     | always undefined                                                                          |
 

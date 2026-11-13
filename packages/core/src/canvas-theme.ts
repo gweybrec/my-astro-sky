@@ -251,6 +251,12 @@ export const PHOTO_OUTLINE = {
   dash: [6, 4] as number[],
 } as const;
 
+/** The outline of a photo of a visited sky (someone else's): a cool blue, told at a glance from the user's own. */
+export const VISIT_OUTLINE = {
+  stroke: 'rgba(96, 165, 220, 0.6)',
+  label: 'rgba(96, 165, 220, 0.9)',
+} as const;
+
 /** The border ring around the visible hemisphere disc. */
 export const BORDER_RING = { color: 'rgba(200, 185, 168, 0.3)', lineWidth: 1.5 } as const;
 

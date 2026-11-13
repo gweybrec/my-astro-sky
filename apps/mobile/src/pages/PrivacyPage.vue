@@ -11,6 +11,7 @@ const blocks = [
   { title: 'settings.privacyAstrometryTitle', text: 'settings.privacyAstrometry' },
   { title: 'settings.privacyHorizonTitle', text: 'settings.privacyHorizon' },
   { title: 'settings.privacyIdentifyTitle', text: 'settings.privacyIdentify' },
+  { title: 'settings.privacySharedTitle', text: 'settings.privacyShared' },
 ];
 </script>
 
