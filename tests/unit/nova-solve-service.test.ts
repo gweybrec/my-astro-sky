@@ -175,6 +175,29 @@ describe('submit()', () => {
     );
   });
 
+  it.each(['raw.fit', 'raw.fits', 'RAW.FIT', 'RAW.FITS'])(
+    'reads the size of the FITS file %s that has no plate solution',
+    async (fileName) => {
+      const fits = new Uint8Array(
+        buildFits({
+          bitpix: 16,
+          naxis1: 40,
+          naxis2: 30,
+          pixels: Array.from({ length: 1200 }, () => 0),
+        }),
+      );
+      const t = setup({
+        size: 'unreadable',
+        route: (r) => loginOk(r.url) ?? json({ status: 'success', subid: 1 }),
+      });
+      await t.service.submit({ fileName, bytes: fits });
+      const request = JSON.parse(
+        (t.calls[1].body as { form: Array<{ value?: string }> }).form[0].value!,
+      );
+      expect(request.scale_lower).toBeCloseTo((2 * 3600) / 30 / 2);
+    },
+  );
+
   it('logs in once and sends the picture as a multipart form with the file part', async () => {
     const t = setup({
       route: (r) => loginOk(r.url) ?? json({ status: 'success', subid: 5 }),

@@ -490,3 +490,11 @@ export function wcsFromHeader(parsed: Record<string, number | string | boolean>)
 
   return wcs;
 }
+
+/** The width and height of a FITS image, from its header (`NAXIS1`, `NAXIS2`), even without a plate solution; 0 when unknown. */
+export function fitsImageSize(bytes: Uint8Array): { width: number; height: number } {
+  const header = parseFITSHeader(extractFITSHeaderFromFITS(bytes));
+  const width = typeof header.NAXIS1 === 'number' ? header.NAXIS1 : 0;
+  const height = typeof header.NAXIS2 === 'number' ? header.NAXIS2 : 0;
+  return { width, height };
+}

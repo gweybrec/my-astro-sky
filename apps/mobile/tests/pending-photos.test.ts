@@ -5,6 +5,7 @@ import {
   createMemoryPendingStore,
   loadPendingPhotos,
   pendingPhotoFile,
+  pendingPhotoSolveFile,
   pendingPhotos,
   removePendingPhoto,
   setPendingState,
@@ -25,6 +26,27 @@ describe('the photos waiting to be placed', () => {
     const file = await pendingPhotoFile(added.id);
     expect([file!.name, file!.type, await file!.text()]).toEqual(['M42.png', 'image/png', 'abc']);
     expect(await pendingPhotoFile('unknown')).toBeNull();
+  });
+
+  it('keeps a separate raw solve file without exposing it in the waiting-photo list', async () => {
+    const raw = new File(['fits-bytes'], 'M42.fit', { type: 'application/fits' });
+    const added = await addPendingPhoto(
+      new Blob(['png-bytes'], { type: 'image/png' }),
+      'M42.fit',
+      undefined,
+      raw,
+    );
+
+    const picture = await pendingPhotoFile(added.id);
+    const solveFile = await pendingPhotoSolveFile(added.id);
+    expect([picture!.type, await picture!.text()]).toEqual(['image/png', 'png-bytes']);
+    expect([solveFile!.name, solveFile!.type, await solveFile!.text()]).toEqual([
+      'M42.fit',
+      'application/fits',
+      'fits-bytes',
+    ]);
+    expect(pendingPhotos.value[0]).toEqual(added);
+    expect(pendingPhotos.value[0]).not.toHaveProperty('solvePicture');
   });
 
   it('reads the kept photos again, oldest first, without their pictures', async () => {

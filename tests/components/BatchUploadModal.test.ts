@@ -55,13 +55,19 @@ const pollLocalSolveJob = vi.fn(async (_endpoint: string, jobId: string) =>
 );
 const cancelLocalSolveJob = vi.fn(async () => {});
 const convertRawPhoto = vi.fn();
+const submitPlateSolve = vi.fn(async (_file: File, _hints?: unknown) => ({ jobId: 'online-job' }));
+const pollPlateSolve = vi.fn(async (_jobId: string) => ({
+  jobId: 'online-job',
+  status: 'solved',
+  correspondences: [{ pointIndex: 0 }],
+}));
 vi.mock('../../src/api', () => ({
   getSolverAvailability: () => state.availability,
   submitLocalSolveJob: (...args: unknown[]) => submitLocalSolveJob(...(args as [])),
   pollLocalSolveJob: (...args: unknown[]) => pollLocalSolveJob(...(args as [string, string])),
   cancelLocalSolveJob: (...args: unknown[]) => cancelLocalSolveJob(...(args as [])),
-  submitPlateSolve: vi.fn(),
-  pollPlateSolve: vi.fn(),
+  submitPlateSolve: (...args: unknown[]) => submitPlateSolve(...(args as [File, unknown?])),
+  pollPlateSolve: (...args: unknown[]) => pollPlateSolve(...(args as [string])),
   uploadPhoto: vi.fn(),
   convertRawPhoto: (...args: unknown[]) => convertRawPhoto(...(args as [])),
   setPhotoFitsHeaders: vi.fn(),
@@ -98,12 +104,19 @@ beforeEach(() => {
   vi.useFakeTimers();
   state.pendingFiles = [jpeg('a.jpg'), jpeg('b.jpg'), jpeg('c.jpg')];
   state.maxParallel = '2';
+  state.availability = { solveField: true, astap: true, astrometry: true };
   state.jobSeq = 0;
   state.pollResponder = () => ({ status: 'running', result: undefined });
   submitLocalSolveJob.mockClear();
   pollLocalSolveJob.mockClear();
   cancelLocalSolveJob.mockClear();
   convertRawPhoto.mockReset();
+  submitPlateSolve.mockReset().mockResolvedValue({ jobId: 'online-job' });
+  pollPlateSolve.mockReset().mockResolvedValue({
+    jobId: 'online-job',
+    status: 'solved',
+    correspondences: [{ pointIndex: 0 }],
+  });
   localStorage.setItem('batch-auto-place', 'false');
 });
 
@@ -179,6 +192,40 @@ function items(
 }
 
 describe('BatchUploadModal — raw file conversion', () => {
+  it('submits the original raw file to astrometry.net after converting its stored picture to PNG', async () => {
+    const raw = fit('M101.fit');
+    state.pendingFiles = [raw];
+    state.availability = { solveField: false, astap: false, astrometry: true };
+    pollPlateSolve.mockResolvedValue({
+      jobId: 'online-job',
+      status: 'failed',
+      error: 'no solve',
+    });
+    convertRawPhoto.mockResolvedValue({
+      png: new File(['png'], 'M101.png', { type: 'image/png' }),
+      meta: { success: false },
+    });
+
+    const wrapper = mountModal();
+    await flushPromises();
+    expect(items(wrapper)[0].file.name).toBe('M101.png');
+
+    const item = items(wrapper)[0] as unknown as { solver: string };
+    item.solver = 'astrometry';
+    const solveItem = (wrapper.vm as unknown as { solveItem(item: unknown): Promise<void> })
+      .solveItem;
+    const solving = solveItem(item);
+    await flushPromises();
+
+    expect(submitPlateSolve).toHaveBeenCalledWith(raw, undefined);
+    await vi.advanceTimersByTimeAsync(2000);
+    await flushPromises();
+    await solving;
+    expect(items(wrapper)[0].status).toBe('failed');
+
+    wrapper.unmount();
+  });
+
   it('joins a raw .fit file as "converting" rather than "pending"', async () => {
     state.pendingFiles = [fit('M101.fit')];
     let resolveConvert: (v: unknown) => void = () => {};

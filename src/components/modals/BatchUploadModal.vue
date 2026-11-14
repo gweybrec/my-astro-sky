@@ -191,6 +191,7 @@ import {
   ANY_PHOTO_EXT_RE,
   PHOTO_PICKER_ACCEPT,
   isRawAstroFile,
+  solveInputFile,
 } from '@myastrosky/core/photo-formats';
 import { convertRawPhoto, setPhotoFitsHeaders } from '../../api';
 import { noSolutionMessage, suggestedSetupFor } from '../../wcs-load-flow';
@@ -276,6 +277,7 @@ function createBatchItem(file: File): BatchItem {
   return {
     id: `batch-${Date.now()}-${itemSeq++}`,
     file,
+    rawFile: raw ? file : null,
     rawName: raw ? file.name : null,
     convertProgress: 0,
     thumbBlobUrl: null,
@@ -644,7 +646,11 @@ async function solveItem(item: BatchItem) {
       item.solveAbort = new AbortController();
       const { jobId } = await submitLocalSolveJob(
         endpoint,
-        item.file,
+        solveInputFile(
+          item.solver === 'solve-field' ? 'solve-field' : 'astap',
+          item.rawFile,
+          item.file,
+        ),
         hints,
         item.solveAbort.signal,
       );
@@ -657,7 +663,7 @@ async function solveItem(item: BatchItem) {
         return;
       }
       const { jobId } = await submitPlateSolve(
-        item.file,
+        solveInputFile('astrometry', item.rawFile, item.file),
         hints ? { ra: hints.ra!, dec: hints.dec!, radius: 2.0 } : undefined,
       );
       result = await pollUntilDone(item, jobId, item.solveAbort.signal);

@@ -25,6 +25,8 @@ export type BatchItemStatus =
 export interface BatchItem {
   id: string;
   file: File;
+  /** Original raw file kept for astrometry.net after `file` becomes its PNG preview. */
+  rawFile?: File | null;
   /** Original raw filename (e.g. "M101.fit") while the item is converting/converted; null for a plain jpg/png/webp import. */
   rawName: string | null;
   /** Upload progress (0-1) of the raw file to the conversion endpoint, while status is 'converting'. */

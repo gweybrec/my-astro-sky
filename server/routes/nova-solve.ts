@@ -1,7 +1,7 @@
 import express from 'express';
 import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { NovaSolveHints } from '@myastrosky/core/domain/solve';
-import { upload } from './shared.js';
+import { upload, uploadSolve } from './shared.js';
 import { novaSolve } from '../services.js';
 
 export const novaSolveRouter = express.Router();
@@ -30,7 +30,7 @@ function sendRule(res: express.Response, err: unknown, messages: Record<string, 
  *         description: Plate solve job submitted successfully
  */
 // --- Astrometry.net plate solve routes ---
-novaSolveRouter.post('/api/solve-plate', upload.single('photo'), async (req, res) => {
+novaSolveRouter.post('/api/solve-plate', uploadSolve.single('photo'), async (req, res) => {
   try {
     // Get language from request (default to 'en')
     const lang = langOf(req.body);
@@ -123,7 +123,7 @@ novaSolveRouter.post('/api/solve-plate', upload.single('photo'), async (req, res
  *       500:
  *         description: Server error
  */
-novaSolveRouter.post('/api/solve-plate/resume', upload.single('photo'), async (req, res) => {
+novaSolveRouter.post('/api/solve-plate/resume', uploadSolve.single('photo'), async (req, res) => {
   try {
     const lang = langOf(req.body);
     const notConfigured =

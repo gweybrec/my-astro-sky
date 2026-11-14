@@ -227,15 +227,15 @@ export const msg = {
     unsupportedFormatAstap: (lang: ServerLang, ext: string) =>
       m(
         lang,
-        `Format non pris en charge pour ASTAP : ${ext}. Utilisez JPG/PNG/WEBP.`,
-        `Unsupported format for ASTAP: ${ext}. Use JPG/PNG/WEBP.`,
+        `Format non pris en charge pour ASTAP : ${ext}. Utilisez JPG/PNG/WEBP/FITS.`,
+        `Unsupported format for ASTAP: ${ext}. Use JPG/PNG/WEBP/FITS.`,
       ),
 
     unsupportedFormatSolveField: (lang: ServerLang, ext: string) =>
       m(
         lang,
-        `Format non pris en charge pour solve-field : ${ext}. Utilisez JPG/PNG/WEBP.`,
-        `Unsupported format for solve-field: ${ext}. Use JPG/PNG/WEBP.`,
+        `Format non pris en charge pour solve-field : ${ext}. Utilisez JPG/PNG/WEBP/TIFF/FITS.`,
+        `Unsupported format for solve-field: ${ext}. Use JPG/PNG/WEBP/TIFF/FITS.`,
       ),
 
     unsupportedRawFormat: (lang: ServerLang, ext: string) =>

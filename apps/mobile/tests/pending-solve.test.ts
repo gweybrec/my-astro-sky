@@ -82,6 +82,26 @@ describe('solving a waiting photo online', () => {
     expect(solvedPhotoCount.value).toBe(before + 1);
   });
 
+  it('submits the original raw file while the pending picture remains the converted PNG', async () => {
+    const raw = new File(['fits-bytes'], 'M45.fit', { type: 'application/fits' });
+    const photo = await addPendingPhoto(
+      new Blob(['png-bytes'], { type: 'image/png' }),
+      'M45.fit',
+      undefined,
+      raw,
+    );
+    submitPlateSolve.mockResolvedValue({ jobId: 'job-raw' });
+
+    await solvePendingOnline(photo.id);
+
+    const sent = submitPlateSolve.mock.calls[0][0];
+    expect([sent.name, sent.type, await sent.text()]).toEqual([
+      'M45.fit',
+      'application/fits',
+      'fits-bytes',
+    ]);
+  });
+
   it("keeps the solver's own objects when it names some", async () => {
     const photo = await addPendingPhoto(new Blob(['x']), 'a.jpg');
     submitPlateSolve.mockResolvedValue({ jobId: 'j' });

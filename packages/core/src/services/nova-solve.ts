@@ -27,7 +27,8 @@ import type {
 } from '../domain/solve';
 import type { HttpClient, HttpResponse } from '../ports/http-client';
 import type { ImageCodec } from '../ports/image-codec';
-import { extractWCS, parseFITSHeader, wcsToCorrespondences } from '../wcs';
+import { fitsImageSize, parseFITSHeader, wcsToCorrespondences } from '../wcs';
+import { isFitsFile } from '../photo-formats';
 
 const API_BASE = 'https://nova.astrometry.net/api';
 const WCS_FILE_BASE = 'https://nova.astrometry.net/wcs_file';
@@ -94,6 +95,8 @@ interface Job {
   error?: string;
   imageWidth: number;
   imageHeight: number;
+  /** The picture sent is a FITS file: its rows count from the bottom. */
+  fits: boolean;
   dsoIds?: string[];
 }
 
@@ -102,12 +105,6 @@ const isOk = (res: HttpResponse) => res.status >= 200 && res.status <= 299;
 const readJson = async (res: HttpResponse): Promise<any> => JSON.parse(await res.text());
 const formBody = (payload: unknown) =>
   `request-json=${encodeURIComponent(JSON.stringify(payload))}`;
-
-function extensionOf(fileName: string): string {
-  const base = fileName.slice(Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\')) + 1);
-  const dot = base.lastIndexOf('.');
-  return dot <= 0 ? '' : base.slice(dot).toLowerCase();
-}
 
 export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveService {
   const { http, settings, images, now, newId, log } = deps;
@@ -157,16 +154,12 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
 
   /** The size of a picture: its own, else the one a FITS header reports. 0 when unknown. */
   async function dimensionsOf(file: NovaSolveFile): Promise<{ width: number; height: number }> {
+    // A FITS file is not an image the codec reads: its header gives the size, plate solution or not.
+    if (isFitsFile(file.fileName)) return fitsImageSize(file.bytes);
     try {
       const info = await images.probe(file.bytes);
       return { width: info.width || 0, height: info.height || 0 };
     } catch {
-      // For non-image formats, try to extract from FITS header
-      const ext = extensionOf(file.fileName);
-      if (ext === '.fits' || ext === '.fit') {
-        const wcs = extractWCS(file.bytes, ext);
-        if (wcs) return { width: wcs.NAXIS1, height: wcs.NAXIS2 };
-      }
       return { width: 0, height: 0 };
     }
   }
@@ -214,7 +207,14 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
     const session = await getSession();
     const localId = newId();
     evictStaleJobs();
-    const job: Job = { localId, createdAt: now(), status: 'pending', imageWidth, imageHeight };
+    const job: Job = {
+      localId,
+      createdAt: now(),
+      status: 'pending',
+      imageWidth,
+      imageHeight,
+      fits: isFitsFile(file.fileName),
+    };
     jobs.set(localId, job);
 
     const requestData: Record<string, unknown> = {
@@ -287,6 +287,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
       status: 'solving',
       imageWidth,
       imageHeight,
+      fits: isFitsFile(file.fileName),
     };
     jobs.set(localId, job);
     pollJob(job).catch((err) => log?.('astrometry_poll_failed', err, { jobId: localId }));
@@ -342,6 +343,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
                 solutionToWcs(parsed, job.imageWidth, job.imageHeight),
                 job.imageWidth,
                 job.imageHeight,
+                job.fits,
               );
               if (correspondences.length >= 3) {
                 job.status = 'solved';
@@ -356,11 +358,11 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
 
           // Fallback: the calibration.
           const cal = await fetchCalibration(job.jobId);
-          const correspondences = calibrationToCorrespondences(
-            cal,
-            job.imageWidth,
-            job.imageHeight,
-          );
+          const found = calibrationToCorrespondences(cal, job.imageWidth, job.imageHeight);
+          // The calibration counts rows from the top of the picture as read; a FITS file is drawn from the bottom.
+          const correspondences = job.fits
+            ? found.map((c) => ({ ...c, photoY: job.imageHeight - c.photoY }))
+            : found;
           if (correspondences.length >= 3) {
             job.status = 'solved';
             job.correspondences = correspondences;

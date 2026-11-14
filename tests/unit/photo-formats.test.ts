@@ -6,6 +6,8 @@ import {
   PHOTO_PICKER_ACCEPT,
   RAW_COMPANION_ACCEPT,
   isRawAstroFile,
+  isFitsFile,
+  solveInputFile,
 } from '@myastrosky/core/photo-formats';
 
 describe('RASTER_PHOTO_EXT_RE', () => {
@@ -69,5 +71,30 @@ describe('accept strings', () => {
 
   it('the companion accept string only offers raw extensions', () => {
     expect(RAW_COMPANION_ACCEPT).toBe('.fit,.fits,.tif,.tiff,.xisf');
+  });
+});
+
+describe('solveInputFile', () => {
+  const png = { name: 'M1.png' };
+  it('sends a FITS file as it is to every engine', () => {
+    const fits = { name: 'M1.fit' };
+    for (const engine of ['astrometry', 'astap', 'solve-field'] as const) {
+      expect(solveInputFile(engine, fits, png)).toBe(fits);
+    }
+    for (const name of ['M1.fit', 'M1.fits', 'M1.FIT', 'M1.FITS']) {
+      expect(isFitsFile(name)).toBe(true);
+      expect(solveInputFile('astap', { name }, png).name).toBe(name);
+    }
+    expect(isFitsFile('M1.tif')).toBe(false);
+  });
+  it('sends a TIFF as it is to solve-field only', () => {
+    const tiff = { name: 'M1.tiff' };
+    expect(solveInputFile('solve-field', tiff, png)).toBe(tiff);
+    expect(solveInputFile('astrometry', tiff, png)).toBe(png);
+    expect(solveInputFile('astap', tiff, png)).toBe(png);
+  });
+  it('sends an XISF, or a file with no raw original, as the PNG', () => {
+    expect(solveInputFile('solve-field', { name: 'M1.xisf' }, png)).toBe(png);
+    expect(solveInputFile('astap', null, png)).toBe(png);
   });
 });

@@ -2,7 +2,7 @@
 
 ## How placement works
 
-When solve-field solves a JPEG/PNG, it writes a `.wcs` FITS file containing the WCS (World Coordinate System) solution. `wcsToCorrespondences` (core, re-exported by `server/wcs-reader.ts`) then turns this solution into **reference points**: 9 pairs of `(photoX, photoY)` ↔ `(RA, Dec)` at the corners, the edge middles and the centre of the photo, which tell the frontend affine transform where to place the image on the sky map.
+When solve-field solves a JPEG/PNG/TIFF/FITS, it writes a `.wcs` FITS file containing the WCS (World Coordinate System) solution. `wcsToCorrespondences` (core, re-exported by `server/wcs-reader.ts`) then turns this solution into **reference points**: 9 pairs of `(photoX, photoY)` ↔ `(RA, Dec)` at the corners, the edge middles and the centre of the photo, which tell the frontend affine transform where to place the image on the sky map.
 
 Two independent coordinate-system issues must be handled correctly:
 
@@ -11,26 +11,38 @@ Two independent coordinate-system issues must be handled correctly:
 
 ---
 
-## 1. Y-axis convention: `fitsYConvention=false`
+## 1. Y-axis convention: `fitsYConvention`
 
 `wcsToCorrespondences(wcs, w, h, fitsYConvention)` converts display pixels to the solution's FITS pixels, then to sky coordinates. The `fitsYConvention` flag controls how FITS pixel coordinates map to display (screen) coordinates:
 
-| Convention              | Y=1 at…             | Who uses it                                                |
-| ----------------------- | ------------------- | ---------------------------------------------------------- |
-| `fitsYConvention=true`  | **bottom** of image | PixInsight/Siril FITS files; **ASTAP** (`server/astap.ts`) |
-| `fitsYConvention=false` | **top** of image    | solve-field, astrometry.net (JPEG/PNG input)               |
+| Convention              | Y=1 at…             | Who uses it                                                                             |
+| ----------------------- | ------------------- | --------------------------------------------------------------------------------------- |
+| `fitsYConvention=true`  | **bottom** of image | PixInsight/Siril FITS files; **ASTAP** (`server/astap.ts`); any solver given a raw FITS |
+| `fitsYConvention=false` | **top** of image    | solve-field, astrometry.net (JPEG/PNG/TIFF input)                                       |
 
 **ASTAP** uses the **same pixel convention as the Siril/PixInsight metadata path**. This was verified empirically: solving `M97+M108.jpg` with ASTAP and reading the embedded WCS of the same image in `M97+M108.tiff` (Siril) gave the **same `CDELT2` sign and scale**. Since the metadata path passes `true` (`extractWCS` → `wcsToCorrespondences(..., true)` in `POST /api/solve-wcs`, `server/routes/solved-import.ts`) and places correctly, `server/astap.ts` passes `true` as well.
 
-**solve-field always writes its `.wcs` with Y=1 at the top row** when the input is a JPEG or PNG (the natural storage order of those formats). Therefore `server/solve-field.ts` passes `false` unconditionally:
+**solve-field writes its `.wcs` with Y=1 at the top row** when the input is a JPEG, PNG or TIFF (the natural storage order of those formats), so `server/solve-field.ts` passes `false` for them. For a FITS input it passes `true`, chosen from the file extension:
 
 ```typescript
-// solve-field receives a JPEG/PNG (screen/display convention):
-// pixel (1,1) = upper-left, Y increases downward → fitsYConvention=false
-const correspondences = wcsToCorrespondences(wcs, width, height, false);
+// JPEG/PNG/TIFF: pixel (1,1) = upper-left, Y increases downward → false
+// FITS: rows count from the bottom → true
+wcsToCorrespondences(wcs, width, height, ext === '.fits' || ext === '.fit');
 ```
 
-The input to solve-field is **always** a JPEG or PNG (never a raw FITS file), so this value never needs to change.
+### Which file each solver receives
+
+A TIFF, FITS or XISF import is converted to a PNG for display; the original file is kept as `rawFile` (desktop batch item) or as the pending photo's solve file (phone) and `solveInputFile` (`packages/core/src/photo-formats.ts`) picks what each engine is sent:
+
+| Original | astrometry.net | ASTAP         | solve-field   |
+| -------- | -------------- | ------------- | ------------- |
+| FITS     | the FITS file  | the FITS file | the FITS file |
+| TIFF     | the PNG        | the PNG       | the TIFF file |
+| XISF     | the PNG        | the PNG       | the PNG       |
+
+astrometry.net and ASTAP read FITS only. A solution computed on a raw FITS is in the FITS file's own pixels (row 1 at the bottom, as `fits-decoder.ts` draws it), so every path that solves a FITS passes `fitsYConvention=true`: ASTAP always, solve-field by extension, and astrometry.net (`nova-solve.ts`) by the submitted file's name. astrometry.net's calibration fallback, which has no flag, mirrors `photoY` for a FITS instead.
+
+The size of a FITS file comes from its header (`fitsImageSize`: `NAXIS1`, `NAXIS2`), never from an image codec and not from its WCS, so a FITS with no plate solution still has a size. The local routes accept `.fit`/`.fits` for ASTAP and solve-field, and `.tif`/`.tiff` for solve-field only. A FITS has no EXIF orientation.
 
 **Raw FITS import ignores `ROWORDER`.** A WCS counts rows in stored order whatever `ROWORDER` says, and Siril shows and exports even a `ROWORDER = 'TOP-DOWN'` file with its first stored row at the bottom. `fits-decoder.ts` therefore always draws the first stored row at the bottom, which is what `fitsYConvention=true` assumes. Honouring `TOP-DOWN` there drew the picture upside down against its own objects.
 

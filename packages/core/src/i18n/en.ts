@@ -426,7 +426,7 @@ const en: Translations = {
       'All your data (photos, metadata, headers of the FITS/TIFF files read, settings) is stored locally on your device. The following features need a connection to external servers:',
     privacyAstrometryTitle: 'Astrometry.net solver',
     privacyAstrometry:
-      'When you use the astrometry.net solver, your image is uploaded to nova.astrometry.net for plate solving. An API key is required. No other data is transmitted.',
+      'When you use the astrometry.net solver, a FITS file is uploaded to nova.astrometry.net as it is, with all its headers (telescope, camera, exposure, location and date if they are in them). Any other photo (JPEG, PNG, TIFF, XISF…) is uploaded as an image, without its headers. An API key is required. No other data is sent separately.',
     privacyHorizonTitle: 'Horizon calculation',
     privacyHorizon:
       'When you compute the horizon of a place, the area around that place is sent to the elevation tile servers (Amazon S3) and to an OpenStreetMap Overpass server, to get the terrain and the names of the peaks. No other data is transmitted. This is the only feature that sends your position off your device.',

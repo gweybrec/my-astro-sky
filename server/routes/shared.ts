@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import fs from 'fs';
 import multer from 'multer';
 import { INCOMING_DIR } from '../server-paths.js';
+import { isRawAstroFile } from '@myastrosky/core/photo-formats';
 
 export { ALLOWED_PHOTO_EXTENSIONS } from '@myastrosky/core/services/photos';
 
@@ -45,6 +46,23 @@ export const upload = multer({
   limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
   fileFilter: (_req, file, cb) => {
     if (ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(Object.assign(new Error('Invalid file type'), { status: 400, code: 'INVALID_FILE_TYPE' }));
+    }
+  },
+});
+
+/**
+ * The plate-solve routes take a picture or a raw astro file (FITS, TIFF, XISF), which arrives as
+ * `application/octet-stream`: the extension admits it, the solver then reads what it supports.
+ * Anything else that is not an image (a text file, say) is refused.
+ */
+export const uploadSolve = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 600 * 1024 * 1024 }, // 600 MB, like uploadRaw
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype) || isRawAstroFile(file.originalname)) {
       cb(null, true);
     } else {
       cb(Object.assign(new Error('Invalid file type'), { status: 400, code: 'INVALID_FILE_TYPE' }));

@@ -51,6 +51,9 @@ export interface PendingCapture {
 
 interface StoredPending extends PendingPhoto {
   picture: Blob;
+  solvePicture?: Blob;
+  solveName?: string;
+  solveType?: string;
   capture?: PendingCapture;
 }
 
@@ -122,6 +125,9 @@ export const pendingPhotos = shallowRef<PendingPhoto[]>([]);
 
 const recordOf = ({
   picture: _picture,
+  solvePicture: _solvePicture,
+  solveName: _solveName,
+  solveType: _solveType,
   capture: _capture,
   ...record
 }: StoredPending): PendingPhoto => record;
@@ -137,6 +143,7 @@ export async function addPendingPhoto(
   picture: Blob,
   name: string,
   capture?: PendingCapture,
+  solveFile?: File,
 ): Promise<PendingPhoto> {
   const record: StoredPending = {
     id: crypto.randomUUID(),
@@ -144,6 +151,13 @@ export async function addPendingPhoto(
     state: 'toPlace',
     addedAt: Date.now(),
     picture,
+    ...(solveFile
+      ? {
+          solvePicture: solveFile,
+          solveName: solveFile.name,
+          solveType: solveFile.type,
+        }
+      : {}),
     ...(capture ? { capture } : {}),
   };
   await store.put(record);
@@ -156,6 +170,17 @@ export async function addPendingPhoto(
 export async function pendingPhotoFile(id: string): Promise<File | null> {
   const found = await store.get(id);
   return found ? new File([found.picture], found.name, { type: found.picture.type }) : null;
+}
+
+/** The original raw file for astrometry.net, or the kept picture when there is no separate solve file. */
+export async function pendingPhotoSolveFile(id: string): Promise<File | null> {
+  const found = await store.get(id);
+  if (!found) return null;
+  return found.solvePicture
+    ? new File([found.solvePicture], found.solveName ?? found.name, {
+        type: found.solveType ?? '',
+      })
+    : new File([found.picture], found.name, { type: found.picture.type });
 }
 
 /** Changes where a waiting photo stands; the solver's job, its submission and the failure reason are those given, or none. */

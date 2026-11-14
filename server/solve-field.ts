@@ -336,9 +336,14 @@ ${fullOutput}`,
     );
 
     // Generate correspondences from catalog stars.
-    // solve-field receives a JPEG/PNG (screen/display convention): pixel (1,1) = upper-left,
-    // Y increases downward → fitsYConvention=false.
-    const correspondences = wcsToCorrespondences(wcs, width, height, false);
+    // A JPEG/PNG/TIFF is in screen/display convention (pixel (1,1) = upper-left, Y increases
+    // downward: fitsYConvention=false); a FITS file counts its rows from the bottom (true).
+    const correspondences = wcsToCorrespondences(
+      wcs,
+      width,
+      height,
+      ext === '.fits' || ext === '.fit',
+    );
 
     if (correspondences.length < 3) {
       return {

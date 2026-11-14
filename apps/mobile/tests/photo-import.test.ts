@@ -36,12 +36,14 @@ import {
   importBusy,
   importItems,
   importableCount,
+  keepImportPending,
   solvedCount,
 } from '../src/composables/usePhotoImport';
 import {
   configurePendingStore,
   createMemoryPendingStore,
   pendingPhotoFile,
+  pendingPhotoSolveFile,
   pendingPhotos,
   storePlacedPendingPhoto,
 } from '../src/pending-photos';
@@ -105,6 +107,40 @@ describe('the photo import', () => {
     await settle();
     expect(importItems.value[0].status).toBe('toPlace');
     expect(solvedCount.value).toBe(0);
+  });
+
+  it('keeps the original FITS file for online solving while storing its PNG as the pending picture', async () => {
+    const raw = new File(['fits-bytes'], 'M1-CCD.fit', { type: 'application/fits' });
+    convertRawPhoto.mockResolvedValue({
+      png,
+      meta: { success: false, width: 10, height: 10 },
+    });
+    addImportFiles([raw]);
+    await settle();
+
+    const item = importItems.value[0];
+    expect(item.file).toBe(png);
+    await keepImportPending(item);
+
+    const id = pendingPhotos.value[0].id;
+    const picture = await pendingPhotoFile(id);
+    const solveFile = await pendingPhotoSolveFile(id);
+    expect([picture!.type, await picture!.text()]).toEqual(['image/png', 'png']);
+    expect([solveFile!.name, solveFile!.type, await solveFile!.text()]).toEqual([
+      'M1-CCD.fit',
+      'application/fits',
+      'fits-bytes',
+    ]);
+  });
+
+  it('solves a TIFF from its PNG: astrometry.net does not read TIFF', async () => {
+    convertRawPhoto.mockResolvedValue({ png, meta: { success: false, width: 10, height: 10 } });
+    addImportFiles([new File(['tiff-bytes'], 'M1-CCD.tiff', { type: 'image/tiff' })]);
+    await settle();
+    expect(importItems.value[0].rawFile).toBeUndefined();
+    await keepImportPending(importItems.value[0]);
+    const solveFile = await pendingPhotoSolveFile(pendingPhotos.value[0].id);
+    expect([solveFile!.type, await solveFile!.text()]).toEqual(['image/png', 'png']);
   });
 
   it('a raw file without a plate solution keeps its capture data, setup and headers until it is placed', async () => {

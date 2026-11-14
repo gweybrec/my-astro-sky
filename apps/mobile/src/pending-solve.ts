@@ -16,6 +16,7 @@ import { pollPlateSolve, resumePlateSolve, submitPlateSolve } from '@myastrosky/
 import {
   type PendingPhoto,
   pendingPhotoFile,
+  pendingPhotoSolveFile,
   pendingPhotos,
   setPendingState,
   storePlacedPendingPhoto,
@@ -96,7 +97,7 @@ async function follow(id: string, firstJobId: string, again = false): Promise<vo
       try {
         if (startAgain && photo.submissionId) {
           startAgain = false;
-          const file = await pendingPhotoFile(id);
+          const file = await pendingPhotoSolveFile(id);
           if (!file) return;
           ({ jobId } = await resumePlateSolve(file, photo.submissionId));
           await setPendingState(id, 'solving', { jobId, submissionId: photo.submissionId });
@@ -140,7 +141,7 @@ async function follow(id: string, firstJobId: string, again = false): Promise<vo
 export async function solvePendingOnline(id: string): Promise<void> {
   const stopped = pendingPhotos.value.find((p) => p.id === id && p.state === 'offline');
   if (stopped) return followAgain(stopped);
-  const file = await pendingPhotoFile(id);
+  const file = await pendingPhotoSolveFile(id);
   if (!file) return;
   await setPendingState(id, 'solving');
   let jobId: string;

@@ -1008,6 +1008,26 @@ describe('online solving routes (astrometry.net)', () => {
   const formJson = (body: string) =>
     JSON.parse(decodeURIComponent(body.replace('request-json=', '')));
 
+  it('takes a raw astro file (octet-stream) on the solve routes, and refuses a file that is not an image', async () => {
+    const send = async (url: string, name: string) => {
+      const form = new FormData();
+      form.append(
+        'photo',
+        new Blob([new Uint8Array([1, 2, 3])], { type: 'application/octet-stream' }),
+        name,
+      );
+      const res = await realFetch(base + url, { method: 'POST', body: form });
+      return (await res.json()) as any;
+    };
+    for (const name of ['m.fit', 'm.fits', 'M.FIT', 'm.tif', 'm.tiff', 'm.xisf']) {
+      // Past the upload filter: the route goes on to its own checks (here, the missing key).
+      expect((await send('/api/solve-plate', name)).code).toBe('ASTROMETRY_NOT_CONFIGURED');
+    }
+    for (const url of ['/api/solve-plate', '/api/solve-astap', '/api/solve-field']) {
+      expect((await send(url, 'notes.txt')).code).toBe('INVALID_FILE_TYPE');
+    }
+  });
+
   it('refuses every route with ASTROMETRY_NOT_CONFIGURED while no key is set', async () => {
     const solve = await post('/api/solve-plate', { name: 'a.png', bytes: png });
     expect(solve.status).toBe(400);

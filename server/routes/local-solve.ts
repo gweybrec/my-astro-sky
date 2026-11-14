@@ -1,15 +1,28 @@
 import express from 'express';
 import sharp from 'sharp';
 import path from 'path';
-import { ALLOWED_PHOTO_EXTENSIONS, upload } from './shared.js';
+import { ALLOWED_PHOTO_EXTENSIONS, uploadSolve } from './shared.js';
 import { solveWithASTAP } from '../astap.js';
 import { solveWithSolveField } from '../solve-field.js';
 import { createJob, getJob, updateJob, cancelJob } from '../solve-queue.js';
 import { rawToBrowserCoords } from '@myastrosky/core/exif-utils';
+import { fitsImageSize } from '@myastrosky/core/wcs';
 import { msg } from '../messages.js';
 import type { ServerLang } from '../messages.js';
 
 export const localSolveRouter = express.Router();
+
+/** ASTAP reads FITS besides the usual pictures; solve-field reads TIFF too. */
+const ASTAP_EXTENSIONS = new Set([...ALLOWED_PHOTO_EXTENSIONS, '.fit', '.fits']);
+const SOLVE_FIELD_EXTENSIONS = new Set([...ASTAP_EXTENSIONS, '.tif', '.tiff']);
+
+/** The size and EXIF orientation of the upload; a FITS file gives its size from its header (sharp cannot read it). */
+async function sizeOf(buffer: Buffer, ext: string) {
+  if (ext === '.fit' || ext === '.fits')
+    return { ...fitsImageSize(buffer), orientation: undefined };
+  const meta = await sharp(buffer).metadata();
+  return { width: meta.width ?? 0, height: meta.height ?? 0, orientation: meta.orientation };
+}
 
 /**
  * Transform raw image coordinates to browser-display coordinates based on EXIF orientation.
@@ -67,7 +80,7 @@ export const localSolveRouter = express.Router();
  *                   type: string
  */
 // --- ASTAP local plate solve route ---
-localSolveRouter.post('/api/solve-astap', upload.single('photo'), async (req, res) => {
+localSolveRouter.post('/api/solve-astap', uploadSolve.single('photo'), async (req, res) => {
   const lang = (
     req.body.lang === 'fr' || req.body.lang === 'en' ? req.body.lang : 'en'
   ) as ServerLang;
@@ -81,7 +94,7 @@ localSolveRouter.post('/api/solve-astap', upload.single('photo'), async (req, re
 
   try {
     const ext = path.extname(req.file.originalname).toLowerCase() || '.jpg';
-    if (!ALLOWED_PHOTO_EXTENSIONS.has(ext)) {
+    if (!ASTAP_EXTENSIONS.has(ext)) {
       res.status(400).json({
         success: false,
         error: msg.api.unsupportedFormatAstap(lang, ext),
@@ -90,9 +103,9 @@ localSolveRouter.post('/api/solve-astap', upload.single('photo'), async (req, re
       return;
     }
 
-    const meta = await sharp(req.file.buffer).metadata();
-    const width = meta.width ?? 0;
-    const height = meta.height ?? 0;
+    const meta = await sizeOf(req.file.buffer, ext);
+    const width = meta.width;
+    const height = meta.height;
     if (!width || !height) {
       res.status(400).json({
         success: false,
@@ -309,7 +322,7 @@ localSolveRouter.delete('/api/solve-astap/:jobId', (req, res) => {
  *                   type: string
  */
 // --- solve-field local plate solve route ---
-localSolveRouter.post('/api/solve-field', upload.single('photo'), async (req, res) => {
+localSolveRouter.post('/api/solve-field', uploadSolve.single('photo'), async (req, res) => {
   const lang = (
     req.body.lang === 'fr' || req.body.lang === 'en' ? req.body.lang : 'en'
   ) as ServerLang;
@@ -321,7 +334,7 @@ localSolveRouter.post('/api/solve-field', upload.single('photo'), async (req, re
 
   try {
     const ext = path.extname(req.file.originalname).toLowerCase() || '.jpg';
-    if (!ALLOWED_PHOTO_EXTENSIONS.has(ext)) {
+    if (!SOLVE_FIELD_EXTENSIONS.has(ext)) {
       res.status(400).json({
         success: false,
         error: msg.api.unsupportedFormatSolveField(lang, ext),
@@ -330,9 +343,9 @@ localSolveRouter.post('/api/solve-field', upload.single('photo'), async (req, re
       return;
     }
 
-    const meta = await sharp(req.file.buffer).metadata();
-    const width = meta.width ?? 0;
-    const height = meta.height ?? 0;
+    const meta = await sizeOf(req.file.buffer, ext);
+    const width = meta.width;
+    const height = meta.height;
     if (!width || !height) {
       res.status(400).json({
         success: false,

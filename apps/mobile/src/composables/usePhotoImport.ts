@@ -1,6 +1,6 @@
 import { computed, shallowRef, watch } from 'vue';
 import type { Photo, PhotoCorrespondence } from '@myastrosky/core/types';
-import { ANY_PHOTO_EXT_RE, isRawAstroFile } from '@myastrosky/core/photo-formats';
+import { ANY_PHOTO_EXT_RE, isFitsFile, isRawAstroFile } from '@myastrosky/core/photo-formats';
 import { sanitizeCaptureDetails } from '@myastrosky/core/capture-fields';
 import {
   wcsCaptureMetadata,
@@ -40,6 +40,8 @@ export interface ImportItem {
   name: string;
   /** The picture to store: the file itself, or the PNG made from a TIFF / FITS. */
   file: File;
+  /** The original FITS file, kept for astrometry.net after conversion (it reads no TIFF or XISF: those go as the PNG). */
+  rawFile?: File;
   status: ImportStatus;
   /** Where the photo is on the sky (status `solved`). */
   correspondences: PhotoCorrespondence[] | null;
@@ -83,6 +85,7 @@ async function readSolvedFile(item: ImportItem) {
     const gearSetupId = await suggestedSetupFor(meta);
     update(item, {
       file: png,
+      rawFile: isFitsFile(item.file.name) ? item.file : undefined,
       status: wcs ? 'solved' : 'toPlace',
       correspondences: wcs ? (meta.correspondences ?? null) : null,
       metadata: wcs,
@@ -154,7 +157,9 @@ export const importableCount = computed(
  */
 export async function keepImportPending(item: ImportItem): Promise<string> {
   if (item.pendingId) return item.pendingId;
-  const pendingId = (await addPendingPhoto(item.file, item.name, pendingCapture(item))).id;
+  const pendingId = (
+    await addPendingPhoto(item.file, item.name, pendingCapture(item), item.rawFile)
+  ).id;
   update(item, { pendingId });
   return pendingId;
 }
@@ -245,7 +250,7 @@ export async function importAll(): Promise<Photo[]> {
         }
         stored.push(photo);
       } else {
-        await addPendingPhoto(item.file, item.name, pendingCapture(item));
+        await addPendingPhoto(item.file, item.name, pendingCapture(item), item.rawFile);
       }
       update(item, { status: 'imported' });
     } catch (error) {
