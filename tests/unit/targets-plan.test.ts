@@ -10,6 +10,8 @@ import {
   customLocationLabelOr,
   defaultPlanName,
   formatPlanDate,
+  isPlanOverdue,
+  tonightISO,
   moonPhaseForWindow,
   moonSeparationRating,
   planItemCount,
@@ -277,5 +279,32 @@ describe('resolvePlanNight', () => {
     expect(r.moon).toBeNull();
     expect(r.infos.every((i) => i.moonSepDeg === null)).toBe(true);
     expect(r.phase.phaseIndex).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('tonightISO', () => {
+  it("is today's date from noon, and yesterday's before noon (the session still running)", () => {
+    expect(tonightISO(new Date(2026, 10, 15, 12, 0))).toBe('2026-11-15');
+    expect(tonightISO(new Date(2026, 10, 15, 23, 30))).toBe('2026-11-15');
+    expect(tonightISO(new Date(2026, 10, 15, 2, 0))).toBe('2026-11-14');
+    expect(tonightISO(new Date(2026, 0, 1, 3, 0))).toBe('2025-12-31');
+  });
+});
+
+describe('isPlanOverdue', () => {
+  const plan = { nightOf: '2026-11-14', archived: false };
+
+  it('flags a plan from noon on the day after its night, never during the session', () => {
+    expect(isPlanOverdue(plan, new Date(2026, 10, 14, 22, 0))).toBe(false);
+    expect(isPlanOverdue(plan, new Date(2026, 10, 15, 3, 0))).toBe(false);
+    expect(isPlanOverdue(plan, new Date(2026, 10, 15, 11, 59))).toBe(false);
+    expect(isPlanOverdue(plan, new Date(2026, 10, 15, 12, 0))).toBe(true);
+    expect(isPlanOverdue(plan, new Date(2026, 11, 1, 12, 0))).toBe(true);
+  });
+
+  it('never flags an archived plan or a plan that follows the global date', () => {
+    const later = new Date(2026, 11, 1, 12, 0);
+    expect(isPlanOverdue({ ...plan, archived: true }, later)).toBe(false);
+    expect(isPlanOverdue({ nightOf: null, archived: false }, later)).toBe(false);
   });
 });

@@ -81,6 +81,7 @@ const de: Translations['mobile'] = {
     chartAria: 'Bahn in der Nacht: {alt} um {time}',
     searchPlaceholder: 'Plan suchen…',
     searchLabel: 'Plan suchen',
+    scopeLabel: 'Angezeigte Pläne',
     moon: 'Mond',
     phase0: 'Neumond',
     phase1: 'Zunehmende Sichel',

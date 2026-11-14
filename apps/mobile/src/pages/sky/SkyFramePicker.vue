@@ -39,7 +39,7 @@ const mosaic = computed(() => props.kind === 'mosaic');
 const isSmart = (setupId: string | null) => !!setupId && !!fov.specs.get(setupId)?.smart;
 // A plan with no setup stays: its mosaic is a single tile until it has one, as on the desktop.
 const eligiblePlans = computed(() =>
-  mosaic.value ? plans.plans.filter((p) => !isSmart(p.setupId)) : plans.plans,
+  mosaic.value ? plans.activePlans.filter((p) => !isSmart(p.setupId)) : plans.activePlans,
 );
 
 async function addToPlan(planId: string | null) {

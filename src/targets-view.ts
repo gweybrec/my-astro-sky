@@ -85,6 +85,8 @@ import {
 import type { ObservationWindow } from './api';
 import exportSvg from './icons/export.svg?raw';
 import trashSvg from './icons/trash.svg?raw';
+import archiveSvg from './icons/archive.svg?raw';
+import unarchiveSvg from './icons/unarchive.svg?raw';
 import penSvg from './icons/pen.svg?raw';
 import mapPinSvg from './icons/map-pin.svg?raw';
 import listPlusSvg from './icons/list-plus.svg?raw';
@@ -140,10 +142,12 @@ import {
   buildMoonOverlay,
   computePlanTargets,
   defaultPlanName,
+  isPlanOverdue,
   moonPhaseForWindow,
   moonSeparationRating,
   planItemCount,
   scorePlanEntry,
+  tonightISO,
   type MoonOverlay,
   type PlanTargetInfo,
 } from '@myastrosky/core/targets/plan';
@@ -1053,7 +1057,7 @@ export class TargetsView {
 
   private updatePlanBadge(): void {
     if (this.planBadgeEl) {
-      const n = this.plansStore.planCount;
+      const n = this.plansStore.activePlans.length;
       this.planBadgeEl.textContent = n > 0 ? ` (${n})` : '';
     }
   }
@@ -2846,7 +2850,8 @@ export class TargetsView {
 
   /** Highlight the plan-list button when the DSO is already in at least one plan. */
   private refreshPlanBtnState(btn: HTMLButtonElement, dsoId: string): void {
-    const inPlan = this.plansStore.plansContaining(dsoId).length > 0;
+    // Only a current plan counts: an archived one is out of every picker.
+    const inPlan = this.plansStore.plansContaining(dsoId).some((p) => !p.archived);
     btn.classList.toggle('bg-[var(--accent-fill-sm)]', inPlan);
   }
 
@@ -3089,10 +3094,23 @@ export class TargetsView {
     wrap.className = 'targets-plans flex flex-col gap-4 p-4';
 
     // Each plan carries its own observation night and gear setup (controls live
-    // inside the plan section), so there are no shared controls at the top.
-    const plans = this.plansStore.plans;
+    // inside the plan section). The only control at the top picks the current or
+    // the archived plans.
+    const all = this.plansStore.plans;
+    const archivedCount = all.filter((p) => p.archived).length;
+    // Back to the current plans once the last archived one is unarchived or deleted.
+    const showArchived = this.prefs.showArchivedPlans === true && archivedCount > 0;
+    const plans = all.filter((p) => p.archived === showArchived);
 
-    if (plans.length === 0) {
+    if (archivedCount > 0)
+      wrap.appendChild(this.buildPlansScopeSwitch(showArchived, archivedCount));
+
+    if (showArchived && plans.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'targets-empty';
+      empty.textContent = t('targets.plan.noArchivedPlans');
+      wrap.appendChild(empty);
+    } else if (plans.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'targets-empty flex flex-col items-center gap-3';
       const msg = document.createElement('div');
@@ -3112,6 +3130,7 @@ export class TargetsView {
       for (const plan of plans) accordion.appendChild(this.buildPlanSection(plan));
       wrap.appendChild(accordion);
     }
+    if (showArchived) return wrap;
 
     const newBtn = document.createElement('button');
     newBtn.type = 'button';
@@ -3125,6 +3144,47 @@ export class TargetsView {
     wrap.appendChild(newBtn);
 
     return wrap;
+  }
+
+  /** Current / Archived choice above the plans list, as two filter chips (radio choices). */
+  private buildPlansScopeSwitch(showArchived: boolean, archivedCount: number): HTMLElement {
+    const group = document.createElement('div');
+    group.className = 'flex items-center gap-2';
+    group.setAttribute('role', 'radiogroup');
+    const currentCount = this.plansStore.plans.length - archivedCount;
+    const choices: [boolean, string][] = [
+      [false, t('targets.plan.current', { n: currentCount })],
+      [true, t('targets.plan.archived', { n: archivedCount })],
+    ];
+    for (const [archived, label] of choices) {
+      const chip = document.createElement('label');
+      chip.className = 'targets-type-chip';
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'plans-scope';
+      input.className = 'sr-only';
+      input.checked = archived === showArchived;
+      input.addEventListener('change', () => {
+        this.prefs.showArchivedPlans = archived;
+        savePrefs(this.prefs);
+        this.render();
+      });
+      chip.appendChild(input);
+      chip.appendChild(document.createTextNode(label));
+      group.appendChild(chip);
+    }
+    return group;
+  }
+
+  /** Archive or unarchive a plan; an archived plan's frames leave the sky map. */
+  private setPlanArchived(plan: Plan, archived: boolean): void {
+    this.plansStore.setPlanArchived(plan.id, archived);
+    const sel = this.fovFramesStore.selection;
+    if (archived && sel.kind === 'plan' && sel.planId === plan.id) {
+      this.fovFramesStore.setSelection({ kind: 'free' });
+    }
+    this.updatePlanBadge();
+    this.render();
   }
 
   private buildPlanSection(plan: Plan): HTMLElement {
@@ -3153,6 +3213,13 @@ export class TargetsView {
 
     nameWrap.appendChild(nameEl);
     nameWrap.appendChild(count);
+    const overdue = isPlanOverdue(plan);
+    if (overdue) {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip status-warn shrink-0';
+      chip.textContent = t('targets.plan.datePassed');
+      nameWrap.appendChild(chip);
+    }
 
     // "Find targets" — summoned overlay, above the target list so it's reachable
     // without scrolling. Opened with this plan's id as context: picks made in the
@@ -3187,14 +3254,27 @@ export class TargetsView {
     });
     const exportBtn = this.iconActionBtn(exportSvg, t('targets.plan.exportPdf'));
     exportBtn.classList.add('shrink-0');
+    const archiveBtn = plan.archived
+      ? this.iconActionBtn(unarchiveSvg, t('targets.plan.unarchive'))
+      : this.iconActionBtn(archiveSvg, t('targets.plan.archive'));
+    archiveBtn.classList.add('shrink-0');
+    archiveBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.setPlanArchived(plan, !plan.archived);
+    });
     const deleteBtn = this.iconActionBtn(trashSvg, t('targets.plan.delete'));
     deleteBtn.classList.add('shrink-0', 'btn-icon--danger');
 
     summary.appendChild(nameWrap);
-    summary.appendChild(findTargetsBtn);
-    summary.appendChild(showOnMapBtn);
+    // An archived plan is not offered for adding targets or framing on the map.
+    if (!plan.archived) {
+      summary.appendChild(findTargetsBtn);
+      summary.appendChild(showOnMapBtn);
+    }
     summary.appendChild(renameBtn);
     summary.appendChild(exportBtn);
+    summary.appendChild(archiveBtn);
     summary.appendChild(deleteBtn);
     details.appendChild(summary);
 
@@ -3276,6 +3356,34 @@ export class TargetsView {
     controls.appendChild(locRow);
 
     body.appendChild(controls);
+
+    // The night has passed: archive the plan, or move it to tonight (the date control
+    // moves it to any other night, and clears this line too).
+    if (overdue) {
+      const warn = document.createElement('div');
+      warn.className =
+        'status-warn rounded-md px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-2';
+      const text = document.createElement('span');
+      text.className = 'flex-1 min-w-0 text-base';
+      text.textContent = t('targets.plan.datePassedHint');
+      const archiveNow = document.createElement('button');
+      archiveNow.type = 'button';
+      archiveNow.className = 'display-controls-btn';
+      archiveNow.textContent = t('targets.plan.archiveShort');
+      archiveNow.addEventListener('click', () => this.setPlanArchived(plan, true));
+      const moveBtn = document.createElement('button');
+      moveBtn.type = 'button';
+      moveBtn.className = 'display-controls-btn';
+      moveBtn.textContent = t('targets.plan.moveToTonight');
+      moveBtn.addEventListener('click', () => {
+        plan.nightOf = tonightISO();
+        this.plansStore.updatePlanSettings(plan.id, plan.nightOf, plan.setupId, plan.lat, plan.lon);
+        this.uiStore.pendingPlanFocusId = plan.id;
+        this.render();
+      });
+      warn.append(text, archiveNow, moveBtn);
+      body.appendChild(warn);
+    }
 
     // Region rebuilt whenever the plan's night or setup changes (keeps the
     // <details> open and the controls focused — only the trajectories refresh).
@@ -3409,6 +3517,12 @@ export class TargetsView {
     dateInput.addEventListener('change', () => {
       plan.nightOf = dateInput.value || null;
       this.plansStore.updatePlanSettings(plan.id, plan.nightOf, plan.setupId, plan.lat, plan.lon);
+      // The "date passed" chip and line follow the new date.
+      if (overdue !== isPlanOverdue(plan)) {
+        this.uiStore.pendingPlanFocusId = plan.id;
+        this.render();
+        return;
+      }
       renderTrajectories();
     });
 
@@ -4961,7 +5075,7 @@ export class TargetsView {
 
     const renderList = () => {
       list.innerHTML = '';
-      for (const plan of this.plansStore.plans) {
+      for (const plan of this.plansStore.activePlans) {
         const rowBtn = document.createElement('button');
         rowBtn.type = 'button';
         rowBtn.className =

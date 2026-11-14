@@ -249,6 +249,12 @@ Entries cannot be reordered by hand: use the **Sort by** dropdown in the plan (t
 
 Click **Export as PDF** in the plan header to generate a printable observation sheet with the target list, "Highest at" times, and FOV sketches.
 
+### Archiving a plan
+
+Once a night is done, click the **archive** icon in the plan header to put the plan away. Archived plans leave the plans list, the "add to a plan" choices and the sky map; a **Current / Archived** switch above the list shows them again, and the same icon unarchives a plan. Plans are only archived by hand, never because of their date.
+
+A current plan whose night has passed is marked **Date passed** (from noon the next day). Open it to **archive** it or **move it to tonight**, or pick another night in its date field — useful when clouds cancelled the session.
+
 ---
 
 ## Sharing your sky

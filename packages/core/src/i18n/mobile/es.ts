@@ -80,6 +80,7 @@ const es: Translations['mobile'] = {
     chartAria: 'Trayectoria de la noche: {alt} a las {time}',
     searchPlaceholder: 'Buscar un plan…',
     searchLabel: 'Buscar un plan',
+    scopeLabel: 'Planes mostrados',
     moon: 'Luna',
     phase0: 'Luna nueva',
     phase1: 'Creciente',

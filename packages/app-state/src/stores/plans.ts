@@ -6,6 +6,7 @@ import {
   renamePlanAPI,
   updatePlanSettingsAPI,
   updatePlanSortAPI,
+  updatePlanArchivedAPI,
   deletePlanAPI,
   reorderPlansAPI,
   addPlanEntryAPI,
@@ -82,6 +83,8 @@ export const usePlansStore = defineStore('plans', () => {
   const pendingWindows = new Map<string, PendingEdit<ObservationWindow[]>>();
 
   const planCount = computed(() => plans.value.length);
+  /** The plans the user has not archived: the ones every plan picker offers. */
+  const activePlans = computed(() => plans.value.filter((p) => !p.archived));
   const entryCount = computed(() => plans.value.reduce((n, p) => n + p.entries.length, 0));
 
   function isInPlan(dsoId: string, planId: string): boolean {
@@ -193,6 +196,18 @@ export const usePlansStore = defineStore('plans', () => {
     if (plan) plan.sortBy = sortBy;
     updatePlanSortAPI(id, sortBy).catch((err) => {
       reportError('plan_set_sort_failed', err, { id });
+    });
+  }
+
+  /**
+   * Archive or unarchive a plan. Mutates the local cache immediately then
+   * persists in the background — deliberately does NOT call load().
+   */
+  function setPlanArchived(id: string, archived: boolean): void {
+    const plan = plans.value.find((p) => p.id === id);
+    if (plan) plan.archived = archived;
+    updatePlanArchivedAPI(id, archived).catch((err) => {
+      reportError('plan_set_archived_failed', err, { id });
     });
   }
 
@@ -389,6 +404,7 @@ export const usePlansStore = defineStore('plans', () => {
 
   return {
     plans,
+    activePlans,
     loaded,
     planCount,
     entryCount,
@@ -400,6 +416,7 @@ export const usePlansStore = defineStore('plans', () => {
     createPlan,
     renamePlan,
     updatePlanSettings,
+    setPlanArchived,
     deletePlan,
     reorderPlans,
     addEntry,

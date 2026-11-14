@@ -152,7 +152,7 @@ plansRouter.put('/api/plans/order', async (req, res) => {
  * @swagger
  * /api/plans/{id}:
  *   put:
- *     summary: Rename a night plan or update its settings (night/setup/location/sort)
+ *     summary: Rename a night plan or update its settings (night/setup/location/sort/archived)
  *     parameters:
  *       - in: path
  *         name: id
@@ -175,6 +175,9 @@ plansRouter.put('/api/plans/order', async (req, res) => {
  *                 type: string
  *                 enum: [transit, altitude, rating, magnitude, size, name, difficulty, window]
  *                 description: Objects-list sort key (drives the UI list and exported PDF order)
+ *               archived:
+ *                 type: boolean
+ *                 description: Archived plans are hidden from the plans list and the plan pickers
  *     responses:
  *       200:
  *         description: Plan renamed

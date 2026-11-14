@@ -65,7 +65,7 @@ async function addToNewPlan() {
   <PhoneSheet v-model:open="open" :title="t('targets.plan.pickerTitle')" :subtitle="target.name">
     <IonList v-if="target.star" class="mob-list" lines="none">
       <PhoneRow
-        v-for="plan in plans.plans"
+        v-for="plan in plans.activePlans"
         :key="plan.id"
         :title="plan.name"
         button
@@ -73,7 +73,7 @@ async function addToNewPlan() {
       />
     </IonList>
     <PhoneCheckRow
-      v-for="plan in target.star ? [] : plans.plans"
+      v-for="plan in target.star ? [] : plans.activePlans"
       :key="plan.id"
       :title="plan.name"
       :model-value="plans.isInPlan(target.id, plan.id)"

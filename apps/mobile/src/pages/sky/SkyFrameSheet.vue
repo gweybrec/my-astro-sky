@@ -125,10 +125,10 @@ const freeSetupId = computed(() => {
   return null;
 });
 const canMove = computed(
-  () => (kind.value === 'free' || kind.value === 'freeMosaic') && plans.plans.length > 0,
+  () => (kind.value === 'free' || kind.value === 'freeMosaic') && plans.activePlans.length > 0,
 );
 const planChoices = computed(() =>
-  plans.plans.map((p) => ({
+  plans.activePlans.map((p) => ({
     id: p.id,
     name: p.name,
     reason:

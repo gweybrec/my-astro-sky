@@ -116,6 +116,7 @@ export interface PlanChanges {
   lat?: number | null;
   lon?: number | null;
   sortBy?: PlanSortKey;
+  archived?: boolean;
 }
 
 /** A new plan entry: a catalogue target (`dsoId`) or a custom location (`ra` and `dec`). */
@@ -164,6 +165,8 @@ export interface Plan {
   lon: number | null;
   /** Objects-list sort key (drives the UI list and the exported PDF order). */
   sortBy: PlanSortKey;
+  /** Archived by the user: left out of the plans list and of every plan picker until unarchived. */
+  archived: boolean;
   entries: PlanEntry[];
   mosaics: PlanMosaic[];
 }

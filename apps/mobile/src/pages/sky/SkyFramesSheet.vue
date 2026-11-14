@@ -64,7 +64,10 @@ const selected = computed({
 });
 const setOptions = computed(() => [
   { value: FREE, label: t('fovOverlay.freeFrames') },
-  ...plans.plans.map((p) => ({ value: p.id, label: p.name })),
+  // Archived plans are left out, unless one is still the selection (archived on another device).
+  ...plans.plans
+    .filter((p) => !p.archived || selected.value === p.id)
+    .map((p) => ({ value: p.id, label: p.name })),
 ]);
 const setName = computed(
   () => setOptions.value.find((o) => o.value === selected.value)?.label ?? '',

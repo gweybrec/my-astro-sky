@@ -511,8 +511,8 @@ export function openFramePicker(
         kind === 'mosaic' ? setups.filter((s) => !smartTelIds.has(s.telescopeId)) : setups;
       const eligiblePlans =
         kind === 'mosaic'
-          ? plansStore.plans.filter((p) => !p.setupId || !setupIsSmart(p.setupId))
-          : plansStore.plans;
+          ? plansStore.activePlans.filter((p) => !p.setupId || !setupIsSmart(p.setupId))
+          : plansStore.activePlans;
 
       buildFramePickerModal(
         kind,
@@ -1076,7 +1076,10 @@ export function buildFovPopup(
     free.value = FREE_VALUE;
     free.textContent = t('fovOverlay.freeFrames');
     select.appendChild(free);
+    // Archived plans are left out, unless one is still the selection (archived elsewhere).
     for (const plan of plansStore.plans) {
+      const selected = fovStore.selection;
+      if (plan.archived && !(selected.kind === 'plan' && selected.planId === plan.id)) continue;
       const opt = document.createElement('option');
       opt.value = `plan:${plan.id}`;
       opt.textContent = plan.name;
@@ -1191,7 +1194,7 @@ export function buildFovPopup(
       sub.appendChild(subSetup);
     }
     bodyM.appendChild(sub);
-    for (const p of plansStore.plans) {
+    for (const p of plansStore.activePlans) {
       const compatible = !!freeSetupId && p.setupId === freeSetupId;
       const b = document.createElement('button');
       b.type = 'button';
@@ -1411,7 +1414,7 @@ export function buildFovPopup(
       // Free items only: move this frame/mosaic into a plan. The picker lists every
       // plan, disabling those whose gear setup differs (see openPlanPicker). Hidden
       // only when there are no plans at all.
-      if ((isFreeFrame || isFreeMosaic) && plansStore.plans.length > 0) {
+      if ((isFreeFrame || isFreeMosaic) && plansStore.activePlans.length > 0) {
         const toPlanBtn = document.createElement('button');
         toPlanBtn.type = 'button';
         toPlanBtn.className = 'btn-icon';
@@ -1965,7 +1968,7 @@ export function buildFovPopup(
   const stopSelect = watch(
     () => [
       fovStore.selection,
-      plansStore.plans.map((p) => `${p.id}:${p.name}:${p.setupId}`).join(','),
+      plansStore.plans.map((p) => `${p.id}:${p.name}:${p.setupId}:${p.archived}`).join(','),
     ],
     () => renderAll(),
     { deep: true },

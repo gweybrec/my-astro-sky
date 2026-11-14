@@ -192,6 +192,7 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
       lat: null,
       lon: null,
       sortBy: 'transit',
+      archived: false,
       entries: [],
       mosaics: [],
       ...extra,
@@ -213,6 +214,19 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
       await b.plans.list(),
       [plan(c, 'C', 0), plan(a, 'A2', 1, settings)],
       'plan settings changed',
+    );
+
+    await b.plans.update(c, { archived: true });
+    expectEqual(
+      await b.plans.list(),
+      [plan(c, 'C', 0, { archived: true }), plan(a, 'A2', 1, settings)],
+      'plan archived',
+    );
+    await b.plans.update(c, { archived: false });
+    expectEqual(
+      await b.plans.list(),
+      [plan(c, 'C', 0), plan(a, 'A2', 1, settings)],
+      'plan unarchived',
     );
 
     // Entries: a catalogue target and a custom frame.

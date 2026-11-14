@@ -38,6 +38,8 @@ export interface TargetsPrefs {
   respectHorizon?: boolean;
   showMoon?: boolean;
   showCardinal?: boolean;
+  /** The plans list shows the archived plans instead of the current ones. */
+  showArchivedPlans?: boolean;
   obsStartTime?: string | null;
   obsEndTime?: string | null;
 }

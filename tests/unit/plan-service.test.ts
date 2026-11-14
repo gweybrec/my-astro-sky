@@ -175,6 +175,7 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
         lat: null,
         lon: null,
         sortBy: 'transit',
+        archived: false,
         entries: [],
         mosaics: [],
       });
@@ -310,7 +311,7 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
     });
 
     it('rejects a body with none of the three groups, before looking the plan up', async () => {
-      const message = 'name, settings (nightOf/setupId/lat/lon), or sortBy required';
+      const message = 'name, settings (nightOf/setupId/lat/lon), sortBy, or archived required';
       for (const body of [{}, { foo: 1 }]) {
         await expectRejected(svc.update('nope', body), 'invalid', message, 'PLAN_UPDATE_EMPTY');
       }
@@ -389,6 +390,23 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
           'PLAN_SORT_INVALID',
         );
       }
+    });
+
+    it('archives and unarchives a plan, and refuses anything but true or false', async () => {
+      const id = (await svc.create({ name: 'A' })).id;
+      await svc.update(id, { archived: true });
+      expect((await plan(id)).archived).toBe(true);
+      await svc.update(id, { archived: false });
+      expect((await plan(id)).archived).toBe(false);
+      for (const archived of [1, 'yes', null]) {
+        await expectRejected(
+          svc.update(id, { archived } as never),
+          'invalid',
+          'archived must be true or false',
+          'PLAN_ARCHIVED_INVALID',
+        );
+      }
+      expect((await plan(id)).archived).toBe(false);
     });
 
     it('writes nothing when a later part of the body is rejected (all or nothing)', async () => {
@@ -957,6 +975,15 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
           position: 7,
         },
       ]);
+    });
+
+    it('keeps an archived plan archived, and reads a plan of an older backup as current', async () => {
+      await svc.importPlan({ id: 'old', name: 'Old' }, { ...opts, index: 0 });
+      await svc.importPlan({ id: 'arch', name: 'Arch', archived: true }, { ...opts, index: 1 });
+      await svc.importPlan({ id: 'odd', name: 'Odd', archived: 'yes' }, { ...opts, index: 2 });
+      expect((await plan('old')).archived).toBe(false);
+      expect((await plan('arch')).archived).toBe(true);
+      expect((await plan('odd')).archived).toBe(false);
     });
 
     it('uses the index as position, "transit" for an unknown sort key, and null for wrong types', async () => {

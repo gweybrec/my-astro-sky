@@ -230,6 +230,13 @@ export async function seed({ ports }) {
     'M13',
   ]);
   const spring = await makePlan('Galaxies de printemps', setup2.id, ['M101', 'M45', 'M27']);
+  // A current plan whose night has passed (its "Date passée" badge and warning row), and an archived one (the
+  // Plans tab's switch and its archived view).
+  const passed = await makePlan('Nuit passée', setup1.id, ['M27']);
+  const lastMonth = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  await api(base, 'PUT', `/api/plans/${passed.id}`, { nightOf: lastMonth });
+  const archived = await makePlan('Nuit archivée', setup2.id, ['M42']);
+  await api(base, 'PUT', `/api/plans/${archived.id}`, { archived: true });
 
   const windows = (ids) =>
     ids.map((id, i) => ({
@@ -329,6 +336,7 @@ export async function seed({ ports }) {
       visitSky: visit.sky,
       visitPhoto: visit.photo,
       plan: summer.id,
+      passedPlan: passed.id,
       entry: summer.entries.NGC7000,
       longEntry: summer.entries['SH2-308'],
     },
@@ -1117,7 +1125,25 @@ export const views = [
   },
   { name: 'poi-types', path: '/gallery/poi-types', ready: '.mob-type-row' },
   { name: 'plans', path: '/tabs/plans', ready: 'ion-item.mob-row' },
+  {
+    name: 'plans-archived',
+    path: '/tabs/plans',
+    ready: '.mob-seg-btn',
+    open: [{ click: '.mob-seg-btn:last-of-type' }, { pause: 300 }],
+  },
   { name: 'plan', path: (ids) => `/plans/${ids.plan}`, ready: '.mob-list .mob-row' },
+  { name: 'plan-passed', path: (ids) => `/plans/${ids.passedPlan}`, ready: '.mob-row-actions' },
+  {
+    name: 'plan-actions',
+    path: (ids) => `/plans/${ids.plan}`,
+    ready: '.mob-list .mob-row',
+    open: [
+      { click: '.mob-topbar ion-button.mob-icon-btn:last-of-type' },
+      { wait: '.mob-sheet .mob-row' },
+      { pause: 600 },
+    ],
+    ...SHEET,
+  },
   { name: 'plan-target', path: (ids) => `/plans/${ids.plan}/${ids.entry}`, ready: '.mob-meta' },
   {
     name: 'plan-target-long-name',

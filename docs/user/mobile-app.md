@@ -16,7 +16,7 @@ Everything is stored on the phone itself. No server or computer is needed, and t
 
 - **Sky map**: the same interactive map as on the desktop, with your placed photos, constellations, deep-sky objects, regions and the terrain horizon. Search finds objects and your own photos.
 - **Targets**: recommendations for tonight from your location, your gear and the sky conditions, as on the desktop ([Targets tab](/user/user-guide.md#targets-tab)). Your own gear and filters, including smart telescopes and their mosaics, are available.
-- **Observing plans**: create plans, add targets, reorder them, view them on the map and export them as a PDF ([Observing plans](/user/user-guide.md#observing-plans)).
+- **Observing plans**: create plans, add targets, reorder them, change their night, view them on the map, export them as a PDF and archive them ([Observing plans](/user/user-guide.md#observing-plans)).
 - **Photos**: import photos from the phone, place them on the sky map, and browse them in a gallery. Supported formats: JPEG, PNG, WEBP, TIFF, FITS, XISF. Max size: 200 MB.
 - **Shared skies**: share your sky as a file through any app of the phone, and open the files others send you to see their photos beside or instead of yours, read-only (Settings → Ciels partagés; tick the skies shown in the Affichage sheet of the map or the gallery). See [Sharing your sky](/user/user-guide.md#sharing-your-sky).
 - **Settings**: location, language (French, English, Spanish, German), theme, display options and your astrometry.net key.

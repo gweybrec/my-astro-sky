@@ -80,6 +80,7 @@ interface PlanRow {
   lat: number | null;
   lon: number | null;
   sort_by: string | null;
+  archived: number | null;
 }
 
 interface PlanEntryRow {
@@ -116,13 +117,14 @@ const SELECT_PLAN = 'SELECT * FROM plans WHERE id = ?';
 const SELECT_PLAN_NAMES = 'SELECT id, name FROM plans ORDER BY position ASC, rowid ASC';
 // The new plan goes at the end: its position follows the last one, read by the same statement.
 const INSERT_PLAN_AT_END =
-  'INSERT INTO plans (id, name, position, created_at, night_of, setup_id, lat, lon, sort_by) VALUES (?, ?, (SELECT COALESCE(MAX(position) + 1, 0) FROM plans), ?, ?, ?, ?, ?, ?)';
+  'INSERT INTO plans (id, name, position, created_at, night_of, setup_id, lat, lon, sort_by, archived) VALUES (?, ?, (SELECT COALESCE(MAX(position) + 1, 0) FROM plans), ?, ?, ?, ?, ?, ?, ?)';
 const INSERT_PLAN =
-  'INSERT INTO plans (id, name, position, created_at, night_of, setup_id, lat, lon, sort_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+  'INSERT INTO plans (id, name, position, created_at, night_of, setup_id, lat, lon, sort_by, archived) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 const RENAME_PLAN = 'UPDATE plans SET name = ? WHERE id = ?';
 const UPDATE_PLAN_SETTINGS =
   'UPDATE plans SET night_of = ?, setup_id = ?, lat = ?, lon = ? WHERE id = ?';
 const UPDATE_PLAN_SORT = 'UPDATE plans SET sort_by = ? WHERE id = ?';
+const UPDATE_PLAN_ARCHIVED = 'UPDATE plans SET archived = ? WHERE id = ?';
 const UPDATE_PLAN_POSITION = 'UPDATE plans SET position = ? WHERE id = ?';
 const DELETE_PLAN = 'DELETE FROM plans WHERE id = ?';
 
@@ -383,6 +385,8 @@ function planImportStatements(
       typeof p.lat === 'number' ? p.lat : null,
       typeof p.lon === 'number' ? p.lon : null,
       (PLAN_SORT_KEYS as readonly string[]).includes(p.sortBy) ? p.sortBy : 'transit',
+      // A backup from before archiving existed has no field: its plans come back current.
+      p.archived === true ? 1 : 0,
     ],
   });
   if (Array.isArray(p.entries)) {
@@ -454,6 +458,7 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
         lat: p.lat ?? null,
         lon: p.lon ?? null,
         sortBy: (p.sort_by ?? 'transit') as PlanSortKey,
+        archived: p.archived === 1,
         entries: (entries.get(p.id) ?? []).map(planEntryToApi),
         mosaics: (mosaics.get(p.id) ?? []).map(planMosaicToApi),
       }));
@@ -476,6 +481,7 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
         null,
         null,
         'transit',
+        0,
       ]);
       return { id };
     },
@@ -491,10 +497,11 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
       const hasName = 'name' in body;
       const hasSettings = 'nightOf' in body || 'setupId' in body || 'lat' in body || 'lon' in body;
       const hasSort = 'sortBy' in body;
-      if (!hasName && !hasSettings && !hasSort) {
+      const hasArchived = 'archived' in body;
+      if (!hasName && !hasSettings && !hasSort && !hasArchived) {
         throw err(
           'invalid',
-          'name, settings (nightOf/setupId/lat/lon), or sortBy required',
+          'name, settings (nightOf/setupId/lat/lon), sortBy, or archived required',
           'PLAN_UPDATE_EMPTY',
         );
       }
@@ -537,6 +544,12 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
           );
         }
         writes.push({ sql: UPDATE_PLAN_SORT, params: [sortBy, id] });
+      }
+      if (hasArchived) {
+        if (typeof body.archived !== 'boolean') {
+          throw err('invalid', 'archived must be true or false', 'PLAN_ARCHIVED_INVALID');
+        }
+        writes.push({ sql: UPDATE_PLAN_ARCHIVED, params: [body.archived ? 1 : 0, id] });
       }
       await db.batch(writes);
     },

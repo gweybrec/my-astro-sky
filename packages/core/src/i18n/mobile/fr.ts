@@ -79,6 +79,7 @@ const fr = {
     chartAria: 'Trajectoire de la nuit : {alt} à {time}',
     searchPlaceholder: 'Rechercher un plan…',
     searchLabel: 'Rechercher un plan',
+    scopeLabel: 'Plans affichés',
     moon: 'Lune',
     phase0: 'Nouvelle Lune',
     phase1: 'Premier croissant',

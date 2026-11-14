@@ -80,6 +80,7 @@ const en: Translations['mobile'] = {
     chartAria: 'Night trajectory: {alt} at {time}',
     searchPlaceholder: 'Search for a plan…',
     searchLabel: 'Search for a plan',
+    scopeLabel: 'Plans shown',
     moon: 'Moon',
     phase0: 'New Moon',
     phase1: 'Waxing crescent',

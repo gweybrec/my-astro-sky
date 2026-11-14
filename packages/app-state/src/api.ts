@@ -739,6 +739,11 @@ export async function updatePlanSortAPI(id: string, sortBy: PlanSortKey): Promis
   return guard('errors.updatePlanSort', () => getBackend().plans.update(id, { sortBy }));
 }
 
+/** Archive or unarchive a plan (partial update of the plan). */
+export async function updatePlanArchivedAPI(id: string, archived: boolean): Promise<void> {
+  return guard('errors.updatePlanArchived', () => getBackend().plans.update(id, { archived }));
+}
+
 export async function deletePlanAPI(id: string): Promise<void> {
   return guard('errors.deletePlan', () => getBackend().plans.remove(id));
 }

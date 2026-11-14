@@ -215,6 +215,18 @@ function raiseError() {
             ></template>
           </PhoneRow>
           <PhoneRow title="Désactivée" :subs="['La raison reste lisible']" disabled chevron />
+          <PhoneRow title="Cygne et Céphée" :subs="['10 oct. 2026 · 6 objets']" chevron button>
+            <template #badges><PhoneBadge kind="warn">Date passée</PhoneBadge></template>
+          </PhoneRow>
+          <PhoneRow
+            :subs="['Cette nuit est passée : archivez le plan ou choisissez une autre nuit.']"
+          >
+            <template #badges><PhoneBadge kind="warn">Date passée</PhoneBadge></template>
+            <template #actions>
+              <PhoneButton>Archiver</PhoneButton>
+              <PhoneButton>Déplacer à ce soir</PhoneButton>
+            </template>
+          </PhoneRow>
           <PhoneToggleRow v-model="switchOn" title="Interrupteur activé" />
           <PhoneToggleRow v-model="switchOff" title="Interrupteur désactivé" />
           <PhoneToggleRow
@@ -391,6 +403,7 @@ function raiseError() {
           <PhoneChip compact still>Affichée</PhoneChip>
           <PhoneBadge kind="type">Galaxie</PhoneBadge>
           <PhoneBadge kind="const">Andromède</PhoneBadge>
+          <PhoneBadge kind="warn">Date passée</PhoneBadge>
         </div>
         <!-- A photo's objects: two lines of chips to a page, the others on the next pages. -->
         <PhoneChipPager

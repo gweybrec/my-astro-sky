@@ -138,6 +138,19 @@ async function mkMosaic(planId: string, extra: object = {}): Promise<string> {
 // ─── Plans ───────────────────────────────────────────────────────────────────
 
 describe('PUT /api/plans/:id', () => {
+  it('archives a plan and refuses an archived value that is not true or false', async () => {
+    const id = await mkPlan('Old night');
+    expect(await call('PUT', `/api/plans/${id}`, { archived: true })).toMatchObject({
+      status: 200,
+    });
+    expect((await readPlan(id)).archived).toBe(true);
+    expect(await call('PUT', `/api/plans/${id}`, { archived: 'yes' })).toEqual({
+      status: 400,
+      body: { error: 'archived must be true or false', code: 'PLAN_ARCHIVED_INVALID' },
+    });
+    expect((await readPlan(id)).archived).toBe(true);
+  });
+
   it('rejects a blank name and leaves the name alone', async () => {
     const id = await mkPlan('Keep me');
     for (const name of ['', '   ', 5, null]) {
@@ -203,7 +216,7 @@ describe('PUT /api/plans/:id', () => {
 
   it('rejects a body with none of the recognised keys', async () => {
     const id = await mkPlan();
-    const message = 'name, settings (nightOf/setupId/lat/lon), or sortBy required';
+    const message = 'name, settings (nightOf/setupId/lat/lon), sortBy, or archived required';
     for (const body of [{}, { foo: 1 }, { notes: 'x' }]) {
       expect(await call('PUT', `/api/plans/${id}`, body)).toEqual({
         status: 400,
@@ -1177,7 +1190,7 @@ describe('requests with no body', () => {
     expect(await callRaw('PUT', `/api/plans/${id}`)).toEqual({
       status: 400,
       body: {
-        error: 'name, settings (nightOf/setupId/lat/lon), or sortBy required',
+        error: 'name, settings (nightOf/setupId/lat/lon), sortBy, or archived required',
         code: 'PLAN_UPDATE_EMPTY',
       },
     });

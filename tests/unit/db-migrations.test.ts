@@ -5,6 +5,8 @@ import { applyMigrations } from '../../server/db-migrations';
 
 /** The tables version 19 creates: a test that sets the version back removes them, since the updates create them again. */
 const DROP_VISIT_TABLES = 'DROP TABLE shared_sky_photos; DROP TABLE shared_skies';
+/** What migration 21 added: a test that goes back to an earlier version takes it away first. */
+const DROP_PLAN_ARCHIVED = 'ALTER TABLE plans DROP COLUMN archived';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -450,6 +452,7 @@ describe('applyMigrations — v9 supernova type + ISS recolor', () => {
     db.exec('DELETE FROM poi_categories');
     db.prepare('UPDATE schema_version SET version = 8').run();
     db.exec(DROP_VISIT_TABLES);
+    db.exec(DROP_PLAN_ARCHIVED);
     // Migration 15 on is plain SQL, run once: what it added goes too.
     db.exec('ALTER TABLE photos DROP COLUMN quarter_turns');
     const ins = db.prepare(
@@ -882,6 +885,7 @@ describe('applyMigrations — v15 photo quarter turns', () => {
     db.exec('ALTER TABLE photos DROP COLUMN quarter_turns');
     db.prepare('UPDATE schema_version SET version = 14').run();
     db.exec(DROP_VISIT_TABLES);
+    db.exec(DROP_PLAN_ARCHIVED);
     db.prepare(
       'INSERT INTO photos (id, filename, original_name, width, height) VALUES (?, ?, ?, ?, ?)',
     ).run('p1', 'p1.jpg', 'p1.jpg', 30, 20);
@@ -898,6 +902,7 @@ describe('applyMigrations — v16 photo dates in ISO form', () => {
     applyMigrations(db);
     db.prepare('UPDATE schema_version SET version = 15').run();
     db.exec(DROP_VISIT_TABLES);
+    db.exec(DROP_PLAN_ARCHIVED);
     const ins = db.prepare(
       'INSERT INTO photos (id, filename, original_name, width, height, created_at) VALUES (?, ?, ?, ?, ?, ?)',
     );
@@ -992,6 +997,7 @@ describe('applyMigrations — v20 author of a visited photo', () => {
     // back to v19, with a visit and its photo
     db.exec('ALTER TABLE shared_sky_photos DROP COLUMN author');
     db.prepare('UPDATE schema_version SET version = 19').run();
+    db.exec(DROP_PLAN_ARCHIVED);
     db.prepare(
       `INSERT INTO shared_skies (id, sender_name, display_name, shared_at, received_at)
        VALUES ('sky-0001', 'Paul', 'Paul', '2026-11-01T00:00:00.000Z', '2026-11-02T00:00:00.000Z')`,

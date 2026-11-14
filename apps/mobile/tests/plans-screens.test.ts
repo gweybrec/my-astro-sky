@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
@@ -217,6 +217,9 @@ const PLANS = [
 ];
 
 beforeEach(() => {
+  // The evening of the plans' night: none of them has passed yet (only the clock is pinned, the timers run).
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(2026, 9, 3, 21, 0));
   mounted.splice(0).forEach((w) => w.unmount());
   localStorage.setItem('lang', 'fr');
   configureStorage(createMemoryStore());
@@ -246,7 +249,8 @@ beforeEach(() => {
     difficulty: 2,
   });
   backend.gear.listSetups.mockResolvedValue(setups);
-  backend.plans.list.mockResolvedValue(PLANS);
+  // A fresh copy each time, as a real backend gives: the store changes the plans it holds in place.
+  backend.plans.list.mockImplementation(async () => structuredClone(PLANS));
   backend.plans.create.mockResolvedValue({ id: 'p3' });
   backend.plans.remove.mockResolvedValue(undefined);
   backend.plans.update.mockResolvedValue(undefined);
@@ -255,6 +259,10 @@ beforeEach(() => {
   backend.plans.addEntry.mockResolvedValue({ id: 'e9' });
   confirm.mockResolvedValue(true);
   setBackend(backend as never);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('the Plans page', () => {
@@ -626,6 +634,114 @@ describe('the plan detail page', () => {
     const { w } = await show(PlanDetailPage, '/plans/p1');
     expect(w.text()).not.toContain('Début de nuit');
     expect(w.findAll('.mob-list .mob-row')).toHaveLength(2);
+  });
+});
+
+describe('archived plans and plans whose night has passed', () => {
+  const ARCHIVE_PLANS = [
+    ...PLANS.map((p) => ({ ...p, archived: false })),
+    plan('p3', 'Nuit du 2026-09-19', [], { nightOf: '2026-09-19', archived: true }),
+  ];
+  const segButtons = (w: { findAll: (s: string) => { text: () => string }[] }) =>
+    w.findAll('.mob-seg-btn').map((b) => b.text());
+
+  it('has no switch while no plan is archived', async () => {
+    const { w } = await show(PlansPage, '/tabs/plans');
+    expect(w.find('.mob-seg').exists()).toBe(false);
+  });
+
+  it('shows the current plans and a switch with both counts once a plan is archived', async () => {
+    backend.plans.list.mockImplementation(async () => structuredClone(ARCHIVE_PLANS));
+    const { w } = await show(PlansPage, '/tabs/plans');
+    expect(segButtons(w as never)).toEqual(['En cours (2)', 'Archivés (1)']);
+    const rows = w.findAll('.mob-list .mob-row');
+    expect(rows.map((r) => r.find('.mob-row-title').text())).toEqual([
+      'Nuit du 2026-10-03',
+      'Cygne et Céphée',
+    ]);
+    expect(w.find('button[aria-label="Nouveau plan"]').exists()).toBe(true);
+  });
+
+  it('shows the archived plans, without the plus, and remembers the choice', async () => {
+    backend.plans.list.mockImplementation(async () => structuredClone(ARCHIVE_PLANS));
+    const { w } = await show(PlansPage, '/tabs/plans');
+    await w.findAll('.mob-seg-btn')[1].trigger('click');
+    await settle();
+    const rows = w.findAll('.mob-list .mob-row');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].text()).toContain('Nuit du 2026-09-19');
+    expect(w.find('button[aria-label="Nouveau plan"]').exists()).toBe(false);
+    expect(JSON.parse(storage().get('targets-prefs-v3')!).showArchivedPlans).toBe(true);
+  });
+
+  it('marks a current plan whose night has passed, from noon the next day', async () => {
+    backend.plans.list.mockImplementation(async () => structuredClone(ARCHIVE_PLANS));
+    vi.setSystemTime(new Date(2026, 9, 4, 11, 59));
+    const before = await show(PlansPage, '/tabs/plans');
+    expect(before.w.findAll('.mob-badge--warn')).toHaveLength(0);
+    vi.setSystemTime(new Date(2026, 9, 4, 12, 0));
+    const after = await show(PlansPage, '/tabs/plans');
+    const marked = after.w
+      .findAll('.mob-list .mob-row')
+      .filter((r) => r.find('.mob-badge--warn').exists());
+    expect(marked.map((r) => r.find('.mob-row-title').text())).toEqual(['Nuit du 2026-10-03']);
+    expect(marked[0].text()).toContain('Date passée');
+  });
+
+  it('offers to archive a plan whose night has passed, and archives it', async () => {
+    vi.setSystemTime(new Date(2026, 9, 5, 12, 0));
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    expect(w.text()).toContain('Cette nuit est passée');
+    const archive = w.findAll('button').find((b) => b.text() === 'Archiver')!;
+    await archive.trigger('click');
+    await settle();
+    expect(backend.plans.update).toHaveBeenCalledWith('p1', { archived: true });
+    // archived: the warning goes, and the plan takes no new target
+    expect(w.text()).not.toContain('Cette nuit est passée');
+    expect(w.find('button[aria-label="Ajouter une cible"]').exists()).toBe(false);
+  });
+
+  it('moves a plan whose night has passed to tonight', async () => {
+    vi.setSystemTime(new Date(2026, 9, 5, 21, 0));
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    const move = w.findAll('button').find((b) => b.text() === 'Déplacer à ce soir')!;
+    await move.trigger('click');
+    await settle();
+    expect(backend.plans.update).toHaveBeenCalledWith(
+      'p1',
+      expect.objectContaining({ nightOf: '2026-10-05' }),
+    );
+    expect(w.text()).not.toContain('Cette nuit est passée');
+  });
+
+  it("shows the plan's night in a field and changes it with the phone's picker", async () => {
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    const field = w.findAll('button').find((b) => b.text().startsWith('Nuit'))!;
+    expect(field.text()).toContain('Ce soir');
+    const picker = w.findAllComponents(PhoneNativePicker)[0];
+    picker.vm.$emit('pick', '2026-10-12');
+    await settle();
+    expect(backend.plans.update).toHaveBeenCalledWith(
+      'p1',
+      expect.objectContaining({ nightOf: '2026-10-12' }),
+    );
+    expect(field.text()).toContain('12 oct. 2026');
+  });
+
+  it('archives and unarchives from the actions, and hides the map action of an archived plan', async () => {
+    backend.plans.list.mockImplementation(async () => structuredClone(ARCHIVE_PLANS));
+    const { w } = await show(PlanDetailPage, '/plans/p3');
+    const rowTitles = () => w.findAll('.mob-row').map((r) => r.text());
+    expect(rowTitles()).toContain('Désarchiver le plan');
+    expect(rowTitles()).not.toContain('Afficher sur la carte');
+    await w
+      .findAll('.mob-row')
+      .find((r) => r.text() === 'Désarchiver le plan')!
+      .trigger('click');
+    await settle();
+    expect(backend.plans.update).toHaveBeenCalledWith('p3', { archived: false });
+    expect(rowTitles()).toContain('Archiver le plan');
+    expect(rowTitles()).toContain('Afficher sur la carte');
   });
 });
 
@@ -1081,6 +1197,20 @@ describe('the target page ("Cibles, détail d\'une cible")', () => {
     await settle();
     expect(backend.plans.removeEntry).toHaveBeenCalled();
     expect(showNotice).toHaveBeenLastCalledWith(`Retiré de « ${inside.props('title')} »`);
+  });
+
+  it('leaves the archived plans out of the plans offered', async () => {
+    backend.plans.list.mockImplementation(async () =>
+      structuredClone(PLANS).map((p) => ({ ...p, archived: p.id === 'p2' })),
+    );
+    const { w } = await show(TargetDetailPage, '/targets/M31');
+    await row(w, 'Ajouter à un plan').trigger('click');
+    await settle();
+    const picker = w
+      .findAllComponents({ name: 'PhoneSheet' })
+      .find((c) => c.props('title') === 'Ajouter au plan')!;
+    const titles = picker.findAllComponents({ name: 'PhoneCheckRow' }).map((c) => c.props('title'));
+    expect(titles).toEqual(['Nuit du 2026-10-03']);
   });
 
   it('shows a multiple star of the list and adds it to a plan as a frame on its position', async () => {

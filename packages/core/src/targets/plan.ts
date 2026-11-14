@@ -204,6 +204,32 @@ export function formatPlanDate(dateISO: string, locale?: string | string[]): str
   });
 }
 
+function localISO(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * The night a plan for "tonight" is dated: today's local date, or yesterday's before noon (at 2 a.m. the session that
+ * started yesterday evening is still running).
+ */
+export function tonightISO(now: Date = new Date()): string {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (now.getHours() < 12) d.setDate(d.getDate() - 1);
+  return localISO(d);
+}
+
+/**
+ * Whether a plan's night has passed while the plan is still current: from local noon on the day after its date, so a
+ * plan is never flagged during its own session. A plan with no date of its own follows the global date and never is.
+ */
+export function isPlanOverdue(
+  plan: { nightOf?: string | null; archived?: boolean },
+  now: Date = new Date(),
+): boolean {
+  if (plan.archived || !plan.nightOf) return false;
+  return plan.nightOf < tonightISO(now);
+}
+
 /** The default name of a new plan: "Nuit du {date}" with the date of the chosen night written in the given locale. */
 export function defaultPlanName(
   dateISO: string,

@@ -4,21 +4,31 @@ import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonList, onIonViewWillEnter } from '@ionic/vue';
 import { getLang, t } from '@myastrosky/core/i18n/index';
 import { todayISO } from '@myastrosky/core/targets/format';
-import { defaultPlanName, formatPlanDate, planItemCount } from '@myastrosky/core/targets/plan';
+import {
+  defaultPlanName,
+  formatPlanDate,
+  isPlanOverdue,
+  planItemCount,
+} from '@myastrosky/core/targets/plan';
 import { createPlanAPI } from '@myastrosky/app-state/api';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
-import { reloadTargetsPrefs, targetsPrefs } from '../composables/useTargets';
+import { reloadTargetsPrefs, targetsPrefs, updateTargetsPrefs } from '../composables/useTargets';
 import { useErrorToast } from '../composables/useErrorToast';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneSearch from '../components/PhoneSearch.vue';
 import PhoneEmptyState from '../components/PhoneEmptyState.vue';
 import PhoneRow from '../components/PhoneRow.vue';
+import PhoneBadge from '../components/PhoneBadge.vue';
+import PhoneSegmented from '../components/PhoneSegmented.vue';
 import PhoneFab from '../components/PhoneFab.vue';
 import plusIcon from '@icons/plus.svg?raw';
 import planIcon from '@icons/plan-list.svg?raw';
 
-// The Plans tab, from the boards "Plans" and "Plans, aucun plan": the observing plans, each with its night and its
-// number of objects; a tap opens the plan, the plus (or the button of the empty screen) adds one.
+// The Plans tab, from the boards "Plans", "Plans, aucun plan", "Plans, avec archives" and "Plans, archivés": the
+// observing plans, each with its night and its number of objects; a tap opens the plan, the plus (or the button of the
+// empty screen) adds one. Once a plan is archived, a switch shows the current plans or the archived ones (the choice is
+// the desktop's, kept with the Targets settings); a current plan whose night has passed carries a warning badge. The
+// archived view has no plus: a new plan is a current one.
 const router = useRouter();
 const store = usePlansStore();
 const { showError } = useErrorToast();
@@ -32,16 +42,33 @@ const fold = (text: string) =>
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase();
 
+const archivedCount = computed(() => store.plans.filter((p) => !!p.archived).length);
+// Back to the current plans once the last archived one is unarchived or deleted, as on the desktop.
+const scope = computed<'current' | 'archived'>({
+  get: () =>
+    targetsPrefs.showArchivedPlans === true && archivedCount.value > 0 ? 'archived' : 'current',
+  set: (value) => updateTargetsPrefs({ showArchivedPlans: value === 'archived' }),
+});
+const scopeOptions = computed(() => [
+  {
+    value: 'current' as const,
+    label: t('targets.plan.current', { n: store.plans.length - archivedCount.value }),
+  },
+  { value: 'archived' as const, label: t('targets.plan.archived', { n: archivedCount.value }) },
+]);
+
 const rows = computed(() => {
   const query = fold(search.value.trim());
+  const archived = scope.value === 'archived';
   return store.plans
-    .filter((plan) => !query || fold(plan.name).includes(query))
+    .filter((plan) => !!plan.archived === archived && (!query || fold(plan.name).includes(query)))
     .map((plan) => {
       const count = t('targets.plan.itemCount', { n: planItemCount(plan) });
       return {
         id: plan.id,
         name: plan.name,
         sub: plan.nightOf ? `${formatPlanDate(plan.nightOf, getLang())} · ${count}` : count,
+        overdue: isPlanOverdue(plan),
       };
     });
 });
@@ -82,21 +109,39 @@ async function create() {
           :button-icon="plusIcon"
           @action="create"
         />
-        <IonList v-else class="mob-list" lines="none" style="padding-top: var(--space-4)">
-          <PhoneRow
-            v-for="row in rows"
-            :key="row.id"
-            :title="row.name"
-            :subs="[row.sub]"
-            :lead="planIcon"
-            button
-            chevron
-            @click="router.push(`/plans/${row.id}`)"
-          />
-        </IonList>
+        <template v-else>
+          <!-- The page's top gap goes above the switch when there is one, else above the list. -->
+          <div v-if="archivedCount > 0" style="padding-top: var(--space-4)">
+            <PhoneSegmented
+              v-model="scope"
+              :options="scopeOptions"
+              :label="t('mobile.plans.scopeLabel')"
+            />
+          </div>
+          <IonList
+            class="mob-list"
+            lines="none"
+            :style="archivedCount > 0 ? undefined : 'padding-top: var(--space-4)'"
+          >
+            <PhoneRow
+              v-for="row in rows"
+              :key="row.id"
+              :title="row.name"
+              :subs="[row.sub]"
+              :lead="planIcon"
+              button
+              chevron
+              @click="router.push(`/plans/${row.id}`)"
+            >
+              <template v-if="row.overdue" #badges>
+                <PhoneBadge kind="warn">{{ t('targets.plan.datePassed') }}</PhoneBadge>
+              </template>
+            </PhoneRow>
+          </IonList>
+        </template>
       </div>
       <PhoneFab
-        v-if="store.plans.length > 0"
+        v-if="store.plans.length > 0 && scope === 'current'"
         in-tab
         :label="t('targets.plan.newPlan')"
         @click="create"

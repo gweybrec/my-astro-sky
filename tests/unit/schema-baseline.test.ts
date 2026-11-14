@@ -100,7 +100,7 @@ describe('baseline schema equals the server upgrade path', () => {
   });
 
   it('both report the baseline version', () => {
-    expect(SCHEMA_VERSION).toBe(20);
+    expect(SCHEMA_VERSION).toBe(21);
     expect(version(a)).toBe(SCHEMA_VERSION);
     expect(version(b)).toBe(SCHEMA_VERSION);
   });
@@ -248,6 +248,7 @@ describe.each(OPENERS)('the photos table rebuild of version 17 (%s)', (_adapter,
     for (const sql of BASELINE_SCHEMA) conn.exec(sql.replace(NEW_DEFAULT, "datetime('now')"));
     // Tables of later versions, which the updates create again.
     conn.exec('DROP TABLE shared_sky_photos; DROP TABLE shared_skies');
+    conn.exec('ALTER TABLE plans DROP COLUMN archived');
     conn.exec('CREATE TABLE schema_version (version INTEGER NOT NULL DEFAULT 0)');
     conn.prepare('INSERT INTO schema_version (version) VALUES (16)').run();
     const photo = conn.prepare(

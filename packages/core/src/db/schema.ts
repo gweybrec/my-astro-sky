@@ -13,7 +13,7 @@
 import type { SqlDb } from '../ports/sql-db';
 
 /** Schema version produced by `BASELINE_SCHEMA` (the latest migration it includes). */
-export const SCHEMA_VERSION = 20;
+export const SCHEMA_VERSION = 21;
 
 /** The columns of the photos table at version 17, in their order (migration 17 copies them). */
 const PHOTO_COLUMNS_V17 =
@@ -157,7 +157,8 @@ export const BASELINE_SCHEMA: readonly string[] = [
     setup_id   TEXT,
     lat        REAL,
     lon        REAL,
-    sort_by    TEXT NOT NULL DEFAULT 'transit'
+    sort_by    TEXT NOT NULL DEFAULT 'transit',
+    archived   INTEGER NOT NULL DEFAULT 0
   )`,
   `CREATE TABLE poi_categories (
     id       TEXT PRIMARY KEY,
@@ -246,6 +247,25 @@ export const MIGRATIONS: readonly DataMigration[] = [
   {
     version: 20,
     statements: ["ALTER TABLE shared_sky_photos ADD COLUMN author TEXT NOT NULL DEFAULT ''"],
+  },
+  // A plan the user archived: hidden from the plans list and the plan pickers until unarchived. The server
+  // creates the plans table only after its migrations run, so a new database gets it here, as version 20 had it.
+  {
+    version: 21,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS plans (
+        id         TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        position   INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        night_of   TEXT,
+        setup_id   TEXT,
+        lat        REAL,
+        lon        REAL,
+        sort_by    TEXT NOT NULL DEFAULT 'transit'
+      )`,
+      'ALTER TABLE plans ADD COLUMN archived INTEGER NOT NULL DEFAULT 0',
+    ],
   },
 ];
 

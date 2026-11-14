@@ -6,6 +6,7 @@ import { setActivePinia, createPinia } from 'pinia';
 vi.mock('@myastrosky/app-state/api', () => ({
   getPlans: vi.fn().mockResolvedValue([]),
   updatePlanSortAPI: vi.fn().mockResolvedValue(undefined),
+  updatePlanArchivedAPI: vi.fn().mockResolvedValue(undefined),
   renamePlanAPI: vi.fn().mockResolvedValue(undefined),
   updatePlanEntryPositionAPI: vi.fn().mockResolvedValue(undefined),
 }));
@@ -15,6 +16,7 @@ import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import {
   getPlans,
   updatePlanSortAPI,
+  updatePlanArchivedAPI,
   renamePlanAPI,
   updatePlanEntryPositionAPI,
   type Plan,
@@ -31,6 +33,7 @@ function makePlan(id: string, setupId: string | null): Plan {
     lat: null,
     lon: null,
     sortBy: 'transit',
+    archived: false,
     entries: [],
     mosaics: [],
   };
@@ -102,6 +105,33 @@ describe('plans store · setPlanSort', () => {
 
     expect(store.plans[0].sortBy).toBe('transit');
     expect(updatePlanSortAPI).toHaveBeenCalledWith('missing', 'altitude');
+  });
+});
+
+describe('plans store · setPlanArchived and activePlans', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.mocked(updatePlanArchivedAPI).mockClear();
+  });
+
+  it('archives a plan in the cache at once, persists it, and leaves it out of the active plans', () => {
+    const store = usePlansStore();
+    store.plans = [makePlan('a', null), makePlan('b', null)];
+
+    store.setPlanArchived('a', true);
+
+    expect(store.plans[0].archived).toBe(true);
+    expect(updatePlanArchivedAPI).toHaveBeenCalledWith('a', true);
+    expect(store.activePlans.map((p) => p.id)).toEqual(['b']);
+
+    store.setPlanArchived('a', false);
+    expect(store.activePlans.map((p) => p.id)).toEqual(['a', 'b']);
+  });
+
+  it('still counts an archived plan as using its setup', () => {
+    const store = usePlansStore();
+    store.plans = [{ ...makePlan('a', 's1'), archived: true }];
+    expect(store.plansUsingSetup('s1').map((p) => p.id)).toEqual(['a']);
   });
 });
 

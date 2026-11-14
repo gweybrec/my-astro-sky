@@ -390,6 +390,7 @@ describe('plans', () => {
         lat: null,
         lon: null,
         sortBy: 'transit',
+        archived: false,
         entries: [],
         mosaics: [],
       },
@@ -540,7 +541,7 @@ describe('plans', () => {
     expect(await call('PUT', '/api/plans/nope', {})).toEqual({
       status: 400,
       body: {
-        error: 'name, settings (nightOf/setupId/lat/lon), or sortBy required',
+        error: 'name, settings (nightOf/setupId/lat/lon), sortBy, or archived required',
         code: 'PLAN_UPDATE_EMPTY',
       },
     });

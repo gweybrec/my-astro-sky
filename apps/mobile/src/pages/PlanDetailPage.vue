@@ -2,14 +2,17 @@
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent, IonList, onIonViewWillEnter } from '@ionic/vue';
-import { t } from '@myastrosky/core/i18n/index';
+import { getLang, t } from '@myastrosky/core/i18n/index';
 import { fracToClock } from '@myastrosky/core/observation-windows';
 import type { PlanSortKey } from '@myastrosky/core/domain/plans';
-import { formatClock24 } from '@myastrosky/core/targets/format';
+import { formatClock24, todayISO } from '@myastrosky/core/targets/format';
 import {
   customLocationLabelOr,
+  formatPlanDate,
+  isPlanOverdue,
   planItemCount,
   resolvePlanNight,
+  tonightISO,
 } from '@myastrosky/core/targets/plan';
 import { buildPlanPdfTargets } from '@myastrosky/core/targets/plan-pdf';
 import { fovDeg } from '@myastrosky/core/gear-presets';
@@ -43,12 +46,16 @@ import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PlanSetupField from './plans/PlanSetupField.vue';
 import PhoneFacts from '../components/PhoneFacts.vue';
 import PhoneRow from '../components/PhoneRow.vue';
+import PhoneBadge from '../components/PhoneBadge.vue';
+import PhoneButton from '../components/PhoneButton.vue';
+import PhoneNativePicker from '../components/PhoneNativePicker.vue';
 import PhoneFab from '../components/PhoneFab.vue';
 import PhoneRadioSheet from '../components/PhoneRadioSheet.vue';
 import PlanActionsSheet from './plans/PlanActionsSheet.vue';
 import PlanRenameSheet from './plans/PlanRenameSheet.vue';
 import moreIcon from '../icons/more-vertical.svg?raw';
 import sortIcon from '../icons/arrow-up-down.svg?raw';
+import caretIcon from '../icons/chevron-down.svg?raw';
 
 // The boards "Détail du plan", "Plan, actions" and "Plan, confirmer la suppression": the night of the plan, then its
 // plan's equipment (a field: choosing another may ask about its mosaics, board "Ciel, changer d'équipement"), then its
@@ -59,6 +66,9 @@ import sortIcon from '../icons/arrow-up-down.svg?raw';
 // desktop's "Trouver des cibles" of a plan; the targets added there show when this page is entered again. A mosaic is
 // an item of the plan like a target (its name · Mosaïque, its number of tiles): sorted with them, a tap
 // shows the plan on the map zoomed to fit it, as the desktop's "Afficher sur la carte" of a mosaic.
+// The night is a field above the equipment (the phone's date picker, as the Targets' night). When it has passed and
+// the plan is still current (board "Plan, détail, date passée"), a warning row offers to archive the plan or to move
+// it to tonight. An archived plan takes no new target and is not shown on the map, as on the desktop.
 const route = useRoute();
 const router = useRouter();
 const store = usePlansStore();
@@ -71,6 +81,32 @@ const plan = computed<Plan | undefined>(() => store.plans.find((p) => p.id === p
 const actionsOpen = ref(false);
 const renameOpen = ref(false);
 const sortOpen = ref(false);
+
+const nightPicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
+/** The plan's own night, else the Targets' one (the night the plan is shown for). */
+const nightISO = computed(() => plan.value?.nightOf ?? targetsPrefs.lastDateISO ?? todayISO());
+const nightLabel = computed(() =>
+  nightISO.value === todayISO()
+    ? t('mobile.targets.tonight')
+    : formatPlanDate(nightISO.value, getLang()),
+);
+const overdue = computed(() => !!plan.value && isPlanOverdue(plan.value));
+
+function setNight(dateISO: string | null) {
+  const p = plan.value;
+  if (!p) return;
+  void store.updatePlanSettings(p.id, dateISO, p.setupId, p.lat, p.lon);
+}
+
+/** Archive or unarchive the plan; an archived plan's frames leave the map. */
+function setArchived(archived: boolean) {
+  const p = plan.value;
+  if (!p) return;
+  actionsOpen.value = false;
+  store.setPlanArchived(p.id, archived);
+  const sel = fov.selection;
+  if (archived && sel.kind === 'plan' && sel.planId === p.id) fov.setSelection({ kind: 'free' });
+}
 
 const night = computed(() =>
   plan.value ? resolvePlanNight(plan.value, targetsPrefs, planLookups) : null,
@@ -322,6 +358,46 @@ async function remove() {
           <PhoneSectionHeader>{{ t('targets.plan.pdf.summary') }}</PhoneSectionHeader>
           <PhoneFacts :facts="summary" />
         </template>
+        <div class="mob-form-row" style="padding-bottom: var(--space-4)">
+          <PhoneButton
+            variant="field"
+            block
+            text-style="body"
+            :aria-label="
+              t('mobile.targets.fieldAria', {
+                name: t('mobile.targets.fieldNight'),
+                value: nightLabel.toLowerCase(),
+              })
+            "
+            @click="nightPicker?.open()"
+          >
+            <span class="mob-btn-key">{{ t('mobile.targets.fieldNight') }}</span>
+            <span class="mob-btn-value mob-btn-value--swatch">{{ nightLabel }}</span>
+            <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
+          </PhoneButton>
+        </div>
+        <PhoneNativePicker
+          ref="nightPicker"
+          type="date"
+          :value="nightISO"
+          @pick="setNight"
+          @clear="setNight(null)"
+        />
+        <IonList v-if="overdue" class="mob-list" lines="none" style="margin-bottom: var(--space-4)">
+          <PhoneRow :subs="[t('targets.plan.datePassedHint')]">
+            <template #badges>
+              <PhoneBadge kind="warn">{{ t('targets.plan.datePassed') }}</PhoneBadge>
+            </template>
+            <template #actions>
+              <PhoneButton @click="setArchived(true)">{{
+                t('targets.plan.archiveShort')
+              }}</PhoneButton>
+              <PhoneButton @click="setNight(tonightISO())">{{
+                t('targets.plan.moveToTonight')
+              }}</PhoneButton>
+            </template>
+          </PhoneRow>
+        </IonList>
         <PlanSetupField :plan="plan" bare @new-setup="router.push('/settings/setups/new')" />
         <PhoneSectionHeader>{{
           t('targets.plan.itemCount', { n: planItemCount(plan) })
@@ -340,6 +416,7 @@ async function remove() {
         </IonList>
       </div>
       <PhoneFab
+        v-if="plan && !plan.archived"
         :label="t('mobile.plans.addTarget')"
         flush
         @click="router.push(`/plans/${planId}/targets`)"
@@ -349,9 +426,11 @@ async function remove() {
       v-if="plan"
       v-model:open="actionsOpen"
       :name="plan.name"
+      :archived="plan.archived"
       @show-on-map="showOnMap"
       @rename="openRename"
       @export-pdf="exportPdf"
+      @archive="setArchived(!plan.archived)"
       @delete="remove"
     />
     <PlanRenameSheet v-if="plan" v-model:open="renameOpen" :name="plan.name" @rename="rename" />

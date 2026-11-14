@@ -292,6 +292,7 @@ describe('export and import round trip', () => {
         lon: 2.25,
         setupId,
         sortBy: 'name',
+        archived: true,
       }),
     ).toEqual(OK);
     const e1 = await call('POST', `/api/plans/${planId}/entries`, { dsoId: 'M31' });
