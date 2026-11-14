@@ -291,6 +291,21 @@ export async function seed({ ports }) {
     captureDetails: { gain: 100, ccdTemp: -10, binning: '1x1' },
     notes: 'Seeing moyen',
   });
+  // The header cards of the file the photo's data came from (board "Photo, en-têtes du fichier"): short and long
+  // values, with and without a comment.
+  await api(base, 'PUT', `/api/photos/${photoId}/fits-headers`, {
+    cards: [
+      { key: 'SIMPLE', value: 'T', comment: 'file does conform to FITS standard' },
+      { key: 'OBJECT', value: 'M31' },
+      { key: 'DATE-OBS', value: '2025-08-23T21:30:12.000', comment: 'UTC start of exposure' },
+      { key: 'EXPTIME', value: '180.', comment: '[s] Exposure time' },
+      { key: 'INSTRUME', value: 'ZWO ASI2600MM Pro', comment: 'Camera model' },
+      {
+        key: 'HISTORY',
+        value: 'Calibrated, registered and integrated: a long value that wraps onto a second line',
+      },
+    ],
+  });
   // Twelve photos: six rows of the gallery's two columns in portrait, two rows of its six columns in landscape.
   for (const fileName of [
     'Cygnus_close_2025-08-24.jpg',
@@ -492,6 +507,14 @@ export const rules = [
     lines: '.mob-meta, .mob-credit-links',
     chips: 'ion-badge, ion-chip, .mob-badge, .mob-chip',
   },
+  // A file's header card: the keyword and the first line of its value share a baseline (a long value wraps under it).
+  {
+    id: 'card-baseline',
+    type: 'baseline',
+    lines: '.mob-card-row',
+    chips: '.mob-card-row-value',
+    firstLine: true,
+  },
   // A target's name and the rating's stars at the right end of its line share a baseline.
   { id: 'target-rating', type: 'baseline', lines: '.mob-target-head', chips: '.mob-rating' },
   // An icon, a switch or an "i" button is centred on its row.
@@ -532,7 +555,7 @@ export const rules = [
   {
     id: 'centre-line',
     type: 'centreLine',
-    bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .mob-stepper-row, .phone-field-unit-line, .mob-icon-row, .mob-map-top, .mob-timebar-row, .mob-when-row, .mob-form-row--search, .mob-type-row, .mob-add-row',
+    bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .mob-stepper-row, .phone-field-unit-line, .mob-icon-row, .mob-map-top, .mob-timebar-row, .mob-when-row, .mob-form-row--search, .mob-type-row, .mob-add-row, .mob-wcs-row',
   },
   // The clear button of a search field is centred on the field.
   { id: 'search-clear', type: 'rowCentre', rows: '.mob-search-wrap', items: '.mob-search-clear' },
@@ -588,7 +611,7 @@ export const rules = [
     id: 'left-edge',
     type: 'leadingEdge',
     items:
-      '.mob-section-header, .mob-sheet-title, .mob-stepper-label, .mob-form-label:not(.mob-form-row--pair > :not(:first-child) *), .mob-helper, ion-item.mob-row:not(:has(.mob-row-lead, .mob-row-thumb)):not(.mob-entry .mob-row) .mob-row-title, ion-item.mob-row:not(.mob-entry .mob-row) .mob-row-thumb, ion-toggle.mob-row:not(:has(.mob-row-lead)) .mob-row-title, ion-toggle.mob-row .mob-row-lead',
+      '.mob-section-header, .mob-sheet-title, .mob-stepper-label, .mob-form-label:not(.mob-form-row--pair > :not(:first-child) *), .mob-helper, ion-item.mob-row:not(:has(.mob-row-lead, .mob-row-thumb)):not(.mob-entry .mob-row) .mob-row-title, ion-item.mob-row:not(.mob-entry .mob-row) .mob-row-thumb, ion-toggle.mob-row:not(:has(.mob-row-lead)) .mob-row-title, ion-toggle.mob-row .mob-row-lead, .mob-card-row-key',
   },
   // The chevron (else the switch) of each row ends on one line.
   {
@@ -998,8 +1021,9 @@ export const views = [
     ...SHEET,
   },
   {
-    // A solved FITS (placed by its own WCS) and a JPEG that still has to be placed: the files are the repository's
-    // local test photos.
+    // A solved FITS (placed by its own WCS), a FITS without a plate solution (its row's warning line, board
+    // "Importer, fichier non résolu") and a JPEG that still has to be placed: the files are the repository's local
+    // test photos.
     name: 'gallery-import',
     path: '/tabs/gallery',
     ready: '.mob-photo',
@@ -1009,9 +1033,10 @@ export const views = [
       { pause: 600 },
       {
         chooseFiles: '.mob-sheet ion-item.mob-row',
-        files: ['test-photos/M1-CCD.fit', 'test-photos/M1-CCD.jpg'],
+        files: ['test-photos/M1-CCD.fit', 'test-photos/M2.fit', 'test-photos/M1-CCD.jpg'],
       },
       { wait: '.mob-status--success' },
+      { wait: '.mob-status--warn' },
     ],
   },
   { name: 'photo', path: (ids) => `/gallery/photo/${ids.photo}`, ready: '.mob-photo-view' },
@@ -1038,6 +1063,24 @@ export const views = [
       { pause: 600 },
     ],
     ...SHEET,
+  },
+  // The information sheet's "En-têtes" opens the file's header cards (board "Photo, en-têtes du fichier").
+  {
+    name: 'photo-headers',
+    path: (ids) => `/gallery/photo/${ids.photo}`,
+    ready: '.mob-photo-view',
+    open: [
+      { click: '.mob-topbar--overlay ion-button.mob-icon-btn:last-of-type' },
+      { wait: '.mob-photo-buttons ion-button' },
+      { click: '.mob-photo-buttons ion-button:last-of-type' },
+      { wait: '.mob-wcs-row ion-button:last-of-type' },
+      { pause: 600 },
+      { click: '.mob-wcs-row ion-button:last-of-type' },
+      { wait: '.mob-card-row' },
+      { pause: 600 },
+    ],
+    // The headers sheet opens over the information sheet: the one with the cards.
+    scope: `${OPEN_SHEET}:has(.mob-card-row)`,
   },
   {
     name: 'photo-edit',

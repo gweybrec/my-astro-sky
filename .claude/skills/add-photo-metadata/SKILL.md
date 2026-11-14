@@ -277,28 +277,17 @@ Pass `myField: editMyField || null` to `updatePhotoMetadata()`.
 
 ## WCS pre-fill pipeline
 
-When the user uploads a `.wcs`, `.tiff`, or `.fit` WCS companion file:
+When the user reads a solved or raw file (`.fits`, `.fit`, `.tif`, `.tiff`, `.xisf`), solved or not:
 
-1. `server/wcs-reader.ts` — `parseFITSHeader()` reads the raw header.
-   Add the new keyword to `extractWCS()`:
-
-   ```typescript
-   const rawVal = parsed['MY-KEY'];
-   if (typeof rawVal === 'string') wcs.myField = rawVal;
-   ```
-
-   Extend the `WCSData` interface with the new optional field.
-
-2. `server/routes/solved-import.ts` — `POST /api/solve-wcs` (and `POST /api/photos/convert`) spread the field into the response:
-
-   ```typescript
-   ...(wcs.myField ? { myField: wcs.myField } : {}),
-   ```
-
-3. `src/types.ts` — `PlateSolveResult` already has the field (Step 1).
-
-4. Each of the 3 UI contexts calls `prefillWCSMeta` / stores the value when
-   the response includes the field (Steps 6, 7, 8).
+1. `packages/core/src/fits-header.ts` — `captureFromHeader()` reads the capture keywords of the parsed header (it does
+   not need a plate solution). Add the new keyword there, and the field to `SolvedCaptureMetadata`
+   (`packages/core/src/domain/solved-import.ts`) and `PlateSolveResult` (`packages/core/src/types.ts`). A capture-detail
+   field goes in `CAPTURE_FITS_MAP` (`packages/core/src/wcs.ts`) instead.
+2. `server/routes/solved-import.ts` — `captureFields()` spreads the field into both responses (solved or not).
+3. `packages/core/src/wcs-photo-metadata.ts` (`wcsCaptureMetadata`) and `photo-metadata-draft.ts` (`wcsDraftChanges`)
+   turn it into the metadata the add-photo card (`src/batch-wcs.ts`) and the editors fill in.
+4. The desktop reads files through `src/wcs-load-flow.ts` (checks, warnings popup), the phone through
+   `apps/mobile/src/composables/useWcsLoad.ts` and `usePhotoImport.ts`.
 
 ---
 

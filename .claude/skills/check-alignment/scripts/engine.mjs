@@ -69,9 +69,10 @@ export function measureInPage([rules, scopeSel]) {
     probe.remove();
     return w;
   };
-  // The bottom of the text's baseline. The probe goes at the end of the element's own text. In a flex host (a chip)
+  // The bottom of the text's baseline. The probe goes at the end of the element's own text (its last line), or with
+  // `first` at its start (its first line: text that wraps and lines up by its first line). In a flex host (a chip)
   // it would become a flex item of its own, so the text is wrapped in a temporary span and the probe sits inside it.
-  const baselineOf = (el) => {
+  const baselineOf = (el, first = false) => {
     const text = [...el.childNodes].reverse().find((n) => n.nodeType === 3 && n.textContent.trim());
     if (!text) return null;
     const wrap = document.createElement('span');
@@ -79,7 +80,8 @@ export function measureInPage([rules, scopeSel]) {
     wrap.appendChild(text);
     const probe = document.createElement('span');
     probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
-    wrap.appendChild(probe);
+    if (first) wrap.insertBefore(probe, text);
+    else wrap.appendChild(probe);
     const bottom = R(probe).bottom;
     wrap.replaceWith(text);
     return bottom;
@@ -91,17 +93,18 @@ export function measureInPage([rules, scopeSel]) {
   };
 
   const types = {
-    // The text and the text inside a chip of the same line share a baseline.
+    // The text and the text inside a chip of the same line share a baseline (with `firstLine`, the baseline of their
+    // first lines: items that wrap and line up by their first line).
     baseline(rule) {
       for (const line of all(rule.lines)) {
         const kids = [...line.children].filter((k) => R(k).width > 0);
         const plain = kids.filter((k) => !k.matches(rule.chips));
         const chips = kids.filter((k) => k.matches(rule.chips));
         if (!plain.length || !chips.length) continue;
-        const reference = baselineOf(plain[0]);
+        const reference = baselineOf(plain[0], rule.firstLine);
         if (reference === null) continue;
         for (const chip of chips) {
-          const b = baselineOf(chip);
+          const b = baselineOf(chip, rule.firstLine);
           if (b !== null) add(rule, chip, plain[0], 'y', b, reference);
         }
       }
