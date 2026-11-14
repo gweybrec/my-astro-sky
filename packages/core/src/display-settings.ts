@@ -24,6 +24,8 @@ export const DSO_CATALOGS_DEFAULT_ON = new Set(['M', 'NGC', 'IC', 'SH2']);
 
 export interface DisplaySettings {
   showStars: boolean;
+  /** The Milky Way picture under the stars. */
+  showMilkyWay: boolean;
   showConstellationLines: boolean;
   showConstellationNames: boolean;
   showStarLabels: boolean;
@@ -61,6 +63,7 @@ export interface DisplaySettings {
 
 export const DEFAULT_SETTINGS: DisplaySettings = {
   showStars: true,
+  showMilkyWay: true,
   showConstellationLines: true,
   showConstellationNames: true,
   showStarLabels: false,

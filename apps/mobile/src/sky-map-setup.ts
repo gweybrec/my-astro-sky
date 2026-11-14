@@ -226,6 +226,7 @@ export function createPhoneSkyMap(
   map.setHemisphere(settings.hemisphere, settings.borderLatDeg);
   map.setRotationDeg(settings.mapRotationDeg);
   map.setShowStars(settings.showStars);
+  map.setShowMilkyWay(settings.showMilkyWay);
   map.setShowConstellationLines(settings.showConstellationLines);
   map.setShowConstellationNames(
     isIAUStyle(settings.constellationStyle) ? settings.showConstellationNames : false,

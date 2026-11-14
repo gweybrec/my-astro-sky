@@ -126,6 +126,11 @@ export function setProjectionObserver(lstH: number, latDeg: number): void {
   if (_centerMode === 'zenith') _projGeneration++;
 }
 
+/** The observer the zenith-centred projection uses (see {@link setProjectionObserver}). */
+export function getProjectionObserver(): { lstH: number; latDeg: number } {
+  return { lstH: _obsLstH, latDeg: _obsLatDeg };
+}
+
 /**
  * Stereographic polar projection: (RA°, Dec°) → projection (x, y).
  *

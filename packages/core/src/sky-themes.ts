@@ -22,6 +22,19 @@ export interface SkyThemeConfig {
   bgStops: Array<[number, string]>;
   /** Colour just outside the border circle (around the map), reached shortly past it. */
   bgOutside: string;
+  /**
+   * Brightness of the Milky Way picture drawn under the stars (0 = none). Scaled by the
+   * background-opacity setting relative to its default (0.5), so that slider dims it too.
+   */
+  milkyWayGain: number;
+  /** Picture level (0..1) treated as black: cuts the faint haze around the band. */
+  milkyWayBlack: number;
+  /**
+   * Zoom (view scale, px per projection unit) over which the Milky Way fades out: full up
+   * to `from`, gone at `to`. The picture is 4096 px for 360° (~0.09° a pixel); zoomed past
+   * ~1500 one of its pixels spans ~2 screen pixels where the band runs, and it turns blocky.
+   */
+  milkyWayFadeScale: { from: number; to: number };
   /** Optional darkened rim: transparent at `innerStop`, `color` at the edge. */
   vignette: { color: string; innerStop: number } | null;
   /** Multiplier on the user's background-opacity setting (1 = unchanged). */
@@ -133,6 +146,9 @@ export const SKY_THEME: SkyThemeConfig = {
     [1.0, 'rgba(42, 58, 92, 0.9)'], // lighter blue glow at the horizon
   ],
   bgOutside: 'rgba(7, 12, 26, 0.6)', // dark around the map
+  milkyWayGain: 0.25, // kept faint: the photos stay the main thing on the map
+  milkyWayBlack: 0.1,
+  milkyWayFadeScale: { from: 600, to: 2000 },
 
   vignette: null,
   // The default background-opacity setting (0.5) then shows the gradient at ~0.8.
@@ -202,4 +218,17 @@ export function applyStarColor(
   const g = (255 + (g0 - 255) * s) * gMul;
   const b = (255 + (b0 - 255) * s) * bMul;
   return [clamp255(r), clamp255(g), clamp255(b)];
+}
+
+/**
+ * How much of the Milky Way shows at a zoom `scale`: 1 up to `milkyWayFadeScale.from`,
+ * easing out to 0 at `milkyWayFadeScale.to` (smoothstep, so it starts and ends without a jump), so its
+ * picture never shows blocky.
+ */
+export function milkyWayZoomFade(scale: number, theme: SkyThemeConfig = SKY_THEME): number {
+  const { from, to } = theme.milkyWayFadeScale;
+  if (scale <= from) return 1;
+  if (scale >= to) return 0;
+  const x = (to - scale) / (to - from);
+  return x * x * (3 - 2 * x);
 }

@@ -406,6 +406,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   overlay.setBorderParams(settings.hemisphere, settings.borderLatDeg);
 
   skyMap.setShowStars(settings.showStars);
+  skyMap.setShowMilkyWay(settings.showMilkyWay);
   skyMap.setShowConstellationLines(settings.showConstellationLines);
   skyMap.setShowConstellationNames(
     isIAUStyle(settings.constellationStyle) ? settings.showConstellationNames : false,

@@ -1001,6 +1001,7 @@ export async function renderPlanPdf(skyMap: SkyMap, opts: PlanPdfOptions): Promi
     const fullView = skyMap.getFullMapView(ovW, ovH);
     skyMap.renderToCanvas(off, fullView, dpr, {
       showStars: false,
+      showMilkyWay: false,
       showDSOs: false,
       showConstellationNames: false,
       showGrid: false,

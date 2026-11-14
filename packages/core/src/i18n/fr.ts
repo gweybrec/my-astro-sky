@@ -149,6 +149,7 @@ const fr = {
     showPois: "Afficher les points d'intérêt",
     section: 'Affichage',
     showStars: 'Afficher les étoiles',
+    showMilkyWay: 'Voie lactée',
     constellationLines: 'Traits des constellations',
     constellationNames: 'Noms des constellations',
     constellationStyle: 'Style de tracé',

@@ -23,6 +23,7 @@ import type { Trajectory } from '@myastrosky/core/sky-trajectory';
 /** Layers that the export path can override per render. */
 export interface SkyLayerFlags {
   showStars: boolean;
+  showMilkyWay: boolean;
   showDSOs: boolean;
   showConstellationLines: boolean;
   showConstellationNames: boolean;

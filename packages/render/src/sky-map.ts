@@ -39,7 +39,7 @@ import {
   starMagThreshold,
   type StarAreaBudget,
 } from '@myastrosky/core/star-budget';
-import { SKY_THEME } from '@myastrosky/core/sky-themes';
+import { SKY_THEME, milkyWayZoomFade } from '@myastrosky/core/sky-themes';
 import { computeMaxMag, starRadius } from '@myastrosky/core/star-render-math';
 import { InteractionLod } from '@myastrosky/core/interaction-lod';
 import {
@@ -57,6 +57,7 @@ import {
 } from '@myastrosky/core/sky-view-math';
 import { resolveHover } from '@myastrosky/core/hover-resolve';
 import { StarSpriteAtlas } from './star-sprite-atlas';
+import { MilkyWayLayer } from './milky-way';
 import type { SkyScene, SkyLayerFlags } from './sky-scene';
 import {
   renderStars,
@@ -206,6 +207,7 @@ export class SkyMap {
   private onSummitHover: SummitHoverCallback | null = null;
   private showDSOs = true;
   private showStars = true;
+  private showMilkyWay = true;
   private showConstellationLines = true;
   private showConstellationNames = true;
   private constellationStyle: ConstellationStyle = 'western';
@@ -229,6 +231,8 @@ export class SkyMap {
   private showStarLabels = true;
   private showDSOLabels = true;
   private skyOpacity = 0.5;
+  /** The Milky Way pass; created on first draw (undefined), null without WebGL. */
+  private milkyWay: MilkyWayLayer | null | undefined;
   private backgroundOpacity = 1.0;
   // The app's single sky theme (background, stars, glow, grid tint).
   private readonly skyTheme = SKY_THEME;
@@ -413,6 +417,11 @@ export class SkyMap {
 
   setShowStars(show: boolean) {
     this.showStars = show;
+    this.requestRender();
+  }
+
+  setShowMilkyWay(show: boolean) {
+    this.showMilkyWay = show;
     this.requestRender();
   }
   setShowConstellationLines(show: boolean) {
@@ -1639,6 +1648,7 @@ export class SkyMap {
       mountainProfile: this.mountainProfile,
 
       showStars: this.showStars,
+      showMilkyWay: this.showMilkyWay,
       showDSOs: this.showDSOs,
       showConstellationLines: this.showConstellationLines,
       showConstellationNames: this.showConstellationNames,
@@ -1716,6 +1726,19 @@ export class SkyMap {
     ctx.beginPath();
     ctx.arc(poleOrigin.x, poleOrigin.y, borderR, 0, Math.PI * 2);
     ctx.clip();
+
+    // The Milky Way under everything drawn on the sky (lines, objects, stars).
+    // It fades out when zoomed in far enough for its picture to turn blocky.
+    const milkyWayFade = milkyWayZoomFade(view.scale, scene.theme);
+    if (scene.showMilkyWay && scene.theme.milkyWayGain > 0 && milkyWayFade > 0) {
+      this.milkyWay ??= MilkyWayLayer.create(() => this.requestRender());
+      this.milkyWay?.draw(
+        ctx,
+        view,
+        scene.theme.milkyWayGain * scene.backgroundOpacity * 2 * milkyWayFade,
+        scene.theme.milkyWayBlack,
+      );
+    }
 
     ctx.globalAlpha = scene.skyOpacity;
     if (scene.showConstellationLines) {

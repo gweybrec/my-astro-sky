@@ -150,6 +150,7 @@ const de: Translations = {
     showPois: 'Points of Interest anzeigen',
     section: 'Anzeige',
     showStars: 'Sterne anzeigen',
+    showMilkyWay: 'Milchstraße',
     constellationLines: 'Sternbildlinien',
     constellationNames: 'Sternbildnamen',
     constellationStyle: 'Zeichenstil',

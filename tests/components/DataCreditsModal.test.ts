@@ -32,7 +32,7 @@ describe('DataCreditsModal', () => {
       t('settings.dataCreditsOnlineLabel'),
     ]);
     expect(texts('.credits-section-intro')).toEqual([t('settings.dataCreditsOnlineIntro')]);
-    expect(texts('.dep-name')).toHaveLength(12);
+    expect(texts('.dep-name')).toHaveLength(13);
     w.unmount();
   });
 

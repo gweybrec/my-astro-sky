@@ -16,6 +16,7 @@ export const useDisplayStore = defineStore('display', () => {
 
   // ─── State ───────────────────────────────────────────────────────────────────
   const showStars = ref(s.showStars);
+  const showMilkyWay = ref(s.showMilkyWay);
   const showConstellationLines = ref(s.showConstellationLines);
   const showConstellationNames = ref(s.showConstellationNames);
   const showStarLabels = ref(s.showStarLabels);
@@ -49,6 +50,7 @@ export const useDisplayStore = defineStore('display', () => {
   function snap() {
     return {
       showStars: showStars.value,
+      showMilkyWay: showMilkyWay.value,
       showConstellationLines: showConstellationLines.value,
       showConstellationNames: showConstellationNames.value,
       showStarLabels: showStarLabels.value,
@@ -89,6 +91,12 @@ export const useDisplayStore = defineStore('display', () => {
   function setShowStars(v: boolean) {
     showStars.value = v;
     canvasStore.skyMap?.setShowStars(v);
+    persist();
+  }
+
+  function setShowMilkyWay(v: boolean) {
+    showMilkyWay.value = v;
+    canvasStore.skyMap?.setShowMilkyWay(v);
     persist();
   }
 
@@ -303,6 +311,7 @@ export const useDisplayStore = defineStore('display', () => {
   return {
     // state
     showStars,
+    showMilkyWay,
     showConstellationLines,
     showConstellationNames,
     showStarLabels,
@@ -332,6 +341,7 @@ export const useDisplayStore = defineStore('display', () => {
     constellationStyle,
     // actions
     setShowStars,
+    setShowMilkyWay,
     setShowConstellationLines,
     setShowConstellationNames,
     setConstellationStyle,

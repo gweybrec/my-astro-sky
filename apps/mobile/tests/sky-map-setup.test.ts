@@ -215,6 +215,7 @@ describe('the Ciel tab sky map', () => {
         borderLatDeg: 30,
         mapRotationDeg: 90,
         showStars: false,
+        showMilkyWay: false,
         showConstellationLines: false,
         showDSOLabels: false,
         showGrid: true,
@@ -230,6 +231,7 @@ describe('the Ciel tab sky map', () => {
     expect(calls.setHemisphere).toEqual([['south', 30]]);
     expect(calls.setRotationDeg).toEqual([[90]]);
     expect(calls.setShowStars).toEqual([[false]]);
+    expect(calls.setShowMilkyWay).toEqual([[false]]);
     expect(calls.setShowConstellationLines).toEqual([[false]]);
     expect(calls.setShowDSOLabels).toEqual([[false]]);
     expect(calls.setShowGrid).toEqual([[true]]);

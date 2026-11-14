@@ -1257,7 +1257,7 @@ describe('the data credits page', () => {
       "Ces données ne sont pas incluses dans l'application : elles sont téléchargées depuis ces services quand vous calculez l'horizon d'un lieu.",
     ]);
     const names = w.findAll('.mob-credit > .mob-row-title').map((n) => n.text());
-    expect(names).toHaveLength(12);
+    expect(names).toHaveLength(13);
     expect(names).toContain('Stars — d3-celestial');
     expect(names).toContain('Finest NGC Chart/Log System');
     expect(names.slice(-2)).toEqual(['Peak names — OpenStreetMap', 'Elevation — Terrain Tiles']);

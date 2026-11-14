@@ -178,6 +178,11 @@
       @update:model-value="displayStore.setShowStars"
     />
     <CheckRow
+      :label="t('display.showMilkyWay')"
+      :model-value="displayStore.showMilkyWay"
+      @update:model-value="displayStore.setShowMilkyWay"
+    />
+    <CheckRow
       :label="t('display.constellationLines')"
       :model-value="displayStore.showConstellationLines"
       @update:model-value="displayStore.setShowConstellationLines"

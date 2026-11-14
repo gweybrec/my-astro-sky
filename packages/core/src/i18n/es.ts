@@ -150,6 +150,7 @@ const es: Translations = {
     showPois: 'Mostrar puntos de interés',
     section: 'Visualización',
     showStars: 'Mostrar estrellas',
+    showMilkyWay: 'Vía Láctea',
     constellationLines: 'Líneas de constelaciones',
     constellationNames: 'Nombres de constelaciones',
     constellationStyle: 'Estilo de trazado',

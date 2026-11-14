@@ -14,7 +14,16 @@ describe('dataCreditSections', () => {
       t('settings.dataCreditsDocsLabel'),
       t('settings.dataCreditsOnlineLabel'),
     ]);
-    expect(sections.map((s) => s.credits.length)).toEqual([7, 3, 2]);
+    expect(sections.map((s) => s.credits.length)).toEqual([8, 3, 2]);
+  });
+
+  it('credits the Milky Way picture to NASA SVS and the Gaia data to ESA/Gaia/DPAC', () => {
+    const milkyWay = dataCreditSections()[0].credits.find((c) => c.name.startsWith('Milky Way'));
+    expect(milkyWay).toMatchObject({
+      detail:
+        'NASA/Goddard Space Flight Center Scientific Visualization Studio · Gaia data: ESA/Gaia/DPAC',
+      url: 'https://svs.gsfc.nasa.gov/4851/',
+    });
   });
 
   it('says only of the online data that it is downloaded, not shipped', () => {

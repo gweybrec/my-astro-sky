@@ -255,6 +255,8 @@ describe('the display sheet ("Ciel, affichage")', () => {
     const before = display.showStars;
     toggle(w, 'Afficher les étoiles').vm.$emit('update:modelValue', !before);
     expect(display.showStars).toBe(!before);
+    toggle(w, 'Voie lactée').vm.$emit('update:modelValue', false);
+    expect(display.showMilkyWay).toBe(false);
     toggle(w, 'Grille RA/Déc').vm.$emit('update:modelValue', true);
     expect(display.showGrid).toBe(true);
   });

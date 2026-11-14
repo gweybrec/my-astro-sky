@@ -47,6 +47,7 @@ const {
   visiblePois,
   visibleLabels,
   showStars,
+  showMilkyWay,
   showStarLabels,
   showConstellationLines,
   showConstellationNames,
@@ -249,6 +250,11 @@ const dsoDensity = computed({
       :model-value="showStars"
       :title="t('display.showStars')"
       @update:model-value="display.setShowStars"
+    />
+    <PhoneToggleRow
+      :model-value="showMilkyWay"
+      :title="t('display.showMilkyWay')"
+      @update:model-value="display.setShowMilkyWay"
     />
     <PhoneToggleRow
       :model-value="showStarLabels"

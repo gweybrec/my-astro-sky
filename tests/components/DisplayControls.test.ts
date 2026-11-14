@@ -151,12 +151,14 @@ describe('CheckRow', () => {
 
 const mockSetShowStars = vi.hoisted(() => vi.fn());
 const mockSetShowGrid = vi.hoisted(() => vi.fn());
+const mockSetShowMilkyWay = vi.hoisted(() => vi.fn());
 
 vi.mock('@myastrosky/app-state/stores/map-port', () => ({
   useMapPortStore: () => ({
     skyMap: {
       setShowStars: mockSetShowStars,
       setShowGrid: mockSetShowGrid,
+      setShowMilkyWay: mockSetShowMilkyWay,
       setShowDSOs: vi.fn(),
       setVisibleDSOTypes: vi.fn(),
       setVisibleDSOCatalogs: vi.fn(),
@@ -170,6 +172,7 @@ vi.mock('@myastrosky/core/display-settings', () => ({
   DSO_CATALOGS_DEFAULT_ON: new Set(['M', 'NGC', 'IC', 'SH2']),
   loadSettings: () => ({
     showStars: true,
+    showMilkyWay: true,
     showConstellationLines: true,
     showConstellationNames: true,
     showStarLabels: true,
@@ -223,6 +226,14 @@ describe('useDisplayStore', () => {
     store.setShowStars(false);
     expect(store.showStars).toBe(false);
     expect(mockSetShowStars).toHaveBeenCalledWith(false);
+  });
+
+  it('setShowMilkyWay updates reactive state and calls skyMap', () => {
+    const store = makeStore();
+    expect(store.showMilkyWay).toBe(true);
+    store.setShowMilkyWay(false);
+    expect(store.showMilkyWay).toBe(false);
+    expect(mockSetShowMilkyWay).toHaveBeenCalledWith(false);
   });
 
   it('setShowGrid updates reactive state and calls skyMap', () => {

@@ -87,6 +87,14 @@ export function dataCreditSections(): DataCreditSection[] {
           license: 'CC BY-ND 4.0',
           licenseUrl: 'https://creativecommons.org/licenses/by-nd/4.0/',
         },
+        {
+          // The picture behind the "Voie lactée" layer (public/data/milkyway.jpg), from milkyway_2020_4k.exr.
+          name: 'Milky Way — Deep Star Maps 2020',
+          detail:
+            'NASA/Goddard Space Flight Center Scientific Visualization Studio · Gaia data: ESA/Gaia/DPAC',
+          url: 'https://svs.gsfc.nasa.gov/4851/',
+          linkText: 'svs.gsfc.nasa.gov/4851',
+        },
       ],
     },
     {

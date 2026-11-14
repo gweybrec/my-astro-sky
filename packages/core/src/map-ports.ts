@@ -3,6 +3,7 @@ import type { ConstellationStyle } from './types';
 /** What the shared display and time stores ask of the sky map. `SkyMap` satisfies it; each app holds its own instance. */
 export interface SkyMapPort {
   setShowStars(v: boolean): void;
+  setShowMilkyWay(v: boolean): void;
   setShowConstellationLines(v: boolean): void;
   setShowConstellationNames(v: boolean): void;
   setConstellationStyle(style: ConstellationStyle): Promise<void>;

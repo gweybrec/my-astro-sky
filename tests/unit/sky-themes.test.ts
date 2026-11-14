@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { applyStarColor, SKY_THEME, type SkyThemeConfig } from '@myastrosky/core/sky-themes';
+import {
+  applyStarColor,
+  milkyWayZoomFade,
+  SKY_THEME,
+  type SkyThemeConfig,
+} from '@myastrosky/core/sky-themes';
 
 function makeTheme(overrides: Partial<SkyThemeConfig>): SkyThemeConfig {
   return {
@@ -93,5 +98,27 @@ describe('SKY_THEME', () => {
     expect(typeof SKY_THEME.baseFill).toBe('string');
     expect(SKY_THEME.glowOpacity).toBeGreaterThan(0);
     expect(SKY_THEME.glowSaturation).toBeGreaterThan(0);
+  });
+});
+
+describe('milkyWayZoomFade', () => {
+  const { from, to } = SKY_THEME.milkyWayFadeScale;
+
+  it('shows the Milky Way fully up to the fade start', () => {
+    expect(milkyWayZoomFade(100)).toBe(1);
+    expect(milkyWayZoomFade(from)).toBe(1);
+  });
+
+  it('fades smoothly between the two zooms: half way at the middle, gentle at both ends', () => {
+    const at = (f: number) => milkyWayZoomFade(from + f * (to - from));
+    expect(at(0.5)).toBeCloseTo(0.5, 5);
+    expect(at(0.1)).toBeCloseTo(0.972, 3);
+    expect(at(0.9)).toBeCloseTo(0.028, 3);
+    expect(at(0.25)).toBeGreaterThan(at(0.75));
+  });
+
+  it('hides it once zoomed in past the end', () => {
+    expect(milkyWayZoomFade(to)).toBe(0);
+    expect(milkyWayZoomFade(to * 10)).toBe(0);
   });
 });
