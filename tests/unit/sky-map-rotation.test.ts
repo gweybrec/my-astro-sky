@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../src/star-catalog', () => ({
   getStars: () => [],
   getConstellationLines: () => [],
+  getConstellationVertexMags: () => [],
   getConstellationInfos: () => [],
 }));
 

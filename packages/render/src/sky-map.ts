@@ -40,7 +40,7 @@ import {
   type StarAreaBudget,
 } from '@myastrosky/core/star-budget';
 import { SKY_THEME } from '@myastrosky/core/sky-themes';
-import { computeMaxMag } from '@myastrosky/core/star-render-math';
+import { computeMaxMag, starRadius } from '@myastrosky/core/star-render-math';
 import { InteractionLod } from '@myastrosky/core/interaction-lod';
 import {
   pointInConvexPolygon,
@@ -871,6 +871,22 @@ export class SkyMap {
   }
 
   /** Position-independent star magnitude limit for the current view. */
+  /**
+   * The gap a constellation line leaves around a vertex star of a given magnitude: the
+   * star's drawn radius plus the theme's padding, or 0 when the star is too faint to be
+   * drawn at this zoom (or stars are hidden), so the line never breaks around nothing.
+   */
+  private constellationGapFn(scene: SkyScene): (mag: number) => number {
+    if (!scene.showStars) return () => 0;
+    const { theme, view } = scene;
+    const limit = starMagThreshold(scene.starBudget);
+    return (mag) =>
+      mag <= limit
+        ? starRadius(mag, view.scale, theme.brightZoomBoost) * theme.radiusScale +
+          theme.constellationLineGap
+        : 0;
+  }
+
   private starMagThreshold(): number {
     return starMagThreshold(this.starAreaBudget());
   }
@@ -1688,13 +1704,13 @@ export class SkyMap {
     ctx.save();
     ctx.clearRect(0, 0, width, height);
 
-    drawBackground(ctx, view, scene.theme, scene.backgroundOpacity);
-
     // ── Hemisphere clip circle ──────────────────────────────────────────────
     // In stereo mode: borderLatDeg determines how far into the opposite hemisphere we show.
     // In fisheye mode: borderRadiusPU() returns 1.0 (the horizon circle).
     const poleOrigin = toCanvas(0, 0, view);
     const borderR = borderRadiusPU(scene.borderLatDeg) * view.scale;
+
+    drawBackground(ctx, view, scene.theme, scene.backgroundOpacity, poleOrigin, borderR);
 
     ctx.save();
     ctx.beginPath();
@@ -1708,6 +1724,8 @@ export class SkyMap {
         view,
         this.constellationStyle,
         scene.theme.constellationLineColor,
+        scene.theme.constellationLineWidth,
+        this.constellationGapFn(scene),
       );
     }
     if (scene.showDSOs) {

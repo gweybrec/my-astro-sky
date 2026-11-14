@@ -7,6 +7,7 @@ vi.mock('@myastrosky/core/catalog/star-registry', () => ({
   getStars: () => [],
   getStarMagsSorted: () => MAGS,
   getConstellationLines: () => [],
+  getConstellationVertexMags: () => [],
   getConstellationInfos: () => [],
   loadConstellationStyle: vi.fn(),
 }));

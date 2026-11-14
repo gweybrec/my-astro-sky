@@ -6,6 +6,8 @@ import {
   atlasScaleBucket,
   ATLAS_SCALE_STEP,
   computeStarPaint,
+  starAlpha,
+  STAR_MIN_RADIUS,
 } from '@myastrosky/core/star-render-math';
 import { SKY_THEME } from '@myastrosky/core/sky-themes';
 
@@ -41,14 +43,14 @@ describe('starRadius', () => {
     expect(bright).toBeGreaterThan(faint);
   });
 
-  it('grows with zoom (scale) but never below the 0.9 floor', () => {
+  it('grows with zoom (scale) but never below the minimum radius', () => {
     expect(starRadius(6, 10000)).toBeGreaterThan(starRadius(6, 400));
-    expect(starRadius(10, 50)).toBeGreaterThanOrEqual(0.9);
+    expect(starRadius(10, 50)).toBeGreaterThanOrEqual(STAR_MIN_RADIUS);
   });
 
   it('caps zoom growth so stars do not take over the view', () => {
-    // Faint star capped at STAR_ZOOM_CAP=2.2 → base(0.3)*2.2 floored at 0.9.
-    expect(starRadius(20, 1e9)).toBeCloseTo(0.9, 5);
+    // Faint star capped at STAR_ZOOM_CAP=2.2 → base(0.3)*2.2 = 0.66.
+    expect(starRadius(20, 1e9)).toBeCloseTo(0.66, 5);
   });
 });
 
@@ -104,5 +106,35 @@ describe('computeStarPaint', () => {
     const established = computeStarPaint(4, 0.5, 1000, 8, SKY_THEME, true);
     const appearing = computeStarPaint(8, 0.5, 1000, 8, SKY_THEME, false);
     expect(appearing.soft).toBeGreaterThan(established.soft);
+  });
+
+  it('dims faint stars but keeps the highlighted one at full brightness', () => {
+    const faint = computeStarPaint(8, 0.5, 1000, 8, SKY_THEME, false);
+    const highlighted = computeStarPaint(8, 0.5, 1000, 8, SKY_THEME, true);
+    expect(faint.alpha).toBeCloseTo(SKY_THEME.faintStarAlpha, 5);
+    expect(highlighted.alpha).toBe(1);
+  });
+});
+
+describe('starAlpha', () => {
+  const from = SKY_THEME.faintFadeFromMag;
+
+  it('is fully opaque up to the fade start', () => {
+    expect(starAlpha(from - 2, 10, SKY_THEME)).toBe(1);
+    expect(starAlpha(from, 10, SKY_THEME)).toBe(1);
+  });
+
+  it('fades linearly to faintStarAlpha at the magnitude limit', () => {
+    const maxMag = from + 4;
+    expect(starAlpha(maxMag, maxMag, SKY_THEME)).toBeCloseTo(SKY_THEME.faintStarAlpha, 5);
+    expect(starAlpha(from + 2, maxMag, SKY_THEME)).toBeCloseTo(
+      1 - (1 - SKY_THEME.faintStarAlpha) / 2,
+      5,
+    );
+  });
+
+  it('never goes below faintStarAlpha, and is 1 when the limit is not past the fade start', () => {
+    expect(starAlpha(from + 20, from + 4, SKY_THEME)).toBeCloseTo(SKY_THEME.faintStarAlpha, 5);
+    expect(starAlpha(from + 1, from, SKY_THEME)).toBe(1);
   });
 });

@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('../../src/star-catalog', () => ({
   getStars: () => [],
   getConstellationLines: () => [],
+  getConstellationVertexMags: () => [],
   getConstellationInfos: () => [],
   loadConstellationStyle: () => {},
 }));

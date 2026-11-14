@@ -18,6 +18,7 @@ import { toCanvas, borderRadiusPU, getProjectionGeneration } from '@myastrosky/c
 import type { PhotoSkyModel } from '@myastrosky/core/photo-sky-model';
 import { MEDIUM_SIZE, THUMB_SIZE } from '@myastrosky/core/services/photos';
 import { affineToCSS } from '@myastrosky/core/affine';
+import { PHOTO_BLEND_MODE } from '@myastrosky/core/canvas-theme';
 import { logDebug } from '@myastrosky/core/platform/log';
 import {
   isCentroidInsideBorder,
@@ -134,6 +135,10 @@ export class PhotoLayer {
     this.getView = getView;
     this.hooks = hooks;
     this.skyMap = hooks.skyMap ?? null;
+    // Screen blending: a photo's black background disappears into the sky instead of drawing a dark square over it,
+    // and its light adds on top. Set on the container (it holds only the photos): its border-circle clip-path makes
+    // it an isolated group, so a blend set on the photos inside would only blend with the empty container.
+    container.style.mixBlendMode = PHOTO_BLEND_MODE;
     const canvas = document.createElement('canvas');
     // Not `photo-overlay-img`: `photos-frozen` hides those while the view moves, and the photos follow the view.
     canvas.className = 'photo-gl-canvas';

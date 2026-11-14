@@ -13,12 +13,30 @@ import type { DSOType } from './types';
 // ── Fonts ────────────────────────────────────────────────────────────────────
 export const FONTS = {
   gridLabel: '11px sans-serif',
-  constellationName: '11px sans-serif',
+  constellationName: '12px sans-serif',
   dsoLabel: '9px sans-serif',
   starLabel: '10px sans-serif',
   frameLabel: '11px sans-serif',
   bodyLabel: '10px sans-serif',
 } as const;
+
+/**
+ * Constellation names: letter-spaced capitals that fade out when zoomed out far enough
+ * to pile on top of each other (fully hidden at `hideBelowScale`, fully shown from
+ * `showFromScale`, in view-scale units: px per projection unit).
+ */
+export const CONSTELLATION_NAMES = {
+  letterSpacing: '3px',
+  hideBelowScale: 200,
+  showFromScale: 280,
+} as const;
+
+/**
+ * How placed photos combine with the sky under them, as both a CSS `mix-blend-mode` and a
+ * canvas `globalCompositeOperation`: "screen" lets a photo's black background vanish into
+ * the sky (no dark squares) while its light adds on top.
+ */
+export const PHOTO_BLEND_MODE = 'screen';
 
 /** Grid line widths (equator drawn heavier than the regular declination circles). */
 export const GRID = { lineWidth: 0.8, equatorLineWidth: 1.5 } as const;

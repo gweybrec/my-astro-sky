@@ -62,7 +62,7 @@ export interface DisplaySettings {
 export const DEFAULT_SETTINGS: DisplaySettings = {
   showStars: true,
   showConstellationLines: true,
-  showConstellationNames: false,
+  showConstellationNames: true,
   showStarLabels: false,
   showDSOLabels: true,
   showGrid: false,

@@ -54,7 +54,22 @@ export function starRadius(mag: number, scale: number, brightZoomBoost = 0): num
   // when zoomed in (Stellarium-like); the brightest grow the most.
   const cap = STAR_ZOOM_CAP + (mag < 3 ? (3 - mag) * brightZoomBoost : 0);
   const zoomFactor = Math.min(cap, Math.sqrt(scale / 400));
-  return Math.max(0.9, base * zoomFactor);
+  return Math.max(STAR_MIN_RADIUS, base * zoomFactor);
+}
+
+/** Smallest star radius in CSS px: faint stars read as fine pinpricks, dimmed by {@link starAlpha}. */
+export const STAR_MIN_RADIUS = 0.6;
+
+/**
+ * A star's opacity: 1 up to `theme.faintFadeFromMag`, fading linearly to
+ * `theme.faintStarAlpha` at the current magnitude limit `maxMag`, so the faint field
+ * reads as a dim dust behind the bright stars instead of same-sized dots.
+ */
+export function starAlpha(mag: number, maxMag: number, theme: typeof SKY_THEME): number {
+  const from = theme.faintFadeFromMag;
+  if (mag <= from || maxMag <= from) return 1;
+  const t = Math.min(1, (mag - from) / (maxMag - from));
+  return 1 - (1 - theme.faintStarAlpha) * t;
 }
 
 export function computeMaxMag(scale: number): number {
@@ -89,6 +104,7 @@ export interface StarPaint {
   gr: number;
   gg: number;
   gb: number; // glow colour
+  alpha: number; // whole-star opacity (faint stars are dimmer, see starAlpha)
 }
 
 export function computeStarPaint(
@@ -127,5 +143,7 @@ export function computeStarPaint(
     coreEdge = radius / glowR; // dot edge as a fraction of glowR
     solidUntil = coreEdge * (1 - soft); // fully opaque out to here
   }
-  return { radius, r, g, b, soft, glowAlpha, glowR, coreEdge, solidUntil, gr, gg, gb };
+  // The highlighted (established) star stays at full brightness.
+  const alpha = established ? 1 : starAlpha(mag, maxMag, theme);
+  return { radius, r, g, b, soft, glowAlpha, glowR, coreEdge, solidUntil, gr, gg, gb, alpha };
 }

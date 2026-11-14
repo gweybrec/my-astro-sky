@@ -11,11 +11,17 @@
  */
 
 export interface SkyThemeConfig {
-  // ── Background (radial gradient from canvas center outward) ──
+  // ── Background (radial gradient from the projection centre outward) ──
   /** Solid base color painted first. */
   baseFill: string;
-  /** Radial gradient stops [offset 0..1, css color]; 0 = center, 1 = far corner. */
+  /**
+   * Radial gradient stops [offset 0..1, css color]; 0 = projection centre (the zenith in
+   * local-sky mode, the pole otherwise), 1 = the map's border circle (the horizon in
+   * local-sky mode). Lighter toward 1 gives the glow of the sky near the horizon.
+   */
   bgStops: Array<[number, string]>;
+  /** Colour just outside the border circle (around the map), reached shortly past it. */
+  bgOutside: string;
   /** Optional darkened rim: transparent at `innerStop`, `color` at the edge. */
   vignette: { color: string; innerStop: number } | null;
   /** Multiplier on the user's background-opacity setting (1 = unchanged). */
@@ -32,6 +38,14 @@ export interface SkyThemeConfig {
   starSaturation: number;
   /** Multiply each star's pixel radius (1 = unchanged). */
   radiusScale: number;
+  /**
+   * Opacity of the faintest star drawn (at the current magnitude limit). Stars up to
+   * `faintFadeFromMag` are fully opaque; fainter ones fade linearly down to this value,
+   * so brightness reads by light as well as by size.
+   */
+  faintStarAlpha: number;
+  /** Magnitude from which stars start fading toward {@link faintStarAlpha}. */
+  faintFadeFromMag: number;
   /**
    * How much bright stars (mag < 3) keep growing when zooming in, past the normal
    * 1.0 zoom cap. 0 = legacy behavior (cap at 1.0). Higher keeps the brightest
@@ -62,7 +76,11 @@ export interface SkyThemeConfig {
   gridEquatorColor: string;
   gridLabelColor: string;
   constellationLineColor: string;
-  /** Color of the constellation *name* labels (uppercase, faint). */
+  /** Constellation line width in CSS px. */
+  constellationLineWidth: number;
+  /** Space in CSS px a constellation line leaves beyond the edge of a drawn star it meets. */
+  constellationLineGap: number;
+  /** Color of the constellation *name* labels (uppercase, letter-spaced). */
   constellationNameColor: string;
   /** Color of the bright-star name labels. */
   starLabelColor: string;
@@ -109,22 +127,26 @@ export const SKY_THEME: SkyThemeConfig = {
   // Deep blue-black base — already has a hint of atmosphere, never pure black
   baseFill: '#040810',
   bgStops: [
-    [0.0, 'rgba(26, 38, 66, 0.55)'], // soft deep-blue atmospheric glow at center
-    [0.45, 'rgba(14, 22, 44, 0.5)'], // fading blue twilight
-    [0.8, 'rgba(7, 12, 26, 0.55)'], // deepening toward the edge
-    [1.0, 'rgba(3, 5, 12, 0.6)'], // near-black blue at the far corner
+    [0.0, 'rgba(6, 10, 22, 0.9)'], // deep navy overhead
+    [0.55, 'rgba(14, 24, 48, 0.85)'],
+    [0.85, 'rgba(30, 46, 80, 0.85)'],
+    [1.0, 'rgba(42, 58, 92, 0.9)'], // lighter blue glow at the horizon
   ],
-  // Gentle vignette to seat photos without killing the atmospheric blue
-  vignette: { color: 'rgba(1, 2, 6, 0.55)', innerStop: 0.6 },
-  bgOpacityScale: 1.0,
+  bgOutside: 'rgba(7, 12, 26, 0.6)', // dark around the map
+
+  vignette: null,
+  // The default background-opacity setting (0.5) then shows the gradient at ~0.8.
+  bgOpacityScale: 1.6,
   // Slight cool tint so hot stars read a touch bluer (whites clamp, stay white).
   starTint: { rMul: 0.95, gMul: 0.98, bMul: 1.05 },
   // Mostly white with only a subtle blue/orange tint on the extremes.
   starSaturation: 0.45,
-  radiusScale: 1.1,
+  radiusScale: 0.95,
+  faintStarAlpha: 0.35,
+  faintFadeFromMag: 4,
   // Bright stars stay prominent when zooming in (the brightest grow most).
   brightZoomBoost: 0.28,
-  glowThresholdMag: 3.6, // many stars earn a halo → dense, alive field
+  glowThresholdMag: 2.5, // only the brightest stars earn a halo
   glowRadiusMul: 1.7, // small halo that hugs the star — barely there, just noticed
   glowOpacity: 0.55, // opacity tapers with brightness (set in renderStars)
   glowSaturation: 1.45, // halo is strongly tinted (orange/blue) even though the dot is white
@@ -133,8 +155,11 @@ export const SKY_THEME: SkyThemeConfig = {
   gridColor: 'rgba(90, 130, 200, 0.35)',
   gridEquatorColor: 'rgba(120, 165, 235, 0.65)',
   gridLabelColor: 'rgba(155, 190, 240, 0.9)',
-  constellationLineColor: 'rgba(140, 165, 220, 0.5)',
-  constellationNameColor: 'rgba(185, 170, 155, 0.4)',
+  // Teal; the sky-opacity setting (0.7 by default) dims it further on the map (~0.5 seen).
+  constellationLineColor: 'rgba(100, 180, 195, 0.72)',
+  constellationLineWidth: 1.4,
+  constellationLineGap: 2,
+  constellationNameColor: 'rgba(115, 185, 195, 0.95)',
   starLabelColor: 'rgba(195, 180, 160, 0.55)',
   // Matches --moon-lit (tokens.css) for visual consistency with the Targets-view glyph.
   moonLitColor: 'rgba(225, 230, 245, 0.92)',

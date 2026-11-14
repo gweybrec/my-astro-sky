@@ -4,6 +4,7 @@ import type { PhotoOverlay, PlacedPhoto } from './photo-overlay';
 import type { Photo, Point, QuarterTurns } from '@myastrosky/core/types';
 import { drawImageMesh } from '@myastrosky/render/photo-mesh-draw';
 import { quarterTurnsOf } from '@myastrosky/core/photo-rotation';
+import { PHOTO_BLEND_MODE } from '@myastrosky/core/canvas-theme';
 import { photoFileUrl } from './api';
 
 // ─── Gallery contact-sheet layout (pure, unit-tested) ───────────────────────
@@ -85,6 +86,8 @@ async function drawPlacedPhoto(
 
   ctx.save();
   ctx.globalAlpha = placed.opacity;
+  // Same blending as the live map, so the exported picture matches what is on screen.
+  ctx.globalCompositeOperation = PHOTO_BLEND_MODE;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawImageMesh(ctx, img, placed.photo.width, placed.photo.height, mesh);
   ctx.restore();

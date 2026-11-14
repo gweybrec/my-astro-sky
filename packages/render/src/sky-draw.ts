@@ -18,6 +18,7 @@ import {
 import {
   getConstellationLines,
   getConstellationInfos,
+  getConstellationVertexMags,
 } from '@myastrosky/core/catalog/star-registry';
 import { raDecFromAltAz } from '@myastrosky/core/sky-geometry';
 import { sampleDenseAz, type HorizonProfile, type HorizonLayer } from '@myastrosky/core/horizon-io';
@@ -32,6 +33,7 @@ import {
   MOUNTAIN_HORIZON,
   CARDINAL_POINTS,
   SUMMIT_DOT,
+  CONSTELLATION_NAMES,
 } from '@myastrosky/core/canvas-theme';
 
 type SkyTheme = typeof SKY_THEME;
@@ -39,11 +41,22 @@ const DEG2RAD = Math.PI / 180;
 
 // ── Background ───────────────────────────────────────────────────────────────
 
+/** The background gradient fades from the border colour to `bgOutside` by this multiple of the border radius. */
+const BG_OUTSIDE_FALLOFF = 1.08;
+
+/**
+ * The sky's background: a solid base, then the theme gradient from the projection
+ * centre (`origin`: the zenith in local-sky mode, the pole otherwise) out to the map's
+ * border circle (`borderR` px: the horizon in local-sky mode), so the sky is darkest
+ * overhead and glows toward the horizon wherever the view is panned or zoomed.
+ */
 export function drawBackground(
   ctx: CanvasRenderingContext2D,
   view: ViewState,
   theme: SkyTheme,
   backgroundOpacity: number,
+  origin: Point,
+  borderR: number,
 ): void {
   const cx = view.width / 2;
   const cy = view.height / 2;
@@ -53,15 +66,22 @@ export function drawBackground(
   ctx.fillStyle = theme.baseFill;
   ctx.fillRect(0, 0, view.width, view.height);
 
-  const bgAlpha = backgroundOpacity * theme.bgOpacityScale;
+  const bgAlpha = Math.min(1, backgroundOpacity * theme.bgOpacityScale);
   if (bgAlpha <= 0) return;
 
   ctx.save();
   ctx.globalAlpha = bgAlpha;
 
-  // Theme gradient overlay (center → corner)
-  const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
-  for (const [offset, color] of theme.bgStops) gradient.addColorStop(offset, color);
+  // Theme gradient overlay (projection centre → border circle), then a short fall-off past
+  // the border to `bgOutside`, so the area around the map stays dark instead of taking
+  // the horizon glow's colour.
+  const innerR = Math.max(1, borderR);
+  const outerR = innerR * BG_OUTSIDE_FALLOFF;
+  const gradient = ctx.createRadialGradient(origin.x, origin.y, 0, origin.x, origin.y, outerR);
+  for (const [offset, color] of theme.bgStops) {
+    gradient.addColorStop(offset / BG_OUTSIDE_FALLOFF, color);
+  }
+  gradient.addColorStop(1, theme.bgOutside);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, view.width, view.height);
 
@@ -192,15 +212,49 @@ export function drawGrid(
 
 // ── Constellations ───────────────────────────────────────────────────────────
 
+/** A point on a constellation line, with the gap (px) the line leaves around it: 0 at a rim crossing. */
+interface LinePoint {
+  x: number;
+  y: number;
+  gap: number;
+}
+
+/**
+ * Add the line a→b to the current path, pulled back at each end by that end's gap (at
+ * most 30 % of the length per end, so short lines between close stars stay visible),
+ * the way planetarium charts leave the star itself clear.
+ */
+function addGappedLine(ctx: CanvasRenderingContext2D, a: LinePoint, b: LinePoint): void {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-6) return;
+  const ux = dx / len;
+  const uy = dy / len;
+  const ga = Math.min(a.gap, len * 0.3);
+  const gb = Math.min(b.gap, len * 0.3);
+  ctx.moveTo(a.x + ux * ga, a.y + uy * ga);
+  ctx.lineTo(b.x - ux * gb, b.y - uy * gb);
+}
+
+/**
+ * Draw the constellation figures. `gapForMag` gives the gap (px) to leave around a
+ * vertex star of that magnitude: the drawn star's size, or 0 for a star not shown at
+ * this zoom (a gap with no star in it would read as a broken line).
+ */
 export function drawConstellationLines(
   ctx: CanvasRenderingContext2D,
   view: ViewState,
   style: ConstellationStyle,
   color: string,
+  lineWidth: number,
+  gapForMag: (mag: number) => number,
 ): void {
   const lines = getConstellationLines(style);
+  const vertexMags = getConstellationVertexMags(style);
   ctx.strokeStyle = color;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = 'round';
 
   // In fisheye/zenith mode, off-projection points (far hemisphere, or below the
   // horizon in local-sky mode) project to (1e6, 1e6); the pen is lifted there so a
@@ -210,12 +264,16 @@ export function drawConstellationLines(
   // than dropped entirely. (`prev*` track the previous vertex to find that crossing.)
   const clipAtHorizon = getCenterMode() === 'zenith';
 
-  for (const constellation of lines) {
-    for (const segment of constellation.segments) {
+  for (let li = 0; li < lines.length; li++) {
+    const segments = lines[li].segments;
+    for (let si = 0; si < segments.length; si++) {
+      const segment = segments[si];
       if (segment.length < 2) continue;
+      const mags = vertexMags[li]?.[si];
 
       ctx.beginPath();
-      let penDown = false;
+      // The last point the pen is at, or null while it is lifted.
+      let pen: LinePoint | null = null;
       let prevRa = 0;
       let prevDec = 0;
       let prevVisible = false;
@@ -227,36 +285,29 @@ export function drawConstellationLines(
 
         if (visible) {
           const c = toCanvas(p.x, p.y, view);
-          if (penDown) {
-            ctx.lineTo(c.x, c.y);
-          } else {
-            // Entering the visible region from a below-horizon vertex: begin at the
-            // rim so the line re-enters from the edge rather than jumping to the star.
-            if (clipAtHorizon && i > 0 && !prevVisible) {
-              const edge = zenithHorizonCrossing(prevRa, prevDec, ra, dec);
-              if (edge) {
-                const e = toCanvas(edge.x, edge.y, view);
-                ctx.moveTo(e.x, e.y);
-                ctx.lineTo(c.x, c.y);
-                penDown = true;
-              }
-            }
-            if (!penDown) {
-              ctx.moveTo(c.x, c.y);
-              penDown = true;
-            }
-          }
-        } else {
-          // Leaving the visible region: extend the line to the rim before lifting, so
-          // the visible portion reaches the horizon edge instead of stopping short.
-          if (clipAtHorizon && penDown && prevVisible) {
+          const here: LinePoint = { x: c.x, y: c.y, gap: gapForMag(mags?.[i] ?? Infinity) };
+          // Entering the visible region from a below-horizon vertex: begin at the
+          // rim so the line re-enters from the edge rather than jumping to the star.
+          if (!pen && clipAtHorizon && i > 0 && !prevVisible) {
             const edge = zenithHorizonCrossing(prevRa, prevDec, ra, dec);
             if (edge) {
               const e = toCanvas(edge.x, edge.y, view);
-              ctx.lineTo(e.x, e.y);
+              pen = { x: e.x, y: e.y, gap: 0 };
             }
           }
-          penDown = false;
+          if (pen) addGappedLine(ctx, pen, here);
+          pen = here;
+        } else {
+          // Leaving the visible region: extend the line to the rim before lifting, so
+          // the visible portion reaches the horizon edge instead of stopping short.
+          if (clipAtHorizon && pen && prevVisible) {
+            const edge = zenithHorizonCrossing(prevRa, prevDec, ra, dec);
+            if (edge) {
+              const e = toCanvas(edge.x, edge.y, view);
+              addGappedLine(ctx, pen, { x: e.x, y: e.y, gap: 0 });
+            }
+          }
+          pen = null;
         }
 
         prevRa = ra;
@@ -267,6 +318,7 @@ export function drawConstellationLines(
       ctx.stroke();
     }
   }
+  ctx.lineCap = 'butt';
 }
 
 // ── Horizon line + azimuth (alt-az) grid (date mode) ─────────────────────────
@@ -755,12 +807,23 @@ export function drawConstellationNames(
   view: ViewState,
   theme: SkyTheme,
 ): void {
+  // Zoomed far out the names pile on top of each other: fade them out.
+  const { hideBelowScale, showFromScale, letterSpacing } = CONSTELLATION_NAMES;
+  const fade = Math.min(
+    1,
+    Math.max(0, (view.scale - hideBelowScale) / (showFromScale - hideBelowScale)),
+  );
+  if (fade <= 0) return;
   const infos = getConstellationInfos();
 
+  ctx.save();
+  ctx.globalAlpha *= fade;
   ctx.font = FONTS.constellationName;
   ctx.fillStyle = theme.constellationNameColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  // Not in every WebView yet; plain text where it is missing.
+  if ('letterSpacing' in ctx) ctx.letterSpacing = letterSpacing;
 
   for (const info of infos) {
     const p = project(info.ra, info.dec);
@@ -769,8 +832,7 @@ export function drawConstellationNames(
     ctx.fillText(info.displayName.toUpperCase(), c.x, c.y);
   }
 
-  ctx.textAlign = 'start';
-  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
 }
 
 // ── Frame edit glyphs (pin / trash / add) ────────────────────────────────────

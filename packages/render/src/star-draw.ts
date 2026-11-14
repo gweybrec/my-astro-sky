@@ -17,6 +17,9 @@ export function paintStar(
   cy: number,
   p: StarPaint,
 ): void {
+  // Faint stars are dimmer (p.alpha); multiplied on top of the caller's alpha (below-horizon dimming).
+  const prevAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = prevAlpha * p.alpha;
   if (p.glowAlpha > 0.01) {
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, p.glowR);
     grad.addColorStop(0, `rgba(${p.r}, ${p.g}, ${p.b}, 1)`);
@@ -38,6 +41,7 @@ export function paintStar(
     ctx.fillStyle = grad;
     ctx.fillRect(cx - p.radius, cy - p.radius, p.radius * 2, p.radius * 2);
   }
+  ctx.globalAlpha = prevAlpha;
 }
 
 /** Render one star's sprite (centred) into an offscreen canvas sized to its extent. */
