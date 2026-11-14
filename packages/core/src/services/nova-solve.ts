@@ -222,6 +222,9 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
       publicly_visible: 'n',
       allow_modifications: 'n',
       allow_commercial_use: 'n',
+      // As the web form: try both parities, and downsample the stars' detection image by 2.
+      parity: 2,
+      downsample_factor: 2,
     };
     if (hints?.ra !== undefined && hints?.dec !== undefined) {
       requestData.center_ra = hints.ra;
@@ -230,13 +233,13 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
     }
     if (hints?.scale_lower !== undefined) requestData.scale_lower = hints.scale_lower;
     if (hints?.scale_upper !== undefined) requestData.scale_upper = hints.scale_upper;
-    // Estimate the scale from the picture when it is not given: a field of 2 degrees on the smaller side.
+    // The scale range astrometry.net's own web form defaults to: a field from 0.1 to 180 degrees wide.
+    // A narrow guess from the picture's size left out telephoto and very wide fields.
     if (!requestData.scale_lower && !requestData.scale_upper) {
-      const minDim = Math.min(imageWidth, imageHeight);
-      const estimatedArcsecPerPx = (2.0 * 3600) / minDim;
-      requestData.scale_lower = estimatedArcsecPerPx * 0.5;
-      requestData.scale_upper = estimatedArcsecPerPx * 2.0;
-      requestData.scale_units = 'arcsecperpix';
+      requestData.scale_units = 'degwidth';
+      requestData.scale_type = 'ul';
+      requestData.scale_lower = 0.1;
+      requestData.scale_upper = 180;
     }
 
     try {

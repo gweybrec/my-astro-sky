@@ -1203,6 +1203,8 @@ describe('online solving routes (astrometry.net)', () => {
         publicly_visible: 'n',
         allow_modifications: 'n',
         allow_commercial_use: 'n',
+        parity: 2,
+        downsample_factor: 2,
         center_ra: 250.4,
         center_dec: 36.5,
         radius: 1.5,
@@ -1218,19 +1220,20 @@ describe('online solving routes (astrometry.net)', () => {
       expect(status.body).toEqual({ jobId: r.body.jobId, status: 'solving', submissionId: 77 });
     });
 
-    it('reuses the session and estimates the scale from the picture when no hint is given', async () => {
+    it('reuses the session and asks for the default scale range of the web form when no hint is given', async () => {
       upstream = json({ status: 'success', subid: 78 });
       const r = await post('/api/solve-plate', { name: 'a.png', bytes: png });
       expect(r.status).toBe(200);
       expect(recorded.map((x) => x.url)).toEqual([`${API}/upload`]);
       const request = JSON.parse(partOf(recorded[0].body!, 'request-json')!);
       expect(request.session).toBe('sess-1');
-      // 8x6 picture: 2 degrees over the smaller side, from half to double.
-      const perPx = (2 * 3600) / 6;
       expect(request).toMatchObject({
-        scale_lower: perPx * 0.5,
-        scale_upper: perPx * 2,
-        scale_units: 'arcsecperpix',
+        scale_lower: 0.1,
+        scale_upper: 180,
+        scale_units: 'degwidth',
+        scale_type: 'ul',
+        parity: 2,
+        downsample_factor: 2,
       });
       expect(request.center_ra).toBeUndefined();
     });

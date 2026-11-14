@@ -252,14 +252,17 @@ describe('submitJob — upload request payload', () => {
     expect(body).toContain('"allow_commercial_use":"n"');
   });
 
-  it('auto-estimates scale_lower/scale_upper/scale_units when no hints given', async () => {
+  it('asks for a field from 0.1 to 180 degrees wide, both parities and a downsample of 2, when no hints given', async () => {
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'success', subid: 1 }));
     await submitJob(bytesOf('fake-image'), 'photo.jpg', 1920, 1080);
 
     const body = requestJsonOf(fetchMock.mock.calls[1][0]);
-    expect(body).toContain('"scale_units":"arcsecperpix"');
-    expect(body).toContain('"scale_lower"');
-    expect(body).toContain('"scale_upper"');
+    expect(body).toContain('"scale_units":"degwidth"');
+    expect(body).toContain('"scale_type":"ul"');
+    expect(body).toContain('"scale_lower":0.1');
+    expect(body).toContain('"scale_upper":180');
+    expect(body).toContain('"parity":2');
+    expect(body).toContain('"downsample_factor":2');
     expect(body).not.toContain('"center_ra"');
   });
 
@@ -285,7 +288,7 @@ describe('submitJob — upload request payload', () => {
     expect(body).toContain('"radius":2');
   });
 
-  it('uses explicit scale hints without auto-estimation', async () => {
+  it('uses explicit scale hints without the default range', async () => {
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'success', subid: 1 }));
     await submitJob(bytesOf('img'), 'photo.jpg', 800, 600, {
       scale_lower: 0.5,

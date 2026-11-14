@@ -167,8 +167,7 @@ describe('submit()', () => {
     const request = JSON.parse(
       (t.calls[1].body as { form: Array<{ value?: string }> }).form[0].value!,
     );
-    // 30 pixels on the smaller side: 2 degrees over it.
-    expect(request.scale_lower).toBeCloseTo((2 * 3600) / 30 / 2);
+    expect(request).toMatchObject({ scale_units: 'degwidth', scale_lower: 0.1, scale_upper: 180 });
     // The same size with a name that is not a FITS name is not a picture.
     expect(await failure(t.service.submit({ fileName: 'x.dat', bytes: fits }))).toBe(
       'invalid:CANNOT_DETERMINE_DIMENSIONS',
@@ -194,7 +193,7 @@ describe('submit()', () => {
       const request = JSON.parse(
         (t.calls[1].body as { form: Array<{ value?: string }> }).form[0].value!,
       );
-      expect(request.scale_lower).toBeCloseTo((2 * 3600) / 30 / 2);
+      expect(request.scale_upper).toBe(180);
     },
   );
 
