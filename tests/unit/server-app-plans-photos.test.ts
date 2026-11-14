@@ -1621,7 +1621,12 @@ describe('PATCH /api/photos/:id/metadata', () => {
         ],
       }),
     ).toEqual(OK);
+    // Rows without a usable filter keep their counts with an empty filter.
     expect((await readPhoto(id)).integrations).toEqual([
+      { frames: 3, seconds: 60, filter: '' },
+      { frames: 3, seconds: 60, filter: '' },
+      { frames: 3, seconds: 60, filter: '' },
+      { frames: 3, seconds: 60, filter: '' },
       { frames: 4, seconds: 120, filter: 'Ha' },
       { frames: 10, seconds: 300, filter: 'Oiii' },
     ]);

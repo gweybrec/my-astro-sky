@@ -19,6 +19,8 @@ const props = withDefaults(
     waiting?: boolean;
     /** Its action is running: the spinner before the label, not dimmed, no tap until it ends. */
     busy?: boolean;
+    /** Cannot be used now: drawn as a disabled button, but a tap still comes through (the screen says why). */
+    unavailable?: boolean;
     /** Type style of the label: the filled roles are in the strong weight, a field is in the secondary size. */
     textStyle?: 'body' | 'strong' | 'secondary';
   }>(),
@@ -51,7 +53,7 @@ const typeClass = computed(() => {
   <IonButton
     fill="clear"
     :disabled="disabled"
-    :aria-disabled="waiting || busy ? 'true' : undefined"
+    :aria-disabled="waiting || busy || unavailable ? 'true' : undefined"
     :aria-busy="busy ? 'true' : undefined"
     :aria-pressed="pressed === undefined ? undefined : String(pressed)"
     class="mob-btn"
@@ -64,6 +66,7 @@ const typeClass = computed(() => {
         'mob-btn--block': block,
         'mob-btn--icon': icon,
         'mob-btn--busy': busy,
+        'mob-btn--unavailable': unavailable,
       },
     ]"
   >

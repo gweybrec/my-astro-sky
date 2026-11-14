@@ -422,7 +422,7 @@ const fr = {
       "Projection stéréographique · Résolution de plaque (ASTAP, solve-field, astrometry.net) · 12 000+ objets du ciel profond · Recommandation de cibles · Plans d'observation par nuit · Sauvegarde & restauration pour transférer entre appareils et utilisateurs",
     privacyTitle: 'Confidentialité',
     privacyLocal:
-      'Toutes vos données (photos, métadonnées, paramètres) sont stockées localement sur votre appareil. Les fonctions suivantes nécessitent une connexion à des serveurs externes :',
+      'Toutes vos données (photos, métadonnées, en-têtes des fichiers FITS/TIFF lus, paramètres) sont stockées localement sur votre appareil. Les fonctions suivantes nécessitent une connexion à des serveurs externes :',
     privacyAstrometryTitle: 'Solveur astrometry.net',
     privacyAstrometry:
       "Lorsque vous utilisez le solveur astrometry.net, votre image est envoyée au serveur nova.astrometry.net pour résolution. Une clé API est requise. Aucune autre donnée n'est transmise.",
@@ -437,7 +437,7 @@ const fr = {
       "Lorsque vous utilisez le bouton de géolocalisation automatique dans l'onglet Cibles, votre adresse IP est envoyée à ip-api.com pour estimer vos coordonnées géographiques. Aucune autre donnée n'est transmise.",
     privacySharedTitle: 'Ciels partagés',
     privacyShared:
-      "« Partager mon ciel » crée un fichier sur votre appareil : les photos choisies en taille réelle, leur position sur le ciel et leurs informations (cibles, étiquettes, notes, date, poses et, si vous le cochez, matériel et détails de prise de vue). Les coordonnées GPS enregistrées dans les images en sont retirées ; votre lieu d'observation, votre horizon, vos réglages et vos plans n'y figurent jamais. L'application n'envoie ce fichier nulle part : vous choisissez à qui le donner, et toute personne qui le reçoit peut voir ces photos.",
+      "« Partager mon ciel » crée un fichier sur votre appareil : les photos choisies en taille réelle, leur position sur le ciel et leurs informations (cibles, étiquettes, notes, date, poses et, si vous le cochez, matériel et détails de prise de vue). Les coordonnées GPS enregistrées dans les images en sont retirées et les en-têtes des fichiers FITS/TIFF (qui peuvent indiquer le lieu de prise de vue) n'y figurent pas ; votre lieu d'observation, votre horizon, vos réglages et vos plans n'y figurent jamais. L'application n'envoie ce fichier nulle part : vous choisissez à qui le donner, et toute personne qui le reçoit peut voir ces photos.",
     dataCreditsTitle: 'Crédits des données',
     dataCreditsCatalogsLabel: 'Catalogues',
     dataCreditsDocsLabel: 'Documents de référence',
@@ -505,6 +505,35 @@ const fr = {
     wcsDimensionMismatchBody:
       'La photo JPEG fait {jpegW}×{jpegH} px et le fichier FITS/TIFF fait {fitsW}×{fitsH} px. Les proportions ne sont pas identiques — la superposition pourrait être incorrecte.',
     wcsContinueAnyway: 'Continuer quand même',
+    wcsNoSolutionLoaded:
+      "{filename} n'est pas résolu astrométriquement : la photo n'est pas placée par ce fichier, mais ses données de prise de vue ont été chargées.",
+    wcsWarningsTitle: 'Est-ce le bon fichier ?',
+    wcsWarningsIntro: '{filename} ne semble pas correspondre à cette photo :',
+    wcsWarnTruncated: "Le fichier est incomplet : il est plus court que ce qu'annonce son en-tête.",
+    wcsWarnMainObject:
+      "L'objet principal de la photo, {object}, n'est pas dans le champ du fichier.",
+    wcsWarnMessierMissing: 'Objets Messier de la photo absents du fichier : {objects}.',
+    wcsWarnMessierExtra: 'Objets Messier du fichier absents de la photo : {objects}.',
+    wcsWarnCenterOutside: 'Le centre indiqué par le fichier (RA/DEC) est en dehors de la photo.',
+    wcsWarnObject: "Le fichier indique l'objet « {object} », qui n'est pas un objet de la photo.",
+    wcsWarnFocal:
+      "Focale du fichier : {header} mm ; focale de l'équipement de la photo : {setup} mm.",
+    wcsWarnPixelScale:
+      "Échantillonnage du fichier : {file}″/px ; attendu avec l'équipement de la photo : {setup}″/px.",
+    wcsWarnTelescope:
+      "Télescope du fichier « {name} » : ne correspond pas à l'équipement de la photo.",
+    wcsWarnInstrument:
+      "Caméra du fichier « {name} » : ne correspond pas à l'équipement de la photo.",
+    fitsHeadersButton: 'En-têtes',
+    fitsHeadersTitle: 'En-têtes du fichier',
+    fitsHeadersFilter: 'Filtrer…',
+    fitsHeadersEmpty: 'Aucun en-tête',
+    fitsHeadersKey: 'Mot-clé',
+    fitsHeadersValue: 'Valeur',
+    fitsHeadersComment: 'Commentaire',
+    fitsHeadersNoneManual:
+      "Cette photo a été placée manuellement : aucun fichier WCS n'a été chargé, elle n'a donc pas d'en-têtes.",
+    fitsHeadersNone: "Aucun fichier WCS n'a été chargé pour cette photo : elle n'a pas d'en-têtes.",
     onlineButton: 'En ligne (astrometry.net)',
     localButton: 'Résoudre localement',
     astapButton: 'ASTAP (local)',

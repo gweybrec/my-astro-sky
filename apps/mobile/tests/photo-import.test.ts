@@ -2,9 +2,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const convertRawPhoto = vi.fn();
 const uploadPhoto = vi.fn();
+const setPhotoFitsHeaders = vi.fn();
+const getGearSetups = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
   convertRawPhoto: (...a: unknown[]) => convertRawPhoto(...a),
   uploadPhoto: (...a: unknown[]) => uploadPhoto(...a),
+  setPhotoFitsHeaders: (...a: unknown[]) => setPhotoFitsHeaders(...a),
+  getGearSetups: () => getGearSetups(),
+}));
+// The saved setups' optics: one Seestar S30, which a Seestar header points to.
+vi.mock('@myastrosky/core/gear-catalog', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@myastrosky/core/gear-catalog')>()),
+  loadSetupOptics: async () => [
+    {
+      setupId: 's30',
+      nativeFocalMm: 150,
+      effectiveFocalMm: 150,
+      pixelSizeUm: 2.9,
+      telescopeName: 'ZWO Seestar S30',
+      cameraName: 'ZWO Seestar S30',
+      setupName: 'Seestar',
+    },
+  ],
 }));
 vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   findDSOIdsFromCorrespondences: () => ['M1'],
@@ -24,6 +43,7 @@ import {
   createMemoryPendingStore,
   pendingPhotoFile,
   pendingPhotos,
+  storePlacedPendingPhoto,
 } from '../src/pending-photos';
 
 const corr = [
@@ -50,6 +70,8 @@ describe('the photo import', () => {
     configurePendingStore(createMemoryPendingStore());
     convertRawPhoto.mockReset();
     uploadPhoto.mockReset();
+    setPhotoFitsHeaders.mockReset().mockResolvedValue(undefined);
+    getGearSetups.mockReset().mockResolvedValue([{ id: 's30', name: 'Seestar' }]);
   });
 
   it('leaves out files that are not photos, and counts the added ones', () => {
@@ -83,6 +105,77 @@ describe('the photo import', () => {
     await settle();
     expect(importItems.value[0].status).toBe('toPlace');
     expect(solvedCount.value).toBe(0);
+  });
+
+  it('a raw file without a plate solution keeps its capture data, setup and headers until it is placed', async () => {
+    const cards = [{ key: 'EXPTIME', value: '30.' }];
+    convertRawPhoto.mockResolvedValue({
+      png,
+      meta: {
+        success: false,
+        width: 10,
+        height: 10,
+        dateObs: '2025-02-02T21:00:00',
+        expTime: 30,
+        stackCnt: 44,
+        captureDetails: { ccdTemp: 9.9 },
+        facts: { telescope: 'S30_0289c34b', instrument: 'Seestar S30', focalLengthMm: 150 },
+        fitsHeaders: cards,
+      },
+    });
+    addImportFiles([new File(['raw'], 'M2.fit')]);
+    await settle();
+    await settle();
+    // The row: "À placer", and the line of the board "Importer, fichier non résolu".
+    expect(importItems.value[0]).toMatchObject({
+      status: 'toPlace',
+      noSolution: true,
+      gearSetupId: 's30',
+      capture: { integrations: [{ frames: 44, seconds: 30, filter: '' }], fitsHeaders: cards },
+    });
+    await importAll();
+    expect(uploadPhoto).not.toHaveBeenCalled();
+    const [waiting] = pendingPhotos.value;
+    // Placed later (by hand here): the photo is stored with what its file said, and its headers are saved.
+    uploadPhoto.mockResolvedValue({ id: 'p9' });
+    const placement = {
+      centerRa: 10,
+      centerDec: 41,
+      rotationDeg: 0,
+      projPerPx: 1e-5,
+      mirrorX: false,
+      mirrorY: false,
+    };
+    const stored = await storePlacedPendingPhoto(waiting.id, png, [], placement, ['M2']);
+    const [, , manual, , metadata] = uploadPhoto.mock.calls[0];
+    expect(manual).toEqual(placement);
+    expect(metadata).toEqual({
+      dsoIds: ['M2'],
+      displayName: 'M1-CCD',
+      integrations: [{ frames: 44, seconds: 30, filter: '' }],
+      observationDate: '2025-02-02T21:00:00',
+      captureDetails: { ccdTemp: 9.9 },
+      gearSetupId: 's30',
+    });
+    expect(setPhotoFitsHeaders).toHaveBeenCalledWith('p9', cards);
+    expect(stored).toEqual({ id: 'p9', hasFitsHeaders: true });
+    expect(pendingPhotos.value).toEqual([]);
+  });
+
+  it('a placed photo stays stored when its headers cannot be saved', async () => {
+    convertRawPhoto.mockResolvedValue({
+      png,
+      meta: { success: false, width: 10, height: 10, fitsHeaders: [{ key: 'A', value: '1' }] },
+    });
+    addImportFiles([new File(['raw'], 'M2.fit')]);
+    await settle();
+    await settle();
+    await importAll();
+    uploadPhoto.mockResolvedValue({ id: 'p9' });
+    setPhotoFitsHeaders.mockRejectedValue(new Error('offline'));
+    const stored = await storePlacedPendingPhoto(pendingPhotos.value[0].id, png, [], undefined, []);
+    expect(stored).toEqual({ id: 'p9' });
+    expect(pendingPhotos.value).toEqual([]);
   });
 
   it('a file that cannot be read fails with the reason', async () => {
@@ -125,11 +218,24 @@ describe('the photo import', () => {
       displayName: 'M1-CCD',
       observationDate: '2025-01-01T00:00:00',
     });
+    // No header cards in this file: nothing to save beside the photo.
+    expect(setPhotoFitsHeaders).not.toHaveBeenCalled();
     // Both leave the list; the one without a placement is kept, with its picture, to be placed later.
     expect(importItems.value).toEqual([]);
     expect(pendingPhotos.value.map((p) => [p.name, p.state])).toEqual([['M42.jpg', 'toPlace']]);
     const kept = await pendingPhotoFile(pendingPhotos.value[0].id);
     expect([kept!.name, kept!.type, await kept!.text()]).toEqual(['M42.jpg', 'image/jpeg', 'x']);
+  });
+
+  it("saves a solved file's headers with its photo", async () => {
+    const cards = [{ key: 'OBJECT', value: 'M1' }];
+    convertRawPhoto.mockResolvedValue({ png, meta: { ...solvedMeta, fitsHeaders: cards } });
+    uploadPhoto.mockResolvedValue({ id: 'p1' });
+    addImportFiles([new File(['raw'], 'M1-CCD.fit')]);
+    await settle();
+    await settle();
+    expect(await importAll()).toEqual([{ id: 'p1', hasFitsHeaders: true }]);
+    expect(setPhotoFitsHeaders).toHaveBeenCalledWith('p1', cards);
   });
 
   it('a photo that cannot be stored stays as failed', async () => {

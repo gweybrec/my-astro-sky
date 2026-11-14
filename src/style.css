@@ -353,11 +353,12 @@ body {
   font-weight: 500;
   transition: background 0.2s;
 }
-.btn-action:hover:not(:disabled) {
+.btn-action:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--accent-bg-hover);
   border-color: var(--border-focus);
 }
-.btn-action:disabled {
+.btn-action:disabled,
+.btn-action[aria-disabled='true'] {
   opacity: 0.5;
   cursor: default;
 }

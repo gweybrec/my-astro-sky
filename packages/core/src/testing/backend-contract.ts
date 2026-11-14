@@ -660,6 +660,34 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     expectEqual(await b.photos.listWithSizes(), [], 'every photo removed');
   });
 
+  add('photos: the header cards of the file a photo was read from', async () => {
+    const { backend: b, fixtures } = await makeBackend();
+    const { id } = await b.photos.upload(fixtures.jpeg(), {
+      correspondences: JSON.stringify(CORRESPONDENCES),
+    });
+    expectEqual(await b.photos.getFitsHeaders(id), [], 'none at first');
+    expectEqual(
+      (await b.photos.listWithSizes())[0].hasFitsHeaders,
+      undefined,
+      'the photo says it has none',
+    );
+    const cards = [
+      { key: 'EXPTIME', value: '30.', comment: '[s] Exposure time' },
+      { key: 'HISTORY', value: 'Stacked' },
+    ];
+    await b.photos.setFitsHeaders(id, cards);
+    expectEqual(await b.photos.getFitsHeaders(id), cards, 'the cards as given, in order');
+    expectEqual((await b.photos.listWithSizes())[0].hasFitsHeaders, true, 'listed with headers');
+    await b.photos.setFitsHeaders(id, []);
+    expectEqual(await b.photos.getFitsHeaders(id), [], 'an empty list clears them');
+    await expectDomainError(
+      b.photos.getFitsHeaders('no-such-photo'),
+      'notFound',
+      'PHOTO_NOT_FOUND',
+      'the headers of an unknown photo',
+    );
+  });
+
   add('photos: turning a photo a quarter to the right', async () => {
     const { backend: b, fixtures } = await makeBackend();
     const { id } = await b.photos.upload(fixtures.jpeg(), {

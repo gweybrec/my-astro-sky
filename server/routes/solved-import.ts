@@ -16,6 +16,9 @@ const captureFields = (r: SolvedCaptureMetadata): SolvedCaptureMetadata => ({
   ...(r.stackCnt !== undefined ? { stackCnt: r.stackCnt } : {}),
   ...(r.filter ? { filter: r.filter } : {}),
   ...(r.captureDetails ? { captureDetails: r.captureDetails } : {}),
+  ...(r.facts ? { facts: r.facts } : {}),
+  ...(r.fitsHeaders ? { fitsHeaders: r.fitsHeaders } : {}),
+  ...(r.truncated ? { truncated: true } : {}),
 });
 
 export const solvedImportRouter = express.Router();
@@ -29,7 +32,10 @@ export const solvedImportRouter = express.Router();
  *       - multipart/form-data
  *     responses:
  *       200:
- *         description: Correspondences returned successfully
+ *         description: >
+ *           Correspondences returned successfully. Also answered with success:false and a code
+ *           (NO_WCS_DATA, NO_IMAGE_DIMENSIONS, NOT_ENOUGH_CATALOG_STARS) when the file has no
+ *           usable solution; its size, capture fields, facts and header cards are still sent.
  *         content:
  *           application/json:
  *             schema:
@@ -58,8 +64,17 @@ export const solvedImportRouter = express.Router();
  *                 captureDetails:
  *                   type: object
  *                   description: Parsed capture fields (gain, offset, iso, ccdTemp, setTemp, binning) keyed by field id, present when available
+ *                 facts:
+ *                   type: object
+ *                   description: Header values used to check the file against the photo (object, centre, focal length, pixel size, binning, telescope, instrument, size, solved pixel scale)
+ *                 fitsHeaders:
+ *                   type: array
+ *                   description: Every header card as written ({ key, value, comment? })
+ *                 truncated:
+ *                   type: boolean
+ *                   description: Present (true) when the file is shorter than its header announces
  *       400:
- *         description: Missing file, unsupported format, or no WCS data found
+ *         description: Missing file or unsupported format
  *       500:
  *         description: Server error
  */
@@ -103,7 +118,16 @@ solvedImportRouter.post('/api/solve-wcs', uploadWCS.single('photo'), async (req,
         NO_IMAGE_DIMENSIONS: msg.api.noImageDimensions(lang),
         NOT_ENOUGH_CATALOG_STARS: msg.api.notEnoughCatalogStars(lang),
       }[result.code];
-      res.json({ success: false, error, code: result.code });
+      // A file without a usable solution still says what it can: its size and its header.
+      res.json({
+        success: false,
+        error,
+        code: result.code,
+        ...(result.sourceWidth ? { sourceWidth: result.sourceWidth } : {}),
+        ...(result.sourceHeight ? { sourceHeight: result.sourceHeight } : {}),
+        ...(result.dimensionWarning ? { dimensionWarning: result.dimensionWarning } : {}),
+        ...captureFields(result),
+      });
       return;
     }
 

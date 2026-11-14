@@ -346,6 +346,89 @@ photosRouter.post('/api/photos/:id/rotate', async (req, res) => {
 
 /**
  * @swagger
+ * /api/photos/{id}/fits-headers:
+ *   get:
+ *     summary: The header cards of the raw or solved file the photo's data was read from
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Photo ID
+ *     responses:
+ *       200:
+ *         description: The stored cards, in file order (an empty list when there are none)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 cards:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       key:
+ *                         type: string
+ *                       value:
+ *                         type: string
+ *                       comment:
+ *                         type: string
+ *       404:
+ *         description: Photo not found (code PHOTO_NOT_FOUND)
+ *       500:
+ *         description: Server error
+ *   put:
+ *     summary: Replace the header cards stored with the photo
+ *     description: >
+ *       The cards are cleaned (string key, value and comment; at most 2000 cards and 256 KB of JSON).
+ *       An empty list clears them.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Photo ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               cards:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *     responses:
+ *       200:
+ *         description: Stored
+ *       404:
+ *         description: Photo not found (code PHOTO_NOT_FOUND)
+ *       500:
+ *         description: Server error
+ */
+photosRouter.get('/api/photos/:id/fits-headers', async (req, res) => {
+  try {
+    res.json({ cards: await photos.getFitsHeaders(req.params.id) });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+photosRouter.put('/api/photos/:id/fits-headers', async (req, res) => {
+  try {
+    await photos.setFitsHeaders(req.params.id, req.body?.cards);
+    res.json({ success: true });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+/**
+ * @swagger
  * /api/photos/repair-sizes:
  *   post:
  *     summary: Give the photos stored without a size the size of their picture

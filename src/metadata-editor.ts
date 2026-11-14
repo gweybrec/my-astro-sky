@@ -7,7 +7,12 @@ import type {
   CaptureDetails,
 } from '@myastrosky/core/types';
 import type { GearSetupData } from './api';
-import { updatePhotoMetadata, getGearSetups, solveWCS } from './api';
+import {
+  updatePhotoMetadata,
+  getGearSetups,
+  getPhotoFitsHeaders,
+  setPhotoFitsHeaders,
+} from './api';
 import {
   applyWcsChanges,
   draftFromPhoto,
@@ -15,9 +20,12 @@ import {
   isDraftDirty,
   wcsDraftChanges,
 } from '@myastrosky/core/photo-metadata-draft';
-import { wcsErrorMessage, wcsThrownErrorMessage } from '@myastrosky/core/wcs-load';
-import { confirmWcsDimensionMismatch } from './photo-delete-confirm';
+import { wcsThrownErrorMessage } from '@myastrosky/core/wcs-load';
+import { fitsHeadersMissingKey, type FitsCard } from '@myastrosky/core/fits-header';
+import { photoSkyModel } from '@myastrosky/core/photo-placement';
 import { showWcsConflicts } from './wcs-conflicts';
+import { showFitsHeaders } from './wcs-dialogs';
+import { noSolutionMessage, readWcsFileForPhoto } from './wcs-load-flow';
 import { showToast } from './toast';
 import { t } from './i18n';
 import MetadataEditorPanel from './components/modals/MetadataEditorPanel.vue';
@@ -51,6 +59,8 @@ export function buildMetadataEditorPanel(
   /** Fired on every (unsaved) POI edit — lets the gallery detail view pin a
    * just-identified supernova on the photo before the user saves. */
   onPoisChange?: (pois: PointOfInterest[]) => void,
+  /** `headersButton: false`: no "Headers" button (the stand-alone editor; the headers are read in the photo's panel). */
+  options: { headersButton?: boolean } = {},
 ): { teardown: () => void; isDirty: () => boolean } {
   const original = draftFromPhoto(photo);
 
@@ -65,7 +75,7 @@ export function buildMetadataEditorPanel(
       /* leave empty on failure — the picker just shows "none" */
     });
 
-  const isDirty = (): boolean => isDraftDirty(state, original);
+  const isDirty = (): boolean => isDraftDirty(state, original) || loadedCards !== null;
 
   const knownFilterMap = new Map<string, string>();
   const rememberFilters = (candidates: string[]) => {
@@ -136,20 +146,45 @@ export function buildMetadataEditorPanel(
   app.mount(panelEl);
 
   // ── Load metadata from a WCS/FITS/TIFF file ───────────────────────────────────
-  // Re-reads the companion file to back-fill capture metadata after the fact (e.g.
-  // when the photo was placed with a different solver). Empty fields are filled; a
-  // file whose proportions differ from the photo's asks first (probably another
-  // photo's file), and values that differ from ones already entered are listed so
-  // the user picks which to replace. Nothing is saved before Save.
+  // Re-reads the photo's solved or raw file to back-fill capture metadata after the fact (e.g. when the photo was
+  // placed with a different solver). A file without a plate solution still brings its capture data. The file is
+  // checked against the photo first (size, objects, centre, OBJECT, gear: `readWcsFileForPhoto`), and the user goes
+  // on past the warnings on purpose. Empty fields are filled; values that differ from ones already entered are
+  // listed so the user picks which to replace. Nothing is saved before Save, the file's header cards included.
   const wcsRow = document.createElement('div');
   // `wcs-load-row` is a hook gallery.ts uses to relocate this out of the scrolling
   // form into the fixed action area; `my-2` spaces it in the standalone modal.
-  wcsRow.className = 'wcs-load-row my-2';
+  wcsRow.className = 'wcs-load-row my-2 flex gap-2';
 
   const wcsBtn = document.createElement('button');
   wcsBtn.type = 'button';
-  wcsBtn.className = 'btn-action btn-action--full';
+  wcsBtn.className = 'btn-action flex-1';
   wcsBtn.textContent = t('gallery.loadFromWcs');
+
+  // The header cards of the file read in this editor, saved with the photo on Save.
+  let loadedCards: FitsCard[] | null = null;
+  // The headers are read-only: only the photo's own panel (the gallery) shows them, beside the WCS button. Without
+  // any, the button stays, greyed out, and says why when pressed.
+  const headersBtn = document.createElement('button');
+  headersBtn.type = 'button';
+  headersBtn.className = 'btn-action';
+  headersBtn.dataset.test = 'fits-headers-btn';
+  headersBtn.textContent = t('modal.fitsHeadersButton');
+  headersBtn.title = t('modal.fitsHeadersTitle');
+  const missingKey = () => (loadedCards ? null : fitsHeadersMissingKey(photo));
+  const showHeadersBtn = () => {
+    if (missingKey()) headersBtn.setAttribute('aria-disabled', 'true');
+    else headersBtn.removeAttribute('aria-disabled');
+  };
+  showHeadersBtn();
+  headersBtn.addEventListener('click', () => {
+    const missing = missingKey();
+    if (missing) {
+      showToast({ message: t(missing), type: 'info', duration: 5000 });
+      return;
+    }
+    void showFitsHeaders(loadedCards ?? (() => getPhotoFitsHeaders(photo.id)));
+  });
 
   const wcsInput = document.createElement('input');
   wcsInput.type = 'file';
@@ -168,16 +203,21 @@ export function buildMetadataEditorPanel(
     const label = wcsBtn.textContent;
     wcsBtn.textContent = t('gallery.loadFromWcsLoading');
     try {
-      const result = await solveWCS(file, photo.width || undefined, photo.height || undefined);
-      if (!result.success) {
-        const info = wcsErrorMessage(result, file.name);
-        showToast({ message: t(info.key, info.params), type: 'error', duration: 8000 });
+      const outcome = await readWcsFileForPhoto(file, {
+        width: photo.width,
+        height: photo.height,
+        dsoIds: state.dsoIds,
+        skyModel: photoSkyModel(photo),
+        gearSetupId: state.gearSetupId,
+      });
+      if (outcome.kind === 'error') {
+        showToast({ message: outcome.message, type: 'error', duration: 8000 });
         return;
       }
-      const warning = result.dimensionWarning;
-      if (warning?.aspectMismatch && !(await confirmWcsDimensionMismatch(warning))) return;
+      if (outcome.kind === 'cancelled') return;
+      const { result, solved, suggestedSetup } = outcome;
 
-      const { fills, conflicts } = wcsDraftChanges(state, result);
+      const { fills, conflicts } = wcsDraftChanges(state, result, suggestedSetup);
       let taken = fills;
       if (conflicts.length > 0) {
         const chosen = await showWcsConflicts(conflicts);
@@ -187,10 +227,18 @@ export function buildMetadataEditorPanel(
       const patch = applyWcsChanges(state, taken);
       Object.assign(state, patch);
       if (patch.integrations) rememberFilters(patch.integrations.map((row) => row.filter));
+      if (result.fitsHeaders?.length) {
+        loadedCards = result.fitsHeaders;
+        showHeadersBtn();
+      }
       showToast({
-        message: taken.length > 0 ? t('gallery.loadFromWcsSuccess') : t('gallery.loadFromWcsEmpty'),
-        type: 'info',
-        duration: 3500,
+        message: !solved
+          ? noSolutionMessage(file.name)
+          : taken.length > 0
+            ? t('gallery.loadFromWcsSuccess')
+            : t('gallery.loadFromWcsEmpty'),
+        type: solved ? 'info' : 'warning',
+        duration: solved ? 3500 : 8000,
       });
     } catch (err) {
       showToast({
@@ -205,6 +253,7 @@ export function buildMetadataEditorPanel(
   });
 
   wcsRow.appendChild(wcsBtn);
+  if (options.headersButton !== false) wcsRow.appendChild(headersBtn);
   wcsRow.appendChild(wcsInput);
   // Placed after the form (panelEl) and before the save/delete row, full width.
   container.appendChild(wcsRow);
@@ -229,7 +278,12 @@ export function buildMetadataEditorPanel(
     try {
       const metadata = draftToMetadata(state, photo.originalName);
       await updatePhotoMetadata(photo.id, metadata);
-      const updated: Photo = { ...photo, ...metadata };
+      if (loadedCards) await setPhotoFitsHeaders(photo.id, loadedCards);
+      const updated: Photo = {
+        ...photo,
+        ...metadata,
+        ...(loadedCards ? { hasFitsHeaders: true } : {}),
+      };
       onClose();
       onSaved(updated);
     } catch (err: any) {
@@ -300,7 +354,16 @@ export function showMetadataEditor(
   subtitle.textContent = photo.originalName;
   modal.appendChild(subtitle);
 
-  const panel = buildMetadataEditorPanel(modal, photo, onSaved, close, knownLabels, knownFilters);
+  const panel = buildMetadataEditorPanel(
+    modal,
+    photo,
+    onSaved,
+    close,
+    knownLabels,
+    knownFilters,
+    undefined,
+    { headersButton: false },
+  );
   teardown = panel.teardown;
 
   // Focus DSO input

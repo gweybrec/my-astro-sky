@@ -9,7 +9,9 @@ import {
 import type { Photo } from '@myastrosky/core/types';
 import { deletePhotoAPI } from '@myastrosky/app-state/api';
 import { useConfirm } from '../../composables/useConfirm';
-import { useErrorToast } from '../../composables/useErrorToast';
+import { LONG_TOAST_MS, useErrorToast } from '../../composables/useErrorToast';
+import { fitsHeadersMissingKey } from '@myastrosky/core/fits-header';
+import FitsHeadersSheet from './FitsHeadersSheet.vue';
 import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneBadge from '../../components/PhoneBadge.vue';
 import PhotoFacts from '../../components/PhotoFacts.vue';
@@ -46,7 +48,7 @@ const { confirm } = useConfirm();
 // A visited sky's photo (board "Photo d'un ciel visité"): its author first among its facts, and nothing that
 // changes it.
 const visited = computed(() => !!props.photo.sharedSkyId);
-const { showError } = useErrorToast();
+const { showError, showNotice } = useErrorToast();
 
 // The photo's objects, the most important first (Messier, NGC, IC, …).
 const ids = computed(() => sortDsoIdsByImportance(props.photo.dsoIds ?? []));
@@ -63,6 +65,18 @@ const object = computed(() => {
     constellation: dso.constellation,
   };
 });
+
+// "En-têtes": the header cards of the file the photo's data was read from (board "Photo, en-têtes du fichier"). A photo
+// without any (placed by hand from a JPEG/PNG, or no file read) shows the button greyed out, and a tap says why.
+const headersOpen = ref(false);
+const headersMissing = computed(() => fitsHeadersMissingKey(props.photo));
+function openHeaders() {
+  if (headersMissing.value) {
+    void showNotice(t(headersMissing.value), LONG_TOAST_MS);
+    return;
+  }
+  headersOpen.value = true;
+}
 
 async function remove() {
   const ok = await confirm({
@@ -131,16 +145,20 @@ async function remove() {
       :aria-label="t('mobile.photo.actions')"
       data-sheet-stop="before"
     >
-      <div class="mob-form-row">
-        <PhoneButton block :disabled="wcsLoading" @click="emit('wcs')">
+      <div class="mob-form-row mob-wcs-row">
+        <PhoneButton :disabled="wcsLoading" @click="emit('wcs')">
           {{ wcsLoading ? t('gallery.loadFromWcsLoading') : t('gallery.loadFromWcs') }}
         </PhoneButton>
+        <PhoneButton :unavailable="!!headersMissing" @click="openHeaders">{{
+          t('modal.fitsHeadersButton')
+        }}</PhoneButton>
       </div>
       <div class="mob-btn-row">
         <PhoneButton @click="emit('edit')">{{ t('mobile.photo.edit') }}</PhoneButton>
         <PhoneButton variant="danger" @click="remove">{{ t('photos.delete') }}</PhoneButton>
       </div>
     </div>
+    <FitsHeadersSheet v-model:open="headersOpen" :photo-id="photo.id" />
     <SkyCheckSheet
       v-model:open="catalogsOpen"
       :title="t('gallery.filterCatalogs')"

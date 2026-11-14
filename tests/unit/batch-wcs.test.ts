@@ -7,7 +7,7 @@ vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   findDSOIdsFromCorrespondences: (...args: unknown[]) => mockFindDSOIds(...args),
 }));
 
-const { applyWcsResultToItem } = await import('../../src/batch-wcs');
+const { applyWcsResultToItem, applyWcsMetadataToItem } = await import('../../src/batch-wcs');
 
 function makeItem(overrides: Partial<BatchItem> = {}): BatchItem {
   return {
@@ -138,5 +138,43 @@ describe('applyWcsResultToItem', () => {
       100,
     );
     expect(result.aspectMismatch).toBe(true);
+  });
+});
+
+describe('a file without a plate solution', () => {
+  const unsolved: PlateSolveResult = {
+    success: false,
+    code: 'NO_WCS_DATA',
+    dateObs: '2026-09-04T21:51:11Z',
+    expTime: 30,
+    stackCnt: 44,
+    captureDetails: { ccdTemp: 9.9 },
+    fitsHeaders: [{ key: 'EXPTIME', value: '30.' }],
+  };
+
+  it('still gives its capture data and header cards, without placing the item', () => {
+    const item = makeItem({ status: 'pending' });
+    expect(applyWcsResultToItem(item, unsolved, 100, 100).applied).toBe(false);
+    expect(item.status).toBe('pending');
+    expect(item.solveCorrespondences).toBeNull();
+    expect(item.observationDate).toBe('2026-09-04T21:51:11Z');
+    expect(item.integrations).toEqual([{ frames: 44, seconds: 30, filter: '' }]);
+    expect(item.captureDetails).toEqual({ ccdTemp: 9.9 });
+    expect(item.fitsHeaders).toEqual([{ key: 'EXPTIME', value: '30.' }]);
+  });
+
+  it('keeps what the user entered and takes the suggested setup only when there is none', () => {
+    const item = makeItem({
+      observationDate: '2020-01-01T00:00:00Z',
+      integrations: [{ frames: 1, seconds: 1, filter: 'L' }],
+      gearSetupId: 'mine',
+    });
+    applyWcsMetadataToItem(item, unsolved, 's30');
+    expect(item.observationDate).toBe('2020-01-01T00:00:00Z');
+    expect(item.integrations).toEqual([{ frames: 1, seconds: 1, filter: 'L' }]);
+    expect(item.gearSetupId).toBe('mine');
+    const bare = makeItem();
+    applyWcsMetadataToItem(bare, unsolved, 's30');
+    expect(bare.gearSetupId).toBe('s30');
   });
 });

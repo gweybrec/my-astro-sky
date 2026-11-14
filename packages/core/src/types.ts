@@ -1,3 +1,5 @@
+import type { FitsCard, FitsHeaderFacts } from './fits-header';
+
 /** Binary/multiple-star metadata, from the curated public/data/star-multiples.json. */
 export interface StarMultiplicity {
   /** Number of known stars in the system (2 = binary … up to 8). Source of truth;
@@ -106,6 +108,7 @@ export interface Photo {
   thumbFilename?: string | null; // Low-res thumbnail filename (generated on upload)
   mediumFilename?: string | null; // Medium-sized copy of a large picture, shown between the thumbnail and the full picture
   quarterTurns?: QuarterTurns; // Quarters to the right the picture is shown turned (absent = 0); the file and everything measured in its pixels stay as stored
+  hasFitsHeaders?: boolean; // The header cards of the raw/solved file its data came from are stored (read them with photos.getFitsHeaders)
   sharedSkyId?: string; // Set on a photo of a visited sky (someone else's, read-only); absent on the user's own photos
   sharedGear?: { setup?: string; telescope?: string; camera?: string; accessory?: string }; // A visited photo's gear, as text
   author?: string; // A visited photo's author: the name its sender shared it under, never editable here
@@ -186,6 +189,12 @@ export interface PlateSolveResult {
   stackCnt?: number; // STACKCNT from WCS header (frame count)
   filter?: string; // FILTER from WCS header (feeds the integration row)
   captureDetails?: CaptureDetails; // Parsed capture fields from WCS header
+  /** Header values used to check that a solved/raw file belongs to the photo (also on failure). */
+  facts?: FitsHeaderFacts;
+  /** Every header card of a solved/raw file, as written (also on failure). */
+  fitsHeaders?: FitsCard[];
+  /** The solved/raw file is shorter than its header announces. */
+  truncated?: boolean;
 }
 
 export interface AstrometrySolveStatus {

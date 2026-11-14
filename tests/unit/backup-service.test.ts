@@ -137,6 +137,7 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       height: 50,
       correspondences: correspondences(2),
     });
+    await a.photos.setFitsHeaders('p1', [{ key: 'EXPTIME', value: '30.', comment: 'Exposure' }]);
     a.blobs.store.set('p1.jpg', text('image-1'));
     a.blobs.store.set('thumb_p1.jpg', text('thumb-1'));
     a.blobs.store.set('p2.jpg', text('image-2'));
@@ -215,6 +216,12 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       const manifest = parse(writer.files[0][1]);
       expect(manifest.manifestVersion).toBe(1);
       expect(manifest.photos.map((p: any) => p.id)).toEqual(['p1', 'p2']);
+      // The header cards travel in the manifest; the "has headers" flag of the list does not.
+      expect(manifest.photos[0].fitsHeaders).toEqual([
+        { key: 'EXPTIME', value: '30.', comment: 'Exposure' },
+      ]);
+      expect(manifest.photos[0].hasFitsHeaders).toBeUndefined();
+      expect(manifest.photos[1].fitsHeaders).toBeUndefined();
       expect(new TextDecoder().decode(writer.files[1][1])).toBe('image-1');
       expect(parse(writer.files[4][1])).toEqual({ M31: { name: 'Andromeda' } });
       expect(parse(writer.files[10][1])).toEqual({ zoomIn: '+' });
@@ -297,6 +304,10 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
         selectedGear: preview.gear.map((g) => g.id),
       });
       expect(result).toEqual({ imported: 2, skipped: 0, dsoOverridesImported: 1, failed: [] });
+      expect(await b.photos.getFitsHeaders('p1')).toEqual([
+        { key: 'EXPTIME', value: '30.', comment: 'Exposure' },
+      ]);
+      expect(await b.photos.getFitsHeaders('p2')).toEqual([]);
 
       expect(await b.photos.list()).toEqual(await a.photos.list());
       expect(await b.plans.list()).toEqual(await a.plans.list());

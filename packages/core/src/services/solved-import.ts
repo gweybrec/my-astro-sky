@@ -22,7 +22,22 @@ import {
   UnsupportedXisfError,
 } from '../raw-decode/index';
 import { parseXisfHeader } from '../raw-decode/xisf';
-import { extractWCS, wcsFromHeader, wcsToCorrespondences, type WCSData } from '../wcs';
+import {
+  extractFITSHeaderFromFITS,
+  extractFITSHeaderFromTIFF,
+  parseFITSHeader,
+  wcsFromHeader,
+  wcsToCorrespondences,
+  type WCSData,
+} from '../wcs';
+import {
+  captureFromHeader,
+  fitsDataTruncated,
+  headerFacts,
+  parseFitsCards,
+  type FitsCard,
+  type FitsHeaderFacts,
+} from '../fits-header';
 
 export interface SolvedImportServiceDeps {
   images: ImageCodec;
@@ -47,25 +62,69 @@ export interface SolvedImportService {
 
 const ALLOWED_EXTENSIONS = new Set(['.tif', '.tiff', '.fits', '.fit', '.xisf']);
 
+/** What a file's header holds: its keywords, raw cards, plate solution (if any), facts and image size. */
+interface FileHeader {
+  parsed: Record<string, number | string | boolean>;
+  cards: FitsCard[];
+  wcs: WCSData | null;
+  /** Width and height of the image, from NAXIS or the XISF image element (0 when unknown). */
+  width: number;
+  height: number;
+  truncated: boolean;
+}
+
+const EMPTY_HEADER: FileHeader = {
+  parsed: {},
+  cards: [],
+  wcs: null,
+  width: 0,
+  height: 0,
+  truncated: false,
+};
+
 /**
- * The solution a file's header holds. An XISF carries it as FITS keywords in its XML header, and
- * its size in the image element; an XISF that cannot be read has no solution.
+ * The header of a FITS file, of a TIFF's ImageDescription (tag 270) or of an XISF's FITS keywords, whether or not it
+ * holds a plate solution. A file whose header cannot be read gives an empty header.
  */
-function readWcs(bytes: Uint8Array, ext: string): WCSData | null {
-  if (ext !== '.xisf') return extractWCS(bytes, ext);
-  let header: ReturnType<typeof parseXisfHeader>;
-  try {
-    header = parseXisfHeader(bytes);
-  } catch (err) {
-    if (err instanceof UnsupportedXisfError) return null;
-    throw err;
+function readHeader(bytes: Uint8Array, ext: string): FileHeader {
+  if (ext === '.xisf') {
+    let header: ReturnType<typeof parseXisfHeader>;
+    try {
+      header = parseXisfHeader(bytes);
+    } catch (err) {
+      if (err instanceof UnsupportedXisfError) return EMPTY_HEADER;
+      throw err;
+    }
+    const parsed = header.fitsKeywords;
+    const wcs = wcsFromHeader(parsed);
+    const width = (parsed.NAXIS1 as number) || header.image?.width || 0;
+    const height = (parsed.NAXIS2 as number) || header.image?.height || 0;
+    if (wcs) {
+      wcs.NAXIS1 = wcs.NAXIS1 || width;
+      wcs.NAXIS2 = wcs.NAXIS2 || height;
+    }
+    const loc = header.image?.location;
+    const truncated =
+      loc?.kind === 'attachment' && (loc.position ?? 0) + (loc.size ?? 0) > bytes.length;
+    return { parsed, cards: header.fitsCards, wcs, width, height, truncated };
   }
-  const wcs = wcsFromHeader(header.fitsKeywords);
-  if (wcs && header.image) {
-    wcs.NAXIS1 = wcs.NAXIS1 || header.image.width;
-    wcs.NAXIS2 = wcs.NAXIS2 || header.image.height;
-  }
-  return wcs;
+  const headerStr =
+    ext === '.fits' || ext === '.fit'
+      ? extractFITSHeaderFromFITS(bytes)
+      : extractFITSHeaderFromTIFF(bytes);
+  if (!headerStr) return EMPTY_HEADER;
+  const parsed = parseFITSHeader(headerStr);
+  const isFits = ext === '.fits' || ext === '.fit';
+  // A text that is not a FITS header (a TIFF description, a file that is not FITS) has no keyword cards.
+  if (Object.keys(parsed).length === 0) return EMPTY_HEADER;
+  return {
+    parsed,
+    cards: parseFitsCards(headerStr),
+    wcs: wcsFromHeader(parsed),
+    width: (parsed.NAXIS1 as number) || 0,
+    height: (parsed.NAXIS2 as number) || 0,
+    truncated: isFits && fitsDataTruncated(bytes.length, headerStr.length, parsed),
+  };
 }
 
 /** Lower-case extension with its dot ('' when there is none), as `path.extname` gives it. */
@@ -87,14 +146,38 @@ function requireFile(file: SolvedFile): string {
   return ext;
 }
 
-/** The header fields of a solved file that describe the capture, only those present. */
-function metadataOf(wcs: WCSData | null): SolvedCaptureMetadata {
+/** What the header says about the capture, the facts used to check the file, and the raw cards. */
+function metadataOf(header: FileHeader): SolvedCaptureMetadata {
+  const facts: FitsHeaderFacts = headerFacts(header.parsed);
+  if (header.wcs) {
+    const det = Math.abs(header.wcs.CD1_1 * header.wcs.CD2_2 - header.wcs.CD1_2 * header.wcs.CD2_1);
+    if (det > 0) facts.pixelScaleArcsec = Math.sqrt(det) * 3600;
+  }
   return {
-    ...(wcs?.dateObs ? { dateObs: wcs.dateObs } : {}),
-    ...(wcs?.expTime !== undefined ? { expTime: wcs.expTime } : {}),
-    ...(wcs?.stackCnt !== undefined ? { stackCnt: wcs.stackCnt } : {}),
-    ...(wcs?.filter ? { filter: wcs.filter } : {}),
-    ...(wcs?.captureDetails ? { captureDetails: wcs.captureDetails } : {}),
+    ...captureFromHeader(header.parsed),
+    ...(Object.keys(facts).length > 0 ? { facts } : {}),
+    ...(header.cards.length > 0 ? { fitsHeaders: header.cards } : {}),
+    ...(header.truncated ? { truncated: true } : {}),
+  };
+}
+
+/** The aspect/size difference between the file and the displayed picture, when a target is given and differs. */
+function dimensionWarningOf(
+  width: number,
+  height: number,
+  targetWidth: number,
+  targetHeight: number,
+): DimensionWarning | undefined {
+  if (!width || !height || !(targetWidth > 0) || !(targetHeight > 0)) return undefined;
+  if (targetWidth === width && targetHeight === height) return undefined;
+  const sourceAspect = width / height;
+  const targetAspect = targetWidth / targetHeight;
+  return {
+    sourceW: width,
+    sourceH: height,
+    targetW: targetWidth,
+    targetH: targetHeight,
+    aspectMismatch: Math.abs(sourceAspect - targetAspect) / sourceAspect > 0.01,
   };
 }
 
@@ -110,12 +193,12 @@ export function createSolvedImportService(deps: SolvedImportServiceDeps): Solved
   return {
     async solveWcs(request) {
       const ext = requireFile(request);
-      const wcs = readWcs(request.bytes, ext);
-      if (!wcs) return { success: false, code: 'NO_WCS_DATA' };
+      const header = readHeader(request.bytes, ext);
+      const meta = metadataOf(header);
 
-      // The size comes from the NAXIS header keywords; for a TIFF without them, from the codec.
-      let imageWidth = wcs.NAXIS1;
-      let imageHeight = wcs.NAXIS2;
+      // The size comes from the header (NAXIS, or the XISF image); for a TIFF without them, from the codec.
+      let imageWidth = header.width;
+      let imageHeight = header.height;
       if ((ext === '.tif' || ext === '.tiff') && (!imageWidth || !imageHeight)) {
         try {
           const info = await images.probe(request.bytes);
@@ -125,38 +208,40 @@ export function createSolvedImportService(deps: SolvedImportServiceDeps): Solved
           // An unreadable TIFF has no size; reported below.
         }
       }
-      if (!imageWidth || !imageHeight) return { success: false, code: 'NO_IMAGE_DIMENSIONS' };
-
-      const correspondences = await correspondencesOf(wcs, imageWidth, imageHeight);
-      if (correspondences.length < 3) return { success: false, code: 'NOT_ENOUGH_CATALOG_STARS' };
-
-      // Rescale to the target (displayed) size when it is given and differs.
       const targetWidth = request.targetWidth ?? 0;
       const targetHeight = request.targetHeight ?? 0;
-      let finalCorrespondences = correspondences;
-      let dimensionWarning: DimensionWarning | undefined;
-      if (
-        targetWidth > 0 &&
-        targetHeight > 0 &&
-        (targetWidth !== imageWidth || targetHeight !== imageHeight)
-      ) {
-        const sourceAspect = imageWidth / imageHeight;
-        const targetAspect = targetWidth / targetHeight;
-        dimensionWarning = {
-          sourceW: imageWidth,
-          sourceH: imageHeight,
-          targetW: targetWidth,
-          targetH: targetHeight,
-          aspectMismatch: Math.abs(sourceAspect - targetAspect) / sourceAspect > 0.01,
-        };
-        const scaleX = targetWidth / imageWidth;
-        const scaleY = targetHeight / imageHeight;
-        finalCorrespondences = correspondences.map((c) => ({
-          ...c,
-          photoX: c.photoX * scaleX,
-          photoY: c.photoY * scaleY,
-        }));
+      const dimensionWarning = dimensionWarningOf(
+        imageWidth,
+        imageHeight,
+        targetWidth,
+        targetHeight,
+      );
+      const sizeFields = {
+        ...(imageWidth && imageHeight
+          ? { sourceWidth: imageWidth, sourceHeight: imageHeight }
+          : {}),
+        ...(dimensionWarning ? { dimensionWarning } : {}),
+      };
+
+      const wcs = header.wcs;
+      if (!wcs) return { success: false, code: 'NO_WCS_DATA', ...sizeFields, ...meta };
+      if (!imageWidth || !imageHeight) {
+        return { success: false, code: 'NO_IMAGE_DIMENSIONS', ...meta };
       }
+
+      const correspondences = await correspondencesOf(wcs, imageWidth, imageHeight);
+      if (correspondences.length < 3) {
+        return { success: false, code: 'NOT_ENOUGH_CATALOG_STARS', ...sizeFields, ...meta };
+      }
+
+      // Rescale to the target (displayed) size when it is given and differs.
+      const finalCorrespondences = dimensionWarning
+        ? correspondences.map((c) => ({
+            ...c,
+            photoX: (c.photoX * targetWidth) / imageWidth,
+            photoY: (c.photoY * targetHeight) / imageHeight,
+          }))
+        : correspondences;
 
       return {
         success: true,
@@ -164,7 +249,7 @@ export function createSolvedImportService(deps: SolvedImportServiceDeps): Solved
         sourceWidth: imageWidth,
         sourceHeight: imageHeight,
         ...(dimensionWarning ? { dimensionWarning } : {}),
-        ...metadataOf(wcs),
+        ...meta,
       };
     },
 
@@ -187,7 +272,8 @@ export function createSolvedImportService(deps: SolvedImportServiceDeps): Solved
       }
 
       // WCS and capture metadata; no rescale is needed since the PNG has the file's own size.
-      const wcs = readWcs(file.bytes, ext);
+      const header = readHeader(file.bytes, ext);
+      const wcs = header.wcs;
       let correspondences: ConvertSolvedResult['correspondences'];
       if (wcs) correspondences = await correspondencesOf(wcs, decoded.width, decoded.height);
       const success = !!correspondences && correspondences.length >= 3;
@@ -200,7 +286,7 @@ export function createSolvedImportService(deps: SolvedImportServiceDeps): Solved
         width: decoded.width,
         height: decoded.height,
         png: decoded.png,
-        ...metadataOf(wcs),
+        ...metadataOf(header),
       };
     },
   };

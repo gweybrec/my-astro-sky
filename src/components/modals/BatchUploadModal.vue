@@ -192,7 +192,8 @@ import {
   PHOTO_PICKER_ACCEPT,
   isRawAstroFile,
 } from '@myastrosky/core/photo-formats';
-import { convertRawPhoto } from '../../api';
+import { convertRawPhoto, setPhotoFitsHeaders } from '../../api';
+import { noSolutionMessage, suggestedSetupFor } from '../../wcs-load-flow';
 import { applyWcsResultToItem } from '../../batch-wcs';
 import BatchCard from './BatchCard.vue';
 import CheckRow from '../base/CheckRow.vue';
@@ -346,8 +347,13 @@ async function convertOneItem(item: BatchItem) {
     if (!items.includes(item)) return; // removed mid-flight
     item.file = png;
     item.solveAbort = null;
-    const applied = applyWcsResultToItem(item, meta, meta.width, meta.height);
+    // The raw file is the photo itself: nothing to compare it with, but its header may point to a saved setup.
+    const suggested = await suggestedSetupFor(meta);
+    if (!items.includes(item)) return;
+    const applied = applyWcsResultToItem(item, meta, meta.width, meta.height, suggested);
     item.status = applied.applied ? 'success' : 'pending';
+    // No plate solution in the file: its capture data was taken, the photo still has to be placed.
+    if (!applied.applied) item.wcsNotice = noSolutionMessage(item.rawName ?? item.file.name);
   } catch (err: any) {
     if (!items.includes(item)) return;
     item.solveAbort = null;
@@ -840,6 +846,7 @@ async function placeAll() {
         canvasStore.overlay?.placeUploadedPhoto(photo);
       },
       t,
+      setPhotoFitsHeaders,
     );
   }
   isPlacing.value = false;
@@ -855,6 +862,7 @@ function autoPlaceItem(item: BatchItem) {
       canvasStore.overlay?.placeUploadedPhoto(photo);
     },
     t,
+    setPhotoFitsHeaders,
   );
 }
 

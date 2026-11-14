@@ -163,8 +163,11 @@ describe('photo serialization — get / list parity', () => {
 // serialized photo — forcing the serializer to be updated too.
 
 describe('photo serialization — no column left behind', () => {
-  /** Columns that are deliberately NOT part of the serialized photo shape. */
-  const INTERNAL_COLUMNS = new Set(['display_order']);
+  /**
+   * Columns that are deliberately NOT part of the serialized photo shape. `fits_headers` is shown as `hasFitsHeaders`
+   * and read on demand (`photos.getFitsHeaders`), so that the photo list stays light.
+   */
+  const INTERNAL_COLUMNS = new Set(['display_order', 'fits_headers']);
 
   /** photos-table column (snake_case) → serialized key (camelCase). */
   const columnToKey = (col: string): string =>

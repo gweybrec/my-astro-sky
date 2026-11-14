@@ -13,7 +13,7 @@
 import type { SqlDb } from '../ports/sql-db';
 
 /** Schema version produced by `BASELINE_SCHEMA` (the latest migration it includes). */
-export const SCHEMA_VERSION = 21;
+export const SCHEMA_VERSION = 22;
 
 /** The columns of the photos table at version 17, in their order (migration 17 copies them). */
 const PHOTO_COLUMNS_V17 =
@@ -42,7 +42,7 @@ function photosTable(name: string, atVersion17 = false): string {
     points_of_interest TEXT NOT NULL DEFAULT '[]',
     capture_details TEXT NOT NULL DEFAULT '{}',
     gear_setup_id TEXT,
-    quarter_turns INTEGER NOT NULL DEFAULT 0${atVersion17 ? '' : ',\n    medium_filename TEXT'}
+    quarter_turns INTEGER NOT NULL DEFAULT 0${atVersion17 ? '' : ',\n    medium_filename TEXT,\n    fits_headers TEXT'}
   )`;
 }
 
@@ -267,6 +267,8 @@ export const MIGRATIONS: readonly DataMigration[] = [
       'ALTER TABLE plans ADD COLUMN archived INTEGER NOT NULL DEFAULT 0',
     ],
   },
+  // The header cards of the raw or solved file a photo's data was read from (JSON list), shown on request.
+  { version: 22, statements: ['ALTER TABLE photos ADD COLUMN fits_headers TEXT'] },
 ];
 
 /**

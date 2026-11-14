@@ -212,6 +212,71 @@ export function resolveSetupCamera(
   return cameras.find((c) => c.id === wantedId) ?? null;
 }
 
+/** What a gear setup images with, as the checks of a solved/raw file compare it with its header. */
+export interface SetupOptics {
+  setupId: string;
+  /** The telescope's own focal length, in mm. */
+  nativeFocalMm: number;
+  /** With the setup's reducer or barlow (the same as native for a smart telescope or without one). */
+  effectiveFocalMm: number;
+  /** The camera's pixel size in µm, null when the camera is unknown. */
+  pixelSizeUm: number | null;
+  telescopeName: string;
+  cameraName: string | null;
+  setupName: string;
+}
+
+/** The optics of a saved setup from the gear lists; null when its telescope is not in them. */
+export function setupOptics(
+  setup: {
+    id: string;
+    name: string;
+    telescopeId: string;
+    cameraId: string;
+    accessoryId: string | null;
+  },
+  telescopes: TelescopeData[],
+  cameras: CameraData[],
+  accessories: AccessoryData[],
+): SetupOptics | null {
+  const telescope = telescopes.find((t) => t.id === setup.telescopeId);
+  if (!telescope) return null;
+  const camera = resolveSetupCamera(telescope, cameras, setup.cameraId);
+  const accessory = setup.accessoryId
+    ? (accessories.find((a) => a.id === setup.accessoryId) ?? null)
+    : null;
+  const factor = telescope.is_smart_telescope ? 1 : (accessory?.magnification_factor ?? 1);
+  return {
+    setupId: setup.id,
+    nativeFocalMm: telescope.focal_length_mm,
+    effectiveFocalMm: telescope.focal_length_mm * factor,
+    pixelSizeUm: camera?.pixel_size_um ?? null,
+    telescopeName: telescopeLabel(telescope),
+    cameraName: camera ? cameraLabel(camera) : null,
+    setupName: setup.name,
+  };
+}
+
+/** `setupOptics` for each saved setup that resolves, loading the gear lists first. */
+export async function loadSetupOptics(
+  setups: {
+    id: string;
+    name: string;
+    telescopeId: string;
+    cameraId: string;
+    accessoryId: string | null;
+  }[],
+): Promise<SetupOptics[]> {
+  const [telescopes, cameras, accessories] = await Promise.all([
+    getTelescopes(),
+    getCameras(),
+    getAccessories(),
+  ]);
+  return setups
+    .map((s) => setupOptics(s, telescopes, cameras, accessories))
+    .filter((o): o is SetupOptics => o !== null);
+}
+
 // ─── Display helpers ──────────────────────────────────────────────────────────
 
 export function telescopeLabel(t: TelescopeData): string {

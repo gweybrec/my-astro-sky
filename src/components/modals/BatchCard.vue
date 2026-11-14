@@ -127,8 +127,18 @@
         {{ wcsLoaded ? `✓ ${wcsFileName}` : wcsLoading ? '…' : t('modal.wcsButton') }}
       </button>
       <button
+        v-if="item.fitsHeaders?.length"
+        type="button"
+        class="batch-wcs-btn !w-auto shrink-0"
+        data-test="fits-headers-btn"
+        :title="t('modal.fitsHeadersTitle')"
+        @click="showFitsHeaders(item.fitsHeaders)"
+      >
+        {{ t('modal.fitsHeadersButton') }}
+      </button>
+      <button
         v-if="
-          wcsLoaded &&
+          (wcsLoaded || item.wcsNotice) &&
           item.status !== 'solving' &&
           item.status !== 'placing' &&
           item.status !== 'placed'
@@ -149,7 +159,9 @@
     </div>
 
     <!-- WCS / manual error message (inline, full single-modal parity) -->
-    <div v-if="wcsError" class="batch-status-upload-error">{{ wcsError }}</div>
+    <div v-if="wcsError || item.wcsNotice" class="batch-status-upload-error">
+      {{ wcsError || item.wcsNotice }}
+    </div>
 
     <!-- Hints section -->
     <div :class="['solve-hints-section', { 'has-hint': item.hintTargetName }]">
@@ -263,14 +275,16 @@ import type { SolverAvailability } from '../../api';
 import { t } from '../../i18n';
 import { useCanvasStore } from '../../stores/canvas';
 import { searchUnified } from '@myastrosky/core/search';
-import { solveWCS, reuseAstrometrySubmission, updatePhotoMetadata } from '../../api';
+import { reuseAstrometrySubmission, updatePhotoMetadata } from '../../api';
 import type { GearSetupData } from '../../api';
 import { stripExtension, getFileDimensions } from '../../file-utils';
 import { generateThumbnail } from '../../lazy-image';
 import { showToast } from '../../toast';
 import { sanitizeIntegrationRows, clearWcsSolution } from '../../batch-utils';
-import { wcsErrorMessage } from '@myastrosky/core/wcs-load';
 import { applyWcsResultToItem } from '../../batch-wcs';
+import { photoSkyModel } from '@myastrosky/core/photo-placement';
+import { noSolutionMessage, readWcsFileForPhoto } from '../../wcs-load-flow';
+import { showFitsHeaders } from '../../wcs-dialogs';
 import { RAW_COMPANION_ACCEPT } from '@myastrosky/core/photo-formats';
 import BatchSolveStatus from './BatchSolveStatus.vue';
 import MetadataEditorPanel from './MetadataEditorPanel.vue';
@@ -390,30 +404,48 @@ async function handleWcsFile(e: Event) {
   wcsLoading.value = true;
   wcsError.value = '';
   try {
-    const { width: imgWidth, height: imgHeight } = await getFileDimensions(props.item.file);
-    const result = await solveWCS(f, imgWidth || undefined, imgHeight || undefined);
-    const applied = applyWcsResultToItem(props.item, result, imgWidth, imgHeight);
+    const item = props.item;
+    const { width: imgWidth, height: imgHeight } = await getFileDimensions(item.file);
+    // The photo's own placement, when another solver (or a previous file) already placed it.
+    const skyModel =
+      imgWidth && imgHeight && (item.solveCorrespondences?.length || item.manualPlacement)
+        ? photoSkyModel({
+            width: imgWidth,
+            height: imgHeight,
+            correspondences: item.solveCorrespondences ?? [],
+            manualPlacement: item.manualPlacement ?? undefined,
+          })
+        : null;
+    const outcome = await readWcsFileForPhoto(f, {
+      width: imgWidth,
+      height: imgHeight,
+      dsoIds: item.dsoIds,
+      skyModel,
+      gearSetupId: item.gearSetupId,
+    });
+    if (outcome.kind === 'error') {
+      wcsError.value = outcome.message;
+      return;
+    }
+    if (outcome.kind === 'cancelled') return;
+    const { result } = outcome;
+    const applied = applyWcsResultToItem(
+      item,
+      result,
+      imgWidth,
+      imgHeight,
+      outcome.suggestedSetup?.id ?? null,
+    );
+    // Values already entered are kept; the card's metadata section shows what the file filled in.
+    scheduleMetaSave();
     if (applied.applied) {
-      if (applied.aspectMismatch && result.dimensionWarning) {
-        const { sourceW, sourceH, targetW, targetH } = result.dimensionWarning;
-        showToast({
-          message: t('modal.wcsDimensionMismatchBody', {
-            fitsW: String(sourceW),
-            fitsH: String(sourceH),
-            jpegW: String(targetW),
-            jpegH: String(targetH),
-          }),
-          type: 'warning',
-          duration: 6000,
-        });
-        wcsWarning.value = true;
-      }
+      item.wcsNotice = '';
+      wcsWarning.value = applied.aspectMismatch;
       wcsLoaded.value = true;
       wcsFileName.value = f.name;
     } else {
-      // Full single-modal parity: specific message per failure code, shown inline.
-      const info = wcsErrorMessage(result, f.name);
-      wcsError.value = t(info.key, info.params);
+      // No plate solution: the capture data was taken, the photo still has to be placed.
+      item.wcsNotice = noSolutionMessage(f.name);
     }
   } catch (err: any) {
     wcsError.value = t('modal.wcsParseError', {

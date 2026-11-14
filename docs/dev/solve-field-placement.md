@@ -102,3 +102,18 @@ If a newly solved image appears misaligned, check in order:
 4. **Slight rotation/scale error but correct region** → SIP distortion coefficients not being applied (the WCS has higher-order corrections that we currently skip).
 
 5. **Completely wrong region of sky** → solve-field found a false match. Re-run with a tighter RA/Dec hint.
+
+## Reading a header without a solution, and checking the file
+
+`packages/core/src/fits-header.ts` reads a FITS header (FITS file, TIFF tag 270, XISF keywords) whether or not it holds a
+plate solution: the capture data (`captureFromHeader`: sub exposure from `EXPTIME`/`EXPOSURE`, frames from
+`STACKCNT`/`NCOMBINE`/`LIVETIME` ÷ exposure), the facts used to check the file (`headerFacts`: `OBJECT`, centre,
+`FOCALLEN`, `XPIXSZ`, `XBINNING`, `TELESCOP`, `INSTRUME`, `NAXIS`), the raw cards (`parseFitsCards`) and a truncated FITS
+(`fitsDataTruncated`). `solveWcs` and `convert` return all of it on failure too.
+
+`packages/core/src/wcs-file-checks.ts` compares a file with the photo it is read for (`wcsFileWarnings`) and picks the
+saved setup the header points to (`suggestGearSetup`). Both apps run them through `packages/app-state/src/wcs-load-flow.ts`
+(`readWcsFileForPhoto`), which asks about the warnings through a dialog the app passes in: the desktop's
+`src/wcs-load-flow.ts` (add-photo card, metadata editor) and the phone's `useWcsLoad` (photo sheet, editor). A raw file
+added as the photo itself skips the comparison. On the phone, a raw file without a plate solution waits to be placed
+with its capture data, setup and header cards, given to the photo when it is placed (`storePlacedPendingPhoto`).

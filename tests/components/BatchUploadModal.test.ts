@@ -64,6 +64,13 @@ vi.mock('../../src/api', () => ({
   pollPlateSolve: vi.fn(),
   uploadPhoto: vi.fn(),
   convertRawPhoto: (...args: unknown[]) => convertRawPhoto(...(args as [])),
+  setPhotoFitsHeaders: vi.fn(),
+  getGearSetups: vi.fn().mockResolvedValue([]),
+}));
+// The WCS reading flow (setup suggestion) is shared and calls the package's data functions.
+vi.mock('@myastrosky/app-state/api', () => ({
+  solveWCS: vi.fn(),
+  getGearSetups: vi.fn().mockResolvedValue([]),
 }));
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
@@ -214,6 +221,35 @@ describe('BatchUploadModal — raw file conversion', () => {
     expect(items(wrapper)[0].file.name).toBe('M101.png');
     // Never reached a solver — placed straight from the raw file's own WCS.
     expect(submitLocalSolveJob).not.toHaveBeenCalled();
+
+    wrapper.unmount();
+  });
+
+  it('keeps the capture data and headers of a raw file without a solution, and says it is not placed', async () => {
+    state.pendingFiles = [fit('M2.fit')];
+    convertRawPhoto.mockResolvedValue({
+      png: new File(['png'], 'M2.png', { type: 'image/png' }),
+      meta: {
+        success: false,
+        code: 'NO_WCS_DATA',
+        expTime: 30,
+        stackCnt: 44,
+        captureDetails: { ccdTemp: 9.9 },
+        fitsHeaders: [{ key: 'EXPTIME', value: '30.' }],
+        width: 100,
+        height: 100,
+      },
+    });
+
+    const wrapper = mountModal();
+    await flushPromises();
+
+    expect(statuses(wrapper)).toEqual(['pending']);
+    const item = items(wrapper)[0];
+    expect(item.integrations).toEqual([{ frames: 44, seconds: 30, filter: '' }]);
+    expect(item.captureDetails).toEqual({ ccdTemp: 9.9 });
+    expect(item.fitsHeaders).toEqual([{ key: 'EXPTIME', value: '30.' }]);
+    expect(item.wcsNotice).toBeTruthy();
 
     wrapper.unmount();
   });

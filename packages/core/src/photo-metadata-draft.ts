@@ -106,6 +106,8 @@ export function draftToMetadata(draft: PhotoMetadataDraft, currentName: string) 
 export type WcsChange =
   | { key: 'observationDate'; current: string; incoming: string }
   | { key: 'integrations'; current: PhotoIntegration[]; incoming: PhotoIntegration[] }
+  /** The saved setup the header points to (see `suggestGearSetup`), for a photo without one. */
+  | { key: 'gearSetupId'; current: null; incoming: string; name: string }
   | {
       key: `capture.${string}`;
       field: string;
@@ -141,9 +143,19 @@ function sameIntegrations(a: PhotoIntegration[], b: PhotoIntegration[]): boolean
 export function wcsDraftChanges(
   draft: PhotoMetadataDraft,
   result: PlateSolveResult,
+  /** The saved setup the header points to, offered only when the draft has none. */
+  suggestedSetup?: { id: string; name: string } | null,
 ): { fills: WcsChange[]; conflicts: WcsChange[] } {
   const fills: WcsChange[] = [];
   const conflicts: WcsChange[] = [];
+  if (suggestedSetup && !draft.gearSetupId) {
+    fills.push({
+      key: 'gearSetupId',
+      current: null,
+      incoming: suggestedSetup.id,
+      name: suggestedSetup.name,
+    });
+  }
   if (result.dateObs) {
     const change: WcsChange = {
       key: 'observationDate',
@@ -184,6 +196,7 @@ export function applyWcsChanges(
   const patch: Partial<PhotoMetadataDraft> = {};
   for (const change of changes) {
     if (change.key === 'observationDate') patch.observationDate = change.incoming;
+    else if (change.key === 'gearSetupId') patch.gearSetupId = change.incoming;
     else if (change.key === 'integrations')
       patch.integrations = change.incoming.map((row) => ({ ...row }));
     else {

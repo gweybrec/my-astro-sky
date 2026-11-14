@@ -106,7 +106,8 @@ Express 5 server with multiple modules:
   - `DELETE /api/photos/:id` — Delete photo file, its `_thumb.jpg` sibling and its `_medium.jpg` copy when it has one
   - `POST /api/photos/make-mediums` — Make the missing medium-sized copies (photos stored before copies existed, restored from a backup, or whose copy failed); the apps call it at start-up after `repair-sizes`
   - `PATCH /api/photos/:id/manual-placement` — Update manual placement parameters for photo repositioning
-  - `POST /api/solve-wcs` — Extract WCS metadata from FITS/TIFF headers
+  - `POST /api/solve-wcs` — Extract WCS metadata from FITS/TIFF headers (an unsolved file still gets its size, capture data, check facts and header cards)
+  - `GET` / `PUT /api/photos/:id/fits-headers` — The header cards of the file a photo's data was read from (stored apart from the photo list)
   - `POST /api/solve-astap` — Run ASTAP local plate solver
   - `POST /api/solve-plate` — Submit job to astrometry.net
   - `GET /api/solve-plate/:jobId` — Poll astrometry.net job status

@@ -22,6 +22,7 @@ const es: Translations['mobile'] = {
     importMany: 'Importar {n} fotos',
     alreadySolved: '✓ Ya resuelta',
     toPlace: 'Por ubicar',
+    noSolutionLoaded: 'Sin resolución astrométrica: datos de captura cargados',
     solving: 'Resolviendo',
     solvingOffline: 'Sin conexión',
     solveOffline:

@@ -6,7 +6,8 @@ vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   findDSOIdsFromCorrespondences: (...args: unknown[]) => findDsoIds(...args),
 }));
 
-const { wcsPhotoMetadata } = await import('@myastrosky/core/wcs-photo-metadata');
+const { wcsPhotoMetadata, wcsCaptureMetadata } =
+  await import('@myastrosky/core/wcs-photo-metadata');
 
 const corr = [{ pointIndex: 0, photoX: 1, photoY: 2, starHip: 0, starName: '' }];
 const solved = (extra: Partial<PlateSolveResult> = {}): PlateSolveResult => ({
@@ -49,5 +50,25 @@ describe('wcsPhotoMetadata', () => {
 
   it('has no exposure row without both the exposure time and the frame count', () => {
     expect(wcsPhotoMetadata(solved({ expTime: 10 }), 10, 10)?.integrations).toEqual([]);
+  });
+});
+
+describe('wcsCaptureMetadata', () => {
+  it('reads the capture data and the raw cards of a file without a solution', () => {
+    expect(
+      wcsCaptureMetadata({
+        success: false,
+        code: 'NO_WCS_DATA',
+        expTime: 30,
+        stackCnt: 44,
+        captureDetails: { ccdTemp: 9.9 },
+        fitsHeaders: [{ key: 'EXPTIME', value: '30.' }],
+      }),
+    ).toEqual({
+      integrations: [{ frames: 44, seconds: 30, filter: '' }],
+      captureDetails: { ccdTemp: 9.9 },
+      fitsHeaders: [{ key: 'EXPTIME', value: '30.' }],
+    });
+    expect(wcsCaptureMetadata({ success: false })).toEqual({ integrations: [] });
   });
 });

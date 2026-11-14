@@ -20,6 +20,7 @@ const fr = {
     importMany: 'Importer {n} photos',
     alreadySolved: '✓ Déjà résolue',
     toPlace: 'À placer',
+    noSolutionLoaded: 'Non résolu astrométriquement : données de prise de vue chargées',
     solving: 'Résolution',
     solvingOffline: 'Hors ligne',
     solveOffline:

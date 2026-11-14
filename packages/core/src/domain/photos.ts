@@ -113,6 +113,8 @@ export interface BackupPhoto {
   captureDetails?: unknown;
   gearSetupId?: unknown;
   quarterTurns?: unknown;
+  /** The header cards of the file the photo's data was read from (written by exports since schema 22). */
+  fitsHeaders?: unknown;
 }
 
 /** The image of an upload: the name it had on the sender's side and its bytes. */

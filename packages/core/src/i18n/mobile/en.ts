@@ -22,6 +22,7 @@ const en: Translations['mobile'] = {
     importMany: 'Import {n} photos',
     alreadySolved: '✓ Already solved',
     toPlace: 'To place',
+    noSolutionLoaded: 'Not plate-solved: capture data loaded',
     solving: 'Solving',
     solvingOffline: 'Offline',
     solveOffline:

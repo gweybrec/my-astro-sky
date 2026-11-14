@@ -143,6 +143,7 @@ onIonViewDidLeave(clearImport);
             :title="item.name"
             :subs="[stateOf(item)]"
             :status="statusOf(item)"
+            :warning="item.noSolution ? t('mobile.gallery.noSolutionLoaded') : undefined"
             :button="canChoose(item)"
             :chevron="canChoose(item)"
             @click="chooseMethod(item)"

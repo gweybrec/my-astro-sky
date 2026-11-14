@@ -119,9 +119,11 @@ export default defineConfig({
       'rounded-md cursor-pointer',
       'text-body font-medium',
       'transition-colors duration-200',
-      '[&:hover:not(:disabled)]:bg-[var(--accent-bg-hover)]',
-      '[&:hover:not(:disabled)]:border-[var(--border-focus)]',
+      '[&:hover:not(:disabled):not([aria-disabled=true])]:bg-[var(--accent-bg-hover)]',
+      '[&:hover:not(:disabled):not([aria-disabled=true])]:border-[var(--border-focus)]',
       'disabled:opacity-50 disabled:cursor-default',
+      // Greyed out but still pressable (it then says why it is unavailable).
+      'aria-disabled:opacity-50 aria-disabled:cursor-default',
     ].join(' '),
 
     'btn-action--full': 'btn-action w-full',

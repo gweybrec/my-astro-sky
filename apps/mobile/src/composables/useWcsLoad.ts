@@ -1,69 +1,79 @@
 import { ref, shallowRef } from 'vue';
-import { t } from '@myastrosky/core/i18n/index';
-import type { PlateSolveResult } from '@myastrosky/core/types';
-import { wcsErrorMessage, wcsThrownErrorMessage } from '@myastrosky/core/wcs-load';
-import { solveWCS } from '@myastrosky/app-state/api';
+import type { Photo, PlateSolveResult } from '@myastrosky/core/types';
+import { photoSkyModel } from '@myastrosky/core/photo-placement';
+import { wcsThrownErrorMessage } from '@myastrosky/core/wcs-load';
+import { readWcsFileForPhoto } from '@myastrosky/app-state/wcs-load-flow';
 import { pickFile, WCS_FILE_TYPES } from '../platform-device';
-import { useConfirm } from './useConfirm';
-import { useErrorToast } from './useErrorToast';
+import { confirmWcsWarnings } from './useConfirm';
+import { LONG_TOAST_MS, useErrorToast } from './useErrorToast';
 
-/** Long enough to read the explanation of a file that was not plate-solved. */
-const ERROR_DURATION_MS = 8000;
+/** A solved or raw file read for a photo, after the user went on past its warnings. */
+export interface WcsLoaded {
+  result: PlateSolveResult;
+  /** False: the file has no plate solution, only its capture data and header cards were taken. */
+  solved: boolean;
+  /** The saved setup the header points to, for a photo without one. */
+  suggestedSetup: { id: string; name: string } | null;
+  filename: string;
+}
 
 /**
- * A WCS file read from the photo's sheet, waiting for its editor: the editor takes its values when it opens on that
- * photo (asking about the ones that differ from the photo's), then clears it.
+ * A file read from the photo's sheet, waiting for its editor: the editor takes its values when it opens on that photo,
+ * then clears it.
  */
-export const pendingWcs = shallowRef<{ photoId: string; result: PlateSolveResult } | null>(null);
+export const pendingWcs = shallowRef<({ photoId: string } & WcsLoaded) | null>(null);
 
 /**
- * "Charger un fichier WCS", as the desktop's metadata editor: picks a solved companion file and reads its header. A
- * file whose proportions differ from the photo's (probably another photo's) asks first, as when adding a photo.
- * `read` answers null when the picker or that question is cancelled, or the file cannot be read (an error toast says
- * why).
+ * "Charger un fichier WCS", as the desktop's metadata editor: picks a solved or raw file, reads its header and checks
+ * that it is probably the photo's file (`readWcsFileForPhoto`), asking once when something does not match. A file
+ * without a plate solution still gives its capture data and header cards. `read` answers null when the picker or the
+ * question is cancelled, or the file cannot be read (an error toast says why; `toasts.above` as `useErrorToast`). `current` gives the editor's unsaved
+ * objects and setup, compared instead of the stored ones.
  */
-export function useWcsLoad() {
+export function useWcsLoad(toasts: { above?: string } = {}) {
   const loading = ref(false);
-  const { showError } = useErrorToast();
-  const { confirm } = useConfirm();
+  const { showError } = useErrorToast(toasts);
 
-  async function read(photo: {
-    width?: number;
-    height?: number;
-  }): Promise<PlateSolveResult | null> {
+  async function read(
+    photo: Pick<
+      Photo,
+      'width' | 'height' | 'dsoIds' | 'correspondences' | 'manualPlacement' | 'gearSetupId'
+    >,
+    current?: { dsoIds: readonly string[]; gearSetupId: string | null },
+  ): Promise<WcsLoaded | null> {
     if (loading.value) return null;
     const file = await pickFile(WCS_FILE_TYPES);
     if (!file) return null;
     loading.value = true;
-    let result: PlateSolveResult;
     try {
-      result = await solveWCS(file, photo.width || undefined, photo.height || undefined);
+      const outcome = await readWcsFileForPhoto(
+        file,
+        {
+          width: photo.width,
+          height: photo.height,
+          dsoIds: current?.dsoIds ?? photo.dsoIds ?? [],
+          skyModel: photoSkyModel(photo),
+          gearSetupId: current ? current.gearSetupId : (photo.gearSetupId ?? null),
+        },
+        confirmWcsWarnings,
+      );
+      if (outcome.kind === 'error') {
+        await showError(outcome.message, LONG_TOAST_MS);
+        return null;
+      }
+      if (outcome.kind === 'cancelled') return null;
+      return {
+        result: outcome.result,
+        solved: outcome.solved,
+        suggestedSetup: outcome.suggestedSetup,
+        filename: file.name,
+      };
     } catch (error) {
-      await showError(wcsThrownErrorMessage(error, file.name), ERROR_DURATION_MS);
+      await showError(wcsThrownErrorMessage(error, file.name), LONG_TOAST_MS);
       return null;
     } finally {
       loading.value = false;
     }
-    if (!result.success) {
-      const info = wcsErrorMessage(result, file.name);
-      await showError(t(info.key, info.params), ERROR_DURATION_MS);
-      return null;
-    }
-    const warning = result.dimensionWarning;
-    if (warning?.aspectMismatch) {
-      const proceed = await confirm({
-        title: t('modal.wcsDimensionMismatchTitle'),
-        message: t('modal.wcsDimensionMismatchBody', {
-          fitsW: String(warning.sourceW),
-          fitsH: String(warning.sourceH),
-          jpegW: String(warning.targetW),
-          jpegH: String(warning.targetH),
-        }),
-        confirmLabel: t('modal.wcsContinueAnyway'),
-      });
-      if (!proceed) return null;
-    }
-    return result;
   }
 
   return { loading, read };

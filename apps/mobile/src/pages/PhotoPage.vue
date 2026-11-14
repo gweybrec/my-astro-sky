@@ -289,9 +289,9 @@ function edit() {
 async function loadWcs() {
   if (!photo.value) return;
   const photoId = photo.value.id;
-  const result = await readWcs(photo.value);
-  if (!result || photo.value?.id !== photoId) return;
-  pendingWcs.value = { photoId, result };
+  const loaded = await readWcs(photo.value);
+  if (!loaded || photo.value?.id !== photoId) return;
+  pendingWcs.value = { photoId, ...loaded };
   edit();
 }
 </script>

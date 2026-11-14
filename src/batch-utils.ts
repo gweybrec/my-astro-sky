@@ -33,4 +33,6 @@ export function clearWcsSolution(item: BatchItem): void {
   item.dsoIds = [];
   item.observationDate = '';
   item.integrations = [];
+  item.fitsHeaders = null;
+  item.wcsNotice = '';
 }

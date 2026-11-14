@@ -5,6 +5,16 @@
  * photo is placed it is stored as an ordinary photo and leaves this list.
  */
 import { shallowRef } from 'vue';
+import type {
+  CaptureDetails,
+  ManualPlacement,
+  Photo,
+  PhotoCorrespondence,
+  PhotoIntegration,
+} from '@myastrosky/core/types';
+import type { FitsCard } from '@myastrosky/core/fits-header';
+import { sanitizeCaptureDetails } from '@myastrosky/core/capture-fields';
+import { setPhotoFitsHeaders, uploadPhoto } from '@myastrosky/app-state/api';
 
 /**
  * `toPlace`: needs a placement method. `solving`: sent to the online solver. `offline`: sent, but its following stopped
@@ -27,8 +37,21 @@ export interface PendingPhoto {
   error?: string;
 }
 
+/**
+ * What the file of a waiting photo said besides its picture (a TIFF/FITS/XISF without a plate solution): its capture
+ * data, the saved setup its header points to, and its header cards. Given to the photo when it is placed.
+ */
+export interface PendingCapture {
+  integrations?: PhotoIntegration[];
+  observationDate?: string;
+  captureDetails?: CaptureDetails;
+  gearSetupId?: string | null;
+  fitsHeaders?: FitsCard[];
+}
+
 interface StoredPending extends PendingPhoto {
   picture: Blob;
+  capture?: PendingCapture;
 }
 
 /** Where the records and their pictures are kept. */
@@ -97,7 +120,11 @@ export function configurePendingStore(next: PendingStore): void {
 /** The photos waiting to be placed, oldest first. Filled by `loadPendingPhotos`. */
 export const pendingPhotos = shallowRef<PendingPhoto[]>([]);
 
-const recordOf = ({ picture: _picture, ...record }: StoredPending): PendingPhoto => record;
+const recordOf = ({
+  picture: _picture,
+  capture: _capture,
+  ...record
+}: StoredPending): PendingPhoto => record;
 
 /** Reads the list again from the store. */
 export async function loadPendingPhotos(): Promise<void> {
@@ -105,14 +132,19 @@ export async function loadPendingPhotos(): Promise<void> {
   pendingPhotos.value = all.sort((a, b) => a.addedAt - b.addedAt).map(recordOf);
 }
 
-/** Keeps a picture that has no placement yet. */
-export async function addPendingPhoto(picture: Blob, name: string): Promise<PendingPhoto> {
+/** Keeps a picture that has no placement yet, with what its file said (`capture`), if anything. */
+export async function addPendingPhoto(
+  picture: Blob,
+  name: string,
+  capture?: PendingCapture,
+): Promise<PendingPhoto> {
   const record: StoredPending = {
     id: crypto.randomUUID(),
     name,
     state: 'toPlace',
     addedAt: Date.now(),
     picture,
+    ...(capture ? { capture } : {}),
   };
   await store.put(record);
   const added = recordOf(record);
@@ -145,4 +177,43 @@ export async function setPendingState(
 export async function removePendingPhoto(id: string): Promise<void> {
   await store.delete(id);
   pendingPhotos.value = pendingPhotos.value.filter((p) => p.id !== id);
+}
+
+const stripExtension = (name: string) => name.replace(/\.[^.]+$/, '');
+
+/**
+ * Stores a waiting photo once it is placed (its reference points, or a hand placement), with the objects found in it
+ * and what its file said (capture data, setup, header cards), then forgets it here. The header cards are informative:
+ * the photo stays stored when they cannot be saved.
+ */
+export async function storePlacedPendingPhoto(
+  id: string,
+  file: File,
+  correspondences: PhotoCorrespondence[],
+  manualPlacement: ManualPlacement | undefined,
+  dsoIds: string[],
+): Promise<Photo> {
+  const capture = (await store.get(id))?.capture;
+  const captureDetails = capture?.captureDetails
+    ? sanitizeCaptureDetails(capture.captureDetails)
+    : null;
+  const photo = await uploadPhoto(file, correspondences, manualPlacement, undefined, {
+    dsoIds,
+    displayName: stripExtension(file.name),
+    ...(capture?.integrations?.length ? { integrations: capture.integrations } : {}),
+    ...(capture?.observationDate ? { observationDate: capture.observationDate } : {}),
+    ...(captureDetails ? { captureDetails } : {}),
+    ...(capture?.gearSetupId ? { gearSetupId: capture.gearSetupId } : {}),
+  });
+  let stored = photo;
+  if (capture?.fitsHeaders?.length) {
+    try {
+      await setPhotoFitsHeaders(photo.id, capture.fitsHeaders);
+      stored = { ...photo, hasFitsHeaders: true };
+    } catch {
+      // The photo is placed; only its header cards are missing.
+    }
+  }
+  await removePendingPhoto(id);
+  return stored;
 }

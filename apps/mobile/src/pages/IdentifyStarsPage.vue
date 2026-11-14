@@ -8,13 +8,13 @@ import { photoSkyModel } from '@myastrosky/core/photo-placement';
 import { raDecFromSexagesimal, starDisplayLabel } from '@myastrosky/core/star-identify';
 import type { StarSearchResult } from '@myastrosky/core/domain/stars';
 import type { PhotoCorrespondence } from '@myastrosky/core/types';
-import { searchStarsAPI, uploadPhoto } from '@myastrosky/app-state/api';
+import { searchStarsAPI } from '@myastrosky/app-state/api';
 import { catalogsReady } from '../catalogs';
 import type { Size } from '../composables/usePhotoZoom';
 import { useBackClose } from '../composables/useBackClose';
 import { useErrorToast } from '../composables/useErrorToast';
 import { skyPhotoFocus } from '../composables/useSkySelection';
-import { pendingPhotoFile, removePendingPhoto } from '../pending-photos';
+import { pendingPhotoFile, storePlacedPendingPhoto } from '../pending-photos';
 import { skyStarPick } from '../sky-modes';
 import {
   clearPointStar,
@@ -248,11 +248,13 @@ async function validate() {
     // Points on one line give no placement to look in: the photo is stored without objects.
     const model = photoSkyModel({ width, height, correspondences, manualPlacement: undefined });
     const dsoIds = model ? findDSOsInImage(model, width, height).map((dso) => dso.id) : [];
-    const photo = await uploadPhoto(file.value, correspondences, undefined, undefined, {
+    const photo = await storePlacedPendingPhoto(
+      pendingId,
+      file.value,
+      correspondences,
+      undefined,
       dsoIds,
-      displayName: stripExtension(file.value.name),
-    });
-    await removePendingPhoto(pendingId);
+    );
     endIdentify(pendingId);
     // As the hand placement: the map shows the photo where it now is.
     skyPhotoFocus.value = photo.id;

@@ -52,3 +52,34 @@ export async function showInfo(title: string, message: string): Promise<void> {
   await alert.present();
   await alert.onDidDismiss();
 }
+
+/** A bullet and a non-breaking space, before each reason of a list in a dialog. */
+const BULLET = String.fromCharCode(0x2022, 0xa0);
+
+/**
+ * The board "Photo, est-ce le bon fichier ?": the reasons the file may not be this photo's, then Annuler and
+ * "Continuer quand même". Resolves true when the user goes on.
+ */
+export async function confirmWcsWarnings(filename: string, warnings: string[]): Promise<boolean> {
+  const alert = await alertController.create({
+    header: t('modal.wcsWarningsTitle'),
+    // The dialog's message is plain text: one reason per line, after a bullet and a non-breaking space.
+    message: [
+      t('modal.wcsWarningsIntro', { filename }),
+      ...warnings.map((w) => `${BULLET}${w}`),
+    ].join('\n'),
+    cssClass: 'mob-dialog-alert',
+    backdropDismiss: true,
+    buttons: [
+      { text: t('modal.cancel'), role: 'cancel', cssClass: 'mob-btn mob-btn--lg m-body' },
+      {
+        text: t('modal.wcsContinueAnyway'),
+        role: 'confirm',
+        cssClass: 'mob-btn mob-btn--lg m-body-strong mob-btn--confirm',
+      },
+    ],
+  });
+  await alert.present();
+  const { role } = await alert.onDidDismiss();
+  return role === 'confirm';
+}

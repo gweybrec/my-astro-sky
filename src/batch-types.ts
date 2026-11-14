@@ -7,6 +7,7 @@ import type {
   ManualPlacement,
   Photo,
 } from '@myastrosky/core/types';
+import type { FitsCard } from '@myastrosky/core/fits-header';
 
 export type SolverType = 'solve-field' | 'astap' | 'astrometry';
 export type BatchItemStatus =
@@ -48,6 +49,10 @@ export interface BatchItem {
   observationDate: string;
   captureDetails: CaptureDetails;
   gearSetupId: string | null;
+  /** The header cards of the raw or solved file read for this photo, saved with it once placed. */
+  fitsHeaders?: FitsCard[] | null;
+  /** Shown on the card when the file read has no plate solution (its capture data was still taken). */
+  wcsNotice?: string;
   notes: string;
   customName: string;
   elapsedSeconds: number;

@@ -8,7 +8,9 @@ const getGearSetups = vi.fn();
 const deletePhotoAPI = vi.fn();
 const rotatePhotoAPI = vi.fn();
 const solveWCS = vi.fn();
+const getPhotoFitsHeaders = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
+  getPhotoFitsHeaders: (...a: unknown[]) => getPhotoFitsHeaders(...a),
   rotatePhotoAPI: (...a: unknown[]) => rotatePhotoAPI(...a),
   solveWCS: (...a: unknown[]) => solveWCS(...a),
   getPhotos: () => getPhotos(),
@@ -32,6 +34,12 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ params: { id: 'p1' } }),
 }));
 
+// The saved setups' optics (the file checks' gear comparison) come from the gear lists: none here.
+vi.mock('@myastrosky/core/gear-catalog', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@myastrosky/core/gear-catalog')>()),
+  loadSetupOptics: async () => [],
+}));
+
 const setStatusBarHidden = vi.fn();
 const pickFile = vi.fn();
 vi.mock('../src/platform-device', () => ({
@@ -41,12 +49,18 @@ vi.mock('../src/platform-device', () => ({
 }));
 
 const confirm = vi.fn();
+const confirmWcsWarnings = vi.fn();
 const showError = vi.fn();
+const showNotice = vi.fn();
 vi.mock('../src/composables/useConfirm', () => ({
   useConfirm: () => ({ confirm }),
+  confirmWcsWarnings: (...a: unknown[]) => confirmWcsWarnings(...a),
   showInfo: vi.fn(),
 }));
-vi.mock('../src/composables/useErrorToast', () => ({ useErrorToast: () => ({ showError }) }));
+vi.mock('../src/composables/useErrorToast', () => ({
+  useErrorToast: () => ({ showError, showNotice }),
+  LONG_TOAST_MS: 8000,
+}));
 // A solved photo has a sky matrix; the drawing and the sky lookups are stand-ins that record what they are asked.
 const solved = { value: true };
 vi.mock('@myastrosky/core/photo-placement', async (importOriginal) => ({
@@ -105,6 +119,9 @@ import {
 
 /** "Photo, détail", "Photo, zoom", "Photo, informations", "Photo, boutons d'affichage", "Photo, barres masquées". */
 
+// One reference point of a solved file.
+const REF = { photoX: 10, photoY: 10, ra: 10.68, dec: 41.27 };
+
 const photo = (over: Partial<Photo> = {}): Photo =>
   ({
     id: 'p1',
@@ -159,6 +176,9 @@ describe("a photo's own screen", () => {
     pendingWcs.value = null;
     pickFile.mockReset();
     solveWCS.mockReset();
+    confirmWcsWarnings.mockReset().mockResolvedValue(true);
+    showNotice.mockReset();
+    getPhotoFitsHeaders.mockReset();
     configureStorage(createMemoryStore());
     // The photo is landscape: the tests that are not about it run without the screen's own turn.
     setAutoRotateLandscape(false);
@@ -342,6 +362,7 @@ describe("a photo's own screen", () => {
     expect(w.find('.mob-sheet-modal').classes()).toContain('mob-sheet-modal--third');
     expect(w.findAll('.mob-photo-actions button').map((b) => b.text())).toEqual([
       'Charger un fichier WCS (fits/tiff)',
+      'En-têtes',
       'Modifier',
       'Supprimer',
     ]);
@@ -467,7 +488,7 @@ describe("a photo's own screen", () => {
   it('reads a WCS file from the sheet, then opens the editor with what it found', async () => {
     const file = new File(['x'], 'm31.fits');
     pickFile.mockResolvedValue(file);
-    const result = { success: true, dateObs: '2025-09-14T21:30:00Z' };
+    const result = { success: true, dateObs: '2025-09-14T21:30:00Z', correspondences: [REF] };
     solveWCS.mockResolvedValue(result);
     const w = mountPage();
     await flushPromises();
@@ -475,7 +496,13 @@ describe("a photo's own screen", () => {
     await flushPromises();
     // the photo's size, so that the solution is scaled to the photo
     expect(solveWCS).toHaveBeenCalledWith(file, 4000, 2000);
-    expect(pendingWcs.value).toEqual({ photoId: 'p1', result });
+    expect(pendingWcs.value).toEqual({
+      photoId: 'p1',
+      result,
+      solved: true,
+      suggestedSetup: null,
+      filename: 'm31.fits',
+    });
     expect(push).toHaveBeenCalledWith('/gallery/photo/p1/edit');
   });
 
@@ -506,12 +533,32 @@ describe("a photo's own screen", () => {
     expect(showError.mock.calls.at(-1)?.[0]).toContain('Siril');
   });
 
+  it('reads a file without a plate solution for its capture data and headers', async () => {
+    const result = {
+      success: false,
+      code: 'NO_WCS_DATA',
+      expTime: 30,
+      stackCnt: 44,
+      fitsHeaders: [{ key: 'EXPTIME', value: '30.' }],
+    };
+    pickFile.mockResolvedValue(new File(['x'], 'M2.fit'));
+    solveWCS.mockResolvedValue(result);
+    const w = mountPage();
+    await flushPromises();
+    await labelled(w, 'Charger un fichier WCS (fits/tiff)').trigger('click');
+    await flushPromises();
+    expect(showError).not.toHaveBeenCalled();
+    expect(pendingWcs.value).toMatchObject({ photoId: 'p1', result, solved: false });
+    expect(push).toHaveBeenCalledWith('/gallery/photo/p1/edit');
+  });
+
   it("asks before taking a file whose proportions differ from the photo's", async () => {
     const w = mountPage();
     await flushPromises();
     const result = {
       success: true,
       dateObs: '2025-09-14T21:30:00Z',
+      correspondences: [REF],
       dimensionWarning: {
         sourceW: 3000,
         sourceH: 3000,
@@ -522,18 +569,76 @@ describe("a photo's own screen", () => {
     };
     pickFile.mockResolvedValue(new File(['x'], 'autre.fits'));
     solveWCS.mockResolvedValue(result);
-    confirm.mockResolvedValueOnce(false);
+    confirmWcsWarnings.mockResolvedValueOnce(false);
     await labelled(w, 'Charger un fichier WCS (fits/tiff)').trigger('click');
     await flushPromises();
-    expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ confirmLabel: 'Continuer quand même' }),
+    // The board "Photo, est-ce le bon fichier ?": the file's name and the reasons, among them the sizes.
+    expect(confirmWcsWarnings).toHaveBeenCalledWith(
+      'autre.fits',
+      expect.arrayContaining([expect.stringContaining('3000×3000')]),
     );
     expect(pendingWcs.value).toBeNull();
     expect(push).not.toHaveBeenCalled();
-    confirm.mockResolvedValueOnce(true);
+    confirmWcsWarnings.mockResolvedValueOnce(true);
     await labelled(w, 'Charger un fichier WCS (fits/tiff)').trigger('click');
     await flushPromises();
-    expect(pendingWcs.value).toEqual({ photoId: 'p1', result });
+    expect(pendingWcs.value).toMatchObject({ photoId: 'p1', result, solved: true });
+  });
+
+  describe('"En-têtes" (board "Photo, en-têtes du fichier")', () => {
+    it('opens the sheet of the stored header cards, with a filter', async () => {
+      getPhotos.mockResolvedValue([photo({ hasFitsHeaders: true })]);
+      getPhotoFitsHeaders.mockResolvedValue([
+        { key: 'EXPTIME', value: '180.', comment: '[s] Exposure time' },
+        { key: 'OBJECT', value: 'M31' },
+      ]);
+      const w = mountPage();
+      await flushPromises();
+      const headers = labelled(w, 'En-têtes');
+      expect(headers.attributes('aria-disabled')).toBeUndefined();
+      await headers.trigger('click');
+      await flushPromises();
+      expect(getPhotoFitsHeaders).toHaveBeenCalledWith('p1');
+      const rows = () =>
+        w.findAll('.mob-card-row').map((r) =>
+          r
+            .findAll('span')
+            .map((s) => s.text())
+            .join(' | '),
+        );
+      expect(rows()).toEqual(['EXPTIME | 180. | [s] Exposure time', 'OBJECT | M31']);
+      const filter = w.findAll('input').find((i) => i.attributes('placeholder') === 'Filtrer…')!;
+      await filter.setValue('m31');
+      expect(rows()).toEqual(['OBJECT | M31']);
+    });
+
+    it('is greyed out on a photo placed by hand, and says why when tapped', async () => {
+      getPhotos.mockResolvedValue([
+        photo({
+          correspondences: [],
+          manualPlacement: {
+            centerRa: 10,
+            centerDec: 41,
+            rotationDeg: 0,
+            projPerPx: 1e-5,
+            mirrorX: false,
+            mirrorY: false,
+          },
+        }),
+      ]);
+      const w = mountPage();
+      await flushPromises();
+      const headers = labelled(w, 'En-têtes');
+      expect(headers.attributes('aria-disabled')).toBe('true');
+      expect(headers.classes()).toContain('mob-btn--unavailable');
+      await headers.trigger('click');
+      await flushPromises();
+      expect(getPhotoFitsHeaders).not.toHaveBeenCalled();
+      expect(showNotice).toHaveBeenCalledWith(
+        "Cette photo a été placée manuellement : aucun fichier WCS n'a été chargé, elle n'a donc pas d'en-têtes.",
+        8000,
+      );
+    });
   });
 
   describe('the objects and points of interest drawn over the photo ("Photo, objets affichés")', () => {

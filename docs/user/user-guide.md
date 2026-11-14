@@ -54,6 +54,12 @@ Reads WCS calibration data already embedded in the file (FITS files from PixInsi
 
 Use this whenever your file already has astrometric metadata.
 
+A file that is not plate-solved still gives its capture data: date, sub exposure and frame count (`EXPTIME`, `STACKCNT`, or `LIVETIME` ÷ `EXPTIME`), filter, gain, offset, temperatures and binning. The card says the photo is not placed yet, and you can solve it with another method.
+
+Before taking a file's data for a photo, the app checks that it is probably that photo's file, and lists anything that does not match: a different image size, an incomplete file, objects in the file's field that differ from the photo's (every Messier object is compared), a centre (`RA`/`DEC`) outside the photo, an `OBJECT` that names none of the photo's objects, a focal length or pixel scale more than 10 % away from the photo's equipment, or a telescope or camera name that matches nothing of it. Click **Continue anyway** to take the data on purpose. When the photo has no equipment yet and the header points to exactly one of your saved setups, that setup is filled in.
+
+**Headers**, beside **Load a WCS file** in the photo's panel, shows every header card of the file the photo's data was read from (keyword, value, comment), with a filter. They are kept with the photo and in backups, but never in a shared sky. A photo with no headers (placed manually from a JPEG or PNG, or solved without reading a file) shows the button greyed out; pressing it says why.
+
 ### 2. Online (astrometry.net) — most reliable
 
 Uploads the image to [nova.astrometry.net](https://nova.astrometry.net) for solving. Requires a free API key configured in Settings. Typically takes 30–60 seconds.

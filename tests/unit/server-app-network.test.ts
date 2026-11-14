@@ -709,12 +709,28 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
       ]) {
         const r = await upload('/api/solve-wcs', file);
         expect(r.status).toBe(200);
-        expect(r.body).toEqual({
+        expect(r.body).toMatchObject({
           success: false,
           error: 'No WCS metadata found in this file. The file was not plate-solved.',
           code: 'NO_WCS_DATA',
         });
       }
+    });
+
+    it('still sends the size, capture data, facts and header cards of a file without a solution', async () => {
+      const capture = ["DATE-OBS= '2025-09-04T21:30:00'", 'EXPTIME = 300', 'STACKCNT= 12'];
+      const r = await upload('/api/solve-wcs', { name: 'a.fits', bytes: fits(capture) });
+      expect(r.body).toMatchObject({
+        success: false,
+        code: 'NO_WCS_DATA',
+        sourceWidth: 40,
+        sourceHeight: 30,
+        dateObs: '2025-09-04T21:30:00Z',
+        expTime: 300,
+        stackCnt: 12,
+        facts: { width: 40, height: 30 },
+      });
+      expect(r.body.fitsHeaders).toContainEqual({ key: 'EXPTIME', value: '300' });
     });
 
     it('answers 200 NO_IMAGE_DIMENSIONS when the header holds a solution but no size', async () => {
@@ -724,7 +740,7 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
         { lang: 'fr' },
       );
       expect(r.status).toBe(200);
-      expect(r.body).toEqual({
+      expect(r.body).toMatchObject({
         success: false,
         error: "Dimensions de l'image introuvables",
         code: 'NO_IMAGE_DIMENSIONS',
@@ -771,6 +787,8 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
         'expTime',
         'stackCnt',
         'filter',
+        'facts',
+        'fitsHeaders',
       ]);
     });
 
@@ -916,6 +934,8 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
         'expTime',
         'stackCnt',
         'filter',
+        'facts',
+        'fitsHeaders',
       ]);
     });
 

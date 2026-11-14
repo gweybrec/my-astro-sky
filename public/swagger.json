@@ -54,7 +54,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Correspondences returned successfully",
+            "description": "Correspondences returned successfully. Also answered with success:false and a code (NO_WCS_DATA, NO_IMAGE_DIMENSIONS, NOT_ENOUGH_CATALOG_STARS) when the file has no usable solution; its size, capture fields, facts and header cards are still sent.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -91,6 +91,18 @@
                     "captureDetails": {
                       "type": "object",
                       "description": "Parsed capture fields (gain, offset, iso, ccdTemp, setTemp, binning) keyed by field id, present when available"
+                    },
+                    "facts": {
+                      "type": "object",
+                      "description": "Header values used to check the file against the photo (object, centre, focal length, pixel size, binning, telescope, instrument, size, solved pixel scale)"
+                    },
+                    "fitsHeaders": {
+                      "type": "array",
+                      "description": "Every header card as written ({ key, value, comment? })"
+                    },
+                    "truncated": {
+                      "type": "boolean",
+                      "description": "Present (true) when the file is shorter than its header announces"
                     }
                   }
                 }
@@ -98,7 +110,7 @@
             }
           },
           "400": {
-            "description": "Missing file, unsupported format, or no WCS data found"
+            "description": "Missing file or unsupported format"
           },
           "500": {
             "description": "Server error"
@@ -2367,6 +2379,103 @@
                 }
               }
             }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/photos/{id}/fits-headers": {
+      "get": {
+        "summary": "The header cards of the raw or solved file the photo's data was read from",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Photo ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored cards, in file order (an empty list when there are none)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cards": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          },
+                          "comment": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Photo not found (code PHOTO_NOT_FOUND)"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Replace the header cards stored with the photo",
+        "description": "The cards are cleaned (string key, value and comment; at most 2000 cards and 256 KB of JSON). An empty list clears them.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Photo ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cards": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stored"
+          },
+          "404": {
+            "description": "Photo not found (code PHOTO_NOT_FOUND)"
           },
           "500": {
             "description": "Server error"

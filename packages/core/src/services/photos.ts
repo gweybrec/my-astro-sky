@@ -30,6 +30,7 @@ import type {
   QuarterTurns,
 } from '../types';
 import { sanitizeCaptureDetails } from '../wcs';
+import { sanitizeFitsCards, type FitsCard } from '../fits-header';
 
 /** Extensions an uploaded photo may have (lower case, with the dot). */
 export const ALLOWED_PHOTO_EXTENSIONS: ReadonlySet<string> = new Set([
@@ -158,6 +159,16 @@ export interface PhotoService {
    * sky. Throws `notFound` (`PHOTO_NOT_FOUND`) when there is no such photo. Returns the photo as stored.
    */
   rotateRight(id: string): Promise<Photo>;
+  /**
+   * The header cards of the raw or solved file the photo's data was read from, as stored (empty when there are
+   * none). Throws `notFound` (`PHOTO_NOT_FOUND`).
+   */
+  getFitsHeaders(id: string): Promise<FitsCard[]>;
+  /**
+   * Replaces the stored header cards (cleaned, at most `MAX_FITS_CARDS` and `MAX_FITS_HEADERS_JSON` characters);
+   * an empty list clears them. Throws `notFound` (`PHOTO_NOT_FOUND`).
+   */
+  setFitsHeaders(id: string, cards: unknown): Promise<void>;
   /** Deletes every photo row (not the files). Returns how many there were. */
   removeAllRows(): Promise<number>;
   /** Deletes every photo: the rows, the images, the thumbnails and the medium-sized copies. Returns how many there were. */
@@ -221,6 +232,20 @@ export interface PhotoRow {
   capture_details: string | null;
   gear_setup_id?: string | null;
   quarter_turns: number | null;
+  /** JSON list of header cards; absent in the visit photos table. */
+  fits_headers?: string | null;
+}
+
+/** The longest stored header list, as JSON text: cards past it are dropped. */
+export const MAX_FITS_HEADERS_JSON = 256 * 1024;
+
+/** The header cards as stored: cleaned and cut to `MAX_FITS_HEADERS_JSON`; null for none. */
+export function fitsHeadersJson(cards: unknown): string | null {
+  const clean = sanitizeFitsCards(cards);
+  while (clean.length > 0 && JSON.stringify(clean).length > MAX_FITS_HEADERS_JSON) {
+    clean.length = Math.floor(clean.length * 0.9);
+  }
+  return clean.length > 0 ? JSON.stringify(clean) : null;
 }
 
 export interface CorrespondenceRow {
@@ -236,8 +261,8 @@ export interface CorrespondenceRow {
 
 const INSERT_PHOTO = `INSERT INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, medium_filename)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?)`;
-const INSERT_PHOTO_WITH_ID = `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, quarter_turns)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?)`;
+const INSERT_PHOTO_WITH_ID = `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, quarter_turns, fits_headers)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?, ?)`;
 const INSERT_CORRESPONDENCE =
   'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip, star_name, star_ra, star_dec) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
 const SELECT_PHOTOS = 'SELECT * FROM photos ORDER BY display_order ASC, created_at ASC, id ASC';
@@ -258,6 +283,8 @@ const UPDATE_METADATA =
   'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, capture_details = ?, gear_setup_id = ? WHERE id = ?';
 const UPDATE_METADATA_WITH_NAME =
   'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, capture_details = ?, gear_setup_id = ?, original_name = ? WHERE id = ?';
+const SELECT_FITS_HEADERS = 'SELECT fits_headers FROM photos WHERE id = ?';
+const UPDATE_FITS_HEADERS = 'UPDATE photos SET fits_headers = ? WHERE id = ?';
 const UPDATE_DRAW_ORDER = 'UPDATE photos SET display_order = ? WHERE id = ?';
 const SELECT_UNSIZED = 'SELECT id, filename FROM photos WHERE width <= 0 OR height <= 0';
 const UPDATE_SIZE = 'UPDATE photos SET width = ?, height = ? WHERE id = ?';
@@ -329,13 +356,16 @@ export function sanitizePois(rows: unknown): PointOfInterest[] {
  */
 export function sanitizeIntegrationRows(rows: unknown): PhotoIntegration[] {
   if (!Array.isArray(rows)) return [];
-  return rows
-    .map((entry: any) => ({
-      frames: Number.isInteger(Number(entry?.frames)) ? Number(entry.frames) : 0,
-      seconds: Number.isInteger(Number(entry?.seconds)) ? Number(entry.seconds) : 0,
-      filter: typeof entry?.filter === 'string' ? entry.filter.trim() : '',
-    }))
-    .filter((entry) => entry.frames >= 1 && entry.seconds >= 1 && entry.filter.length > 0);
+  return (
+    rows
+      .map((entry: any) => ({
+        frames: Number.isInteger(Number(entry?.frames)) ? Number(entry.frames) : 0,
+        seconds: Number.isInteger(Number(entry?.seconds)) ? Number(entry.seconds) : 0,
+        filter: typeof entry?.filter === 'string' ? entry.filter.trim() : '',
+      }))
+      // The filter may be empty: a header without FILTER (a camera without a filter wheel) still gives its exposures.
+      .filter((entry) => entry.frames >= 1 && entry.seconds >= 1)
+  );
 }
 
 /** The extension of a file name, lower-cased, with its dot ('' when there is none). Both slashes separate folders. */
@@ -401,6 +431,7 @@ export function rowToPhoto(p: PhotoRow, corr: readonly CorrespondenceRow[]): Pho
     thumbFilename: p.thumb_filename ?? null,
     mediumFilename: p.medium_filename || null,
     quarterTurns: cleanQuarterTurns(p.quarter_turns),
+    ...(p.fits_headers ? { hasFitsHeaders: true } : {}),
     correspondences: corr.map((c) => ({
       pointIndex: c.point_index,
       photoX: c.photo_x,
@@ -817,6 +848,18 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       return (await readOne(id))!;
     },
 
+    async getFitsHeaders(id) {
+      const row = await db.get<{ fits_headers: string | null }>(SELECT_FITS_HEADERS, [id]);
+      if (!row) throw photoNotFound();
+      return parseSanitized(row.fits_headers, sanitizeFitsCards, []);
+    },
+
+    async setFitsHeaders(id, cards) {
+      if ((await db.run(UPDATE_FITS_HEADERS, [fitsHeadersJson(cards), id])).changes === 0) {
+        throw photoNotFound();
+      }
+    },
+
     async setOrder(photoIds) {
       if (
         !Array.isArray(photoIds) ||
@@ -1030,5 +1073,6 @@ function importParams(p: Record<string, any>, nowIso: string): SqlValue[] {
     JSON.stringify(sanitizeCaptureDetails(p.captureDetails)),
     cleanSetupId(p.gearSetupId),
     cleanQuarterTurns(p.quarterTurns),
+    fitsHeadersJson(p.fitsHeaders),
   ];
 }

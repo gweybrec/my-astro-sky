@@ -4,7 +4,9 @@ import {
   wcsChangeValues,
   wcsErrorMessage,
   wcsThrownErrorMessage,
+  wcsWarningText,
 } from '@myastrosky/core/wcs-load';
+import type { WcsWarning } from '@myastrosky/core/wcs-file-checks';
 import type { WcsChange } from '@myastrosky/core/photo-metadata-draft';
 import { t } from '@myastrosky/core/i18n/index';
 
@@ -80,5 +82,34 @@ describe('wcsChangeLabel / wcsChangeValues', () => {
       incoming: '2024-02-02T03:04:05.000Z',
     };
     expect(wcsChangeValues(change).current).toMatch(/^2024-01-0[12] \d\d:04$/);
+  });
+});
+
+describe('wcsWarningText', () => {
+  it('gives a sentence for every kind of warning, with its values', () => {
+    const all: WcsWarning[] = [
+      { kind: 'dimensions', sourceW: 674, sourceH: 507, targetW: 3000, targetH: 1000 },
+      { kind: 'truncated' },
+      { kind: 'mainObject', dsoId: 'NGC7331' },
+      { kind: 'messierMissing', dsoIds: ['M51', 'M63'] },
+      { kind: 'messierExtra', dsoIds: ['M42'] },
+      { kind: 'centerOutside' },
+      { kind: 'object', object: 'M 42' },
+      { kind: 'focalLength', headerMm: 540.2, setupMm: 1764 },
+      { kind: 'pixelScale', fileArcsec: 0.8812, setupArcsec: 0.44 },
+      { kind: 'telescope', header: 'ZWO AM5' },
+      { kind: 'instrument', header: 'QHY268M' },
+    ];
+    const texts = all.map(wcsWarningText);
+    for (const text of texts) {
+      expect(text).not.toMatch(/^modal\.|\{\w+\}/);
+    }
+    expect(texts[0]).toContain('674');
+    expect(texts[2]).toContain('NGC7331');
+    expect(texts[3]).toContain('M51, M63');
+    expect(texts[7]).toContain('540');
+    expect(texts[7]).toContain('1764');
+    expect(texts[8]).toContain('0.88');
+    expect(texts[9]).toContain('ZWO AM5');
   });
 });

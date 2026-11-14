@@ -1,6 +1,7 @@
 // API shapes of the import of already-solved files (FITS, TIFF with coordinates).
 
 import type { Correspondence } from '../wcs';
+import type { FitsCard, FitsHeaderFacts } from '../fits-header';
 
 /** A file the user picked: its name (the extension tells FITS from TIFF) and its bytes. */
 export interface SolvedFile {
@@ -27,6 +28,12 @@ export interface SolvedCaptureMetadata {
   filter?: string;
   /** Parsed capture fields (gain, offset, iso, ccdTemp, setTemp, binning), keyed by field id. */
   captureDetails?: Record<string, number | string>;
+  /** Header values used to check that the file belongs to the photo. */
+  facts?: FitsHeaderFacts;
+  /** Every card of the header, as written (absent when the file has no FITS header). */
+  fitsHeaders?: FitsCard[];
+  /** The file is shorter than its header announces (an incomplete copy). */
+  truncated?: boolean;
 }
 
 /** The size of the file against the size of the displayed picture, when they differ. */
@@ -51,7 +58,14 @@ export type SolveWcsResult =
       sourceHeight: number;
       dimensionWarning?: DimensionWarning;
     } & SolvedCaptureMetadata)
-  | { success: false; code: SolveWcsFailureCode };
+  | ({
+      success: false;
+      code: SolveWcsFailureCode;
+      /** The size of the image the header describes, when known. */
+      sourceWidth?: number;
+      sourceHeight?: number;
+      dimensionWarning?: DimensionWarning;
+    } & SolvedCaptureMetadata);
 
 /** A raw file converted to a picture, with the solution its header holds (`success` false: none was found; the picture is still there). */
 export type ConvertSolvedResult = {

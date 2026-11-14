@@ -5,6 +5,7 @@ import BatchCard from '../../src/components/modals/BatchCard.vue';
 import type { BatchItem } from '../../src/batch-types';
 import type { SolverAvailability } from '../../src/api';
 import { generateThumbnail } from '../../src/lazy-image';
+import { noSolutionMessage } from '@myastrosky/app-state/wcs-load-flow';
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
@@ -23,6 +24,20 @@ vi.mock('../../src/api', () => ({
   solveWCS: (...args: unknown[]) => mockSolveWCS(...args),
   reuseAstrometrySubmission: vi.fn(),
   updatePhotoMetadata: vi.fn(),
+  getGearSetups: vi.fn().mockResolvedValue([]),
+}));
+
+// The WCS reading flow is shared and calls the package's data functions.
+vi.mock('@myastrosky/app-state/api', () => ({
+  solveWCS: (...args: unknown[]) => mockSolveWCS(...args),
+  getGearSetups: vi.fn().mockResolvedValue([]),
+}));
+
+const mockConfirmWarnings = vi.fn();
+const mockShowFitsHeaders = vi.fn();
+vi.mock('../../src/wcs-dialogs', () => ({
+  confirmWcsWarnings: (...args: unknown[]) => mockConfirmWarnings(...args),
+  showFitsHeaders: (...args: unknown[]) => mockShowFitsHeaders(...args),
 }));
 
 const mockFindDSOIds = vi.fn();
@@ -168,26 +183,59 @@ describe('BatchCard — open WCS file', () => {
     wrapper.unmount();
   });
 
-  it('shows a toast warning when the server reports an aspect-ratio mismatch', async () => {
-    const { showToast } = await import('../../src/toast');
-    mockSolveWCS.mockResolvedValue({
+  it('asks before taking a file whose proportions differ, and takes nothing when cancelled', async () => {
+    const mismatch = {
       success: true,
       correspondences: [{ pointIndex: 0, photoX: 100, photoY: 100, starHip: 1 }],
       dsoIds: [],
+      dateObs: '2026-03-17T20:38:44Z',
       dimensionWarning: {
         sourceW: 4000,
-        sourceH: 3000,
+        sourceH: 4000,
         targetW: 1920,
         targetH: 1080,
         aspectMismatch: true,
       },
-    });
+    };
+    mockSolveWCS.mockResolvedValue(mismatch);
 
+    mockConfirmWarnings.mockResolvedValueOnce(false);
+    const cancelled = makeItem();
+    const w1 = mountCard(cancelled);
+    await triggerWcsChange(w1, new File([''], 'M42.fits'));
+    expect(mockConfirmWarnings).toHaveBeenCalledWith('M42.fits', [expect.any(String)]);
+    expect(cancelled.status).not.toBe('success');
+    expect(cancelled.observationDate).toBe('');
+    w1.unmount();
+
+    mockConfirmWarnings.mockResolvedValueOnce(true);
+    const taken = makeItem();
+    const w2 = mountCard(taken);
+    await triggerWcsChange(w2, new File([''], 'M42.fits'));
+    expect(taken.status).toBe('success');
+    expect(w2.find('.batch-wcs-btn.wcs-warning').exists()).toBe(true);
+    w2.unmount();
+  });
+
+  it('takes the capture data of a file that is not plate-solved, says so, and shows its headers', async () => {
+    const cards = [{ key: 'EXPTIME', value: '30.' }];
+    mockSolveWCS.mockResolvedValue({
+      success: false,
+      code: 'NO_WCS_DATA',
+      expTime: 30,
+      stackCnt: 44,
+      fitsHeaders: cards,
+    });
     const item = makeItem();
     const wrapper = mountCard(item);
-    await triggerWcsChange(wrapper, new File([''], 'M42.fits'));
-
-    expect(showToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'warning' }));
+    await triggerWcsChange(wrapper, new File([''], 'M2.fit'));
+    expect(item.status).not.toBe('success');
+    expect(item.integrations).toEqual([{ frames: 44, seconds: 30, filter: '' }]);
+    expect(item.wcsNotice).toBe(noSolutionMessage('M2.fit'));
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('.batch-status-upload-error').text()).toBe(noSolutionMessage('M2.fit'));
+    await wrapper.find('[data-test=fits-headers-btn]').trigger('click');
+    expect(mockShowFitsHeaders).toHaveBeenCalledWith(cards);
     wrapper.unmount();
   });
 

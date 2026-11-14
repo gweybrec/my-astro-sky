@@ -139,6 +139,9 @@ describe('solveWcs()', () => {
       await expect(service.solveWcs({ fileName: name, bytes: plainTiff() })).resolves.toEqual({
         success: false,
         code: 'NO_WCS_DATA',
+        // The size the codec reads (the fake codec answers 100 × 50).
+        sourceWidth: 100,
+        sourceHeight: 50,
       });
     }
     for (const name of ['a.jpg', 'a', '.fits', 'a.fits.png']) {
@@ -172,19 +175,64 @@ describe('solveWcs()', () => {
     expect(probe).not.toHaveBeenCalled();
   });
 
-  it('answers NO_WCS_DATA when the header holds no solution', async () => {
+  it('answers NO_WCS_DATA when the header holds no solution, with its size and the raw cards', async () => {
     const { service } = setup();
-    expect(await service.solveWcs({ fileName: 'a.fits', bytes: fits([]) })).toEqual({
+    const r = await service.solveWcs({ fileName: 'a.fits', bytes: fits([]) });
+    expect(r).toMatchObject({
       success: false,
       code: 'NO_WCS_DATA',
+      sourceWidth: 40,
+      sourceHeight: 30,
+      facts: { width: 40, height: 30 },
     });
+    expect(r.fitsHeaders?.map((c) => c.key).slice(0, 2)).toEqual(['SIMPLE', 'BITPIX']);
+    expect(r.truncated).toBeUndefined();
+  });
+
+  it('keeps the capture data of a file that is not plate-solved, and checks its size against the photo', async () => {
+    const { service } = setup();
+    const capture = WCS_CARDS.filter((c) => !/^C[DR]/.test(c)).concat([
+      'LIVETIME= 3600',
+      "OBJECT  = 'M 2     '",
+      "OBJCTRA = '21 33 27.104'",
+      "OBJCTDEC= '-00 49 19.424'",
+      'FOCALLEN= 1372.9',
+    ]);
+    const r = await service.solveWcs({
+      fileName: 'a.fits',
+      bytes: fits(capture),
+      targetWidth: 80,
+      targetHeight: 30,
+    });
+    expect(r.success).toBe(false);
+    expect([r.dateObs, r.expTime, r.stackCnt, r.filter]).toEqual([
+      '2025-09-04T21:30:00Z',
+      300,
+      12,
+      'Ha',
+    ]);
+    expect(r.facts).toMatchObject({ object: 'M 2', focalLengthMm: 1372.9 });
+    expect(r.facts!.centerRa).toBeCloseTo(323.363, 3);
+    expect(r.facts!.centerDec).toBeCloseTo(-0.822, 3);
+    expect(r.dimensionWarning?.aspectMismatch).toBe(true);
+  });
+
+  it('flags a FITS file shorter than its header announces', async () => {
+    const { service } = setup();
+    const whole = fits([]);
+    const cut = whole.subarray(0, whole.length - 2000);
+    expect((await service.solveWcs({ fileName: 'a.fits', bytes: cut })).truncated).toBe(true);
+    expect(
+      (await service.solveWcs({ fileName: 'a.fits', bytes: whole })).truncated,
+    ).toBeUndefined();
   });
 
   it('answers NO_IMAGE_DIMENSIONS for a FITS without a size, and asks the codec for the size of a TIFF', async () => {
     const { service, probe, images } = setup();
-    expect(await service.solveWcs({ fileName: 'a.fit', bytes: fits(WCS_CARDS, 0) })).toEqual({
+    expect(await service.solveWcs({ fileName: 'a.fit', bytes: fits(WCS_CARDS, 0) })).toMatchObject({
       success: false,
       code: 'NO_IMAGE_DIMENSIONS',
+      expTime: 300,
     });
     expect(probe).not.toHaveBeenCalled();
 
@@ -196,10 +244,9 @@ describe('solveWcs()', () => {
     if (ok.success) expect([ok.sourceWidth, ok.sourceHeight]).toEqual([40, 30]);
 
     images.info = null; // an unreadable TIFF has no size
-    expect(await service.solveWcs({ fileName: 'a.tif', bytes: tiffWithHeader(header) })).toEqual({
-      success: false,
-      code: 'NO_IMAGE_DIMENSIONS',
-    });
+    expect(
+      await service.solveWcs({ fileName: 'a.tif', bytes: tiffWithHeader(header) }),
+    ).toMatchObject({ success: false, code: 'NO_IMAGE_DIMENSIONS' });
   });
 
   it('rescales to the target size, flags an aspect mismatch, and ignores a target that is absent, equal or not positive', async () => {
@@ -245,7 +292,13 @@ describe('an XISF file', () => {
     const { service } = setup();
     const fromFits = await service.solveWcs({ fileName: 'a.fits', bytes: fits() });
     const fromXisf = await service.solveWcs({ fileName: 'a.XISF', bytes: xisf() });
-    expect(fromXisf).toEqual(fromFits);
+    // The FITS has its own structural cards (SIMPLE, NAXIS…); the rest is the same.
+    const { fitsHeaders: fitsCards, facts: fitsFacts, ...fitsRest } = fromFits;
+    const { fitsHeaders: xisfCards, facts: xisfFacts, ...xisfRest } = fromXisf;
+    expect(xisfRest).toEqual(fitsRest);
+    expect(xisfFacts?.pixelScaleArcsec).toBeCloseTo(fitsFacts!.pixelScaleArcsec!, 6);
+    expect(xisfCards!.map((c) => c.key)).toEqual(WCS_CARDS.map((c) => c.slice(0, 8).trim()));
+    expect(fitsCards!.length).toBeGreaterThan(xisfCards!.length);
     expect(fromXisf.success).toBe(true);
   });
 
@@ -267,6 +320,12 @@ describe('an XISF file', () => {
       success: false,
       code: 'NO_WCS_DATA',
     });
+    // A truncated attachment is flagged.
+    const whole = xisf(false);
+    expect(
+      (await service.solveWcs({ fileName: 'a.xisf', bytes: whole.subarray(0, whole.length - 10) }))
+        .truncated,
+    ).toBe(true);
     expect(await codeOf(service.convert({ fileName: 'a.xisf', bytes: new Uint8Array(40) }))).toBe(
       'invalid:UNSUPPORTED_RAW_FORMAT',
     );

@@ -88,7 +88,8 @@ ion-button.mob-btn--text .mob-btn-content {
   padding: 0 var(--space-2);
 }
 ion-button.mob-btn.button-disabled,
-ion-button.mob-icon-btn.button-disabled {
+ion-button.mob-icon-btn.button-disabled,
+ion-button.mob-btn.mob-btn--unavailable {
   opacity: 0.4;
 }
 /* A running action (the board "Réglages, sauvegarde en cours"): not dimmed, no tap, the small spinner in the label's
@@ -250,6 +251,25 @@ ion-item.mob-row.item-disabled {
 }
 ion-item.mob-row {
   padding: 0 var(--mobile-gutter-end) 0 var(--mobile-gutter);
+}
+/* A file's header card (board "Photo, en-têtes du fichier"): the keyword, then its value, with the comment under the
+   value; the keyword and the value share their baseline. */
+.mob-row-line.mob-card-row {
+  display: grid;
+  grid-template-columns: var(--mobile-card-key-width) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0 var(--space-6);
+}
+.mob-card-row-key {
+  color: var(--text-secondary);
+}
+.mob-card-row-value {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.mob-card-row-comment {
+  grid-column: 2;
+  color: var(--text-secondary);
 }
 ion-item.mob-row .mob-row-line {
   min-height: calc(var(--mobile-list-row-min) - 2 * var(--space-4) - var(--mobile-hairline));
@@ -902,8 +922,9 @@ ion-alert.mob-dialog-alert ion-ripple-effect {
   display: none;
 }
 
-/* ── Toasts: `ion-toast.mob-toast` is the desktop's `.toast` (a message, such as the points of interest added), and with
-   `.mob-toast-error` its `.toast.toast-error` (board "Lieu, horizon indisponible"). */
+/* ── Toasts: `ion-toast.mob-toast` is the desktop's `.toast` (a message, such as the points of interest added), with
+   `.mob-toast-error` its `.toast.toast-error` (board "Lieu, horizon indisponible") and with `.mob-toast-warning` its
+   `.toast.toast-warning`. */
 ion-toast.mob-toast {
   --background: var(--bg-deep);
   --color: var(--text-secondary);
@@ -923,6 +944,11 @@ ion-toast.mob-toast.mob-toast-error {
   --color: var(--btn-danger-hover-text);
   --border-color: var(--card-status-failed);
 }
+/* `.mob-toast-warning`: the desktop's `.toast.toast-warning` (board "Photo, fichier non résolu"). */
+ion-toast.mob-toast.mob-toast-warning {
+  --color: var(--status-warn-text);
+  --border-color: var(--status-warn-border);
+}
 ion-toast.mob-toast::part(message) {
   text-align: left;
   padding: var(--space-5) var(--space-7);
@@ -938,7 +964,6 @@ ion-toast.mob-toast::part(wrapper) {
   top: auto;
   bottom: calc(var(--mobile-gutter) + var(--safe-bottom, 0px));
   inset-block-end: calc(var(--mobile-gutter) + var(--safe-bottom, 0px));
-  transform: none;
   width: auto;
   max-width: none;
   margin: 0;
@@ -963,6 +988,16 @@ ion-toast.mob-toast::part(wrapper) {
       var(--mobile-tabbar-height) + var(--safe-bottom, 0px) + var(--mobile-gutter)
     );
   }
+}
+/* `.mob-toast--above`: a page with a footer (a form's Annuler / Enregistrer) anchors its toast to it (`positionAnchor`):
+   Ionic sets the offset above the footer from the screen's bottom edge (its transform), so the toast starts from that
+   edge (board "Photo, fichier non résolu"); every other toast keeps its bottom room and no transform. */
+ion-toast.mob-toast:not(.mob-toast--above)::part(wrapper) {
+  transform: none;
+}
+ion-toast.mob-toast.mob-toast--above::part(wrapper) {
+  bottom: 0;
+  inset-block-end: 0;
 }
 ion-toast.mob-toast::part(container) {
   width: auto;
@@ -1506,12 +1541,21 @@ ion-modal.mob-sheet-modal.mob-sheet-modal .mob-sheet.mob-sheet--fixed {
 .mob-map-ribbon.mob-photo-buttons {
   top: calc(var(--safe-top, 0px) + var(--mobile-touch-min) + var(--space-4));
 }
-/* The sheet's actions (board "Photo, informations"): the WCS file across the width, then editing and deleting. */
+/* The sheet's actions (board "Photo, informations"): the WCS file and the file's headers, then editing and deleting. */
 .mob-photo-actions {
   padding-top: var(--space-4);
 }
 .mob-form-row--field + .mob-photo-actions {
   padding-top: 0;
+}
+/* The WCS file's row: its button takes the width the headers' button leaves. */
+.mob-wcs-row {
+  display: flex;
+  gap: var(--space-4);
+}
+.mob-wcs-row > .mob-btn:first-child {
+  flex: 1 1 0;
+  min-width: 0;
 }
 .mob-photo-actions .mob-btn-row {
   padding-top: var(--space-4);

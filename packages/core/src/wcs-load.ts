@@ -3,6 +3,8 @@ import { getCaptureField } from './capture-fields';
 import { isoToDatetimeLocal } from './datetime-local';
 import type { PhotoIntegration } from './types';
 import type { WcsChange } from './photo-metadata-draft';
+import type { WcsWarning } from './wcs-file-checks';
+import { getDSOById } from './catalog/dso-registry';
 
 /** An i18n key + interpolation params describing a WCS-companion read failure. */
 export interface WcsErrorInfo {
@@ -47,6 +49,7 @@ export function wcsThrownErrorMessage(error: unknown, filename: string): string 
 export function wcsChangeLabel(change: WcsChange): string {
   if (change.key === 'observationDate') return t('modal.metadataObsDate');
   if (change.key === 'integrations') return t('modal.metadataIntegrations');
+  if (change.key === 'gearSetupId') return t('modal.metadataGearSetup');
   const def = getCaptureField(change.field);
   return def ? t(def.labelKey) : change.field;
 }
@@ -66,6 +69,7 @@ function formatValue(change: WcsChange, which: 'current' | 'incoming'): string {
     return isoToDatetimeLocal(change[which]).replace('T', ' ');
   }
   if (change.key === 'integrations') return formatIntegrations(change[which]);
+  if (change.key === 'gearSetupId') return which === 'incoming' ? change.name : '';
   const value = change[which];
   if (value === undefined || value === '') return '';
   const unit = getCaptureField(change.field)?.unit;
@@ -75,4 +79,47 @@ function formatValue(change: WcsChange, which: 'current' | 'incoming'): string {
 /** The value the photo has now and the one the file brings, as shown in the list of conflicts. */
 export function wcsChangeValues(change: WcsChange): { current: string; incoming: string } {
   return { current: formatValue(change, 'current'), incoming: formatValue(change, 'incoming') };
+}
+
+/** An object's name as shown: its name in the current language, else its id. */
+function dsoName(id: string): string {
+  return getDSOById(id)?.displayName || id;
+}
+
+const round = (n: number, digits: number) => String(Number(n.toFixed(digits)));
+
+/** The sentence listing one warning about a solved/raw file, in the current language. */
+export function wcsWarningText(w: WcsWarning): string {
+  switch (w.kind) {
+    case 'dimensions':
+      return t('modal.wcsDimensionMismatchBody', {
+        fitsW: String(w.sourceW),
+        fitsH: String(w.sourceH),
+        jpegW: String(w.targetW),
+        jpegH: String(w.targetH),
+      });
+    case 'truncated':
+      return t('modal.wcsWarnTruncated');
+    case 'mainObject':
+      return t('modal.wcsWarnMainObject', { object: dsoName(w.dsoId) });
+    case 'messierMissing':
+      return t('modal.wcsWarnMessierMissing', { objects: w.dsoIds.join(', ') });
+    case 'messierExtra':
+      return t('modal.wcsWarnMessierExtra', { objects: w.dsoIds.join(', ') });
+    case 'centerOutside':
+      return t('modal.wcsWarnCenterOutside');
+    case 'object':
+      return t('modal.wcsWarnObject', { object: w.object });
+    case 'focalLength':
+      return t('modal.wcsWarnFocal', { header: round(w.headerMm, 0), setup: round(w.setupMm, 0) });
+    case 'pixelScale':
+      return t('modal.wcsWarnPixelScale', {
+        file: round(w.fileArcsec, 2),
+        setup: round(w.setupArcsec, 2),
+      });
+    case 'telescope':
+      return t('modal.wcsWarnTelescope', { name: w.header });
+    case 'instrument':
+      return t('modal.wcsWarnInstrument', { name: w.header });
+  }
 }

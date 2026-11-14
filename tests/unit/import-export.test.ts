@@ -532,7 +532,11 @@ describe('DB import/export round-trip', () => {
 
     const all = await photos.list();
     expect(all).toHaveLength(1);
-    expect(all[0].integrations).toEqual([{ frames: 5, seconds: 120, filter: 'R' }]);
+    // A row without a filter is kept (a header without FILTER still gives its exposures).
+    expect(all[0].integrations).toEqual([
+      { frames: 5, seconds: 120, filter: 'R' },
+      { frames: 3, seconds: 60, filter: '' },
+    ]);
   });
 
   it('findByOriginalNames returns entries whose original_name matches', async () => {
@@ -1036,7 +1040,10 @@ describe('updateMetadata', () => {
     expect(changed).toBe(true);
 
     const p = (await photos.list())[0];
-    expect(p.integrations).toEqual([{ frames: 18, seconds: 240, filter: 'OIII' }]);
+    expect(p.integrations).toEqual([
+      { frames: 18, seconds: 240, filter: 'OIII' },
+      { frames: 3, seconds: 120, filter: '' },
+    ]);
   });
 
   it('updates originalName when provided', async () => {

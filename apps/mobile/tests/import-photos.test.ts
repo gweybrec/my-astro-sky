@@ -12,6 +12,8 @@ vi.mock('@myastrosky/app-state/api', () => ({
   submitPlateSolve: (...a: unknown[]) => submitPlateSolve(...a),
   // The job never answers here: the tests move the waiting photo themselves.
   pollPlateSolve: () => new Promise(() => {}),
+  // No saved setup for a raw file's header to point to.
+  getGearSetups: () => Promise.resolve([]),
 }));
 vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   findDSOIdsFromCorrespondences: () => [],
@@ -65,6 +67,26 @@ describe('the import page', () => {
     expect(rows[0].find('.mob-row-chevron').exists()).toBe(false);
     expect(rows[1].find('.mob-row-chevron').exists()).toBe(true);
     expect(wrapper.find('footer button').attributes('disabled')).toBeUndefined();
+  });
+
+  it('says on its row that a raw file has no plate solution, its capture data being loaded', async () => {
+    convertRawPhoto.mockResolvedValue({
+      png,
+      meta: { success: false, width: 10, height: 10, expTime: 30, stackCnt: 44 },
+    });
+    addImportFiles([new File(['r'], 'M42_SeeStarS50.fit'), new File(['x'], 'M45.jpg')]);
+    const wrapper = mountPage();
+    await flushPromises();
+    const rows = fileRows(wrapper);
+    // The board "Importer, fichier non résolu": "À placer", then the line in the warning colour.
+    expect(rows[0].findAll('.mob-row-sub').map((s) => s.text())).toEqual([
+      'À placer',
+      'Non résolu astrométriquement : données de prise de vue chargées',
+    ]);
+    expect(rows[0].findAll('.mob-row-sub')[1].classes()).toContain('mob-status--warn');
+    expect(rows[0].find('.mob-row-chevron').exists()).toBe(true);
+    // A photo that is not a raw file has no such line.
+    expect(rows[1].findAll('.mob-row-sub').map((s) => s.text())).toEqual(['À placer']);
   });
 
   it('cannot import while a file is still being read, nor when nothing can be imported', async () => {

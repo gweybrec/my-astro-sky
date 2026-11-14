@@ -445,7 +445,16 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       const selected = await selectPhotos(request.ids);
 
       if (includeMetadata) {
-        await writer.add('manifest.json', encode({ manifestVersion: 1, photos: selected }));
+        // The header cards are not in the photo list: read them for the photos that have some.
+        const records = [];
+        for (const { hasFitsHeaders, ...photo } of selected) {
+          records.push(
+            hasFitsHeaders
+              ? { ...photo, fitsHeaders: await photos.getFitsHeaders(photo.id) }
+              : photo,
+          );
+        }
+        await writer.add('manifest.json', encode({ manifestVersion: 1, photos: records }));
       }
       if (includeImages) {
         for (const photo of selected) {

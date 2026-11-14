@@ -20,7 +20,7 @@ import { catalogsReady } from '../../catalogs';
 import { useErrorToast } from '../../composables/useErrorToast';
 import { useLandscape } from '../../composables/useLandscape';
 import { useSheetDrag, useSheetExpand } from '../../composables/useSheetDrag';
-import { pendingPhotoFile, removePendingPhoto } from '../../pending-photos';
+import { pendingPhotoFile, storePlacedPendingPhoto } from '../../pending-photos';
 import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneSearch from '../../components/PhoneSearch.vue';
 import PhoneSheetGrab from '../../components/PhoneSheetGrab.vue';
@@ -331,11 +331,12 @@ async function validate() {
     await catalogsReady();
     const model = photoSkyModel({ width, height, correspondences: [], manualPlacement: placed });
     const dsoIds = model ? findDSOsInImage(model, width, height).map((dso) => dso.id) : [];
-    const photo = await uploadPhoto(file.value, correspondences, placed, undefined, {
-      dsoIds,
-      displayName: stripExtension(file.value.name),
-    });
-    if (props.pendingId) await removePendingPhoto(props.pendingId);
+    const photo = props.pendingId
+      ? await storePlacedPendingPhoto(props.pendingId, file.value, correspondences, placed, dsoIds)
+      : await uploadPhoto(file.value, correspondences, placed, undefined, {
+          dsoIds,
+          displayName: stripExtension(file.value.name),
+        });
     emit('placed', photo);
   } catch (error) {
     void showError(error);

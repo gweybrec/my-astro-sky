@@ -425,7 +425,7 @@ const es: Translations = {
       'Proyección estereográfica polar · Solución de placa (ASTAP, solve-field, astrometry.net) · Más de 12 000 objetos de cielo profundo · Recomendación de objetivos · Planes de observación por noche · Copia de seguridad y restauración para transferir entre dispositivos y usuarios',
     privacyTitle: 'Privacidad',
     privacyLocal:
-      'Todos tus datos (fotos, metadatos, ajustes) se almacenan localmente en tu dispositivo. Las siguientes funciones necesitan una conexión a servidores externos:',
+      'Todos tus datos (fotos, metadatos, encabezados de los archivos FITS/TIFF leídos, ajustes) se almacenan localmente en tu dispositivo. Las siguientes funciones necesitan una conexión a servidores externos:',
     privacyAstrometryTitle: 'Solver astrometry.net',
     privacyAstrometry:
       'Cuando usas el solver astrometry.net, tu imagen se sube a nova.astrometry.net para la solución de placa. Se requiere una clave API. No se transmiten otros datos.',
@@ -440,7 +440,7 @@ const es: Translations = {
       'Cuando usas el botón de detección automática de ubicación en la pestaña Objetivos, tu dirección IP se envía a ip-api.com para estimar tus coordenadas geográficas. No se transmiten otros datos.',
     privacySharedTitle: 'Cielos compartidos',
     privacyShared:
-      '«Compartir mi cielo» crea un archivo en su dispositivo: las fotos elegidas a tamaño completo, su posición en el cielo y su información (objetivos, etiquetas, notas, fecha, exposiciones y, si lo marca, equipo y detalles de captura). Las coordenadas GPS guardadas en las imágenes se eliminan; su lugar de observación, su horizonte, sus ajustes y sus planes nunca figuran en él. La aplicación no envía este archivo a ningún sitio: usted elige a quién dárselo, y cualquier persona que lo reciba puede ver estas fotos.',
+      '«Compartir mi cielo» crea un archivo en su dispositivo: las fotos elegidas a tamaño completo, su posición en el cielo y su información (objetivos, etiquetas, notas, fecha, exposiciones y, si lo marca, equipo y detalles de captura). Las coordenadas GPS guardadas en las imágenes se eliminan y los encabezados de los archivos FITS/TIFF (que pueden indicar el lugar de captura) no figuran en él; su lugar de observación, su horizonte, sus ajustes y sus planes nunca figuran en él. La aplicación no envía este archivo a ningún sitio: usted elige a quién dárselo, y cualquier persona que lo reciba puede ver estas fotos.',
     dataCreditsTitle: 'Créditos de datos',
     dataCreditsCatalogsLabel: 'Catálogos',
     dataCreditsDocsLabel: 'Documentos de referencia',
@@ -508,6 +508,31 @@ const es: Translations = {
     wcsDimensionMismatchBody:
       'El JPEG mide {jpegW}×{jpegH} px y el FITS/TIFF mide {fitsW}×{fitsH} px. Las proporciones no coinciden — la superposición puede ser inexacta.',
     wcsContinueAnyway: 'Continuar de todos modos',
+    wcsNoSolutionLoaded:
+      '{filename} no está resuelto astrométricamente: no coloca la foto, pero se cargaron sus datos de captura.',
+    wcsWarningsTitle: '¿Es el archivo correcto?',
+    wcsWarningsIntro: '{filename} no parece corresponder a esta foto:',
+    wcsWarnTruncated: 'El archivo está incompleto: es más corto de lo que indica su encabezado.',
+    wcsWarnMainObject: 'El objeto principal de la foto, {object}, no está en el campo del archivo.',
+    wcsWarnMessierMissing: 'Objetos Messier de la foto ausentes del archivo: {objects}.',
+    wcsWarnMessierExtra: 'Objetos Messier del archivo ausentes de la foto: {objects}.',
+    wcsWarnCenterOutside: 'El centro indicado por el archivo (RA/DEC) está fuera de la foto.',
+    wcsWarnObject: 'El archivo indica el objeto «{object}», que no es un objeto de la foto.',
+    wcsWarnFocal: 'Focal del archivo: {header} mm; equipo de la foto: {setup} mm.',
+    wcsWarnPixelScale:
+      'Muestreo del archivo: {file}″/px; esperado con el equipo de la foto: {setup}″/px.',
+    wcsWarnTelescope: 'Telescopio del archivo «{name}»: no corresponde al equipo de la foto.',
+    wcsWarnInstrument: 'Cámara del archivo «{name}»: no corresponde al equipo de la foto.',
+    fitsHeadersButton: 'Encabezados',
+    fitsHeadersTitle: 'Encabezados del archivo',
+    fitsHeadersFilter: 'Filtrar…',
+    fitsHeadersEmpty: 'Sin encabezados',
+    fitsHeadersKey: 'Palabra clave',
+    fitsHeadersValue: 'Valor',
+    fitsHeadersComment: 'Comentario',
+    fitsHeadersNoneManual:
+      'Esta foto se colocó manualmente: no se cargó ningún archivo WCS, así que no tiene encabezados.',
+    fitsHeadersNone: 'No se cargó ningún archivo WCS para esta foto, así que no tiene encabezados.',
     onlineButton: 'En línea (astrometry.net)',
     localButton: 'Resolver localmente',
     astapButton: 'ASTAP (local)',

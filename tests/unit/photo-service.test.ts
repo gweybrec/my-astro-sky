@@ -46,7 +46,10 @@ function oldRouteSanitize(input: unknown) {
   }));
 }
 
-/** The old private `server/db.ts` function: maps, then drops the invalid rows. Ran on every write and read. */
+/**
+ * The old private `server/db.ts` function: maps, then drops the invalid rows. Ran on every write and read. Since
+ * rows may have no filter (a header without FILTER), only the counts are required now.
+ */
 function oldDbSanitize(rows: any) {
   if (!Array.isArray(rows)) return [];
   return rows
@@ -55,7 +58,7 @@ function oldDbSanitize(rows: any) {
       seconds: Number.isInteger(Number(entry?.seconds)) ? Number(entry.seconds) : 0,
       filter: typeof entry?.filter === 'string' ? entry.filter.trim() : '',
     }))
-    .filter((entry) => entry.frames >= 1 && entry.seconds >= 1 && entry.filter.length > 0);
+    .filter((entry) => entry.frames >= 1 && entry.seconds >= 1);
 }
 
 const INTEGRATION_INPUTS: [string, unknown][] = [

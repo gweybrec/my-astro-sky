@@ -7,8 +7,10 @@ const getPhotos = vi.fn();
 const getGearSetups = vi.fn();
 const updatePhotoMetadata = vi.fn();
 const solveWCS = vi.fn();
+const setPhotoFitsHeaders = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
   solveWCS: (...a: unknown[]) => solveWCS(...a),
+  setPhotoFitsHeaders: (...a: unknown[]) => setPhotoFitsHeaders(...a),
   getPhotos: () => getPhotos(),
   getGearSetups: () => getGearSetups(),
   updatePhotoMetadata: (...a: unknown[]) => updatePhotoMetadata(...a),
@@ -29,8 +31,16 @@ vi.mock('vue-router', () => ({
 }));
 
 const confirm = vi.fn();
+const confirmWcsWarnings = vi.fn();
 const showError = vi.fn();
 const showNotice = vi.fn();
+const showWarning = vi.fn();
+// The saved setups' optics, for the file checks and the setup the header points to.
+const loadSetupOptics = vi.fn();
+vi.mock('@myastrosky/core/gear-catalog', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@myastrosky/core/gear-catalog')>()),
+  loadSetupOptics: (...a: unknown[]) => loadSetupOptics(...a),
+}));
 const pickFile = vi.fn();
 vi.mock('../src/platform-device', () => ({
   pickFile: (...a: unknown[]) => pickFile(...a),
@@ -38,10 +48,12 @@ vi.mock('../src/platform-device', () => ({
 }));
 vi.mock('../src/composables/useConfirm', () => ({
   useConfirm: () => ({ confirm }),
+  confirmWcsWarnings: (...a: unknown[]) => confirmWcsWarnings(...a),
   showInfo: vi.fn(),
 }));
 vi.mock('../src/composables/useErrorToast', () => ({
-  useErrorToast: () => ({ showError, showNotice }),
+  useErrorToast: () => ({ showError, showNotice, showWarning }),
+  LONG_TOAST_MS: 8000,
 }));
 vi.mock('../src/composables/useBackClose', () => ({ useBackClose: vi.fn() }));
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => Promise.resolve() }));
@@ -71,7 +83,7 @@ vi.mock('@myastrosky/core/search', () => ({
 import PhotoEditPage from '../src/pages/PhotoEditPage.vue';
 import { deliverPois } from '../src/identify-session';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
-import { pendingWcs } from '../src/composables/useWcsLoad';
+import { pendingWcs, type WcsLoaded } from '../src/composables/useWcsLoad';
 
 /** "Photo, modifier les infos": the form of a photo's metadata. */
 
@@ -346,13 +358,28 @@ describe("a photo's edit page", () => {
 
   describe('"Charger un fichier WCS"', () => {
     const empty = { observationDate: null, integrations: [], captureDetails: {} };
+    const REF = { photoX: 10, photoY: 10, ra: 10.68, dec: 41.27 };
     const read = {
       success: true,
+      correspondences: [REF],
       dateObs: '2025-10-01T20:00:00Z',
       expTime: 300,
       stackCnt: 12,
       filter: 'Ha',
     };
+    const loaded = (result: unknown, solved = true): WcsLoaded => ({
+      result: result as WcsLoaded['result'],
+      solved,
+      suggestedSetup: null,
+      filename: 'm31.fits',
+    });
+
+    beforeEach(() => {
+      confirmWcsWarnings.mockReset().mockResolvedValue(true);
+      showWarning.mockReset();
+      setPhotoFitsHeaders.mockReset().mockResolvedValue(undefined);
+      loadSetupOptics.mockReset().mockResolvedValue([]);
+    });
 
     it('fills only the empty fields from the file, unsaved until Enregistrer', async () => {
       getPhotos.mockResolvedValue([photo(empty)]);
@@ -372,7 +399,11 @@ describe("a photo's edit page", () => {
 
     it('keeps what the photo already has, and says nothing new was found', async () => {
       pickFile.mockResolvedValue(new File(['x'], 'm31.fits'));
-      solveWCS.mockResolvedValue({ success: true, dateObs: '2025-10-01T20:00:00Z' });
+      solveWCS.mockResolvedValue({
+        success: true,
+        correspondences: [REF],
+        dateObs: '2025-10-01T20:00:00Z',
+      });
       const w = await mountPage();
       await byText(w, 'button', 'Charger un fichier WCS (fits/tiff)').trigger('click');
       await flushPromises();
@@ -395,7 +426,7 @@ describe("a photo's edit page", () => {
 
     it("fills the form with a file read from the photo's sheet, and asks before leaving it unsaved", async () => {
       getPhotos.mockResolvedValue([photo(empty)]);
-      pendingWcs.value = { photoId: 'p1', result: read as never };
+      pendingWcs.value = { photoId: 'p1', ...loaded(read) };
       const w = await mountPage();
       expect(pendingWcs.value).toBeNull();
       expect(showNotice).toHaveBeenCalledWith('Métadonnées chargées depuis le fichier');
@@ -406,8 +437,86 @@ describe("a photo's edit page", () => {
       expect(back).not.toHaveBeenCalled();
     });
 
+    it('takes the capture data of a file without a plate solution, says so in amber, and saves its headers', async () => {
+      getPhotos.mockResolvedValue([photo(empty)]);
+      const cards = [{ key: 'EXPTIME', value: '30.' }];
+      pickFile.mockResolvedValue(new File(['x'], 'M2.fit'));
+      solveWCS.mockResolvedValue({
+        success: false,
+        code: 'NO_WCS_DATA',
+        expTime: 30,
+        stackCnt: 44,
+        fitsHeaders: cards,
+      });
+      const w = await mountPage();
+      await byText(w, 'button', 'Charger un fichier WCS (fits/tiff)').trigger('click');
+      await flushPromises();
+      expect(showError).not.toHaveBeenCalled();
+      expect(showWarning).toHaveBeenCalledWith(
+        "M2.fit n'est pas résolu astrométriquement : la photo n'est pas placée par ce fichier, mais ses données de prise de vue ont été chargées.",
+      );
+      expect(setPhotoFitsHeaders).not.toHaveBeenCalled();
+      await save(w);
+      expect(saved().integrations).toEqual([{ frames: 44, seconds: 30, filter: '' }]);
+      expect(setPhotoFitsHeaders).toHaveBeenCalledWith('p1', cards);
+    });
+
+    it('fills the setup the header points to, for a photo without one', async () => {
+      getPhotos.mockResolvedValue([photo({ ...empty, gearSetupId: null })]);
+      getGearSetups.mockResolvedValue([{ id: 's30', name: 'Seestar' }]);
+      loadSetupOptics.mockResolvedValue([
+        {
+          setupId: 's30',
+          nativeFocalMm: 150,
+          effectiveFocalMm: 150,
+          pixelSizeUm: 2.9,
+          telescopeName: 'ZWO Seestar S30',
+          cameraName: 'ZWO Seestar S30',
+          setupName: 'Seestar',
+        },
+      ]);
+      pickFile.mockResolvedValue(new File(['x'], 'S30.fit'));
+      solveWCS.mockResolvedValue({
+        success: false,
+        code: 'NO_WCS_DATA',
+        facts: { telescope: 'S30_0289c34b', instrument: 'Seestar S30', focalLengthMm: 150 },
+        fitsHeaders: [{ key: 'SIMPLE', value: 'T' }],
+      });
+      const w = await mountPage();
+      await byText(w, 'button', 'Charger un fichier WCS (fits/tiff)').trigger('click');
+      await flushPromises();
+      await save(w);
+      expect(saved().gearSetupId).toBe('s30');
+    });
+
+    it('asks about what does not match the photo, and takes nothing when cancelled', async () => {
+      getPhotos.mockResolvedValue([photo(empty)]);
+      pickFile.mockResolvedValue(new File(['x'], 'autre.fits'));
+      solveWCS.mockResolvedValue({
+        ...read,
+        dimensionWarning: {
+          sourceW: 3000,
+          sourceH: 3000,
+          targetW: 4000,
+          targetH: 2000,
+          aspectMismatch: true,
+        },
+      });
+      confirmWcsWarnings.mockResolvedValueOnce(false);
+      const w = await mountPage();
+      await byText(w, 'button', 'Charger un fichier WCS (fits/tiff)').trigger('click');
+      await flushPromises();
+      expect(confirmWcsWarnings).toHaveBeenCalledWith(
+        'autre.fits',
+        expect.arrayContaining([expect.stringContaining('3000×3000')]),
+      );
+      expect(showNotice).not.toHaveBeenCalled();
+      await save(w);
+      expect(saved().observationDate).toBeNull();
+    });
+
     it("leaves another photo's file alone", async () => {
-      pendingWcs.value = { photoId: 'p2', result: read as never };
+      pendingWcs.value = { photoId: 'p2', ...loaded(read) };
       await mountPage();
       expect(pendingWcs.value).not.toBeNull();
       expect(showNotice).not.toHaveBeenCalled();

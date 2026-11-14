@@ -1,3 +1,4 @@
+import type { FitsCard } from '@myastrosky/core/fits-header';
 import type {
   Photo,
   PhotoCorrespondence,
@@ -301,6 +302,16 @@ export async function updatePhotoMetadata(
   await guard('errors.updatePhoto', () => getBackend().photos.updateMetadata(photoId, metadata));
 }
 
+/** The header cards of the raw/solved file a photo's data was read from (empty when none are stored). */
+export async function getPhotoFitsHeaders(photoId: string): Promise<FitsCard[]> {
+  return guard('errors.updatePhoto', () => getBackend().photos.getFitsHeaders(photoId));
+}
+
+/** Stores the header cards of the file a photo's data was just read from (an empty list clears them). */
+export async function setPhotoFitsHeaders(photoId: string, cards: FitsCard[]): Promise<void> {
+  await guard('errors.updatePhoto', () => getBackend().photos.setFitsHeaders(photoId, cards));
+}
+
 export async function updatePhotoOrder(photoIds: string[]): Promise<void> {
   return guard('errors.updatePhoto', () => getBackend().photos.setOrder(photoIds));
 }
@@ -328,12 +339,12 @@ export async function solveWCS(
     throw toUserError(err, 'errors.wcsError');
   }
   if (result.success === false) {
+    // No usable solution: the size and the header (capture data, facts, raw cards) still come with it.
     const translated = t('serverErrors.' + result.code);
     return {
-      success: false,
-      code: result.code,
+      ...result,
       ...(translated.startsWith('serverErrors.') ? {} : { error: translated }),
-    };
+    } as PlateSolveResult;
   }
   return result as PlateSolveResult;
 }

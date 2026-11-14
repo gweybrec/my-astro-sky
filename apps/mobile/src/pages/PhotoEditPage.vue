@@ -19,19 +19,22 @@ import {
 import { resolveCategory } from '@myastrosky/core/poi';
 import { searchDSOs } from '@myastrosky/core/search';
 import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
-import type { Photo, PlateSolveResult } from '@myastrosky/core/types';
+import type { Photo } from '@myastrosky/core/types';
 import {
   getGearSetups,
   getPhotos,
+  setPhotoFitsHeaders,
   updatePhotoMetadata,
   type GearSetupData,
 } from '@myastrosky/app-state/api';
+import { noSolutionMessage } from '@myastrosky/app-state/wcs-load-flow';
+import type { FitsCard } from '@myastrosky/core/fits-header';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { catalogsReady } from '../catalogs';
 import { useBackClose } from '../composables/useBackClose';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
-import { pendingWcs, useWcsLoad } from '../composables/useWcsLoad';
+import { pendingWcs, useWcsLoad, type WcsLoaded } from '../composables/useWcsLoad';
 import { receivePois } from '../identify-session';
 import { poiTypeIcon } from '../poi-icons';
 import AppIcon from '../components/AppIcon.vue';
@@ -60,11 +63,13 @@ import supernovaIcon from '@icons/poi-supernova.svg?raw';
 // interest added by hand or found by an identification join the form (`receivePois`), as the desktop's PoiEditor.
 // "Charger un fichier WCS" fills only the empty fields from a solved file's header, unsaved as the rest; a file read
 // from the photo's sheet (`pendingWcs`) is filled in the same way when the form opens.
+// The toasts of the form sit above its footer (board "Photo, fichier non résolu").
+const FOOTER_ID = 'photo-edit-footer';
 const route = useRoute();
 const router = useRouter();
 const { confirm } = useConfirm();
-const { showError, showNotice } = useErrorToast();
-const { loading: wcsLoading, read: readWcs } = useWcsLoad();
+const { showError, showNotice, showWarning } = useErrorToast({ above: FOOTER_ID });
+const { loading: wcsLoading, read: readWcs } = useWcsLoad({ above: FOOTER_ID });
 const categoriesStore = usePoiCategoriesStore();
 
 const photo = ref<Photo | null>(null);
@@ -102,7 +107,7 @@ onMounted(async () => {
     original.value = draftFromPhoto(found);
     photo.value = found;
     if (pendingWcs.value?.photoId === found.id) {
-      applyWcs(pendingWcs.value.result);
+      applyWcs(pendingWcs.value);
       pendingWcs.value = null;
     }
     knownLabels.value = [...new Set(photos.flatMap((p) => p.labels))];
@@ -115,22 +120,35 @@ onMounted(async () => {
   }
 });
 
-const dirty = computed(() => original.value !== null && isDraftDirty(draft, original.value));
+// The header cards of the file read in this form, saved with the photo on Enregistrer: unsaved, like the fields.
+const loadedCards = ref<FitsCard[] | null>(null);
+const dirty = computed(
+  () =>
+    original.value !== null && (isDraftDirty(draft, original.value) || loadedCards.value !== null),
+);
 
 // ── WCS file ──────────────────────────────────────────────────────────────────────────────────────
 
-function applyWcs(result: PlateSolveResult) {
-  const { fills } = wcsDraftChanges(draft, result);
+function applyWcs(loaded: WcsLoaded) {
+  const { fills } = wcsDraftChanges(draft, loaded.result, loaded.suggestedSetup);
   Object.assign(draft, applyWcsChanges(draft, fills));
-  void showNotice(
-    fills.length > 0 ? t('gallery.loadFromWcsSuccess') : t('gallery.loadFromWcsEmpty'),
-  );
+  if (loaded.result.fitsHeaders?.length) loadedCards.value = loaded.result.fitsHeaders;
+  // A file without a plate solution: its capture data was taken, the photo is not placed by it (board "Photo,
+  // fichier non résolu").
+  if (!loaded.solved) void showWarning(noSolutionMessage(loaded.filename));
+  else
+    void showNotice(
+      fills.length > 0 ? t('gallery.loadFromWcsSuccess') : t('gallery.loadFromWcsEmpty'),
+    );
 }
 
 async function loadWcs() {
   if (!photo.value) return;
-  const result = await readWcs(photo.value);
-  if (result) applyWcs(result);
+  const loaded = await readWcs(photo.value, {
+    dsoIds: draft.dsoIds,
+    gearSetupId: draft.gearSetupId,
+  });
+  if (loaded) applyWcs(loaded);
 }
 /** The desktop's texts start with a "+" that the board draws as an icon. */
 const withoutPlus = (text: string) => text.replace(/^\+\s*/, '');
@@ -321,6 +339,7 @@ async function save() {
   saving.value = true;
   try {
     await updatePhotoMetadata(photo.value.id, draftToMetadata(draft, photo.value.originalName));
+    if (loadedCards.value) await setPhotoFitsHeaders(photo.value.id, loadedCards.value);
     goBack();
   } catch (error) {
     void showError(error);
@@ -543,7 +562,7 @@ async function save() {
         </div>
       </div>
     </IonContent>
-    <PhoneFooter>
+    <PhoneFooter :id="FOOTER_ID">
       <PhoneButton size="lg" @click="cancel">{{ t('gallery.cancelEdit') }}</PhoneButton>
       <PhoneButton variant="confirm" size="lg" :disabled="!photo || saving" @click="save">
         {{ t('gallery.saveMetadata') }}

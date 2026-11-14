@@ -30,6 +30,7 @@ import PhoneInfoButton from '../components/PhoneInfoButton.vue';
 import PhoneReorderList from '../components/PhoneReorderList.vue';
 import PhoneTags from '../components/PhoneTags.vue';
 import PhoneRow from '../components/PhoneRow.vue';
+import PhoneCardRow from '../components/PhoneCardRow.vue';
 import PhoneSearch from '../components/PhoneSearch.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PhoneSheet from '../components/PhoneSheet.vue';
@@ -128,6 +129,7 @@ function raiseError() {
           <PhoneButton variant="confirm" disabled>Valider off</PhoneButton>
           <PhoneButton busy>En cours</PhoneButton>
           <PhoneButton variant="confirm" busy>Valider en cours</PhoneButton>
+          <PhoneButton unavailable>Indisponible</PhoneButton>
         </div>
         <div class="mob-form-row" style="display: flex; gap: var(--space-4)">
           <PhoneButton size="lg">Grand</PhoneButton>
@@ -215,6 +217,14 @@ function raiseError() {
             ></template>
           </PhoneRow>
           <PhoneRow title="Désactivée" :subs="['La raison reste lisible']" disabled chevron />
+          <PhoneRow
+            title="M42_SeeStarS50.fit"
+            :thumb="imageIcon"
+            :subs="['À placer']"
+            warning="Non résolu astrométriquement : données de prise de vue chargées"
+            chevron
+            button
+          />
           <PhoneRow title="Cygne et Céphée" :subs="['10 oct. 2026 · 6 objets']" chevron button>
             <template #badges><PhoneBadge kind="warn">Date passée</PhoneBadge></template>
           </PhoneRow>
@@ -227,6 +237,17 @@ function raiseError() {
               <PhoneButton>Déplacer à ce soir</PhoneButton>
             </template>
           </PhoneRow>
+          <PhoneCardRow keyword="EXPTIME" value="180." comment="[s] Exposure time" />
+          <PhoneCardRow keyword="OBJECT" value="M31" />
+          <PhoneCardRow
+            keyword="DATE-OBS"
+            value="2025-09-14T21:40:12.000"
+            comment="UTC start of exposure, a comment long enough to wrap onto a second line"
+          />
+          <PhoneCardRow
+            keyword="HISTORY"
+            value="Calibrated, registered and integrated with a long processing description that wraps"
+          />
           <PhoneToggleRow v-model="switchOn" title="Interrupteur activé" />
           <PhoneToggleRow v-model="switchOff" title="Interrupteur désactivé" />
           <PhoneToggleRow

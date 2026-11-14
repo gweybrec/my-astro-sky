@@ -12,18 +12,13 @@ import { findDSOIdsFromCorrespondences } from '@myastrosky/core/catalog/dso-regi
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { useErrorToast } from './composables/useErrorToast';
 import type { AstrometrySolveStatus, PhotoCorrespondence } from '@myastrosky/core/types';
-import {
-  pollPlateSolve,
-  resumePlateSolve,
-  submitPlateSolve,
-  uploadPhoto,
-} from '@myastrosky/app-state/api';
+import { pollPlateSolve, resumePlateSolve, submitPlateSolve } from '@myastrosky/app-state/api';
 import {
   type PendingPhoto,
   pendingPhotoFile,
   pendingPhotos,
-  removePendingPhoto,
   setPendingState,
+  storePlacedPendingPhoto,
 } from './pending-photos';
 
 /** How often a job is asked where it stands, as on the desktop. */
@@ -49,7 +44,6 @@ async function stopOffline(id: string, jobId: string, submissionId: number | und
   await setPendingState(id, 'offline', { jobId, submissionId });
   if (first) await useErrorToast().showNotice(t('mobile.gallery.solveOffline'));
 }
-const stripExtension = (name: string) => name.replace(/\.[^.]+$/, '');
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** The size of a picture, for finding the objects in its field; 0 × 0 when it cannot be read. */
@@ -75,11 +69,7 @@ async function storeSolved(
     const { width, height } = await sizeOf(file);
     dsoIds = findDSOIdsFromCorrespondences(correspondences, width, height);
   }
-  await uploadPhoto(file, correspondences, undefined, undefined, {
-    dsoIds,
-    displayName: stripExtension(file.name),
-  });
-  await removePendingPhoto(id);
+  await storePlacedPendingPhoto(id, file, correspondences, undefined, dsoIds);
   solvedPhotoCount.value += 1;
 }
 

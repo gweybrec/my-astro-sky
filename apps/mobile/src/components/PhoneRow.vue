@@ -28,6 +28,8 @@ withDefaults(
     number?: number;
     /** How the line under the title reads: a finished state (green), a running operation (spinner and accent), or a failure (red). */
     status?: 'success' | 'busy' | 'danger';
+    /** A last line in the warning colour, under the others (a file read without its plate solution). */
+    warning?: string;
     /** The delete row: lead and title in the danger colour. */
     danger?: boolean;
     /** Three-line rows take more room above and below. */
@@ -87,6 +89,9 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
             >{{ line }}</span
           ><template v-else>{{ line }}</template></span
         >
+        <span v-if="warning" class="mob-row-sub mob-row-sub--wrap m-secondary mob-status--warn">{{
+          warning
+        }}</span>
         <span v-if="$slots.actions" class="mob-row-actions" @click.stop
           ><slot name="actions"
         /></span>

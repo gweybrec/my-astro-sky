@@ -427,7 +427,7 @@ const de: Translations = {
       'Stereographische Polarprojektion · Plate Solving (ASTAP, solve-field, astrometry.net) · Über 12.000 Deep-Sky-Objekte · Zielempfehlungen · Beobachtungspläne nach Nacht · Sicherung & Wiederherstellung zur Übertragung zwischen Geräten und Nutzern',
     privacyTitle: 'Datenschutz',
     privacyLocal:
-      'Alle deine Daten (Fotos, Metadaten, Einstellungen) werden lokal auf deinem Gerät gespeichert. Die folgenden Funktionen benötigen eine Verbindung zu externen Servern:',
+      'Alle deine Daten (Fotos, Metadaten, Header der gelesenen FITS/TIFF-Dateien, Einstellungen) werden lokal auf deinem Gerät gespeichert. Die folgenden Funktionen benötigen eine Verbindung zu externen Servern:',
     privacyAstrometryTitle: 'astrometry.net-Solver',
     privacyAstrometry:
       'Wenn du den astrometry.net-Solver verwendest, wird dein Bild zur Plate-Solving-Berechnung an nova.astrometry.net hochgeladen. Ein API-Schlüssel ist erforderlich. Es werden keine weiteren Daten übertragen.',
@@ -442,7 +442,7 @@ const de: Translations = {
       'Wenn du die automatische Standorterkennung im Tab Ziele verwendest, wird deine IP-Adresse an ip-api.com gesendet, um deine geografischen Koordinaten zu schätzen. Es werden keine weiteren Daten übertragen.',
     privacySharedTitle: 'Geteilte Himmel',
     privacyShared:
-      '„Meinen Himmel teilen“ erstellt eine Datei auf Ihrem Gerät: die gewählten Fotos in voller Größe, ihre Position am Himmel und ihre Angaben (Ziele, Etiketten, Notizen, Datum, Belichtungen und, wenn Sie es ankreuzen, Ausrüstung und Aufnahmedetails). In den Bildern gespeicherte GPS-Koordinaten werden daraus entfernt; Ihr Beobachtungsort, Ihr Horizont, Ihre Einstellungen und Ihre Pläne sind nie darin enthalten. Die App sendet diese Datei nirgendwohin: Sie entscheiden, wem Sie sie geben, und jede Person, die sie erhält, kann diese Fotos sehen.',
+      '„Meinen Himmel teilen“ erstellt eine Datei auf Ihrem Gerät: die gewählten Fotos in voller Größe, ihre Position am Himmel und ihre Angaben (Ziele, Etiketten, Notizen, Datum, Belichtungen und, wenn Sie es ankreuzen, Ausrüstung und Aufnahmedetails). In den Bildern gespeicherte GPS-Koordinaten werden daraus entfernt, und die Header von FITS/TIFF-Dateien (die den Aufnahmeort angeben können) sind nicht darin enthalten; Ihr Beobachtungsort, Ihr Horizont, Ihre Einstellungen und Ihre Pläne sind nie darin enthalten. Die App sendet diese Datei nirgendwohin: Sie entscheiden, wem Sie sie geben, und jede Person, die sie erhält, kann diese Fotos sehen.',
     dataCreditsTitle: 'Datennachweise',
     dataCreditsCatalogsLabel: 'Kataloge',
     dataCreditsDocsLabel: 'Referenzdokumente',
@@ -508,6 +508,32 @@ const de: Translations = {
     wcsDimensionMismatchBody:
       'Das JPEG hat {jpegW}×{jpegH} px und das FITS/TIFF hat {fitsW}×{fitsH} px. Die Seitenverhältnisse stimmen nicht überein — die Überlagerung könnte ungenau sein.',
     wcsContinueAnyway: 'Trotzdem fortfahren',
+    wcsNoSolutionLoaded:
+      '{filename} ist nicht astrometrisch gelöst: Die Datei platziert das Foto nicht, aber ihre Aufnahmedaten wurden geladen.',
+    wcsWarningsTitle: 'Ist das die richtige Datei?',
+    wcsWarningsIntro: '{filename} scheint nicht zu diesem Foto zu passen:',
+    wcsWarnTruncated: 'Die Datei ist unvollständig: Sie ist kürzer, als ihr Header angibt.',
+    wcsWarnMainObject: 'Das Hauptobjekt des Fotos, {object}, liegt nicht im Feld der Datei.',
+    wcsWarnMessierMissing: 'Messier-Objekte des Fotos, die in der Datei fehlen: {objects}.',
+    wcsWarnMessierExtra: 'Messier-Objekte der Datei, die im Foto fehlen: {objects}.',
+    wcsWarnCenterOutside:
+      'Das von der Datei angegebene Zentrum (RA/DEC) liegt außerhalb des Fotos.',
+    wcsWarnObject: 'Die Datei nennt das Objekt „{object}“, das kein Objekt des Fotos ist.',
+    wcsWarnFocal: 'Brennweite der Datei: {header} mm; Ausrüstung des Fotos: {setup} mm.',
+    wcsWarnPixelScale:
+      'Abbildungsmaßstab der Datei: {file}″/px; erwartet mit der Ausrüstung des Fotos: {setup}″/px.',
+    wcsWarnTelescope: 'Teleskop der Datei „{name}“: passt nicht zur Ausrüstung des Fotos.',
+    wcsWarnInstrument: 'Kamera der Datei „{name}“: passt nicht zur Ausrüstung des Fotos.',
+    fitsHeadersButton: 'Header',
+    fitsHeadersTitle: 'Datei-Header',
+    fitsHeadersFilter: 'Filtern…',
+    fitsHeadersEmpty: 'Keine Header',
+    fitsHeadersKey: 'Schlüsselwort',
+    fitsHeadersValue: 'Wert',
+    fitsHeadersComment: 'Kommentar',
+    fitsHeadersNoneManual:
+      'Dieses Foto wurde manuell platziert: Es wurde keine WCS-Datei geladen, daher hat es keine Header.',
+    fitsHeadersNone: 'Für dieses Foto wurde keine WCS-Datei geladen, daher hat es keine Header.',
     onlineButton: 'Online (astrometry.net)',
     localButton: 'Lokal lösen',
     astapButton: 'ASTAP (lokal)',

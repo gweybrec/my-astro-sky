@@ -94,6 +94,8 @@ export interface Backend {
     | 'setManualPlacement'
     | 'setOrder'
     | 'rotateRight'
+    | 'getFitsHeaders'
+    | 'setFitsHeaders'
     | 'repairSizes'
     | 'makeMissingMediums'
   > & {

@@ -7,6 +7,7 @@ import type {
   ManualPlacement,
 } from '@myastrosky/core/types';
 import type { BatchItem } from './batch-types';
+import type { FitsCard } from '@myastrosky/core/fits-header';
 import { sanitizeIntegrationRows } from './batch-utils';
 import { sanitizeCaptureDetails } from '@myastrosky/core/capture-fields';
 
@@ -34,6 +35,8 @@ export async function placeBatchItem(
   uploadFn: UploadFn,
   onPlaced: (photo: Photo) => void,
   tFn: (key: string) => string,
+  /** Stores the header cards of the file the item's data was read from with the new photo. */
+  saveFitsHeaders?: (photoId: string, cards: FitsCard[]) => Promise<void>,
 ): Promise<void> {
   item.status = 'placing';
   delete item.uploadError;
@@ -55,9 +58,18 @@ export async function placeBatchItem(
         displayName: item.customName,
       },
     );
-    item.photo = photo;
+    let placed = photo;
+    if (item.fitsHeaders?.length && saveFitsHeaders) {
+      try {
+        await saveFitsHeaders(photo.id, item.fitsHeaders);
+        placed = { ...photo, hasFitsHeaders: true };
+      } catch {
+        // The photo is placed; only its header cards are missing (they are informative).
+      }
+    }
+    item.photo = placed;
     item.status = 'placed';
-    onPlaced(photo);
+    onPlaced(placed);
   } catch (err: any) {
     item.uploadError = err.message || tFn('batch.statusFailed');
     item.status = 'success';

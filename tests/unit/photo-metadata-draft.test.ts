@@ -206,6 +206,19 @@ describe('wcsDraftChanges / applyWcsChanges', () => {
       conflicts: [],
     });
   });
+
+  it('fills the suggested setup only when the photo has none', () => {
+    const draft = draftFromPhoto(photo({ gearSetupId: null }));
+    const empty = { success: false } as PlateSolveResult;
+    const setup = { id: 's30', name: 'Seestar' };
+    const { fills } = wcsDraftChanges(draft, empty, setup);
+    expect(fills).toEqual([
+      { key: 'gearSetupId', current: null, incoming: 's30', name: 'Seestar' },
+    ]);
+    expect(applyWcsChanges(draft, fills)).toEqual({ gearSetupId: 's30' });
+    draft.gearSetupId = 'mine';
+    expect(wcsDraftChanges(draft, empty, setup)).toEqual({ fills: [], conflicts: [] });
+  });
 });
 
 // ─── filterLabelCandidates ────────────────────────────────────────────────────

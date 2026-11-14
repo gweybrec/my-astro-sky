@@ -6,6 +6,7 @@
  * This package may use browser APIs (`fetch`, `FormData`, `XMLHttpRequest`) but nothing of the app:
  * what it needs from the app (language, saving a file) arrives through `HttpBackendOptions`.
  */
+import type { FitsCard } from '@myastrosky/core/fits-header';
 import type { Backend, CancelSignal, FileSource, TransferOptions } from '@myastrosky/core/backend';
 import { DomainError, type DomainErrorKind } from '@myastrosky/core/domain/errors';
 import type { ErrorCode } from '@myastrosky/core/domain/error-codes';
@@ -356,6 +357,13 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
       async rotateRight(photoId) {
         return call<Photo>('POST', `/api/photos/${id(photoId)}/rotate`);
       },
+      async getFitsHeaders(photoId) {
+        return (await call<{ cards: FitsCard[] }>('GET', `/api/photos/${id(photoId)}/fits-headers`))
+          .cards;
+      },
+      async setFitsHeaders(photoId, cards) {
+        await call('PUT', `/api/photos/${id(photoId)}/fits-headers`, { cards });
+      },
       async repairSizes() {
         return (await call<{ repaired: number }>('POST', '/api/photos/repair-sizes')).repaired;
       },
@@ -555,11 +563,9 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
           targetHeight: target?.height,
         });
         const reply = await sendForm<Record<string, unknown>>('/api/solve-wcs', form);
-        if (reply.success === false) {
-          return { success: false, code: reply.code as 'NO_WCS_DATA' };
-        }
+        // A file without a usable solution still carries its size and header: keep all but the server's text.
         const { error: _error, ...result } = reply;
-        return result as SolveWcsResult;
+        return result as unknown as SolveWcsResult;
       },
       async convert(file, opts?: TransferOptions): Promise<ConvertSolvedResult> {
         const form = await formOf('photo', file, { lang: options.lang() });

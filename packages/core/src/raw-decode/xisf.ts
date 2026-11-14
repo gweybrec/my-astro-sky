@@ -1,4 +1,5 @@
 import { parseFITSHeader } from '../wcs';
+import { MAX_FITS_CARDS, type FitsCard } from '../fits-header';
 
 /**
  * XISF (PixInsight) monolithic-file header decoding: the `XISF0100` signature, the 4-byte
@@ -43,6 +44,8 @@ export interface XisfImageInfo {
 export interface XisfHeader {
   /** `FITSKeyword` elements, in the `parseFITSHeader` shape. */
   fitsKeywords: Record<string, number | string | boolean>;
+  /** Every `FITSKeyword` element, in order, as raw cards (COMMENT and HISTORY included). */
+  fitsCards: FitsCard[];
   /** The first `Image` element, or null when the header has none. */
   image: XisfImageInfo | null;
 }
@@ -127,6 +130,28 @@ function keywordRecords(xml: string): string {
   return lines.join('\n') + '\nEND';
 }
 
+/** Every FITSKeyword element as a raw card (value with its FITS quotes removed), at most `MAX_FITS_CARDS`. */
+function keywordCards(xml: string): FitsCard[] {
+  const cards: FitsCard[] = [];
+  const re = /<FITSKeyword\b((?:"[^"]*"|'[^']*'|[^>"'])*?)\/?>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(xml)) !== null && cards.length < MAX_FITS_CARDS) {
+    const attrs = parseAttributes(m[1]);
+    const key = (attrs.name ?? '').trim().slice(0, 70);
+    let value = (attrs.value ?? '').replace(/[\r\n]+/g, ' ').trim();
+    if (value.startsWith("'") && value.endsWith("'") && value.length >= 2) {
+      value = value.slice(1, -1).replace(/''/g, "'").trim();
+    }
+    const comment = (attrs.comment ?? '').trim();
+    cards.push({
+      key,
+      value: value.slice(0, 200),
+      ...(comment ? { comment: comment.slice(0, 200) } : {}),
+    });
+  }
+  return cards;
+}
+
 /**
  * Decode an XISF monolithic file's XML header. Throws `UnsupportedXisfError` on a bad
  * signature, a truncated file or an unusable `Image` element.
@@ -176,5 +201,9 @@ export function parseXisfHeader(buf: Uint8Array): XisfHeader {
     }
   }
 
-  return { fitsKeywords: parseFITSHeader(keywordRecords(scope)), image };
+  return {
+    fitsKeywords: parseFITSHeader(keywordRecords(scope)),
+    fitsCards: keywordCards(scope),
+    image,
+  };
 }

@@ -423,7 +423,7 @@ const en: Translations = {
       'Stereographic polar projection · Plate solving (ASTAP, solve-field, astrometry.net) · 12,000+ deep-sky objects · Target recommendations · Observing plans by night · Backup & restore to transfer between devices and users',
     privacyTitle: 'Privacy',
     privacyLocal:
-      'All your data (photos, metadata, settings) is stored locally on your device. The following features need a connection to external servers:',
+      'All your data (photos, metadata, headers of the FITS/TIFF files read, settings) is stored locally on your device. The following features need a connection to external servers:',
     privacyAstrometryTitle: 'Astrometry.net solver',
     privacyAstrometry:
       'When you use the astrometry.net solver, your image is uploaded to nova.astrometry.net for plate solving. An API key is required. No other data is transmitted.',
@@ -438,7 +438,7 @@ const en: Translations = {
       'When you use the auto-detect location button in the Targets tab, your IP address is sent to ip-api.com to estimate your geographic coordinates. No other data is transmitted.',
     privacySharedTitle: 'Shared skies',
     privacyShared:
-      '"Share my sky" creates a file on your device: the chosen photos at full size, their position on the sky and their information (targets, labels, notes, date, exposures and, if you tick it, gear and capture details). GPS coordinates stored in the images are removed from it; your observing site, your horizon, your settings and your plans are never in it. The app sends this file nowhere: you choose whom to give it to, and anyone who gets it can see these photos.',
+      '"Share my sky" creates a file on your device: the chosen photos at full size, their position on the sky and their information (targets, labels, notes, date, exposures and, if you tick it, gear and capture details). GPS coordinates stored in the images are removed from it, and the headers of FITS/TIFF files (which may give the shooting site) are not in it; your observing site, your horizon, your settings and your plans are never in it. The app sends this file nowhere: you choose whom to give it to, and anyone who gets it can see these photos.',
     dataCreditsTitle: 'Data credits',
     dataCreditsCatalogsLabel: 'Catalogues',
     dataCreditsDocsLabel: 'Reference documents',
@@ -504,6 +504,31 @@ const en: Translations = {
     wcsDimensionMismatchBody:
       'The JPEG is {jpegW}×{jpegH} px and the FITS/TIFF is {fitsW}×{fitsH} px. The aspect ratios do not match — the overlay may be inaccurate.',
     wcsContinueAnyway: 'Continue anyway',
+    wcsNoSolutionLoaded:
+      '{filename} is not plate-solved: it does not place the photo, but its capture data was loaded.',
+    wcsWarningsTitle: 'Is this the right file?',
+    wcsWarningsIntro: '{filename} does not seem to match this photo:',
+    wcsWarnTruncated: 'The file is incomplete: it is shorter than its header says.',
+    wcsWarnMainObject: "The photo's main object, {object}, is not in the file's field.",
+    wcsWarnMessierMissing: 'Messier objects of the photo missing from the file: {objects}.',
+    wcsWarnMessierExtra: 'Messier objects of the file missing from the photo: {objects}.',
+    wcsWarnCenterOutside: 'The centre the file gives (RA/DEC) is outside the photo.',
+    wcsWarnObject:
+      'The file names the object "{object}", which is not one of the photo\'s objects.',
+    wcsWarnFocal: "File focal length: {header} mm; the photo's gear: {setup} mm.",
+    wcsWarnPixelScale: "File pixel scale: {file}″/px; expected with the photo's gear: {setup}″/px.",
+    wcsWarnTelescope: 'File telescope "{name}": does not match the photo\'s gear.',
+    wcsWarnInstrument: 'File camera "{name}": does not match the photo\'s gear.',
+    fitsHeadersButton: 'Headers',
+    fitsHeadersTitle: 'File headers',
+    fitsHeadersFilter: 'Filter…',
+    fitsHeadersEmpty: 'No headers',
+    fitsHeadersKey: 'Keyword',
+    fitsHeadersValue: 'Value',
+    fitsHeadersComment: 'Comment',
+    fitsHeadersNoneManual:
+      'This photo was placed manually: no WCS file was loaded, so it has no headers.',
+    fitsHeadersNone: 'No WCS file was loaded for this photo, so it has no headers.',
     onlineButton: 'Online (astrometry.net)',
     localButton: 'Solve locally',
     astapButton: 'ASTAP (local)',

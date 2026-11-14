@@ -2,9 +2,15 @@ import { computed, shallowRef, watch } from 'vue';
 import type { Photo, PhotoCorrespondence } from '@myastrosky/core/types';
 import { ANY_PHOTO_EXT_RE, isRawAstroFile } from '@myastrosky/core/photo-formats';
 import { sanitizeCaptureDetails } from '@myastrosky/core/capture-fields';
-import { wcsPhotoMetadata, type WcsPhotoMetadata } from '@myastrosky/core/wcs-photo-metadata';
-import { convertRawPhoto, uploadPhoto } from '@myastrosky/app-state/api';
-import { addPendingPhoto, pendingPhotos } from '../pending-photos';
+import {
+  wcsCaptureMetadata,
+  wcsPhotoMetadata,
+  type WcsCaptureMetadata,
+  type WcsPhotoMetadata,
+} from '@myastrosky/core/wcs-photo-metadata';
+import { convertRawPhoto, setPhotoFitsHeaders, uploadPhoto } from '@myastrosky/app-state/api';
+import { suggestedSetupFor } from '@myastrosky/app-state/wcs-load-flow';
+import { addPendingPhoto, pendingPhotos, type PendingCapture } from '../pending-photos';
 import { solvePendingOnline } from '../pending-solve';
 
 /**
@@ -38,6 +44,15 @@ export interface ImportItem {
   /** Where the photo is on the sky (status `solved`). */
   correspondences: PhotoCorrespondence[] | null;
   metadata: WcsPhotoMetadata | null;
+  /**
+   * What a TIFF/FITS/XISF said besides its picture, solved or not: capture data and header cards. For a file without
+   * a plate solution (`noSolution`), it goes with the photo still to place.
+   */
+  capture?: WcsCaptureMetadata | null;
+  /** The saved setup the file's header points to. */
+  gearSetupId?: string | null;
+  /** The file was read but has no plate solution: only its capture data was taken. */
+  noSolution?: boolean;
   error: string;
   /** The waiting photo this file became when a placement method was chosen for it here. */
   pendingId?: string;
@@ -64,11 +79,16 @@ async function readSolvedFile(item: ImportItem) {
   try {
     const { png, meta } = await convertRawPhoto(item.file);
     const wcs = wcsPhotoMetadata(meta, meta.width, meta.height);
+    // The raw file is the photo itself: nothing to compare it with, but its header may point to a saved setup.
+    const gearSetupId = await suggestedSetupFor(meta);
     update(item, {
       file: png,
       status: wcs ? 'solved' : 'toPlace',
       correspondences: wcs ? (meta.correspondences ?? null) : null,
       metadata: wcs,
+      capture: wcs ?? wcsCaptureMetadata(meta),
+      gearSetupId,
+      noSolution: !wcs,
     });
   } catch (error) {
     update(item, {
@@ -76,6 +96,19 @@ async function readSolvedFile(item: ImportItem) {
       error: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+/** What a photo still to place keeps of its file until it is placed; undefined when the file said nothing. */
+function pendingCapture(item: ImportItem): PendingCapture | undefined {
+  const capture = item.capture;
+  if (!capture && !item.gearSetupId) return undefined;
+  return {
+    ...(capture?.integrations.length ? { integrations: capture.integrations } : {}),
+    ...(capture?.observationDate ? { observationDate: capture.observationDate } : {}),
+    ...(capture?.captureDetails ? { captureDetails: capture.captureDetails } : {}),
+    ...(item.gearSetupId ? { gearSetupId: item.gearSetupId } : {}),
+    ...(capture?.fitsHeaders?.length ? { fitsHeaders: capture.fitsHeaders } : {}),
+  };
 }
 
 /** Adds the picked files to the import. Files that are not photos are left out; returns how many were added. */
@@ -121,7 +154,7 @@ export const importableCount = computed(
  */
 export async function keepImportPending(item: ImportItem): Promise<string> {
   if (item.pendingId) return item.pendingId;
-  const pendingId = (await addPendingPhoto(item.file, item.name)).id;
+  const pendingId = (await addPendingPhoto(item.file, item.name, pendingCapture(item))).id;
   update(item, { pendingId });
   return pendingId;
 }
@@ -194,19 +227,25 @@ export async function importAll(): Promise<Photo[]> {
     try {
       if (solved) {
         const meta = item.metadata!;
-        stored.push(
-          await uploadPhoto(item.file, item.correspondences!, undefined, undefined, {
-            dsoIds: meta.dsoIds,
-            integrations: meta.integrations,
-            observationDate: meta.observationDate ?? null,
-            captureDetails: meta.captureDetails
-              ? sanitizeCaptureDetails(meta.captureDetails)
-              : null,
-            displayName: stripExtension(item.name),
-          }),
-        );
+        let photo = await uploadPhoto(item.file, item.correspondences!, undefined, undefined, {
+          dsoIds: meta.dsoIds,
+          integrations: meta.integrations,
+          observationDate: meta.observationDate ?? null,
+          captureDetails: meta.captureDetails ? sanitizeCaptureDetails(meta.captureDetails) : null,
+          gearSetupId: item.gearSetupId ?? null,
+          displayName: stripExtension(item.name),
+        });
+        if (meta.fitsHeaders?.length) {
+          try {
+            await setPhotoFitsHeaders(photo.id, meta.fitsHeaders);
+            photo = { ...photo, hasFitsHeaders: true };
+          } catch {
+            // The photo is placed; only its header cards are missing.
+          }
+        }
+        stored.push(photo);
       } else {
-        await addPendingPhoto(item.file, item.name);
+        await addPendingPhoto(item.file, item.name, pendingCapture(item));
       }
       update(item, { status: 'imported' });
     } catch (error) {

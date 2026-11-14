@@ -7,6 +7,8 @@ import { applyMigrations } from '../../server/db-migrations';
 const DROP_VISIT_TABLES = 'DROP TABLE shared_sky_photos; DROP TABLE shared_skies';
 /** What migration 21 added: a test that goes back to an earlier version takes it away first. */
 const DROP_PLAN_ARCHIVED = 'ALTER TABLE plans DROP COLUMN archived';
+/** What migration 22 added, taken away the same way. */
+const DROP_FITS_HEADERS = 'ALTER TABLE photos DROP COLUMN fits_headers';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -998,6 +1000,7 @@ describe('applyMigrations — v20 author of a visited photo', () => {
     db.exec('ALTER TABLE shared_sky_photos DROP COLUMN author');
     db.prepare('UPDATE schema_version SET version = 19').run();
     db.exec(DROP_PLAN_ARCHIVED);
+    db.exec(DROP_FITS_HEADERS);
     db.prepare(
       `INSERT INTO shared_skies (id, sender_name, display_name, shared_at, received_at)
        VALUES ('sky-0001', 'Paul', 'Paul', '2026-11-01T00:00:00.000Z', '2026-11-02T00:00:00.000Z')`,

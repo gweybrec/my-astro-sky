@@ -157,4 +157,26 @@ describe('placeBatchItem — state transitions', () => {
 
     expect(item.uploadError).toBe('batch.statusFailed');
   });
+
+  it('stores the header cards with the new photo, and places it even when that fails', async () => {
+    const cards = [{ key: 'EXPTIME', value: '30.' }];
+    const save = vi.fn().mockResolvedValue(undefined);
+    const item = makeItem({ fitsHeaders: cards });
+    const onPlaced = vi.fn();
+    await placeBatchItem(item, [], vi.fn().mockResolvedValue(fakePhoto) as any, onPlaced, t, save);
+    expect(save).toHaveBeenCalledWith(fakePhoto.id, cards);
+    expect(onPlaced.mock.calls[0][0].hasFitsHeaders).toBe(true);
+
+    const failing = makeItem({ fitsHeaders: cards });
+    await placeBatchItem(
+      failing,
+      [],
+      vi.fn().mockResolvedValue(fakePhoto) as any,
+      vi.fn(),
+      t,
+      vi.fn().mockRejectedValue(new Error('down')),
+    );
+    expect(failing.status).toBe('placed');
+    expect(failing.photo?.hasFitsHeaders).toBeUndefined();
+  });
 });
