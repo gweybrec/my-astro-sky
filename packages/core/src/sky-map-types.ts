@@ -140,6 +140,8 @@ export type StarHoverCallback = (star: Star | null, x: number, y: number) => voi
 export type DSOHoverCallback = (dso: DSO | null, x: number, y: number) => void;
 export type SummitHoverCallback = (summit: HorizonSummit | null, x: number, y: number) => void;
 export type StarPickedCallback = (star: Star) => void;
+/** A click in picking mode that lands on no star: the sky position under the cursor. */
+export type PointPickedCallback = (ra: number, dec: number) => void;
 
 /**
  * Why a view-change notification fired.

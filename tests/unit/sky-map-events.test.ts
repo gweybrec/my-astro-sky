@@ -76,6 +76,7 @@ function makeHost(over: Partial<SkyEventHost> = {}) {
     frameSelect: vi.fn(),
     findClosestStar: vi.fn(() => null as Star | null),
     emitStarPicked: vi.fn(),
+    emitPointPicked: vi.fn(),
     emitPhotoClick: vi.fn(),
     emitDSOClick: vi.fn(),
     emitClearSelection: vi.fn(),
@@ -412,8 +413,25 @@ describe('attachSkyMapEvents', () => {
       press(h);
       window.dispatchEvent(mouse('mouseup', 500, 400));
       expect(h.calls.emitStarPicked).toHaveBeenCalledWith(STAR);
+      expect(h.calls.emitPointPicked).not.toHaveBeenCalled();
       expect(h.calls.emitPhotoClick).not.toHaveBeenCalled();
       expect(h.calls.emitDSOClick).not.toHaveBeenCalled();
+    });
+
+    it('picking mode hands the clicked point on when no star is under the click', () => {
+      const h = setup({ pickingMode: true, hasStarPickedHandler: () => true });
+      press(h);
+      window.dispatchEvent(mouse('mouseup', 500, 400));
+      expect(h.calls.emitStarPicked).not.toHaveBeenCalled();
+      expect(h.calls.emitPointPicked).toHaveBeenCalledWith(500, 400);
+    });
+
+    it('picking mode ignores a click outside the sky circle', () => {
+      const h = setup({ pickingMode: true, hasStarPickedHandler: () => true });
+      h.view.scale = 50; // zoomed out: the sky circle no longer reaches the canvas corner
+      h.canvas.dispatchEvent(mouse('mousedown', 1, 1));
+      window.dispatchEvent(mouse('mouseup', 1, 1));
+      expect(h.calls.emitPointPicked).not.toHaveBeenCalled();
     });
 
     it('skips the star hit-test when nothing is listening for a pick', () => {

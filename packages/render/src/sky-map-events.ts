@@ -79,6 +79,8 @@ export interface SkyEventHost {
   hasStarPickedHandler(): boolean;
   hasPhotoClickHandler(): boolean;
   emitStarPicked(star: Star): void;
+  /** Picking mode, click on no star: hands the sky position under (mx, my) to the picker, if it takes one. */
+  emitPointPicked(mx: number, my: number): void;
   emitPhotoClick(photoName: string): void;
   emitDSOClick(): void;
   emitClearSelection(): void;
@@ -264,11 +266,14 @@ export function attachSkyMapEvents(host: SkyEventHost): EventBinding[] {
 
     const { mx, my } = local(e);
 
-    // Picking mode: click (not drag) selects star
+    // Picking mode: click (not drag) selects the star under it, else the point itself
     if (host.pickingMode) {
       if (host.hasStarPickedHandler()) {
         const star = host.findClosestStar(mx, my);
         if (star) host.emitStarPicked(star);
+        else if (isInsideBorderCircle(mx, my, host.view, host.borderLatDeg)) {
+          host.emitPointPicked(mx, my);
+        }
       }
       return; // picking mode swallows the photo/DSO click paths
     }

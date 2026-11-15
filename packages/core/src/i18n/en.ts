@@ -558,7 +558,7 @@ const en: Translations = {
     invalidCoordinates: 'Invalid coordinates',
     mapPick: 'Map',
     mapPickTooltip: 'Pick on the map',
-    mapPickInstruction: 'Click the star of point {n} on the map',
+    mapPickInstruction: 'Click the map where point {n} lies',
     validate: 'Validate',
     cancel: 'Cancel',
     uploadError: 'Error: {message}',

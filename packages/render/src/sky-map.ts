@@ -12,6 +12,7 @@ import {
   type DSOHoverCallback,
   type SummitHoverCallback,
   type StarPickedCallback,
+  type PointPickedCallback,
   type ViewChangeCallback,
   type ViewChangeReason,
 } from '@myastrosky/core/sky-map-types';
@@ -121,6 +122,7 @@ export type {
   DSOHoverCallback,
   SummitHoverCallback,
   StarPickedCallback,
+  PointPickedCallback,
   ViewChangeCallback,
   ViewChangeReason,
 };
@@ -332,6 +334,7 @@ export class SkyMap {
   // Picking mode
   private pickingMode = false;
   private onStarPicked: StarPickedCallback | null = null;
+  private onPointPicked: PointPickedCallback | null = null;
 
   // Photo click callback
   private onPhotoClick: ((photoName: string) => void) | null = null;
@@ -1087,15 +1090,21 @@ export class SkyMap {
     return this.fovFrameSpecs;
   }
 
-  enterPickingMode(callback: StarPickedCallback) {
+  /**
+   * A click takes the drawn star under the cursor. With `onPoint`, a mouse click on no star
+   * gives the sky position under the cursor instead (inside the sky circle only).
+   */
+  enterPickingMode(callback: StarPickedCallback, onPoint?: PointPickedCallback) {
     this.pickingMode = true;
     this.onStarPicked = callback;
+    this.onPointPicked = onPoint ?? null;
     this.canvas.style.cursor = 'crosshair';
   }
 
   exitPickingMode() {
     this.pickingMode = false;
     this.onStarPicked = null;
+    this.onPointPicked = null;
     this.canvas.style.cursor = 'default';
   }
 
@@ -1296,6 +1305,12 @@ export class SkyMap {
       hasStarPickedHandler: () => this.onStarPicked !== null,
       hasPhotoClickHandler: () => this.onPhotoClick !== null,
       emitStarPicked: (star) => this.onStarPicked?.(star),
+      emitPointPicked: (mx, my) => {
+        if (!this.onPointPicked) return;
+        const proj = fromCanvas(mx, my, this.view);
+        const { ra, dec } = unproject(proj.x, proj.y);
+        this.onPointPicked(ra, dec);
+      },
       emitPhotoClick: (name) => this.onPhotoClick?.(name),
       emitDSOClick: () => {
         const dso = this.hoveredDSO;

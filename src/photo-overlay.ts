@@ -1170,10 +1170,18 @@ export class PhotoOverlay extends PhotoLayer {
             };
             pickCancel.addEventListener('click', endPick);
             window.addEventListener('keydown', escHandler);
-            skyMap.enterPickingMode((star: Star) => {
-              endPick();
-              selectStar(i, star, starDisplayLabel(star));
-            });
+            // A click on a drawn star takes that star; anywhere else, the exact sky
+            // position (for a star the catalogue lacks, placed from a known photo).
+            skyMap.enterPickingMode(
+              (star: Star) => {
+                endPick();
+                selectStar(i, star, starDisplayLabel(star));
+              },
+              (ra, dec) => {
+                endPick();
+                selectRaDec(i, ra, dec);
+              },
+            );
           });
         }
 

@@ -562,7 +562,7 @@ const es: Translations = {
     invalidCoordinates: 'Coordenadas no válidas',
     mapPick: 'Mapa',
     mapPickTooltip: 'Elegir en el mapa',
-    mapPickInstruction: 'Haz clic en la estrella del punto {n} en el mapa',
+    mapPickInstruction: 'Haz clic en el mapa donde está el punto {n}',
     validate: 'Validar',
     cancel: 'Cancelar',
     cancelSolve: 'Cancelar resolución',

@@ -16,10 +16,14 @@ describe('PhotoOverlay manual identify: host backdrop over the map', () => {
   let overlay: PhotoOverlay;
   let container: HTMLDivElement;
   let onPick: ((star: any) => void) | null;
+  let onPoint: ((ra: number, dec: number) => void) | null;
   const skyMap = {
-    enterPickingMode: vi.fn((cb: (star: any) => void) => {
-      onPick = cb;
-    }),
+    enterPickingMode: vi.fn(
+      (cb: (star: any) => void, pointCb?: (ra: number, dec: number) => void) => {
+        onPick = cb;
+        onPoint = pointCb ?? null;
+      },
+    ),
     exitPickingMode: vi.fn(),
     setOnViewChange: vi.fn(),
   };
@@ -90,6 +94,24 @@ describe('PhotoOverlay manual identify: host backdrop over the map', () => {
     expect(hostBackdrop.style.display).toBe('');
     expect(identifyBackdrop.isConnected).toBe(true);
     expect(settled).toBe(false);
+  });
+
+  it('a click on no star sets the point to that sky position', () => {
+    void open();
+    // Place point 1 on the photo first (happy-dom has no layout: give the image a size).
+    const img = document.querySelector<HTMLImageElement>('.modal-photo')!;
+    img.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 100, height: 100, right: 100, bottom: 100 }) as DOMRect;
+    document
+      .querySelector('.modal-photo-container')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 50, clientY: 50 }));
+    document.querySelector<HTMLButtonElement>('.btn-pick-map')!.click();
+
+    onPoint!(83.82, -5.39);
+    expect(document.querySelector('.star-pick-toolbar')).toBeNull();
+    const entry = document.querySelector('.point-entry[data-index="0"]')!;
+    expect(entry.classList.contains('complete')).toBe(true);
+    expect(entry.querySelector('.point-status')!.textContent).toContain('83.82');
   });
 
   it('picking a star or Escape removes the pick window; Escape after a pick does nothing', () => {

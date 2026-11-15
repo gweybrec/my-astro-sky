@@ -563,7 +563,7 @@ const fr = {
     invalidCoordinates: 'Coordonnées invalides',
     mapPick: 'Carte',
     mapPickTooltip: 'Choisir sur la carte',
-    mapPickInstruction: "Cliquez sur l'étoile du point {n} sur la carte",
+    mapPickInstruction: 'Cliquez sur la carte là où se trouve le point {n}',
     validate: 'Valider',
     cancel: 'Annuler',
     uploadError: 'Erreur : {message}',
