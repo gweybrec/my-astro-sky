@@ -30,6 +30,8 @@ const en: Translations['mobile'] = {
     placeHow: 'How should this photo be placed?',
     solveOnline: 'Solve online',
     solveOnlineSub: 'astrometry.net, needs a connection',
+    reuseSolution: 'Re-use an astrometry.net solution',
+    reuseSolutionSub: 'A photo already solved on your astrometry.net account',
     offline: 'No internet connection',
     identifyStars: 'Identify 3 stars',
     identifyStarsSub:
@@ -41,6 +43,17 @@ const en: Translations['mobile'] = {
     placeShowSettings: 'Show the settings',
     import: 'Import',
     perLine: 'Photos per line',
+  },
+  reuse: {
+    helperOne:
+      'Tap a submission to re-use its solution, most recent first. 1 submission on your account.',
+    helperMany:
+      'Tap a submission to re-use its solution, most recent first. {n} submissions on your account.',
+    moreOne: 'Show the next one',
+    moreMany: 'Show the next {n}',
+    solved: '✓ Solved',
+    running: 'Running',
+    failed: 'Failed',
   },
   identify: {
     starPlaceholder: 'Star name…',

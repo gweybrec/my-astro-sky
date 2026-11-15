@@ -75,6 +75,19 @@ async function identify() {
   }
 }
 
+// Reusing a solution of the astrometry.net account: the photo is kept waiting first, and its page opened from the gallery,
+// as for identifying stars.
+async function reuse() {
+  if (!placing.value) return;
+  try {
+    const id = await keepImportPending(placing.value);
+    await router.replace('/tabs/gallery');
+    await router.push(`/gallery/reuse/${id}`);
+  } catch (error) {
+    void showError(error);
+  }
+}
+
 const title = computed(() =>
   importItems.value.length === 1
     ? t('mobile.gallery.importOne')
@@ -164,6 +177,7 @@ onIonViewDidLeave(clearImport);
     <PlacementMethodSheet
       v-model:open="methodOpen"
       @online="solveOnline"
+      @reuse="reuse"
       @identify="identify"
       @hand="placeByHand"
     />

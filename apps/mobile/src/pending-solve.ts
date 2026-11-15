@@ -12,7 +12,12 @@ import { findDSOIdsFromCorrespondences } from '@myastrosky/core/catalog/dso-regi
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { useErrorToast } from './composables/useErrorToast';
 import type { AstrometrySolveStatus, PhotoCorrespondence } from '@myastrosky/core/types';
-import { pollPlateSolve, resumePlateSolve, submitPlateSolve } from '@myastrosky/app-state/api';
+import {
+  pollPlateSolve,
+  resumePlateSolve,
+  reuseAstrometrySubmission,
+  submitPlateSolve,
+} from '@myastrosky/app-state/api';
 import {
   type PendingPhoto,
   pendingPhotoFile,
@@ -153,6 +158,33 @@ export async function solvePendingOnline(id: string): Promise<void> {
   }
   await setPendingState(id, 'solving', { jobId });
   void follow(id, jobId);
+}
+
+/**
+ * Places a waiting photo with the solution of a job already solved on the astrometry.net account (the desktop's
+ * "Réutiliser une solution astrometry.net…"): the picture is not sent to astrometry.net. The photo shows "Résolution"
+ * meanwhile, and is stored placed. When the solution cannot be used (another picture's, astrometry.net refusing), the
+ * photo is back as it was and the reason shows in a red toast.
+ */
+export async function reusePendingSolution(id: string, jobId: number): Promise<void> {
+  const photo = pendingPhotos.value.find((p) => p.id === id);
+  const file = await pendingPhotoFile(id);
+  if (!photo || !file) return;
+  const before = { jobId: photo.jobId, submissionId: photo.submissionId, error: photo.error };
+  await setPendingState(id, 'solving');
+  try {
+    const result = await reuseAstrometrySubmission(file, jobId);
+    if (result.success && result.correspondences && result.correspondences.length > 0) {
+      await storeSolved(id, file, result.correspondences, result.dsoIds);
+      return;
+    }
+    await setPendingState(id, photo.state, before);
+    await useErrorToast().showError(result.error || t('modal.reuseFailed'));
+  } catch (error) {
+    reportError('pending-solve.reuse', error);
+    await setPendingState(id, photo.state, before);
+    await useErrorToast().showError(messageOf(error));
+  }
 }
 
 /** Follows again a solve stopped for want of the network, once the phone is online. */

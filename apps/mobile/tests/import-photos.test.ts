@@ -193,6 +193,24 @@ describe('the import page', () => {
     await removePendingPhoto(pendingPhotos.value[0].id);
   });
 
+  it('keeps a photo whose solution is reused as a waiting photo, and opens the list of solutions', async () => {
+    push.mockReset();
+    addImportFiles([new File(['x'], 'M35.jpg')]);
+    const wrapper = mountPage();
+    await flushPromises();
+    await fileRows(wrapper)[0].trigger('click');
+    await flushPromises();
+    await wrapper
+      .findAll('.mob-sheet .mob-row')
+      .find((r) => r.text().includes('Réutiliser une solution astrometry.net'))!
+      .trigger('click');
+    await flushPromises();
+    expect(pendingPhotos.value.map((p) => [p.name, p.state])).toEqual([['M35.jpg', 'toPlace']]);
+    expect(replace).toHaveBeenCalledWith('/tabs/gallery');
+    expect(push).toHaveBeenCalledWith(`/gallery/reuse/${pendingPhotos.value[0].id}`);
+    await removePendingPhoto(pendingPhotos.value[0].id);
+  });
+
   it('asks how to place a photo, sends it to the online solver and shows "Résolution"', async () => {
     addImportFiles([new File(['x'], 'M45.jpg')]);
     const wrapper = mountPage();
@@ -230,6 +248,7 @@ describe('the import page', () => {
     row = fileRows(wrapper)[0];
     expect(row.find('.mob-row-sub').text()).toBe('Hors ligne');
     expect(row.find('.mob-row-chevron').exists()).toBe(true);
+
     await setPendingState(id, 'failed', { error: 'no stars' });
     await flushPromises();
 

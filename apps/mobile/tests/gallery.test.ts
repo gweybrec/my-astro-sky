@@ -350,6 +350,18 @@ describe('the gallery page', () => {
     expect(push).toHaveBeenCalledWith(`/gallery/identify/${photo.id}`);
   });
 
+  it('opens the page that reuses an astrometry.net solution for a waiting photo', async () => {
+    getPhotos.mockResolvedValue([]);
+    const photo = await addPendingPhoto(new Blob(['y']), 'M35.fit');
+    const wrapper = mountPage();
+    await flushPromises();
+    await openMethods(wrapper);
+    const row = rowWith(wrapper, 'Réutiliser une solution astrometry.net');
+    expect(row.text()).toContain('Une photo déjà résolue sur votre compte astrometry.net');
+    await row.trigger('click');
+    expect(push).toHaveBeenCalledWith(`/gallery/reuse/${photo.id}`);
+  });
+
   it('greys out the online solve without a connection, and without the astrometry.net key', async () => {
     getPhotos.mockResolvedValue([]);
     await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
@@ -362,6 +374,12 @@ describe('the gallery page', () => {
     await online.trigger('click');
     await flushPromises();
     expect(submitPlateSolve).not.toHaveBeenCalled();
+    // Reusing a solution needs the same, and says the same.
+    const reuse = rowWith(wrapper, 'Réutiliser une solution astrometry.net');
+    expect(reuse.classes()).toContain('mob-row--disabled');
+    expect(reuse.text()).toContain('Aucune connexion internet');
+    await reuse.trigger('click');
+    expect(push).not.toHaveBeenCalled();
     onLine.mockRestore();
 
     loadServerSettings.mockResolvedValue({ apiKeySet: false });
@@ -370,6 +388,9 @@ describe('the gallery page', () => {
     online = await openMethods(second);
     expect(online.classes()).toContain('mob-row--disabled');
     expect(online.text()).toContain('Clé API non configurée');
+    expect(rowWith(second, 'Réutiliser une solution astrometry.net').text()).toContain(
+      'Clé API non configurée',
+    );
   });
 
   it('hides the waiting photos with the user own ones when "Mon ciel" is not ticked', async () => {

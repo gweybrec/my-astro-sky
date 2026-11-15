@@ -412,6 +412,28 @@ export const cachedPrefixes = ['/api/'];
 // the pole: its centre is near RA 70°, Dec 82.3°), the comet's elements put it in the comet photo.
 export const fixtures = [
   {
+    // The astrometry.net account's submissions (page "Réutiliser une solution astrometry.net"): a solved one with a long
+    // name, one still running, one that failed, and two more solved.
+    method: 'GET',
+    path: '/api/astrometry/submissions',
+    body: {
+      submissions: [
+        ['M35_linear_test1.fit', 'success'],
+        ['NGC7000_HaOIII_2025-08-23_integration_bin1_crop.tif', 'success'],
+        ['M45_2024-11-02_RGB.jpg', 'solving'],
+        ['M31_2025-09-14_stack.fits', 'failure'],
+        ['IC1805_Ha.fit', 'success'],
+      ].map(([filename, status], i) => ({
+        submissionId: 17323748 - i,
+        jobId: 17323748 - i,
+        status,
+        filename,
+        ...(status === 'success' ? { width: 1354, height: 1018 } : {}),
+      })),
+      total: 12,
+    },
+  },
+  {
     method: 'POST',
     path: '/api/skybot/conesearch',
     body: {
@@ -613,13 +635,13 @@ export const rules = [
     items:
       '.mob-section-header, .mob-sheet-title, .mob-stepper-label, .mob-form-label:not(.mob-form-row--pair > :not(:first-child) *), .mob-helper, ion-item.mob-row:not(:has(.mob-row-lead, .mob-row-thumb)):not(.mob-entry .mob-row) .mob-row-title, ion-item.mob-row:not(.mob-entry .mob-row) .mob-row-thumb, ion-toggle.mob-row:not(:has(.mob-row-lead)) .mob-row-title, ion-toggle.mob-row .mob-row-lead, .mob-card-row-key',
   },
-  // The chevron (else the switch) of each row ends on one line.
+  // The chevron, else the trailing value or state (a submission's "✓ Résolue"), else the switch of each row ends on one line.
   {
     id: 'right-edge',
     type: 'trailingEdge',
     rows: 'ion-item.mob-row, ion-toggle.mob-row',
     skip: '.mob-entry',
-    end: '.mob-row-chevron',
+    end: '.mob-row-chevron, .mob-row-trail',
     track: SWITCH_TRACK,
   },
   // An empty state's content is centred.
@@ -1039,6 +1061,25 @@ export const views = [
       { wait: '.mob-status--warn' },
     ],
   },
+  {
+    // "Comment placer cette photo ?" on the JPEG still to be placed (boards "Importer, méthode de placement").
+    name: 'import-method',
+    path: '/tabs/gallery',
+    ready: '.mob-photo',
+    open: [
+      { click: 'ion-fab-button' },
+      { wait: '.mob-sheet' },
+      { pause: 600 },
+      { chooseFiles: '.mob-sheet ion-item.mob-row', files: ['test-photos/M1-CCD.jpg'] },
+      { wait: 'ion-item.mob-row:has-text("M1-CCD.jpg")' },
+      { click: 'ion-item.mob-row:has-text("M1-CCD.jpg")' },
+      { wait: OPEN_SHEET },
+      { pause: 600 },
+    ],
+    scope: OPEN_SHEET,
+  },
+  // The submissions of the account, from the fixture (board "Importer, réutiliser une solution astrometry.net").
+  { name: 'reuse-solution', path: '/gallery/reuse/check', ready: '.mob-row' },
   { name: 'photo', path: (ids) => `/gallery/photo/${ids.photo}`, ready: '.mob-photo-view' },
   // The column the top bar's "Affichage" button opens (board "Photo, boutons d'affichage").
   {

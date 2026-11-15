@@ -4,7 +4,9 @@ const submitPlateSolve = vi.fn();
 const pollPlateSolve = vi.fn();
 const resumePlateSolve = vi.fn();
 const uploadPhoto = vi.fn();
+const reuseAstrometrySubmission = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
+  reuseAstrometrySubmission: (...a: unknown[]) => reuseAstrometrySubmission(...a),
   submitPlateSolve: (...a: unknown[]) => submitPlateSolve(...a),
   pollPlateSolve: (...a: unknown[]) => pollPlateSolve(...a),
   resumePlateSolve: (...a: unknown[]) => resumePlateSolve(...a),
@@ -16,7 +18,11 @@ vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
 }));
 vi.mock('@myastrosky/core/platform/error-hook', () => ({ reportError: vi.fn() }));
 const showNotice = vi.fn();
-vi.mock('../src/composables/useErrorToast', () => ({ useErrorToast: () => ({ showNotice }) }));
+const showError = vi.fn();
+const showWarning = vi.fn();
+vi.mock('../src/composables/useErrorToast', () => ({
+  useErrorToast: () => ({ showNotice, showError, showWarning }),
+}));
 
 import {
   addPendingPhoto,
@@ -28,6 +34,7 @@ import {
 import {
   POLL_INTERVAL_MS,
   resumePendingSolves,
+  reusePendingSolution,
   solvePendingOnline,
   solvedPhotoCount,
 } from '../src/pending-solve';
@@ -282,5 +289,49 @@ describe('solving a waiting photo online', () => {
     expect(submitPlateSolve).not.toHaveBeenCalled();
     expect(resumePlateSolve.mock.calls[0][1]).toBe(42);
     expect(pendingPhotos.value[0]).toMatchObject({ state: 'solving', jobId: 'job-2' });
+  });
+});
+
+describe('reusing a solution of the astrometry.net account', () => {
+  beforeEach(() => {
+    localStorage.setItem('lang', 'fr');
+    configurePendingStore(createMemoryPendingStore());
+    vi.clearAllMocks();
+    findDsoIds.mockReturnValue([]);
+  });
+
+  it('reads the solution of the job for the kept picture, then stores the photo placed', async () => {
+    const photo = await addPendingPhoto(new Blob(['png'], { type: 'image/png' }), 'M35.fit');
+    let settle: (v: unknown) => void = () => {};
+    reuseAstrometrySubmission.mockReturnValue(new Promise((r) => (settle = r)));
+    uploadPhoto.mockResolvedValue({ id: 'p1' });
+
+    const running = reusePendingSolution(photo.id, 17323748);
+    await vi.waitFor(() => expect(pendingPhotos.value[0].state).toBe('solving'));
+    const [file, jobId] = reuseAstrometrySubmission.mock.calls[0];
+    expect([file.name, file.type, jobId]).toEqual(['M35.fit', 'image/png', 17323748]);
+    expect(submitPlateSolve).not.toHaveBeenCalled();
+
+    settle({ success: true, correspondences: corr, dsoIds: ['M35'] });
+    await running;
+    const [, correspondences, , , metadata] = uploadPhoto.mock.calls[0];
+    expect(correspondences).toEqual(corr);
+    expect(metadata.dsoIds).toEqual(['M35']);
+    expect(pendingPhotos.value).toEqual([]);
+  });
+
+  it('puts the photo back as it was and shows why when the solution cannot be used', async () => {
+    const photo = await addPendingPhoto(new Blob(['x']), 'M35.fit');
+    await setPendingState(photo.id, 'failed', { error: 'no stars' });
+    reuseAstrometrySubmission.mockResolvedValue({ success: false, error: 'another picture' });
+    await reusePendingSolution(photo.id, 7);
+    expect(pendingPhotos.value[0]).toMatchObject({ state: 'failed', error: 'no stars' });
+    expect(showError).toHaveBeenCalledWith('another picture');
+    expect(uploadPhoto).not.toHaveBeenCalled();
+
+    reuseAstrometrySubmission.mockRejectedValue(new Error('offline'));
+    await reusePendingSolution(photo.id, 7);
+    expect(pendingPhotos.value[0].state).toBe('failed');
+    expect(showError).toHaveBeenLastCalledWith('offline');
   });
 });

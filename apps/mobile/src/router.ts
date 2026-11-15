@@ -49,6 +49,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/gallery/poi-types', component: () => import('./pages/PoiTypesPage.vue') },
   // A waiting photo placed by naming 2 or 3 of its stars (board "Identifier les étoiles").
   { path: '/gallery/identify/:id', component: () => import('./pages/IdentifyStarsPage.vue') },
+  { path: '/gallery/reuse/:id', component: () => import('./pages/ReuseSolutionPage.vue') },
   // The page pushed from the Cibles tab: full screen, without the tab bar (board "Cibles, régions du ciel").
   { path: '/targets/regions', component: () => import('./pages/RegionsPage.vue') },
   { path: '/targets/:dsoId', component: () => import('./pages/TargetDetailPage.vue') },

@@ -191,6 +191,12 @@ function placeByHand() {
   void router.push('/tabs/sky');
 }
 
+// Reusing a solution of the astrometry.net account has its own page, where the submission is chosen.
+function reuse() {
+  if (!placingId.value) return;
+  void router.push(`/gallery/reuse/${placingId.value}`);
+}
+
 // Identifying stars starts with no point, even when an earlier identification of this photo was left.
 function identify() {
   if (!placingId.value) return;
@@ -367,6 +373,7 @@ async function addPicked(pick: () => Promise<File[]>) {
       deletable
       @delete="deleteWaiting"
       @online="solveOnline"
+      @reuse="reuse"
       @identify="identify"
       @hand="placeByHand"
     />

@@ -7,14 +7,14 @@ import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneRow from '../../components/PhoneRow.vue';
 import trashIcon from '@icons/trash.svg?raw';
 
-// The boards "Importer, méthode de placement" and "Résolution en ligne, hors connexion": the four ways to place a
-// photo. Solving online needs a connection and the astrometry.net key; without one of them the row is greyed out with
-// the reason under it. Identifying stars has its own page, and placing by hand is done on the sky map. Solving on the
+// The boards "Importer, méthode de placement" and "Importer, hors connexion": the ways to place a photo. Solving online
+// and reusing a solution of the astrometry.net account need a connection and the key; without one of them both rows are
+// greyed out with the reason under them. Reusing a solution has its own page. Identifying stars has its own page, and placing by hand is done on the sky map. Solving on the
 // computer (and the connection it needs) is postponed to a later release: no row for it. A photo already kept as waiting
 // (`deletable`, the gallery's) can also be deleted from the red last row (`delete`; the page asks first).
 const open = defineModel<boolean>('open', { required: true });
 defineProps<{ deletable?: boolean }>();
-const emit = defineEmits<{ online: []; identify: []; hand: []; delete: [] }>();
+const emit = defineEmits<{ online: []; reuse: []; identify: []; hand: []; delete: [] }>();
 
 const online = ref(true);
 const keySet = ref(true);
@@ -34,12 +34,11 @@ watch(
   { immediate: true },
 );
 
-const onlineReason = () =>
-  !online.value
-    ? t('mobile.gallery.offline')
-    : !keySet.value
-      ? t('modal.solverNoApiKey')
-      : t('mobile.gallery.solveOnlineSub');
+/** Why the rows that use astrometry.net are greyed out; null when they can be used. */
+const unavailableReason = () =>
+  !online.value ? t('mobile.gallery.offline') : !keySet.value ? t('modal.solverNoApiKey') : null;
+const onlineReason = () => unavailableReason() ?? t('mobile.gallery.solveOnlineSub');
+const reuseReason = () => unavailableReason() ?? t('mobile.gallery.reuseSolutionSub');
 
 function chooseIdentify() {
   open.value = false;
@@ -58,9 +57,15 @@ function chooseDelete() {
 
 function chooseOnline() {
   // A greyed-out row still receives the tap.
-  if (!online.value || !keySet.value) return;
+  if (unavailableReason()) return;
   open.value = false;
   emit('online');
+}
+
+function chooseReuse() {
+  if (unavailableReason()) return;
+  open.value = false;
+  emit('reuse');
 }
 </script>
 
@@ -73,6 +78,14 @@ function chooseOnline() {
       :title="t('mobile.gallery.solveOnline')"
       :subs="[onlineReason()]"
       @click="chooseOnline"
+    />
+    <PhoneRow
+      button
+      wrap
+      :disabled="!online || !keySet"
+      :title="t('mobile.gallery.reuseSolution')"
+      :subs="[reuseReason()]"
+      @click="chooseReuse"
     />
     <PhoneRow
       button

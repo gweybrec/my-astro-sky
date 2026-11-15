@@ -20,11 +20,15 @@ import {
   deletePhotoAPI,
   searchStarsAPI,
   searchStarsByPosition,
-  listAstrometrySubmissions,
   updatePhotoManualPlacement,
   photoFileUrl,
   type AstrometrySubmissionPage,
 } from './api';
+import {
+  SUBMISSIONS_PAGE_SIZE,
+  isSubmissionsRateLimited,
+  loadSubmissionPage,
+} from '@myastrosky/app-state/astrometry-submissions';
 import { searchUnified } from '@myastrosky/core/search';
 
 /** A (possibly relative) address as an `<img>`'s `src` reports it. */
@@ -77,44 +81,6 @@ function sanitizeIntegrationRows(rows: PhotoIntegration[]): PhotoIntegration[] {
       Number.isInteger(Number(row.seconds)) && Number(row.seconds) >= 0 ? Number(row.seconds) : 0,
     filter: row.filter.trim(),
   }));
-}
-
-const ASTROMETRY_SUBMISSIONS_CACHE_TTL_MS = 2 * 60 * 1000;
-/** Submissions per page: each page asks astrometry.net for the details of these only. */
-const ASTROMETRY_SUBMISSIONS_PAGE_SIZE = 5;
-/** The pages loaded, by their first position; kept past their two minutes to show when astrometry.net refuses. */
-const astrometrySubmissionPages = new Map<number, { at: number; page: AstrometrySubmissionPage }>();
-
-const isRateLimitError = (err: unknown) =>
-  (err as { code?: string } | null)?.code === 'ASTROMETRY_RATE_LIMITED';
-
-/**
- * One page of submissions: the page loaded less than two minutes ago, else a new request (always one
- * with `forceRefresh`). When astrometry.net refuses for too many requests, the page loaded before is
- * returned with `rateLimited`; without one, the error is thrown.
- */
-async function loadAstrometrySubmissionPage(
-  offset: number,
-  forceRefresh: boolean,
-): Promise<{ page: AstrometrySubmissionPage; rateLimited: boolean }> {
-  const cached = astrometrySubmissionPages.get(offset);
-  if (!forceRefresh && cached && Date.now() - cached.at < ASTROMETRY_SUBMISSIONS_CACHE_TTL_MS) {
-    return { page: cached.page, rateLimited: false };
-  }
-  try {
-    const page = await listAstrometrySubmissions(offset, ASTROMETRY_SUBMISSIONS_PAGE_SIZE);
-    // An empty answer from a transient API issue keeps the page known.
-    if (page.submissions.length === 0 && cached && cached.page.submissions.length > 0) {
-      return { page: cached.page, rateLimited: false };
-    }
-    // A refresh can shift every page: the others are loaded again when shown.
-    if (forceRefresh) astrometrySubmissionPages.clear();
-    astrometrySubmissionPages.set(offset, { at: Date.now(), page });
-    return { page, rateLimited: false };
-  } catch (err) {
-    if (isRateLimitError(err) && cached) return { page: cached.page, rateLimited: true };
-    throw err;
-  }
 }
 
 function escapeHtml(value: string): string {
@@ -388,7 +354,7 @@ export class PhotoOverlay extends PhotoLayer {
   }): Promise<{ action: 'upload' | 'reuse' | 'cancel'; jobId?: number }> {
     return new Promise((resolve) => {
       const allowUpload = options?.allowUpload ?? true;
-      const pageSize = ASTROMETRY_SUBMISSIONS_PAGE_SIZE;
+      const pageSize = SUBMISSIONS_PAGE_SIZE;
       let currentPage = 0;
       /** The page on screen; null until one is loaded. */
       let shown: AstrometrySubmissionPage | null = null;
@@ -606,7 +572,7 @@ export class PhotoOverlay extends PhotoLayer {
         updateButtons(true);
         if (!shown) showLoading();
         try {
-          const { page, rateLimited } = await loadAstrometrySubmissionPage(
+          const { page, rateLimited } = await loadSubmissionPage(
             pageIndex * pageSize,
             forceRefresh,
           );
@@ -622,7 +588,7 @@ export class PhotoOverlay extends PhotoLayer {
           }
         } catch (err) {
           const message = (err as Error).message || t('errors.listSubmissionsFailed');
-          if (isRateLimitError(err)) {
+          if (isSubmissionsRateLimited(err)) {
             showToast({ message, type: 'warning', duration: 6000 });
           } else {
             reportUnknownRendererError('astrometry_list_submissions', err);

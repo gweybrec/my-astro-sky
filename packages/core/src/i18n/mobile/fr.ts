@@ -28,6 +28,8 @@ const fr = {
     placeHow: 'Comment placer cette photo ?',
     solveOnline: 'Résoudre en ligne',
     solveOnlineSub: 'astrometry.net, nécessite une connexion',
+    reuseSolution: 'Réutiliser une solution astrometry.net',
+    reuseSolutionSub: 'Une photo déjà résolue sur votre compte astrometry.net',
     offline: 'Aucune connexion internet',
     identifyStars: 'Identifier 3 étoiles',
     identifyStarsSub:
@@ -39,6 +41,17 @@ const fr = {
     placeShowSettings: 'Afficher les réglages',
     import: 'Importer',
     perLine: 'Photos par ligne',
+  },
+  reuse: {
+    helperOne:
+      'Touchez une soumission pour réutiliser sa résolution, les plus récentes en premier. 1 soumission sur votre compte.',
+    helperMany:
+      'Touchez une soumission pour réutiliser sa résolution, les plus récentes en premier. {n} soumissions sur votre compte.',
+    moreOne: 'Voir la suivante',
+    moreMany: 'Voir les {n} suivantes',
+    solved: '✓ Résolue',
+    running: 'En cours',
+    failed: 'Échouée',
   },
   identify: {
     starPlaceholder: "Nom de l'étoile…",

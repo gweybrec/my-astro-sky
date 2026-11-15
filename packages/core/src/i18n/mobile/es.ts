@@ -30,6 +30,8 @@ const es: Translations['mobile'] = {
     placeHow: '¿Cómo ubicar esta foto?',
     solveOnline: 'Resolver en línea',
     solveOnlineSub: 'astrometry.net, necesita conexión',
+    reuseSolution: 'Reutilizar una solución de astrometry.net',
+    reuseSolutionSub: 'Una foto ya resuelta en tu cuenta de astrometry.net',
     offline: 'Sin conexión a internet',
     identifyStars: 'Identificar 3 estrellas',
     identifyStarsSub:
@@ -41,6 +43,17 @@ const es: Translations['mobile'] = {
     placeShowSettings: 'Mostrar los ajustes',
     import: 'Importar',
     perLine: 'Fotos por línea',
+  },
+  reuse: {
+    helperOne:
+      'Toca un envío para reutilizar su resolución, los más recientes primero. 1 envío en tu cuenta.',
+    helperMany:
+      'Toca un envío para reutilizar su resolución, los más recientes primero. {n} envíos en tu cuenta.',
+    moreOne: 'Ver el siguiente',
+    moreMany: 'Ver los {n} siguientes',
+    solved: '✓ Resuelto',
+    running: 'En curso',
+    failed: 'Fallido',
   },
   identify: {
     starPlaceholder: 'Estrella…',
