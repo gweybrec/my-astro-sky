@@ -15,6 +15,15 @@ Any change to the phone app (`apps/mobile/`) starts with mockups on the Claude D
 
 **Approving the plan is NOT approving the mockups.** Each mockup needs its own explicit yes.
 
+## HARD RULE: NO UPLOAD TO ASTROMETRY.NET WITHOUT THE USER'S EXPLICIT CONSENT
+
+Never send a file to astrometry.net (nova.astrometry.net or its API) — not from the app, a script, `curl`, Playwright or a test — unless the user has said yes to **that** upload, clearly and unambiguously.
+
+1. Name the file(s) and why the upload is needed, then **STOP and ask:** "May I upload X to astrometry.net? Yes or no."
+2. One yes covers the uploads named in that question only, never later ones.
+
+**Approving a plan, a task or a test run is NOT consent to upload.** Prefer local solvers (ASTAP, solve-field), the "Reuse online solution" path (existing job ID, no upload) and the fixtures in `tests/fixtures/astrometry/`. Unit tests always mock the astrometry.net API.
+
 ## Nested guides
 
 | File                           | Covers                                                                                                                             |

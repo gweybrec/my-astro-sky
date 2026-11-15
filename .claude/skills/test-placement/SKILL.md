@@ -37,7 +37,7 @@ Click the "+ Add a photo" button (`button[ref]` labeled "+ Add a photo" in the s
 
 In the upload modal, use the **solve-field** button first (local solver, best results). Wait for the solve to complete — it may take 30–60 seconds. Watch for the correspondences to appear in the modal.
 
-**Do NOT use the online astrometry.net submit option** unless the user explicitly asks. It uploads the full image to astrometry.net. The only acceptable online option without asking is "Reuse online solution" (which reuses an existing job ID without uploading).
+**HARD RULE: never use the online astrometry.net submit option without the user's explicit yes to that specific upload** (see the root `CLAUDE.md`). It uploads the full image to astrometry.net; approving a plan or a test run is not consent. The only acceptable online option without asking is "Reuse online solution" (which reuses an existing job ID without uploading).
 
 If solve-field fails, try **ASTAP** next. If both fail, ask the user for hints (target name, RA/Dec, FOV) and retry with those.
 
