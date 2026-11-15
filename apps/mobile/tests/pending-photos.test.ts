@@ -1,23 +1,63 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Photo } from '@myastrosky/core/types';
+
+const api = vi.hoisted(() => ({
+  uploadPhoto: vi.fn(),
+  updatePhotoMetadata: vi.fn(),
+  setPhotoPlacement: vi.fn(),
+  setPhotoOnlineSolve: vi.fn(),
+  setPhotoFitsHeaders: vi.fn(),
+  storedPhotoFile: vi.fn(),
+}));
+vi.mock('@myastrosky/app-state/api', () => api);
+
 import {
   addPendingPhoto,
-  configurePendingStore,
-  createMemoryPendingStore,
-  loadPendingPhotos,
+  holdPendingPlacement,
+  openStoredPhoto,
   pendingPhotoFile,
   pictureName,
   pendingPhotoSolveFile,
   pendingPhotos,
   removePendingPhoto,
+  resetPendingPhotos,
   setPendingState,
-  type PendingStore,
+  storePendingPhoto,
 } from '../src/pending-photos';
 
-describe('the photos waiting to be placed', () => {
-  let store: PendingStore;
+const CORR = [
+  { pointIndex: 0, photoX: 1, photoY: 1, starHip: 1, starName: '' },
+  { pointIndex: 1, photoX: 9, photoY: 9, starHip: 2, starName: '' },
+];
+
+function stored(overrides: Partial<Photo> = {}): Photo {
+  return {
+    id: 'stored-1',
+    filename: 'stored-1.png',
+    originalName: 'NGC7000',
+    width: 100,
+    height: 80,
+    createdAt: '2026-11-15T00:00:00.000Z',
+    correspondences: [],
+    dsoIds: [],
+    labels: ['été'],
+    pointsOfInterest: [],
+    notes: '',
+    ...overrides,
+  };
+}
+
+describe('the photos being worked on before they are saved', () => {
   beforeEach(() => {
-    store = createMemoryPendingStore();
-    configurePendingStore(store);
+    resetPendingPhotos();
+    for (const fn of Object.values(api)) fn.mockReset();
+    api.uploadPhoto.mockImplementation(async (_f: File, correspondences: unknown) =>
+      stored({ id: 'new-1', correspondences: correspondences as never }),
+    );
+    api.storedPhotoFile.mockResolvedValue(new File(['png'], 'stored-1.png', { type: 'image/png' }));
+    api.setPhotoPlacement.mockImplementation(async (id: string, p: { correspondences: unknown }) =>
+      stored({ id, correspondences: p.correspondences as never }),
+    );
   });
 
   it('keeps a picture with its name, to place, and gives it back as a file', async () => {
@@ -37,7 +77,7 @@ describe('the photos waiting to be placed', () => {
     expect(pictureName('M42.fit', '')).toBe('M42.fit');
   });
 
-  it('keeps a separate raw solve file without exposing it in the waiting-photo list', async () => {
+  it('keeps a separate raw solve file without exposing it in the list', async () => {
     const raw = new File(['fits-bytes'], 'M42.fit', { type: 'application/fits' });
     const added = await addPendingPhoto(
       new Blob(['png-bytes'], { type: 'image/png' }),
@@ -45,60 +85,93 @@ describe('the photos waiting to be placed', () => {
       undefined,
       raw,
     );
-
     const picture = await pendingPhotoFile(added.id);
     const solveFile = await pendingPhotoSolveFile(added.id);
-    // The picture is named for what it is: the photo store and the solvers read a file by its extension.
-    expect([picture!.name, picture!.type, await picture!.text()]).toEqual([
-      'M42.png',
-      'image/png',
-      'png-bytes',
-    ]);
-    expect([solveFile!.name, solveFile!.type, await solveFile!.text()]).toEqual([
-      'M42.fit',
-      'application/fits',
-      'fits-bytes',
-    ]);
-    expect(pendingPhotos.value[0]).toEqual(added);
+    expect([picture!.name, await picture!.text()]).toEqual(['M42.png', 'png-bytes']);
+    expect([solveFile!.name, await solveFile!.text()]).toEqual(['M42.fit', 'fits-bytes']);
     expect(pendingPhotos.value[0]).not.toHaveProperty('solvePicture');
   });
 
-  it('reads the kept photos again, oldest first, without their pictures', async () => {
-    await store.put({ id: 'b', name: 'b.jpg', state: 'solving', addedAt: 20, picture: new Blob() });
-    await store.put({ id: 'a', name: 'a.jpg', state: 'toPlace', addedAt: 10, picture: new Blob() });
-    expect(pendingPhotos.value).toEqual([]);
-    await loadPendingPhotos();
-    expect(pendingPhotos.value).toEqual([
-      { id: 'a', name: 'a.jpg', state: 'toPlace', addedAt: 10 },
-      { id: 'b', name: 'b.jpg', state: 'solving', addedAt: 20 },
-    ]);
-  });
-
-  it('changes where a photo stands and forgets it, in the list and in the store', async () => {
+  it('changes where a photo stands and forgets it', async () => {
     const added = await addPendingPhoto(new Blob(['x']), 'M31.jpg');
-    await setPendingState(added.id, 'solving');
-    expect(pendingPhotos.value[0].state).toBe('solving');
-    expect((await store.all())[0].state).toBe('solving');
-    await setPendingState('unknown', 'failed');
-    expect(await store.all()).toHaveLength(1);
+    await setPendingState(added.id, 'solving', { sentAt: 'x', fits: false });
+    expect(pendingPhotos.value[0]).toMatchObject({ state: 'solving', sentAt: 'x' });
     await removePendingPhoto(added.id);
     expect(pendingPhotos.value).toEqual([]);
-    expect(await store.all()).toEqual([]);
   });
 
-  it('reads only the photo asked for, not every kept picture', async () => {
-    const calls: string[] = [];
-    const counted: PendingStore = {
-      all: () => (calls.push('all'), store.all()),
-      get: (id) => (calls.push('get'), store.get(id)),
-      put: (record) => store.put(record),
-      delete: (id) => store.delete(id),
+  it('stores a placed photo with its placement, then forgets it here', async () => {
+    const added = await addPendingPhoto(new Blob(['x'], { type: 'image/jpeg' }), 'M31.jpg');
+    await holdPendingPlacement(added.id, { correspondences: CORR, dsoIds: ['M31'], by: 'solved' });
+    await storePendingPhoto(added.id);
+    expect(api.uploadPhoto.mock.calls[0][1]).toEqual(CORR);
+    expect(api.uploadPhoto.mock.calls[0][4]).toMatchObject({ dsoIds: ['M31'] });
+    expect(pendingPhotos.value).toEqual([]);
+  });
+
+  it('stores a photo not placed "À résoudre", with its astrometry.net solve when astrometry.net has not finished', async () => {
+    const added = await addPendingPhoto(new Blob(['x'], { type: 'image/jpeg' }), 'M45.jpg');
+    await setPendingState(added.id, 'unfinished', {
+      submissionId: 42,
+      sentAt: '2026-11-15T21:42:00.000Z',
+      fits: true,
+    });
+    const photo = await storePendingPhoto(added.id);
+    expect(api.uploadPhoto.mock.calls[0][1]).toEqual([]);
+    const solve = {
+      state: 'unfinished',
+      submissionId: 42,
+      sentAt: '2026-11-15T21:42:00.000Z',
+      fits: true,
     };
-    configurePendingStore(counted);
-    const added = await addPendingPhoto(new Blob(['x']), 'M31.jpg');
-    await addPendingPhoto(new Blob(['y']), 'M42.jpg');
-    await pendingPhotoFile(added.id);
-    await setPendingState(added.id, 'solving');
-    expect(calls).toEqual(['get', 'get']);
+    expect(api.setPhotoOnlineSolve).toHaveBeenCalledWith('new-1', solve);
+    expect(photo.onlineSolve).toEqual(solve);
+  });
+
+  it('opens a stored photo "À résoudre" under its own id, with its picture and its solve', async () => {
+    const photo = stored({
+      onlineSolve: { state: 'unfinished', submissionId: 42, sentAt: 's', fits: true },
+    });
+    const open = await openStoredPhoto(photo);
+    expect(open).toMatchObject({
+      id: 'stored-1',
+      storedId: 'stored-1',
+      name: 'NGC7000',
+      state: 'unfinished',
+      submissionId: 42,
+      fits: true,
+    });
+    expect(await (await pendingPhotoFile('stored-1'))!.text()).toBe('png');
+  });
+
+  it('keeps the solve of a stored photo in the store as it goes on', async () => {
+    await openStoredPhoto(stored());
+    await setPendingState('stored-1', 'solving', { jobId: 'j', sentAt: 's', fits: false });
+    await setPendingState('stored-1', 'unfinished', { submissionId: 7 });
+    expect(api.setPhotoOnlineSolve).toHaveBeenLastCalledWith('stored-1', {
+      state: 'unfinished',
+      submissionId: 7,
+      sentAt: 's',
+    });
+  });
+
+  it('saves a stored photo again: its metadata, and its placement once placed', async () => {
+    await openStoredPhoto(stored());
+    await holdPendingPlacement('stored-1', {
+      correspondences: CORR,
+      dsoIds: ['NGC 7000'],
+      by: 'hand',
+    });
+    const photo = await storePendingPhoto('stored-1');
+    expect(api.uploadPhoto).not.toHaveBeenCalled();
+    expect(api.updatePhotoMetadata).toHaveBeenCalledWith(
+      'stored-1',
+      expect.objectContaining({ labels: ['été'], dsoIds: ['NGC 7000'] }),
+    );
+    expect(api.setPhotoPlacement).toHaveBeenCalledWith('stored-1', {
+      correspondences: CORR,
+      manualPlacement: null,
+    });
+    expect(photo.correspondences).toEqual(CORR);
   });
 });

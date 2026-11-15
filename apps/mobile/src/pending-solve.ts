@@ -1,15 +1,15 @@
 /**
- * Online solving of the photos that wait for a placement: the picture is sent to astrometry.net, its job is followed
- * until it ends, and a solved photo is placed, as the desktop's "Ajouter des photos" window does (`holdSolved`). The job is
- * written on the waiting photo with its astrometry.net submission, so a solve started earlier is followed again when the
- * app comes back (the solver's jobs live in memory and are lost when it restarts). Without a network the following
- * stops and the photo shows "Hors ligne": astrometry.net goes on solving, and the result is fetched once the phone is
- * back online.
+ * Online solving of the photos being worked on: the picture is sent to astrometry.net, its job is followed until it ends,
+ * and a solved photo is placed, as the desktop's "Ajouter des photos" window does (`holdSolved`). The job and its
+ * astrometry.net submission are kept on the photo; a photo stored "À résoudre" keeps them in the photo store, where
+ * `@myastrosky/app-state/stored-solve` follows them again after a restart. Without a network the following stops and
+ * the photo shows "Hors ligne": astrometry.net goes on solving, and the result is fetched once the phone is back online.
  */
 import { ref } from 'vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { findDSOIdsFromCorrespondences } from '@myastrosky/core/catalog/dso-registry';
 import { reportError } from '@myastrosky/core/platform/error-hook';
+import { isFitsFile } from '@myastrosky/core/photo-formats';
 import { useErrorToast } from './composables/useErrorToast';
 import type { AstrometrySolveStatus, PhotoCorrespondence } from '@myastrosky/core/types';
 import {
@@ -116,7 +116,8 @@ async function follow(id: string, firstJobId: string, again = false): Promise<vo
           startAgain = false;
           const file = await pendingPhotoSolveFile(id);
           if (!file) return;
-          ({ jobId } = await resumePlateSolve(file, photo.submissionId));
+          // A stored photo keeps only its PNG: the flag tells whether the picture sent was a FITS file.
+          ({ jobId } = await resumePlateSolve(file, photo.submissionId, { fits: !!photo.fits }));
           await setPendingState(id, 'solving', { jobId, submissionId: photo.submissionId });
           continue;
         }
@@ -143,9 +144,7 @@ async function follow(id: string, firstJobId: string, again = false): Promise<vo
         await setPendingState(id, 'unfinished', {
           submissionId: status.submissionId ?? photo.submissionId,
         });
-        await useErrorToast().showWarning(
-          t('batch.statusUnfinished', { button: t('mobile.gallery.reuseSolution') }),
-        );
+        await useErrorToast().showWarning(t('batch.statusUnfinished'));
         return;
       }
       if (status.status === 'failed') {
@@ -178,8 +177,24 @@ export async function solvePendingOnline(id: string): Promise<void> {
     await setPendingState(id, 'failed', { error: messageOf(error) });
     return;
   }
-  await setPendingState(id, 'solving', { jobId });
+  await setPendingState(id, 'solving', {
+    jobId,
+    sentAt: new Date().toISOString(),
+    fits: isFitsFile(file.name),
+  });
   void follow(id, jobId);
+}
+
+/**
+ * "Récupérer le résultat d'astrometry.net": follows again the submission of a solve astrometry.net goes on with ("En
+ * cours"); nothing is sent again.
+ */
+export async function fetchPendingResult(id: string): Promise<void> {
+  const photo = pendingPhotos.value.find((p) => p.id === id);
+  if (!photo?.submissionId || following.has(id)) return;
+  if (photo.state !== 'unfinished' && photo.state !== 'offline') return;
+  await setPendingState(id, 'solving', { submissionId: photo.submissionId });
+  void follow(id, '', true);
 }
 
 /**

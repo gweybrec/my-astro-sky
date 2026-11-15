@@ -31,8 +31,7 @@ import IdentifyStarsPage from '../src/pages/IdentifyStarsPage.vue';
 import PhoneSearch from '../src/components/PhoneSearch.vue';
 import {
   addPendingPhoto,
-  configurePendingStore,
-  createMemoryPendingStore,
+  resetPendingPhotos,
   pendingPlacement,
   pendingPhotos,
 } from '../src/pending-photos';
@@ -116,7 +115,7 @@ async function nameByCoordinates(w: VueWrapper, values: string[]) {
 describe('identifying the stars of a waiting photo', () => {
   beforeEach(() => {
     localStorage.setItem('lang', 'fr');
-    configurePendingStore(createMemoryPendingStore());
+    resetPendingPhotos();
     uploadPhoto.mockReset().mockResolvedValue({ id: 'p9' });
     searchStarsAPI.mockReset().mockResolvedValue([]);
     findDSOsInImage.mockReset().mockReturnValue([{ id: 'M101' }]);

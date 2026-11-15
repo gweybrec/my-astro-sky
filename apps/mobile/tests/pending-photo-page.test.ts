@@ -7,7 +7,16 @@ const getGearSetups = vi.fn();
 const loadServerSettings = vi.fn();
 const submitPlateSolve = vi.fn();
 const uploadPhoto = vi.fn();
+const updatePhotoMetadata = vi.fn();
+const setPhotoPlacement = vi.fn();
+const setPhotoOnlineSolve = vi.fn();
+const deletePhotoAPI = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
+  updatePhotoMetadata: (...a: unknown[]) => updatePhotoMetadata(...a),
+  setPhotoPlacement: (...a: unknown[]) => setPhotoPlacement(...a),
+  setPhotoOnlineSolve: (...a: unknown[]) => setPhotoOnlineSolve(...a),
+  deletePhotoAPI: (...a: unknown[]) => deletePhotoAPI(...a),
+  storedPhotoFile: async () => new File(['x'], 'w1.png', { type: 'image/png' }),
   getPhotos: () => getPhotos(),
   getGearSetups: () => getGearSetups(),
   loadServerSettings: () => loadServerSettings(),
@@ -46,8 +55,7 @@ import PendingPhotoPage from '../src/pages/PendingPhotoPage.vue';
 import PhoneBackButton from '../src/components/PhoneBackButton.vue';
 import {
   addPendingPhoto,
-  configurePendingStore,
-  createMemoryPendingStore,
+  resetPendingPhotos,
   holdPendingPlacement,
   pendingDraft,
   pendingPhotos,
@@ -77,7 +85,7 @@ const nameField = (w: Page) => w.find('input[aria-label="Nom du fichier"]');
 describe('the page "Photo à ajouter"', () => {
   beforeEach(() => {
     localStorage.setItem('lang', 'fr');
-    configurePendingStore(createMemoryPendingStore());
+    resetPendingPhotos();
     unsavedDrafts.clear();
     vi.clearAllMocks();
     getPhotos.mockResolvedValue([{ id: 'x', labels: ['Galaxies'] }]);
@@ -94,7 +102,7 @@ describe('the page "Photo à ajouter"', () => {
     const w = await mountPage(photo.id);
     expect(w.find('h1').text()).toBe('Photo à ajouter');
     const file = rowWith(w, 'M45_RGB.jpg');
-    expect(file.find('.mob-row-sub').text()).toBe('À placer');
+    expect(file.find('.mob-row-sub').text()).toBe('À résoudre');
     expect(w.text()).toContain('Choisir une méthode de placement');
     for (const method of [
       'Résoudre en ligne',
@@ -174,19 +182,60 @@ describe('the page "Photo à ajouter"', () => {
     expect(replace).toHaveBeenCalledWith('/gallery/import');
   });
 
-  it('stores a placed waiting photo of the gallery with its metadata on Enregistrer', async () => {
-    const photo = await addPendingPhoto(new Blob(['x'], { type: 'image/jpeg' }), 'M101.jpg');
-    await holdPendingPlacement(photo.id, { correspondences: corr, dsoIds: ['M101'], by: 'solved' });
-    uploadPhoto.mockResolvedValue({ id: 'p1' });
-    const w = await mountPage(photo.id);
+  it('opens a gallery photo stored "À résoudre" from the store, and saves it again on Enregistrer, placed', async () => {
+    const waiting = {
+      id: 'w1',
+      originalName: 'M101',
+      filename: 'w1.png',
+      createdAt: '2026-11-15T00:00:00.000Z',
+      correspondences: [],
+      dsoIds: [],
+      labels: ['Galaxies'],
+      pointsOfInterest: [],
+      notes: '',
+    };
+    getPhotos.mockResolvedValue([waiting]);
+    updatePhotoMetadata.mockResolvedValue(undefined);
+    setPhotoPlacement.mockResolvedValue({ ...waiting, correspondences: corr });
+    const w = await mountPage('w1');
+    expect(rowWith(w, 'M101').find('.mob-row-sub').text()).toBe('À résoudre');
+    await holdPendingPlacement('w1', { correspondences: corr, dsoIds: ['M101'], by: 'solved' });
     await nameField(w).setValue('Moulinet');
     await button(w, 'Enregistrer').trigger('click');
     await flushPromises();
-    const [, correspondences, , , metadata] = uploadPhoto.mock.calls[0];
-    expect(correspondences).toEqual(corr);
-    expect(metadata).toMatchObject({ displayName: 'Moulinet', dsoIds: ['M101'] });
+    expect(uploadPhoto).not.toHaveBeenCalled();
+    expect(updatePhotoMetadata).toHaveBeenCalledWith(
+      'w1',
+      expect.objectContaining({ originalName: 'Moulinet', dsoIds: ['M101'], labels: ['Galaxies'] }),
+    );
+    expect(setPhotoPlacement).toHaveBeenCalledWith('w1', {
+      correspondences: corr,
+      manualPlacement: null,
+    });
     expect(pendingPhotos.value).toEqual([]);
-    expect(replace).toHaveBeenCalledWith('/tabs/gallery');
+  });
+
+  it('offers to fetch the result of a solve astrometry.net goes on with, and no new upload', async () => {
+    const waiting = {
+      id: 'w2',
+      originalName: 'NGC7000',
+      filename: 'w2.png',
+      createdAt: '2026-11-15T00:00:00.000Z',
+      correspondences: [],
+      dsoIds: [],
+      labels: [],
+      pointsOfInterest: [],
+      notes: '',
+      onlineSolve: { state: 'unfinished', submissionId: 42, sentAt: '2026-11-15T21:42:00.000Z' },
+    };
+    getPhotos.mockResolvedValue([waiting]);
+    const w = await mountPage('w2');
+    expect(rowWith(w, 'NGC7000').find('.mob-row-sub').text()).toBe('Résolution en cours');
+    expect(w.find('[data-test="fetch-result"]').exists()).toBe(true);
+    const online = rowWith(w, 'Résoudre en ligne');
+    expect(online.text()).toContain('Déjà en cours sur astrometry.net');
+    await online.trigger('click');
+    expect(submitPlateSolve).not.toHaveBeenCalled();
   });
 
   it('keeps only the metadata of a waiting photo not placed yet', async () => {

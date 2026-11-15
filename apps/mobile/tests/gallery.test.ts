@@ -3,11 +3,19 @@ import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
 import { ionicStubs } from './helpers';
 
 const getPhotos = vi.fn();
+const PLACED = vi.hoisted(() => [
+  { pointIndex: 0, photoX: 1, photoY: 1, starHip: 1, starName: '' },
+  { pointIndex: 1, photoX: 9, photoY: 9, starHip: 2, starName: '' },
+]);
 const getGearSetups = vi.fn();
 const loadServerSettings = vi.fn();
 const submitPlateSolve = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
-  getPhotos: () => getPhotos(),
+  // A stored photo is placed unless a test says otherwise (one without a placement waits "À résoudre").
+  getPhotos: () =>
+    Promise.resolve(getPhotos()).then((list?: Record<string, unknown>[]) =>
+      list?.map((p) => ({ correspondences: PLACED, ...p })),
+    ),
   getGearSetups: () => getGearSetups(),
   loadServerSettings: () => loadServerSettings(),
   submitPlateSolve: (...a: unknown[]) => submitPlateSolve(...a),
@@ -16,6 +24,17 @@ vi.mock('@myastrosky/app-state/api', () => ({
   getPlans: vi.fn(),
   convertRawPhoto: vi.fn(),
   uploadPhoto: vi.fn(),
+  storedPhotoFile: vi.fn(async () => new File(['x'], 'w.png', { type: 'image/png' })),
+  setPhotoOnlineSolve: vi.fn(async () => undefined),
+}));
+// The solves of the photos stored "À résoudre" are followed again by the shared module: astrometry.net is never reached.
+const stored = vi.hoisted(() => ({
+  following: new Set<string>(),
+  followStoredSolves: vi.fn(async () => undefined),
+}));
+vi.mock('@myastrosky/app-state/stored-solve', () => ({
+  followStoredSolves: (...a: unknown[]) => stored.followStoredSolves(...(a as [])),
+  isFollowingStoredSolve: (id: string) => stored.following.has(id),
 }));
 
 // The visited sky shown: none unless a test shows one.
@@ -62,13 +81,21 @@ import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/s
 import GalleryPage from '../src/pages/GalleryPage.vue';
 import { clearGalleryFilters, galleryFilters, loadGalleryDisplay } from '../src/gallery-display';
 import { importRows, resetImport } from '../src/composables/usePhotoImport';
-import {
-  addPendingPhoto,
-  configurePendingStore,
-  createMemoryPendingStore,
-  holdPendingPlacement,
-  setPendingState,
-} from '../src/pending-photos';
+import { openStoredPhoto, resetPendingPhotos, setPendingState } from '../src/pending-photos';
+
+/** A photo stored without a placement ("À résoudre"), its astrometry.net solve if it has one. */
+const waitingPhoto = (id: string, name: string, onlineSolve?: Record<string, unknown>) => ({
+  id,
+  originalName: name,
+  filename: `${id}.png`,
+  createdAt: '2026-11-15T00:00:00.000Z',
+  correspondences: [],
+  dsoIds: [],
+  labels: [],
+  pointsOfInterest: [],
+  notes: '',
+  ...(onlineSolve ? { onlineSolve } : {}),
+});
 
 // Each page is unmounted after its test: a page left mounted would keep reacting to the shared search and filters.
 enableAutoUnmount(afterEach);
@@ -91,7 +118,9 @@ describe('the gallery page', () => {
     loadServerSettings.mockReset().mockResolvedValue({ apiKeySet: true });
     submitPlateSolve.mockReset().mockResolvedValue({ jobId: 'job-1' });
     resetImport();
-    configurePendingStore(createMemoryPendingStore());
+    resetPendingPhotos();
+    stored.following.clear();
+    stored.followStoredSolves.mockClear();
   });
 
   it('draws the cards a part at a time, the next part as the grid is scrolled', async () => {
@@ -232,86 +261,78 @@ describe('the gallery page', () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  it('shows the imported photos that are not on the sky yet first, with where they stand', async () => {
-    getPhotos.mockResolvedValue([{ id: 'p1', originalName: 'M42.png', filename: 'a.png' }]);
-    const solving = await addPendingPhoto(new Blob(['x']), 'M31_stack.jpg');
-    await setPendingState(solving.id, 'solving', { jobId: 'job-7' });
-    await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
+  it('shows the photos stored "À résoudre" first, with where their astrometry.net solve stands', async () => {
+    stored.following.add('w1');
+    getPhotos.mockResolvedValue([
+      waitingPhoto('w1', 'M31_stack', { state: 'solving', submissionId: 7, sentAt: 's' }),
+      waitingPhoto('w2', 'NGC7000'),
+      { id: 'p1', originalName: 'M42.png', filename: 'a.png' },
+    ]);
     const wrapper = mountPage();
     await flushPromises();
     const tiles = wrapper.findAll('.mob-photo-card');
     expect(tiles.map((tile) => tile.attributes('aria-label'))).toEqual([
-      'M31_stack.jpg : Résolution',
-      'NGC7000.tif : À placer',
+      'M31_stack : Résolution',
+      'NGC7000 : À résoudre',
       'M42.png',
     ]);
     // A waiting photo has its name in the caption, and no chips.
-    expect(tiles[0].find('.mob-photo-card-name').text()).toBe('M31_stack.jpg');
     expect(tiles[0].find('.mob-tags').exists()).toBe(false);
     expect(tiles[0].find('.mob-photo-state').classes()).toContain('mob-photo-state--busy');
-    expect(tiles[0].find('[role=status]').exists()).toBe(true);
-    expect(tiles[1].find('.mob-photo-state').text()).toBe('À placer');
     expect(tiles[1].find('.mob-photo-state').classes()).not.toContain('mob-photo-state--busy');
   });
 
-  it('shows a solve stopped for want of the network as "Hors ligne", and follows it again once online', async () => {
-    getPhotos.mockResolvedValue([]);
-    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
-    const stopped = await addPendingPhoto(new Blob(['x']), 'M31_stack.jpg');
-    await setPendingState(stopped.id, 'offline', { jobId: 'job-7', submissionId: 42 });
+  it('shows a solve astrometry.net goes on with as "En cours", and opens its page on a tap', async () => {
+    getPhotos.mockResolvedValue([
+      waitingPhoto('w1', 'NGC7000', { state: 'unfinished', submissionId: 42, sentAt: 's' }),
+    ]);
     const wrapper = mountPage();
     await flushPromises();
     const tile = wrapper.find('.mob-photo-card');
-    expect(tile.attributes('aria-label')).toBe('M31_stack.jpg : Hors ligne');
-    expect(tile.find('.mob-photo-state').classes()).not.toContain('mob-photo-state--busy');
+    expect(tile.attributes('aria-label')).toBe('NGC7000 : En cours');
+    await tile.trigger('click');
+    expect(push).toHaveBeenCalledWith('/gallery/pending/w1');
+  });
 
-    onLine.mockReturnValue(true);
+  it('follows the solves of the photos stored "À résoudre" again, and again once the phone is back online', async () => {
+    const waiting = waitingPhoto('w1', 'NGC7000', {
+      state: 'offline',
+      submissionId: 42,
+      sentAt: 's',
+    });
+    getPhotos.mockResolvedValue([
+      waiting,
+      { id: 'p1', originalName: 'M42.png', filename: 'a.png' },
+    ]);
+    mountPage();
+    await flushPromises();
+    expect(stored.followStoredSolves).toHaveBeenCalledTimes(1);
+    expect((stored.followStoredSolves.mock.calls[0] as unknown[])[0]).toEqual([
+      expect.objectContaining({ id: 'w1' }),
+    ]);
     window.dispatchEvent(new Event('online'));
     await flushPromises();
-    expect(wrapper.find('.mob-photo-card').attributes('aria-label')).toBe(
-      'M31_stack.jpg : Résolution',
-    );
-    onLine.mockRestore();
+    expect(stored.followStoredSolves).toHaveBeenCalledTimes(2);
   });
 
-  it('shows a solve astrometry.net has not finished as "Non terminée", and opens its page on a tap', async () => {
-    getPhotos.mockResolvedValue([]);
-    const photo = await addPendingPhoto(new Blob(['x']), 'NGC7000.tif');
-    await setPendingState(photo.id, 'unfinished', { submissionId: 42 });
+  it('a photo whose page is open says where it stands there, and is not followed twice', async () => {
+    const waiting = waitingPhoto('w1', 'NGC7000');
+    getPhotos.mockResolvedValue([waiting]);
+    await openStoredPhoto(waiting as never);
+    await setPendingState('w1', 'solving', { jobId: 'job-1' });
     const wrapper = mountPage();
     await flushPromises();
     const tile = wrapper.find('.mob-photo-card');
-    expect(tile.attributes('aria-label')).toBe('NGC7000.tif : Non terminée');
-    expect(tile.find('.mob-photo-state').classes()).not.toContain('mob-photo-state--busy');
-    await tile.trigger('click');
-    expect(push).toHaveBeenCalledWith(`/gallery/pending/${photo.id}`);
-  });
-
-  it('opens the page "Photo à ajouter" of a waiting photo on a tap, even while it is being solved', async () => {
-    getPhotos.mockResolvedValue([]);
-    const photo = await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
-    await setPendingState(photo.id, 'solving', { jobId: 'job-1' });
-    const wrapper = mountPage();
-    await flushPromises();
-    await wrapper.find('.mob-photo-card').trigger('click');
-    expect(push).toHaveBeenCalledWith(`/gallery/pending/${photo.id}`);
-  });
-
-  it('says how a placed photo not saved yet was placed, and leaves the photos of an open import to the import', async () => {
-    getPhotos.mockResolvedValue([]);
-    const placed = await addPendingPhoto(new Blob(['y']), 'M101.jpg');
-    await holdPendingPlacement(placed.id, { correspondences: [], dsoIds: [], by: 'hand' });
-    await addPendingPhoto(new Blob(['z']), 'M33.jpg', undefined, undefined, { inImport: true });
-    const wrapper = mountPage();
-    await flushPromises();
-    expect(wrapper.findAll('.mob-photo-card').map((t) => t.attributes('aria-label'))).toEqual([
-      'M101.jpg : ✓ Placée à la main',
-    ]);
+    expect(tile.attributes('aria-label')).toBe('NGC7000 : Résolution');
+    expect(tile.find('.mob-photo-state').classes()).toContain('mob-photo-state--busy');
+    expect((stored.followStoredSolves.mock.calls[0] as unknown[])[0]).toEqual([]);
   });
 
   it('hides the waiting photos with the user own ones when "Mon ciel" is not ticked', async () => {
-    getPhotos.mockResolvedValue([{ id: 'p1', originalName: 'Mine.jpg', filename: 'a.jpg' }]);
-    await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
+    getPhotos.mockResolvedValue([
+      { id: 'p1', originalName: 'Mine.jpg', filename: 'a.jpg' },
+      waitingPhoto('w1', 'NGC7000'),
+    ]);
     sharedSkies.visitPhotos = [
       { id: 'v1', originalName: 'Theirs.jpg', filename: 'v.jpg', dsoIds: [], sharedSkyId: 's1' },
     ];
@@ -328,9 +349,8 @@ describe('the gallery page', () => {
     }
   });
 
-  it('shows the grid, not the empty state, when the only photos are waiting ones', async () => {
-    getPhotos.mockResolvedValue([]);
-    await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
+  it('shows the grid, not the empty state, when the only photos wait "À résoudre"', async () => {
+    getPhotos.mockResolvedValue([waitingPhoto('w1', 'NGC7000')]);
     const wrapper = mountPage();
     await flushPromises();
     expect(wrapper.find('.mob-empty').exists()).toBe(false);

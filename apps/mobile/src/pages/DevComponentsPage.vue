@@ -228,7 +228,7 @@ function raiseError() {
           <PhoneRow
             title="M42_SeeStarS50.fit"
             :thumb="imageIcon"
-            :subs="['À placer']"
+            :subs="['À résoudre']"
             warning="Non résolu astrométriquement : données de prise de vue chargées"
             chevron
             button

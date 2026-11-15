@@ -22,8 +22,7 @@ vi.mock('../src/composables/useErrorToast', () => ({ useErrorToast: () => ({ sho
 import SkyPlacement from '../src/pages/sky/SkyPlacement.vue';
 import {
   addPendingPhoto,
-  configurePendingStore,
-  createMemoryPendingStore,
+  resetPendingPhotos,
   pendingPlacement,
   pendingPhotos,
 } from '../src/pending-photos';
@@ -87,7 +86,7 @@ const values = (w: Awaited<ReturnType<typeof mountPlacement>>['w']) =>
 describe('placing a photo by hand', () => {
   beforeEach(() => {
     localStorage.setItem('lang', 'fr');
-    configurePendingStore(createMemoryPendingStore());
+    resetPendingPhotos();
     uploadPhoto.mockReset().mockResolvedValue({ id: 'p9' });
     findDSOsInImage.mockReset().mockReturnValue([{ id: 'M101' }, { id: 'NGC5474' }]);
     showError.mockReset();

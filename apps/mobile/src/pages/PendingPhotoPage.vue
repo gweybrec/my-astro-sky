@@ -11,12 +11,15 @@ import {
   type PhotoMetadataDraft,
 } from '@myastrosky/core/photo-metadata-draft';
 import type { FitsCard } from '@myastrosky/core/fits-header';
+import type { Photo } from '@myastrosky/core/types';
 import {
+  deletePhotoAPI,
   getGearSetups,
   getPhotos,
   loadServerSettings,
   type GearSetupData,
 } from '@myastrosky/app-state/api';
+import { isPlacedPhoto } from '@myastrosky/core/photo-placement';
 import { noSolutionMessage } from '@myastrosky/app-state/wcs-load-flow';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { catalogsReady } from '../catalogs';
@@ -25,6 +28,7 @@ import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
 import { useWcsLoad, type WcsLoaded } from '../composables/useWcsLoad';
 import {
+  openStoredPhoto,
   pendingDraft,
   pendingPhotoFile,
   pendingPhotos,
@@ -34,7 +38,12 @@ import {
   setPendingFitsHeaders,
   storePendingPhoto,
 } from '../pending-photos';
-import { shownPendingId, solvedPhotoCount, solvePendingOnline } from '../pending-solve';
+import {
+  fetchPendingResult,
+  shownPendingId,
+  solvedPhotoCount,
+  solvePendingOnline,
+} from '../pending-solve';
 import { pendingStateText, pendingStatus, unsavedDrafts } from '../pending-display';
 import { skyPlacement } from '../sky-modes';
 import { endIdentify } from '../star-identify-session';
@@ -97,6 +106,13 @@ onMounted(async () => {
   shownPendingId.value = id;
   online.value = navigator.onLine;
   try {
+    // A gallery photo stored "À résoudre": its record is made from the store the first time its page opens.
+    let stored: Photo[] | null = null;
+    if (!pendingPhotos.value.some((p) => p.id === id)) {
+      stored = await getPhotos();
+      const found = stored.find((p) => p.id === id && !isPlacedPhoto(p));
+      if (found) await openStoredPhoto(found);
+    }
     const saved = await pendingDraft(id);
     if (!saved) {
       leaving = true;
@@ -105,7 +121,7 @@ onMounted(async () => {
     }
     original.value = copy(saved);
     Object.assign(draft, copy(unsavedDrafts.get(id) ?? saved));
-    const photos = await getPhotos();
+    const photos = stored ?? (await getPhotos());
     knownLabels.value = [...new Set(photos.flatMap((p) => p.labels))];
     setups.value = await getGearSetups();
     void categoriesStore.ensureLoaded();
@@ -138,10 +154,20 @@ const solving = computed(() => photo.value?.state === 'solving');
 /** The page is opened again after a method: what was typed is kept for it. */
 const keepTyped = () => unsavedDrafts.set(id, copy(draft));
 
+/** astrometry.net goes on with a solve of this photo ("En cours"): its result is fetched, nothing is sent again. */
+const unfinished = computed(
+  () => photo.value?.state === 'unfinished' && !!photo.value.submissionId,
+);
+
 function solveOnline() {
   // A greyed-out row still receives the tap.
-  if (unavailableReason() || solving.value) return;
+  if (unavailableReason() || solving.value || unfinished.value) return;
   void solvePendingOnline(id);
+}
+
+function fetchResult() {
+  if (unavailableReason() || solving.value) return;
+  void fetchPendingResult(id);
 }
 
 function reuse() {
@@ -248,8 +274,8 @@ async function save() {
     await setPendingDraft(id, draft);
     if (loadedCards.value) await setPendingFitsHeaders(id, loadedCards.value);
     unsavedDrafts.delete(id);
-    // From the gallery, a placed photo is stored now; in the import list Importer stores it.
-    if (!current.inImport && current.state === 'placed') {
+    // A gallery photo is saved again now (and placed, when it is); in the import list Importer stores it.
+    if (current.storedId) {
       await storePendingPhoto(id);
       solvedPhotoCount.value += 1;
     }
@@ -273,8 +299,10 @@ async function deletePhoto() {
   });
   if (!ok) return;
   try {
+    if (current.storedId) await deletePhotoAPI(current.storedId);
     await removePendingPhoto(id);
     unsavedDrafts.delete(id);
+    solvedPhotoCount.value += 1;
     goBack();
   } catch (error) {
     await showError(error);
@@ -308,11 +336,24 @@ async function deletePhoto() {
         <PhoneSectionHeader>{{ t('mobile.gallery.chooseMethod') }}</PhoneSectionHeader>
         <IonList class="mob-list" lines="none">
           <PhoneRow
+            v-if="unfinished"
             button
             wrap
             :disabled="!online || !keySet || solving"
+            :title="t('batch.methodFetch')"
+            :subs="[unavailableReason() ?? t('batch.methodFetchSub')]"
+            data-test="fetch-result"
+            @click="fetchResult"
+          />
+          <PhoneRow
+            button
+            wrap
+            :disabled="!online || !keySet || solving || unfinished"
             :title="t('mobile.gallery.solveOnline')"
-            :subs="[unavailableReason() ?? t('mobile.gallery.solveOnlineSub')]"
+            :subs="[
+              unavailableReason() ??
+                (unfinished ? t('batch.onlineRunning') : t('mobile.gallery.solveOnlineSub')),
+            ]"
             @click="solveOnline"
           />
           <PhoneRow

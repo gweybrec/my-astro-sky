@@ -26,14 +26,14 @@ vi.mock('../src/composables/useErrorToast', () => ({
 
 import {
   addPendingPhoto,
-  configurePendingStore,
-  createMemoryPendingStore,
+  resetPendingPhotos,
   pendingPlacement,
   pendingPhotos,
   setPendingState,
 } from '../src/pending-photos';
 import {
   POLL_INTERVAL_MS,
+  fetchPendingResult,
   resumePendingSolves,
   shownPendingId,
   reusePendingSolution,
@@ -51,7 +51,7 @@ describe('solving a waiting photo online', () => {
   beforeEach(() => {
     localStorage.setItem('lang', 'fr');
     vi.useFakeTimers();
-    configurePendingStore(createMemoryPendingStore());
+    resetPendingPhotos();
     vi.clearAllMocks();
     findDsoIds.mockReturnValue(['M45']);
     vi.stubGlobal(
@@ -167,7 +167,7 @@ describe('solving a waiting photo online', () => {
     expect(uploadPhoto).not.toHaveBeenCalled();
   });
 
-  it('marks a solve astrometry.net has not finished in time as unfinished, not failed, and says to reuse it later', async () => {
+  it('marks a solve astrometry.net has not finished in time as unfinished, not failed, and says its result will be fetched', async () => {
     const photo = await addPendingPhoto(new Blob(['x']), 'NGC7000.tif');
     submitPlateSolve.mockResolvedValue({ jobId: 'j' });
     pollPlateSolve.mockResolvedValue({ jobId: 'j', status: 'timeout', submissionId: 42 });
@@ -176,14 +176,26 @@ describe('solving a waiting photo online', () => {
     expect(pendingPhotos.value[0]).toMatchObject({ state: 'unfinished', submissionId: 42 });
     expect(pendingPhotos.value[0].error).toBeUndefined();
     expect(showWarning).toHaveBeenCalledWith(
-      "astrometry.net n'a pas encore fini, la résolution continue de son côté. Revenez plus tard et choisissez-la avec « Réutiliser une solution astrometry.net ».",
+      "astrometry.net n'a pas encore fini, la résolution continue de son côté. Le résultat sera récupéré automatiquement.",
     );
-    // Not followed again when the app comes back: its solution is reused instead.
+    // Not followed again on its own here: "Récupérer le résultat" or the stored photo's follower fetches it.
     pollPlateSolve.mockClear();
     await resumePendingSolves();
     await nextPoll();
     expect(pollPlateSolve).not.toHaveBeenCalled();
     expect(pendingPhotos.value[0].state).toBe('unfinished');
+  });
+
+  it('fetches the result of a solve astrometry.net went on with, from its submission, as a FITS when one was sent', async () => {
+    const photo = await addPendingPhoto(new Blob(['x'], { type: 'image/png' }), 'M1.fit');
+    await setPendingState(photo.id, 'unfinished', { submissionId: 42, fits: true, sentAt: 's' });
+    resumePlateSolve.mockResolvedValue({ jobId: 'again' });
+    pollPlateSolve.mockReturnValue(new Promise(() => {}));
+    await fetchPendingResult(photo.id);
+    expect(pendingPhotos.value[0].state).toBe('solving');
+    await nextPoll();
+    expect(resumePlateSolve).toHaveBeenCalledWith(expect.any(File), 42, { fits: true });
+    expect(submitPlateSolve).not.toHaveBeenCalled();
   });
 
   it('marks the photo as failed when it is solved but cannot be stored', async () => {
@@ -212,7 +224,7 @@ describe('solving a waiting photo online', () => {
 
     // A photo removed while its solve runs is no longer followed.
     pollPlateSolve.mockClear();
-    configurePendingStore(createMemoryPendingStore());
+    resetPendingPhotos();
     await nextPoll();
     expect(pollPlateSolve).not.toHaveBeenCalled();
   });
@@ -226,7 +238,7 @@ describe('solving a waiting photo online', () => {
     expect(pendingPhotos.value[0]).toMatchObject({ jobId: 'job-1', submissionId: 42 });
 
     // The restart: the solver forgot its jobs and the following loop is gone.
-    configurePendingStore(createMemoryPendingStore());
+    resetPendingPhotos();
     const again = await addPendingPhoto(new Blob(['x']), 'a.jpg');
     await setPendingState(again.id, 'solving', { jobId: 'job-1', submissionId: 42 });
     pollPlateSolve.mockReset();
@@ -336,7 +348,7 @@ describe('solving a waiting photo online', () => {
 describe('reusing a solution of the astrometry.net account', () => {
   beforeEach(() => {
     localStorage.setItem('lang', 'fr');
-    configurePendingStore(createMemoryPendingStore());
+    resetPendingPhotos();
     vi.clearAllMocks();
     findDsoIds.mockReturnValue([]);
   });

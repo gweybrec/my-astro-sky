@@ -28,8 +28,7 @@ import ImportPhotosPage from '../src/pages/ImportPhotosPage.vue';
 import PhoneBackButton from '../src/components/PhoneBackButton.vue';
 import { addImportFiles, resetImport } from '../src/composables/usePhotoImport';
 import {
-  configurePendingStore,
-  createMemoryPendingStore,
+  resetPendingPhotos,
   holdPendingPlacement,
   pendingPhotos,
   setPendingState,
@@ -50,7 +49,7 @@ describe('the import page', () => {
   beforeEach(() => {
     localStorage.setItem('lang', 'fr');
     resetImport();
-    configurePendingStore(createMemoryPendingStore());
+    resetPendingPhotos();
     replace.mockReset();
     push.mockReset();
     back.mockReset();
@@ -83,7 +82,7 @@ describe('the import page', () => {
     ]);
     expect(rows.map((r) => r.find('.mob-row-sub').text())).toEqual([
       '✓ Déjà résolue',
-      'À placer',
+      'À résoudre',
       '✓ Placée à la main',
       'Résolution',
     ]);
@@ -103,14 +102,14 @@ describe('the import page', () => {
     const wrapper = mountPage();
     await settle();
     const rows = fileRows(wrapper);
-    // The board "Importer, fichier non résolu": "À placer", then the line in the warning colour.
+    // The board "Importer, fichier non résolu": "À résoudre", then the line in the warning colour.
     expect(rows[0].findAll('.mob-row-sub').map((s) => s.text())).toEqual([
-      'À placer',
+      'À résoudre',
       'Non résolu astrométriquement : données de prise de vue chargées',
     ]);
     expect(rows[0].findAll('.mob-row-sub')[1].classes()).toContain('mob-status--warn');
     // A photo that is not a raw file has no such line.
-    expect(rows[1].findAll('.mob-row-sub').map((s) => s.text())).toEqual(['À placer']);
+    expect(rows[1].findAll('.mob-row-sub').map((s) => s.text())).toEqual(['À résoudre']);
   });
 
   it('cannot import while a file is still being read, nor when nothing can be imported', async () => {
@@ -128,7 +127,7 @@ describe('the import page', () => {
     expect(wrapper.find('footer button').attributes('disabled')).toBeDefined();
   });
 
-  it('imports everything at once: the placed photo is stored, the other one waits in the gallery', async () => {
+  it('imports everything at once: the placed photo with its placement, the other one "À résoudre"', async () => {
     convertRawPhoto.mockResolvedValue(solved);
     uploadPhoto.mockResolvedValue({ id: 'p1' });
     addImportFiles([new File(['r'], 'M31.fits'), new File(['x'], 'M45.jpg')]);
@@ -136,8 +135,9 @@ describe('the import page', () => {
     await settle();
     await wrapper.find('footer button').trigger('click');
     await settle();
-    expect(uploadPhoto).toHaveBeenCalledTimes(1);
-    expect(pendingPhotos.value.map((p) => [p.name, p.inImport])).toEqual([['M45.jpg', false]]);
+    expect(uploadPhoto).toHaveBeenCalledTimes(2);
+    expect(uploadPhoto.mock.calls[1][1]).toEqual([]);
+    expect(pendingPhotos.value).toEqual([]);
     expect(replace).toHaveBeenCalledWith('/tabs/gallery');
   });
 
@@ -149,8 +149,11 @@ describe('the import page', () => {
     await settle();
     await wrapper.find('footer button').trigger('click');
     await settle();
-    expect(fileRows(wrapper).map((r) => r.find('.mob-row-title').text())).toEqual(['M31.fits']);
-    expect(showError).toHaveBeenCalledWith('M31.fits : disk full');
+    expect(fileRows(wrapper).map((r) => r.find('.mob-row-title').text())).toEqual([
+      'M31.fits',
+      'M45.jpg',
+    ]);
+    expect(showError.mock.calls[0][0]).toContain('M31.fits : disk full');
     expect(replace).not.toHaveBeenCalled();
   });
 

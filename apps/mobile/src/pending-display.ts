@@ -4,6 +4,7 @@
  */
 import type { Router } from 'vue-router';
 import type { PhotoMetadataDraft } from '@myastrosky/core/photo-metadata-draft';
+import type { Photo } from '@myastrosky/core/types';
 import { t } from '@myastrosky/core/i18n/index';
 import { pendingPhotos, type PendingPhoto } from './pending-photos';
 
@@ -29,6 +30,22 @@ export function pendingStateText(photo: PendingPhoto, tile = false): string {
         default:
           return t('mobile.gallery.placedSolved');
       }
+    default:
+      return t('mobile.gallery.toPlace');
+  }
+}
+
+/** What a gallery tile says about a photo stored "À résoudre", from its astrometry.net solve. */
+export function storedStateText(photo: Photo): string {
+  switch (photo.onlineSolve?.state) {
+    case 'solving':
+      return t('mobile.gallery.solving');
+    case 'offline':
+      return t('mobile.gallery.solvingOffline');
+    case 'failed':
+      return t('batch.statusFailed');
+    case 'unfinished':
+      return t('mobile.gallery.unfinished');
     default:
       return t('mobile.gallery.toPlace');
   }

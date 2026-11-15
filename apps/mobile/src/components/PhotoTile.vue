@@ -18,7 +18,7 @@ const props = defineProps<{
   /** Quarters to the right the picture is shown turned (the square card stays square). */
   turns?: QuarterTurns;
   tags?: PhotoTag[];
-  /** Where a waiting photo stands ("À placer", "Résolution"), and whether that is a running operation. */
+  /** Where a waiting photo stands ("À résoudre", "Résolution"), and whether that is a running operation. */
   state?: string;
   busy?: boolean;
   /** The tab is not shown: a picture still loading stops (it starts again once the tab is back). */

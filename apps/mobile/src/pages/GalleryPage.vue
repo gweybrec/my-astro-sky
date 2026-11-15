@@ -22,9 +22,11 @@ import { useLandscape } from '../composables/useLandscape';
 import { useErrorToast } from '../composables/useErrorToast';
 import { useGrowingList } from '../composables/useGrowingList';
 import { useKeptScroll } from '../composables/useKeptScroll';
-import { loadPendingPhotos, pendingPhotos } from '../pending-photos';
-import { pendingStateText } from '../pending-display';
+import { pendingPhotos } from '../pending-photos';
+import { pendingStateText, storedStateText } from '../pending-display';
 import { resumePendingSolves, solvedPhotoCount } from '../pending-solve';
+import { isPlacedPhoto } from '@myastrosky/core/photo-placement';
+import { followStoredSolves, isFollowingStoredSolve } from '@myastrosky/app-state/stored-solve';
 import {
   clearGalleryFilters,
   galleryFilters,
@@ -91,10 +93,14 @@ function tagsOf(photo: Photo): PhotoTag[] {
 // desktop gallery's).
 // The user's own photos and those of the visited sky shown (board "Galerie, choix du ciel affiché").
 const sharedSkies = useSharedSkiesStore();
+// A photo stored without a placement is a "À résoudre" tile of its own (`waiting`), not a card of the grid.
 const listed = computed(() =>
   photos.value === null
     ? null
-    : [...(sharedSkies.ownShown ? photos.value : []), ...sharedSkies.visitPhotos],
+    : [
+        ...(sharedSkies.ownShown ? photos.value.filter((p) => isPlacedPhoto(p)) : []),
+        ...sharedSkies.visitPhotos,
+      ],
 );
 const shownPhotos = computed(() =>
   galleryShownPhotos(listed.value ?? [], {
@@ -148,18 +154,20 @@ const gridStyle = computed(() => ({
 // Three photos or more to a line: tighter spacing, so a card keeps room for "NGC 7000" beside the "+N" chip.
 const dense = computed(() => photosPerLine[orientation.value] >= 3);
 
-// The waiting photos are the user's own: shown only while "Mon ciel" is ticked, like the placed ones. The photos of an
-// import still open are shown there, not here.
+// The photos stored without a placement ("À résoudre") are the user's own: shown only while "Mon ciel" is ticked, like the
+// placed ones. One whose page is open says where it stands there; the others, where their astrometry.net solve stands.
+const unplaced = computed(() => (photos.value ?? []).filter((p) => !isPlacedPhoto(p)));
 const waiting = computed(() =>
   sharedSkies.ownShown
-    ? pendingPhotos.value
-        .filter((p) => !p.inImport)
-        .map((p) => ({
-          id: p.id,
-          name: p.name,
-          busy: p.state === 'solving',
-          state: pendingStateText(p, true),
-        }))
+    ? unplaced.value.map((photo) => {
+        const open = pendingPhotos.value.find((p) => p.id === photo.id);
+        return {
+          id: photo.id,
+          name: photo.originalName,
+          busy: open ? open.state === 'solving' : isFollowingStoredSolve(photo.id),
+          state: open ? pendingStateText(open, true) : storedStateText(photo),
+        };
+      })
     : [],
 );
 const isEmpty = computed(
@@ -178,18 +186,30 @@ const noMatch = computed(
 // dropped: the next showing reads the photos again.
 const active = ref(true);
 let running: Promise<void> | null = null;
-/** Reads the waiting and placed photos; a reading already running (the page's first showing) is shared. */
+/** Reads the photos; a reading already running (the page's first showing) is shared. */
 function load() {
   running ??= (async () => {
     try {
-      await loadPendingPhotos();
       await resumePendingSolves();
     } catch (error) {
-      reportError('GalleryPage.loadPendingPhotos', error);
+      reportError('GalleryPage.resumePendingSolves', error);
     }
     await loadPhotos();
+    followWaiting();
   })().finally(() => (running = null));
   return running;
+}
+
+/**
+ * The photos stored while astrometry.net had not finished: their solve went on there; its result is fetched, without a
+ * new upload, and a solved photo joins the placed ones. One whose page is open is followed there.
+ */
+function followWaiting() {
+  const ids = new Set(pendingPhotos.value.map((p) => p.id));
+  void followStoredSolves(
+    unplaced.value.filter((p) => !ids.has(p.id)),
+    { onChange: () => void loadPhotos() },
+  );
 }
 async function loadPhotos() {
   try {
@@ -216,7 +236,10 @@ onIonViewWillEnter(() => {
 });
 onIonViewWillLeave(() => (active.value = false));
 // The solves stopped for want of the network go on as soon as it is back.
-const onOnline = () => void resumePendingSolves();
+const onOnline = () => {
+  void resumePendingSolves();
+  followWaiting();
+};
 window.addEventListener('online', onOnline);
 onBeforeUnmount(() => window.removeEventListener('online', onOnline));
 // A photo solved while the gallery is shown joins the placed ones.

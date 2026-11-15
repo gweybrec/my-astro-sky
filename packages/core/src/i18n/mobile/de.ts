@@ -31,7 +31,7 @@ const de: Translations['mobile'] = {
     leaveMessageMany:
       'Die {n} Fotos werden nicht hinzugefügt. Um sie zu behalten, tippen Sie auf {button}.',
     leaveConfirm: 'Verwerfen',
-    toPlace: 'Zu platzieren',
+    toPlace: 'Zu lösen',
     noSolutionLoaded: 'Nicht astrometrisch gelöst: Aufnahmedaten geladen',
     solving: 'Wird gelöst',
     solvingOffline: 'Offline',
@@ -41,8 +41,8 @@ const de: Translations['mobile'] = {
     solveOnlineSub: 'astrometry.net, benötigt eine Verbindung',
     reuseSolution: 'Eine astrometry.net-Lösung wiederverwenden',
     reuseSolutionSub: 'Ein bereits gelöstes Foto in deinem astrometry.net-Konto',
-    solveUnfinished: 'Lösung nicht abgeschlossen',
-    unfinished: 'Nicht abgeschlossen',
+    solveUnfinished: 'Lösung läuft',
+    unfinished: 'Läuft',
     offline: 'Keine Internetverbindung',
     identifyStars: '3 Sterne identifizieren',
     identifyStarsSub:

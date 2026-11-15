@@ -6,7 +6,6 @@ import { convertRawPhoto } from '@myastrosky/app-state/api';
 import { suggestedSetupFor } from '@myastrosky/app-state/wcs-load-flow';
 import {
   addPendingPhoto,
-  leaveImport,
   pendingPhotos,
   removePendingPhoto,
   storePendingPhoto,
@@ -16,9 +15,9 @@ import {
 
 /**
  * The list of "Importer des photos". Each picked file is read first (`reading`: a TIFF, FITS or XISF is converted and
- * its header's WCS read), then kept as a waiting photo of the import (`inImport`): it stays in the list while its page
- * "Photo à ajouter" or a placement method is open, and after a restart it goes to the gallery. A file whose header
- * places it is kept `placed` at once ("✓ Déjà résolue").
+ * its header's WCS read), then kept in memory as a photo of the import (`inImport`): it stays in the list while its
+ * page "Photo à ajouter" or a placement method is open. A file whose header places it is kept `placed` at once ("✓ Déjà
+ * résolue"). Importer stores them all, placed or not.
  */
 export interface ReadingFile {
   key: string;
@@ -159,9 +158,9 @@ export const importBusy = computed(
 export const importableCount = computed(() => importPhotos.value.length);
 
 /**
- * Imports everything at once: a placed photo is stored with its metadata; the others (to place, being solved) go to the
- * gallery as waiting photos, with theirs. A photo that cannot be stored stays in the list; its reason is returned.
- * The files that could not be read leave the list.
+ * Imports everything at once: each photo is stored with its metadata, placed or not; one not placed waits "À résoudre" in
+ * the gallery, with its astrometry.net solve when one runs or waits. A photo that cannot be stored stays in the list;
+ * its reason is returned. The files that could not be read leave the list.
  */
 export async function importAll(): Promise<{
   stored: Photo[];
@@ -173,8 +172,7 @@ export async function importAll(): Promise<{
   try {
     for (const photo of importPhotos.value) {
       try {
-        if (photo.state === 'placed') stored.push(await storePendingPhoto(photo.id));
-        else await leaveImport(photo.id);
+        stored.push(await storePendingPhoto(photo.id));
       } catch (error) {
         errors.push({ name: photo.name, message: messageOf(error) });
       }

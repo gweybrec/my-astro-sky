@@ -1,58 +1,76 @@
 /**
- * The photos that are imported but not stored yet: in the list of "Importer des photos" (`inImport`), waiting for a
- * placement method ("À placer"), being solved online ("Résolution"), or placed but not saved yet (`placed`, board "Photo
- * à ajouter, placée"). The photo store only takes a photo with its placement, so until then the phone keeps the
- * picture itself, in the WebView's own database (IndexedDB, in the app's private data), with a small record, the
- * metadata typed for it (`draft`) and the placement found for it (`placement`). Once stored it is an ordinary photo
- * and leaves this list.
+ * The photos being worked on before they are saved, kept in memory: those of "Importer des photos" (`inImport`), and a
+ * photo of the gallery stored without a placement ("À résoudre") while its page "Photo à ajouter" and its placement methods
+ * are open (`storedId`, its record has the stored photo's id). Each keeps its picture, the metadata typed for it (`draft`)
+ * and the placement found for it (`placement`). Saving stores it in the photo store, placed or not: a photo not placed
+ * waits "À résoudre" in the gallery, with its astrometry.net solve when one runs or waits (`Photo.onlineSolve`), followed
+ * again later by `@myastrosky/app-state/stored-solve`.
  */
 import { shallowRef, toRaw } from 'vue';
 import type {
   CaptureDetails,
   ManualPlacement,
+  OnlineSolve,
   Photo,
   PhotoCorrespondence,
   PhotoIntegration,
 } from '@myastrosky/core/types';
 import type { FitsCard } from '@myastrosky/core/fits-header';
-import { draftToMetadata, type PhotoMetadataDraft } from '@myastrosky/core/photo-metadata-draft';
-import { setPhotoFitsHeaders, uploadPhoto } from '@myastrosky/app-state/api';
+import {
+  draftFromPhoto,
+  draftToMetadata,
+  type PhotoMetadataDraft,
+} from '@myastrosky/core/photo-metadata-draft';
+import {
+  setPhotoFitsHeaders,
+  setPhotoOnlineSolve,
+  setPhotoPlacement,
+  storedPhotoFile,
+  updatePhotoMetadata,
+  uploadPhoto,
+} from '@myastrosky/app-state/api';
 
 /**
  * `toPlace`: needs a placement method. `solving`: sent to the online solver. `offline`: sent, but its following stopped
  * for want of the network (astrometry.net goes on). `failed`: the solve did not succeed. `unfinished`: astrometry.net
- * had not finished when the app stopped following it; its solution is reused later ("Réutiliser une solution
- * astrometry.net"). `placed`: a placement is held (`placedBy`); Importer or Enregistrer stores the photo.
+ * had not finished when the app stopped following it ("En cours"); its result is fetched later. `placed`: a placement is
+ * held (`placedBy`); Importer or Enregistrer stores it.
  */
 export type PendingState = 'toPlace' | 'solving' | 'offline' | 'failed' | 'unfinished' | 'placed';
 
 /** How a held placement was found: the file's own WCS, by hand on the map, by naming stars, or by astrometry.net. */
 export type PlacedBy = 'file' | 'hand' | 'stars' | 'solved';
 
-/** A placement found for a waiting photo, kept until the photo is stored. */
+/** A placement found for a photo, kept until it is saved. */
 export interface HeldPlacement {
   correspondences: PhotoCorrespondence[];
   manualPlacement?: ManualPlacement;
-  /** The objects that fall in the photo, added to the typed ones when it is stored. */
+  /** The objects that fall in the photo, added to the typed ones when it is saved. */
   dsoIds: string[];
   by: PlacedBy;
 }
 
 export interface PendingPhoto {
   id: string;
-  /** The file's name as it was picked. */
+  /** The file's name as it was picked (a stored photo: its name). */
   name: string;
   state: PendingState;
   /** When it was imported (milliseconds); the list is in this order. */
   addedAt: number;
   /** The online solver's job, while the photo is being solved. */
   jobId?: string;
-  /** The astrometry.net submission of that job: it is followed again under a new job after a restart. */
+  /** The astrometry.net submission of that job: it is followed again under a new job. */
   submissionId?: number;
+  /** When the picture was sent to astrometry.net (ISO date). */
+  sentAt?: string;
+  /** The picture sent was a FITS file (its rows count from the bottom). */
+  fits?: boolean;
   /** Why the solve did not succeed. */
   error?: string;
-  /** In the list of "Importer des photos": not shown in the gallery until Importer. */
+  /** In the list of "Importer des photos": stored with the others by Importer. */
   inImport?: boolean;
+  /** The stored photo this record stands for (a gallery photo "À résoudre"); Enregistrer saves it again. */
+  storedId?: string;
   /** A raw file read without a plate solution: only its capture data was taken. */
   noSolution?: boolean;
   /** How the held placement was found (state `placed`). */
@@ -62,8 +80,8 @@ export interface PendingPhoto {
 }
 
 /**
- * What the file of a waiting photo said besides its picture (a TIFF/FITS/XISF without a plate solution): its capture
- * data, the saved setup its header points to, and its header cards. Given to the photo when it is placed.
+ * What the file of a photo said besides its picture (a TIFF/FITS/XISF without a plate solution): its capture data, the
+ * saved setup its header points to, and its header cards. Given to the photo when it is saved.
  */
 export interface PendingCapture {
   integrations?: PhotoIntegration[];
@@ -73,92 +91,30 @@ export interface PendingCapture {
   fitsHeaders?: FitsCard[];
 }
 
-interface StoredPending extends PendingPhoto {
+interface PendingRecord extends PendingPhoto {
   picture: Blob;
-  solvePicture?: Blob;
-  solveName?: string;
-  solveType?: string;
+  solvePicture?: File;
   capture?: PendingCapture;
   draft?: PhotoMetadataDraft;
   placement?: HeldPlacement;
+  /** The stored photo, for a record that stands for one. */
+  stored?: Photo;
 }
 
-/** Where the records and their pictures are kept. */
-export interface PendingStore {
-  all(): Promise<StoredPending[]>;
-  /** One record, without reading the others; undefined when it is not kept. */
-  get(id: string): Promise<StoredPending | undefined>;
-  put(record: StoredPending): Promise<void>;
-  delete(id: string): Promise<void>;
-}
+const records = new Map<string, PendingRecord>();
 
-const DB_NAME = 'myastrosky-pending-photos';
-const STORE = 'photos';
-
-function request<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error('IndexedDB request failed'));
-  });
-}
-
-/** The store in the WebView's database. */
-export function createIndexedDbPendingStore(factory: IDBFactory): PendingStore {
-  let opened: Promise<IDBDatabase> | null = null;
-  const db = () => {
-    opened ??= new Promise<IDBDatabase>((resolve, reject) => {
-      const open = factory.open(DB_NAME, 1);
-      open.onupgradeneeded = () => open.result.createObjectStore(STORE, { keyPath: 'id' });
-      open.onsuccess = () => resolve(open.result);
-      open.onerror = () => reject(open.error ?? new Error('IndexedDB could not be opened'));
-    });
-    return opened;
-  };
-  const store = async (mode: IDBTransactionMode) =>
-    (await db()).transaction(STORE, mode).objectStore(STORE);
-  return {
-    all: async () => request<StoredPending[]>((await store('readonly')).getAll()),
-    get: async (id) => request<StoredPending | undefined>((await store('readonly')).get(id)),
-    put: async (record) => void (await request((await store('readwrite')).put(record))),
-    delete: async (id) => void (await request((await store('readwrite')).delete(id))),
-  };
-}
-
-/** A store that lasts as long as the page (tests, and a browser without a database). */
-export function createMemoryPendingStore(): PendingStore {
-  const records = new Map<string, StoredPending>();
-  return {
-    all: async () => [...records.values()],
-    get: async (id) => records.get(id),
-    put: async (record) => void records.set(record.id, record),
-    delete: async (id) => void records.delete(id),
-  };
-}
-
-let store: PendingStore =
-  typeof indexedDB === 'undefined'
-    ? createMemoryPendingStore()
-    : createIndexedDbPendingStore(indexedDB);
-
-/** Replaces the store (tests). */
-export function configurePendingStore(next: PendingStore): void {
-  store = next;
-  pendingPhotos.value = [];
-}
-
-/** The photos waiting to be placed, oldest first. Filled by `loadPendingPhotos`. */
+/** The photos being worked on, oldest first. */
 export const pendingPhotos = shallowRef<PendingPhoto[]>([]);
 
 const recordOf = ({
   picture: _picture,
   solvePicture: _solvePicture,
-  solveName: _solveName,
-  solveType: _solveType,
   capture: _capture,
   draft: _draft,
   placement,
+  stored: _stored,
   ...record
-}: StoredPending): PendingPhoto => {
+}: PendingRecord): PendingPhoto => {
   const { placedBy: _placedBy, starCount: _starCount, ...rest } = record;
   if (!placement) return rest;
   return {
@@ -168,34 +124,20 @@ const recordOf = ({
   };
 };
 
+function publish() {
+  pendingPhotos.value = [...records.values()].sort((a, b) => a.addedAt - b.addedAt).map(recordOf);
+}
+
+/** Forgets every record (tests). */
+export function resetPendingPhotos(): void {
+  records.clear();
+  pendingPhotos.value = [];
+}
+
 /** The phone's database stores no Vue proxy: what a form or a list holds is copied as plain data. */
 const plain = <T>(value: T): T => JSON.parse(JSON.stringify(toRaw(value))) as T;
 
-let firstLoad = true;
-
-/** Reads the list from the store again on the next `loadPendingPhotos`, as at start-up (tests). */
-export function resetPendingLoad(): void {
-  firstLoad = true;
-}
-
-/**
- * Reads the list again from the store. On the first reading, the photos left in an import when the app stopped go to
- * the gallery, with their metadata and placement: the import list starts empty.
- */
-export async function loadPendingPhotos(): Promise<void> {
-  const all = await store.all();
-  if (firstLoad) {
-    firstLoad = false;
-    for (const record of all) {
-      if (!record.inImport) continue;
-      record.inImport = false;
-      await store.put(record);
-    }
-  }
-  pendingPhotos.value = all.sort((a, b) => a.addedAt - b.addedAt).map(recordOf);
-}
-
-/** What a waiting photo is kept with besides its picture. */
+/** What a new photo is kept with besides its picture. */
 export interface PendingOptions {
   inImport?: boolean;
   /** The placement its file gives (a solved TIFF/FITS/XISF): the photo is `placed` at once. */
@@ -215,7 +157,7 @@ export async function addPendingPhoto(
   solveFile?: File,
   options: PendingOptions = {},
 ): Promise<PendingPhoto> {
-  const record: StoredPending = {
+  const record: PendingRecord = {
     id: crypto.randomUUID(),
     name,
     state: options.placement ? 'placed' : 'toPlace',
@@ -225,22 +167,50 @@ export async function addPendingPhoto(
     ...(options.placement ? { placement: plain(options.placement) } : {}),
     draft: draftOf(name, capture, options.dsoIds),
     picture,
-    ...(solveFile
-      ? {
-          solvePicture: solveFile,
-          solveName: solveFile.name,
-          solveType: solveFile.type,
-        }
-      : {}),
+    ...(solveFile ? { solvePicture: solveFile } : {}),
     ...(capture ? { capture } : {}),
   };
-  await store.put(record);
-  const added = recordOf(record);
-  pendingPhotos.value = [...pendingPhotos.value, added].sort((a, b) => a.addedAt - b.addedAt);
-  return added;
+  records.set(record.id, record);
+  publish();
+  return recordOf(record);
 }
 
-/** The metadata a new waiting photo starts with: its name, and what its file said. */
+/** The state a stored photo's online solve gives its record. */
+function stateOfSolve(solve: OnlineSolve | undefined): PendingState {
+  if (!solve) return 'toPlace';
+  return solve.state;
+}
+
+/**
+ * Opens a stored photo "À résoudre" for its page: its record has the photo's id, its picture is read from the store, and
+ * its astrometry.net solve (if any) comes with it. A record already open is kept as it is.
+ */
+export async function openStoredPhoto(photo: Photo): Promise<PendingPhoto> {
+  const open = records.get(photo.id);
+  if (open) return recordOf(open);
+  const picture = await storedPhotoFile(photo);
+  const solve = photo.onlineSolve;
+  const record: PendingRecord = {
+    id: photo.id,
+    name: photo.originalName,
+    state: stateOfSolve(solve),
+    addedAt: Date.parse(photo.createdAt) || Date.now(),
+    storedId: photo.id,
+    stored: photo,
+    picture,
+    draft: draftFromPhoto(photo),
+    ...(solve?.submissionId ? { submissionId: solve.submissionId } : {}),
+    ...(solve?.jobId ? { jobId: solve.jobId } : {}),
+    ...(solve?.sentAt ? { sentAt: solve.sentAt } : {}),
+    ...(solve?.fits ? { fits: true } : {}),
+    ...(solve?.error ? { error: solve.error } : {}),
+  };
+  records.set(record.id, record);
+  publish();
+  return recordOf(record);
+}
+
+/** The metadata a new photo starts with: its name, and what its file said. */
 function draftOf(
   name: string,
   capture?: PendingCapture,
@@ -259,51 +229,41 @@ function draftOf(
   };
 }
 
-/** The metadata typed for a waiting photo; null when it is no longer kept. */
+/** The metadata typed for a photo; null when it is not kept. */
 export async function pendingDraft(id: string): Promise<PhotoMetadataDraft | null> {
-  const found = await store.get(id);
+  const found = records.get(id);
   if (!found) return null;
   return found.draft ?? draftOf(found.name, found.capture);
 }
 
-/** Keeps the metadata typed for a waiting photo. */
+/** Keeps the metadata typed for a photo. */
 export async function setPendingDraft(id: string, draft: PhotoMetadataDraft): Promise<void> {
-  const found = await store.get(id);
-  if (!found) return;
-  await store.put({ ...found, draft: plain(draft) });
+  const found = records.get(id);
+  if (found) found.draft = plain(draft);
 }
 
-/** Keeps the header cards of a file read for a waiting photo ("Charger un fichier WCS"), saved with it once stored. */
+/** Keeps the header cards of a file read for a photo ("Charger un fichier WCS"), saved with it. */
 export async function setPendingFitsHeaders(id: string, cards: FitsCard[]): Promise<void> {
-  const found = await store.get(id);
-  if (!found) return;
-  await store.put({ ...found, capture: { ...found.capture, fitsHeaders: plain(cards) } });
+  const found = records.get(id);
+  if (found) found.capture = { ...found.capture, fitsHeaders: plain(cards) };
 }
 
-/** The placement held for a waiting photo; null when it has none. */
+/** The placement held for a photo; null when it has none. */
 export async function pendingPlacement(id: string): Promise<HeldPlacement | null> {
-  return (await store.get(id))?.placement ?? null;
+  return records.get(id)?.placement ?? null;
 }
 
-/** Holds the placement found for a waiting photo: it is `placed`, not stored yet. */
+/** Holds the placement found for a photo: it is `placed`, not stored yet. */
 export async function holdPendingPlacement(id: string, placement: HeldPlacement): Promise<void> {
-  const found = await store.get(id);
+  const found = records.get(id);
   if (!found) return;
-  const { jobId: _jobId, submissionId: _submissionId, error: _error, ...kept } = found;
-  const next: StoredPending = { ...kept, state: 'placed', placement: plain(placement) };
-  await store.put(next);
-  const record = recordOf(next);
-  pendingPhotos.value = pendingPhotos.value.map((p) => (p.id === id ? record : p));
-}
-
-/** Takes a photo out of the import list: the gallery shows it as a waiting photo. */
-export async function leaveImport(id: string): Promise<void> {
-  const found = await store.get(id);
-  if (!found?.inImport) return;
-  const next: StoredPending = { ...found, inImport: false };
-  await store.put(next);
-  const record = recordOf(next);
-  pendingPhotos.value = pendingPhotos.value.map((p) => (p.id === id ? record : p));
+  delete found.jobId;
+  delete found.submissionId;
+  delete found.error;
+  delete found.sentAt;
+  found.state = 'placed';
+  found.placement = plain(placement);
+  publish();
 }
 
 const PICTURE_EXTENSIONS: Record<string, string[]> = {
@@ -324,99 +284,136 @@ export function pictureName(name: string, type: string): string {
   return `${stripExtension(name)}${extensions[0]}`;
 }
 
-/** The picture of a waiting photo as a file to place or solve; null when it is no longer kept. */
+const pictureOf = (found: PendingRecord) =>
+  new File([found.picture], pictureName(found.name, found.picture.type), {
+    type: found.picture.type,
+  });
+
+/** The picture of a photo as a file to place or solve; null when it is not kept. */
 export async function pendingPhotoFile(id: string): Promise<File | null> {
-  const found = await store.get(id);
-  return found
-    ? new File([found.picture], pictureName(found.name, found.picture.type), {
-        type: found.picture.type,
-      })
-    : null;
+  const found = records.get(id);
+  return found ? pictureOf(found) : null;
 }
 
 /** The original raw file for astrometry.net, or the kept picture when there is no separate solve file. */
 export async function pendingPhotoSolveFile(id: string): Promise<File | null> {
-  const found = await store.get(id);
+  const found = records.get(id);
   if (!found) return null;
-  return found.solvePicture
-    ? new File([found.solvePicture], found.solveName ?? found.name, {
-        type: found.solveType ?? '',
-      })
-    : new File([found.picture], pictureName(found.name, found.picture.type), {
-        type: found.picture.type,
-      });
+  return found.solvePicture ?? pictureOf(found);
 }
 
-/** Changes where a waiting photo stands; the solver's job, its submission and the failure reason are those given, or none. */
+/** The online solve a photo not placed is stored with, or null (none, or nothing astrometry.net still has). */
+export function onlineSolveOf(p: PendingPhoto): OnlineSolve | null {
+  if (p.state === 'toPlace' || p.state === 'placed') return null;
+  if (p.state !== 'failed' && !p.submissionId) return null;
+  return {
+    state: p.state,
+    sentAt: p.sentAt ?? new Date().toISOString(),
+    ...(p.submissionId ? { submissionId: p.submissionId } : {}),
+    ...(p.jobId ? { jobId: p.jobId } : {}),
+    ...(p.fits ? { fits: true } : {}),
+    ...(p.error ? { error: p.error } : {}),
+  };
+}
+
+/**
+ * Changes where a photo stands; the solver's job, its submission and the failure reason are those given, or none. A
+ * stored photo keeps its solve with it, so that it is followed again if the app stops.
+ */
 export async function setPendingState(
   id: string,
   state: PendingState,
-  details: { jobId?: string; submissionId?: number; error?: string } = {},
+  details: {
+    jobId?: string;
+    submissionId?: number;
+    error?: string;
+    sentAt?: string;
+    fits?: boolean;
+  } = {},
 ): Promise<void> {
-  const found = await store.get(id);
+  const found = records.get(id);
   if (!found) return;
-  const { jobId: _jobId, submissionId: _submissionId, error: _error, ...kept } = found;
+  delete found.jobId;
+  delete found.submissionId;
+  delete found.error;
   // A placement is held only while the photo is `placed`.
-  const { placement: _placement, ...unplaced } = kept;
-  const next: StoredPending = { ...(state === 'placed' ? kept : unplaced), state, ...details };
-  await store.put(next);
-  const record = recordOf(next);
-  pendingPhotos.value = pendingPhotos.value.map((p) => (p.id === id ? record : p));
+  if (state !== 'placed') delete found.placement;
+  Object.assign(found, { state }, details);
+  publish();
+  if (found.storedId && state !== 'placed') {
+    await setPhotoOnlineSolve(found.storedId, onlineSolveOf(found));
+  }
 }
 
-/** Forgets a waiting photo (it was placed, or removed). */
+/** Forgets a photo here (saved, given up, or deleted). */
 export async function removePendingPhoto(id: string): Promise<void> {
-  await store.delete(id);
-  pendingPhotos.value = pendingPhotos.value.filter((p) => p.id !== id);
+  records.delete(id);
+  publish();
 }
 
 const stripExtension = (name: string) => name.replace(/\.[^.]+$/, '');
 
 /**
- * Stores a waiting photo with its held placement, the metadata typed for it (the objects found in it added) and what its
- * file said (header cards), then forgets it here. The header cards are informative: the photo stays stored when they
- * cannot be saved. Fails when the photo has no placement.
+ * Saves a photo with the metadata typed for it (the objects found in it added), its held placement if it has one, and
+ * what its file said (header cards), then forgets it here. A new photo is stored, placed or not; a stored one ("À
+ * placer") gets its metadata and, once placed, its placement. The header cards are informative: the photo stays saved
+ * when they cannot be.
  */
 export async function storePendingPhoto(id: string): Promise<Photo> {
-  const found = await store.get(id);
-  if (!found?.placement) throw new Error(`No placement for the waiting photo ${id}`);
+  const found = records.get(id);
+  if (!found) throw new Error(`No photo ${id} to save`);
   const { placement, capture } = found;
-  const file = new File([found.picture], pictureName(found.name, found.picture.type), {
-    type: found.picture.type,
-  });
   const metadata = draftToMetadata(
     found.draft ?? draftOf(found.name, capture),
     stripExtension(found.name),
   );
+  const dsoIds = [...new Set([...metadata.dsoIds, ...(placement?.dsoIds ?? [])])];
   const captureDetails = Object.keys(metadata.captureDetails).length
     ? metadata.captureDetails
     : null;
-  const photo = await uploadPhoto(
-    file,
-    placement.correspondences,
-    placement.manualPlacement,
-    undefined,
-    {
-      dsoIds: [...new Set([...metadata.dsoIds, ...placement.dsoIds])],
-      labels: metadata.labels,
-      pointsOfInterest: metadata.pointsOfInterest,
-      integrations: metadata.integrations,
-      notes: metadata.notes,
-      displayName: metadata.originalName,
-      observationDate: metadata.observationDate,
-      captureDetails,
-      gearSetupId: metadata.gearSetupId,
-    },
-  );
-  let stored = photo;
-  if (capture?.fitsHeaders?.length) {
+  let photo: Photo;
+  if (found.storedId) {
+    await updatePhotoMetadata(found.storedId, { ...metadata, dsoIds, captureDetails });
+    photo = { ...found.stored!, ...metadata, dsoIds, captureDetails };
+    if (placement) {
+      const placed = await setPhotoPlacement(found.storedId, {
+        correspondences: placement.correspondences,
+        manualPlacement: placement.manualPlacement ?? null,
+      });
+      photo = { ...placed, ...metadata, dsoIds, captureDetails };
+    }
+  } else {
+    photo = await uploadPhoto(
+      pictureOf(found),
+      placement?.correspondences ?? [],
+      placement?.manualPlacement,
+      undefined,
+      {
+        dsoIds,
+        labels: metadata.labels,
+        pointsOfInterest: metadata.pointsOfInterest,
+        integrations: metadata.integrations,
+        notes: metadata.notes,
+        displayName: metadata.originalName,
+        observationDate: metadata.observationDate,
+        captureDetails,
+        gearSetupId: metadata.gearSetupId,
+      },
+    );
+    const solve = placement ? null : onlineSolveOf(found);
+    if (solve) {
+      await setPhotoOnlineSolve(photo.id, solve);
+      photo = { ...photo, onlineSolve: solve };
+    }
+  }
+  if (capture?.fitsHeaders?.length && !found.stored?.hasFitsHeaders) {
     try {
       await setPhotoFitsHeaders(photo.id, capture.fitsHeaders);
-      stored = { ...photo, hasFitsHeaders: true };
+      photo = { ...photo, hasFitsHeaders: true };
     } catch {
-      // The photo is placed; only its header cards are missing.
+      // The photo is saved; only its header cards are missing.
     }
   }
   await removePendingPhoto(id);
-  return stored;
+  return photo;
 }
