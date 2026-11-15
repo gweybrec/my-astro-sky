@@ -628,17 +628,6 @@ const en: Translations = {
     hintsInfoTryHints: 'Try adding a position hint (object name).',
     hintsInfoTryOnline: 'Use online solving if ASTAP fails.',
     hintsInfoManual: 'As a last resort, use manual star identification.',
-    manualInfoTitle: 'Manual identification — Help',
-    manualInfoWhen:
-      'Use when automatic plate solving fails, or for images with an unusual field of view.',
-    manualInfoMethodsTitle: 'Two approaches',
-    manualInfoMethodMap:
-      '<strong>Place directly on map</strong>: Drag and drop the photo to its approximate position on the sky map. Quick but less precise.',
-    manualInfoMethodStars:
-      '<strong>Identify 2–3 stars</strong>: Click on 2-3 recognizable stars in the photo, then identify each one by name or RA/Dec coordinates. The system places the photo precisely.',
-    manualInfoTipsTitle: 'Tip',
-    manualInfoSuggest:
-      'The "Suggest stars" button (after entering a target name in plate solving) lists bright nearby stars to help identify them.',
     metaInfoTitle: 'Additional info — Help',
     metaInfoAuto:
       'After a successful plate solve, objects in the image field are detected and filled in automatically.',

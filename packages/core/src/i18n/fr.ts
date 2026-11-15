@@ -635,17 +635,6 @@ const fr = {
     hintsInfoTryHints: "Essayez d'ajouter un indice de position (nom de l'objet).",
     hintsInfoTryOnline: 'Utilisez la résolution en ligne si ASTAP échoue.',
     hintsInfoManual: "En dernier recours, utilisez l'identification manuelle des étoiles.",
-    manualInfoTitle: 'Identification manuelle — Aide',
-    manualInfoWhen:
-      'À utiliser lorsque la résolution automatique échoue ou pour les images au champ inhabituel.',
-    manualInfoMethodsTitle: 'Deux approches',
-    manualInfoMethodMap:
-      '<strong>Placement direct sur la carte</strong> : Glissez-déposez la photo à son emplacement approximatif. Rapide mais moins précis.',
-    manualInfoMethodStars:
-      '<strong>Identifier 2–3 étoiles</strong> : Cliquez sur 2 à 3 étoiles reconnaissables dans la photo, puis identifiez chacune par son nom ou ses coordonnées RA/Déc. Le système positionne alors la photo précisément.',
-    manualInfoTipsTitle: 'Conseil',
-    manualInfoSuggest:
-      "Le bouton « Étoiles proches » (après avoir saisi un objet cible dans la résolution de plaque) liste les étoiles brillantes de la zone pour faciliter l'identification.",
     metaInfoTitle: 'Infos complémentaires — Aide',
     metaInfoAuto:
       'Après une résolution de plaque réussie, les objets du champ sont détectés et remplis automatiquement.',

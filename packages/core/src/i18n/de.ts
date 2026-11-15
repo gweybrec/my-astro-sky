@@ -634,17 +634,6 @@ const de: Translations = {
     hintsInfoTryHints: 'Versuche, einen Positionshinweis (Objektname) hinzuzufügen.',
     hintsInfoTryOnline: 'Online-Lösung verwenden, falls ASTAP fehlschlägt.',
     hintsInfoManual: 'Als letzten Ausweg die manuelle Sternidentifikation verwenden.',
-    manualInfoTitle: 'Manuelle Identifikation — Hilfe',
-    manualInfoWhen:
-      'Verwenden, wenn das automatische Plate Solving fehlschlägt oder für Bilder mit ungewöhnlichem Gesichtsfeld.',
-    manualInfoMethodsTitle: 'Zwei Ansätze',
-    manualInfoMethodMap:
-      '<strong>Direkt auf der Karte platzieren</strong>: Foto an die ungefähre Position auf der Himmelskarte ziehen und ablegen. Schnell, aber weniger präzise.',
-    manualInfoMethodStars:
-      '<strong>2–3 Sterne identifizieren</strong>: Auf 2-3 erkennbare Sterne im Foto klicken und jeden nach Name oder RA/Dekl.-Koordinaten identifizieren. Das System positioniert das Foto präzise.',
-    manualInfoTipsTitle: 'Tipp',
-    manualInfoSuggest:
-      'Die Schaltfläche "Sterne vorschlagen" (nach Eingabe eines Zielobjektnamens beim Plate Solving) listet helle Sterne in der Nähe auf, um die Identifikation zu erleichtern.',
     metaInfoTitle: 'Zusätzliche Informationen — Hilfe',
     metaInfoAuto:
       'Nach einem erfolgreichen Plate Solving werden Objekte im Bildfeld automatisch erkannt und eingetragen.',

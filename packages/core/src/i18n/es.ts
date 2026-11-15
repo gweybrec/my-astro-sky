@@ -633,17 +633,6 @@ const es: Translations = {
     hintsInfoTryHints: 'Intenta añadir una indicación de posición (nombre del objeto).',
     hintsInfoTryOnline: 'Usa la solución en línea si ASTAP falla.',
     hintsInfoManual: 'Como último recurso, usa la identificación manual de estrellas.',
-    manualInfoTitle: 'Identificación manual — Ayuda',
-    manualInfoWhen:
-      'Usar cuando la solución automática de placa falla o para imágenes con campo de visión inusual.',
-    manualInfoMethodsTitle: 'Dos enfoques',
-    manualInfoMethodMap:
-      '<strong>Colocar directamente en el mapa</strong>: Arrastra y suelta la foto en su posición aproximada en el mapa del cielo. Rápido pero menos preciso.',
-    manualInfoMethodStars:
-      '<strong>Identificar 2–3 estrellas</strong>: Haz clic en 2-3 estrellas reconocibles de la foto y luego identifica cada una por nombre o coordenadas AR/Dec. El sistema posiciona la foto con precisión.',
-    manualInfoTipsTitle: 'Consejo',
-    manualInfoSuggest:
-      'El botón "Sugerir estrellas" (tras introducir un nombre de objeto objetivo en la solución de placa) lista estrellas brillantes cercanas para facilitar la identificación.',
     metaInfoTitle: 'Información adicional — Ayuda',
     metaInfoAuto:
       'Tras una solución de placa exitosa, los objetos del campo de imagen se detectan y rellenan automáticamente.',
