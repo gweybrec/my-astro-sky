@@ -40,7 +40,7 @@
           {{ t('app.imageLoading') }}
         </div>
         <img
-          v-if="item.status !== 'converting' && thumbUrl"
+          v-if="item.status !== 'converting' && thumbUrl && thumbUrl !== 'pending'"
           class="batch-item-thumb"
           :src="thumbUrl"
           alt=""
@@ -285,7 +285,7 @@ import { applyWcsResultToItem } from '../../batch-wcs';
 import { photoSkyModel } from '@myastrosky/core/photo-placement';
 import { noSolutionMessage, readWcsFileForPhoto } from '../../wcs-load-flow';
 import { showFitsHeaders } from '../../wcs-dialogs';
-import { RAW_COMPANION_ACCEPT } from '@myastrosky/core/photo-formats';
+import { RAW_COMPANION_ACCEPT, isRawAstroFile } from '@myastrosky/core/photo-formats';
 import BatchSolveStatus from './BatchSolveStatus.vue';
 import MetadataEditorPanel from './MetadataEditorPanel.vue';
 import trashSvg from '../../icons/trash.svg?raw';
@@ -308,22 +308,46 @@ const canvasStore = useCanvasStore();
 // ─── Thumbnail lazy loading ───────────────────────────────────────────────────
 const cardEl = ref<HTMLElement | null>(null);
 const thumbUrl = ref('');
+/** The card has come near the viewport once (thumbnails are made lazily). */
+const cardSeen = ref(false);
 let cardObserver: IntersectionObserver | null = null;
+let thumbFile: File | null = null;
+
+// The file a thumbnail can be made from, or null. A raw .fit/.tiff/.xisf is nothing a
+// browser can decode: its card waits for the converted PNG. This depends only on the
+// item's current state, never on the order in which the modal swaps the file and changes
+// the status (an await between the two once left raw photos without a preview).
+const thumbSource = computed<File | null>(() => {
+  const { file, status } = props.item;
+  if (status === 'converting' || isRawAstroFile(file.name)) return null;
+  return file;
+});
+
+function revokeThumb() {
+  if (thumbUrl.value && thumbUrl.value !== 'pending') URL.revokeObjectURL(thumbUrl.value);
+}
+
+watch([cardSeen, thumbSource], ([seen, file]) => {
+  if (!seen || !file || file === thumbFile) return;
+  thumbFile = file;
+  revokeThumb();
+  thumbUrl.value = 'pending';
+  void generateThumbnail(file, 240).then((url) => {
+    if (thumbFile !== file) {
+      if (url) URL.revokeObjectURL(url); // a newer file took over meanwhile
+      return;
+    }
+    thumbUrl.value = url || '';
+  });
+});
 
 onMounted(() => {
   if (!cardEl.value) return;
   cardObserver = new IntersectionObserver(
     (entries) => {
-      for (const entry of entries) {
-        // A 'converting' item's file is still the raw .fit/.tiff — nothing a browser
-        // can decode into a thumbnail. Wait for the file swap below instead.
-        if (entry.isIntersecting && !thumbUrl.value && props.item.status !== 'converting') {
-          thumbUrl.value = 'pending'; // mark in-progress
-          generateThumbnail(props.item.file, 240).then((url) => {
-            thumbUrl.value = url || '';
-          });
-          cardObserver?.disconnect();
-        }
+      if (entries.some((entry) => entry.isIntersecting)) {
+        cardSeen.value = true;
+        cardObserver?.disconnect();
       }
     },
     { rootMargin: '400px 0px' },
@@ -333,28 +357,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   cardObserver?.disconnect();
-  if (thumbUrl.value && thumbUrl.value !== 'pending') {
-    URL.revokeObjectURL(thumbUrl.value);
-  }
+  thumbFile = null;
+  revokeThumb();
 });
-
-// A converted raw item swaps `item.file` from the raw source to the converted PNG once
-// conversion finishes — regenerate the thumbnail from the new file rather than leaving
-// the placeholder shown by the observer above (which deliberately skipped it).
-watch(
-  () => props.item.file,
-  (newFile, oldFile) => {
-    if (newFile === oldFile || props.item.status === 'converting') return;
-    if (thumbUrl.value && thumbUrl.value !== 'pending') {
-      URL.revokeObjectURL(thumbUrl.value);
-    }
-    thumbUrl.value = 'pending';
-    generateThumbnail(newFile, 240).then((url) => {
-      thumbUrl.value = url || '';
-    });
-    cardObserver?.disconnect();
-  },
-);
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const displayName = computed(() => props.item.customName || stripExtension(props.item.file.name));

@@ -130,11 +130,15 @@ beforeEach(() => {
     dsoIds: [],
   });
 
-  // IntersectionObserver is not available in happy-dom
+  // IntersectionObserver is not available in happy-dom: report every card as on screen,
+  // as a browser does for the cards of a freshly opened window.
   vi.stubGlobal(
     'IntersectionObserver',
     class {
-      observe() {}
+      constructor(private callback: (entries: { isIntersecting: boolean }[]) => void) {}
+      observe() {
+        this.callback([{ isIntersecting: true }]);
+      }
       disconnect() {}
     },
   );
@@ -441,6 +445,51 @@ describe('BatchCard — raw conversion progress', () => {
     await flushPromises();
 
     expect(generateThumbnail).toHaveBeenCalledWith(pngFile, 240);
+    wrapper.unmount();
+  });
+
+  // Regression (came back several times): the modal swaps in the PNG, awaits the setup
+  // suggested by the header, and only then changes the status. The preview must show up
+  // whatever the order and however long the gap between the two.
+  it.each([
+    ['the file first, the status after a wait', ['file', 'wait', 'status']],
+    ['the status first, the file after a wait', ['status', 'wait', 'file']],
+  ])('makes the preview of a converted raw photo with %s', async (_label, steps) => {
+    vi.mocked(generateThumbnail).mockResolvedValue('blob:preview');
+    const rawFile = new File(['raw'], 'M101.fit');
+    const item = reactive(makeItem({ status: 'converting', rawName: 'M101.fit', file: rawFile }));
+    const wrapper = mount(BatchCard, {
+      props: { item, solverAvailability: allAvailable, knownFilterMap: new Map() },
+      global: { stubs: { BatchSolveStatus: true, MetadataEditorPanel: true } },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    const pngFile = new File(['png'], 'M101.png', { type: 'image/png' });
+
+    for (const step of steps) {
+      if (step === 'file') item.file = pngFile;
+      else if (step === 'status') item.status = 'pending';
+      await flushPromises(); // the watchers run here, between the two changes
+    }
+
+    expect(generateThumbnail).toHaveBeenCalledTimes(1);
+    expect(generateThumbnail).toHaveBeenCalledWith(pngFile, 240);
+    expect(wrapper.find('img.batch-item-thumb').attributes('src')).toBe('blob:preview');
+    wrapper.unmount();
+    vi.mocked(generateThumbnail).mockResolvedValue('');
+  });
+
+  it('never tries to make a preview from a raw file whose conversion failed', async () => {
+    const item = reactive(
+      makeItem({ status: 'failed', rawName: 'M101.fit', file: new File(['raw'], 'M101.fit') }),
+    );
+    const wrapper = mount(BatchCard, {
+      props: { item, solverAvailability: allAvailable, knownFilterMap: new Map() },
+      global: { stubs: { BatchSolveStatus: true, MetadataEditorPanel: true } },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    expect(generateThumbnail).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 });
