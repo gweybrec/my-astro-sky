@@ -1382,6 +1382,7 @@ describe('online solving routes (astrometry.net)', () => {
       expect(r.body.correspondences.length).toBeGreaterThanOrEqual(3);
       expect(recorded.map((x) => `${x.method} ${x.url}`)).toEqual([
         `GET ${API}/jobs/10796000`,
+        `GET ${API}/jobs/10796000/info/`,
         'GET https://nova.astrometry.net/wcs_file/10796000/',
         `GET ${API}/jobs/10796000/objects_in_field/`,
       ]);
@@ -1422,8 +1423,9 @@ describe('online solving routes (astrometry.net)', () => {
       );
       expect(r.status).toBe(200);
       expect(typeof r.body.success).toBe('boolean');
-      expect(recorded.map((x) => x.url).slice(0, 3)).toEqual([
+      expect(recorded.map((x) => x.url).slice(0, 4)).toEqual([
         `${API}/jobs/10796000`,
+        `${API}/jobs/10796000/info/`,
         'https://nova.astrometry.net/wcs_file/10796000/',
         `${API}/jobs/10796000/calibration/`,
       ]);

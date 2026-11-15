@@ -40,7 +40,7 @@ A TIFF, FITS or XISF import is converted to a PNG for display; the original file
 | TIFF     | the PNG        | the PNG       | the TIFF file |
 | XISF     | the PNG        | the PNG       | the PNG       |
 
-astrometry.net and ASTAP read FITS only. A solution computed on a raw FITS is in the FITS file's own pixels (row 1 at the bottom, as `fits-decoder.ts` draws it), so every path that solves a FITS passes `fitsYConvention=true`: ASTAP always, solve-field by extension, and astrometry.net (`nova-solve.ts`) by the submitted file's name. astrometry.net's calibration fallback, which has no flag, mirrors `photoY` for a FITS instead.
+astrometry.net and ASTAP read FITS only. A solution computed on a raw FITS is in the FITS file's own pixels (row 1 at the bottom, as `fits-decoder.ts` draws it), so every path that solves a FITS passes `fitsYConvention=true`: ASTAP always, solve-field by extension, and astrometry.net (`nova-solve.ts`) by the submitted file's name. astrometry.net's calibration fallback, which has no flag, mirrors `photoY` for a FITS instead. Reusing an astrometry.net job for another picture goes by the name of the file that job solved (`original_filename` of its details), not by the picture's own type: the desktop reuses with the PNG converted from a FITS, which shows the same way up as the FITS, so a job solved on a FITS still needs `fitsYConvention=true`.
 
 The size of a FITS file comes from its header (`fitsImageSize`: `NAXIS1`, `NAXIS2`), never from an image codec and not from its WCS, so a FITS with no plate solution still has a size. The local routes accept `.fit`/`.fits` for ASTAP and solve-field, and `.tif`/`.tiff` for solve-field only. A FITS has no EXIF orientation.
 

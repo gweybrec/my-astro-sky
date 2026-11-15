@@ -585,6 +585,8 @@ describe('reuseSubmission()', () => {
     fetchMock
       // job status
       .mockResolvedValueOnce(jsonResp({ status: 'success' }))
+      // job details: the name of the file solved (a JPEG: rows from the top)
+      .mockResolvedValueOnce(jsonResp({ original_filename: 'photo.jpg' }))
       // WCS file — must include 'CRPIX1' so the code parses it
       .mockResolvedValueOnce(textResp('CRPIX1 = 960 / Reference pixel\nCRPIX2 = 540'))
       // objects_in_field
@@ -630,6 +632,8 @@ describe('reuseSubmission()', () => {
     fetchMock
       // job status
       .mockResolvedValueOnce(jsonResp({ status: 'success' }))
+      // job details: the name of the file solved (a JPEG: rows from the top)
+      .mockResolvedValueOnce(jsonResp({ original_filename: 'photo.jpg' }))
       // WCS file — no CRPIX1, so fallback triggers
       .mockResolvedValueOnce(textResp('SIMPLE = T / no WCS keywords here'))
       // calibration endpoint
@@ -648,6 +652,8 @@ describe('reuseSubmission()', () => {
     mockWcsCorrs.mockReturnValue([] as any);
     fetchMock
       .mockResolvedValueOnce(jsonResp({ status: 'success' }))
+      // job details: the name of the file solved (a JPEG: rows from the top)
+      .mockResolvedValueOnce(jsonResp({ original_filename: 'photo.jpg' }))
       .mockResolvedValueOnce(textResp('SIMPLE = T'))
       .mockResolvedValueOnce(
         jsonResp({ ra: 84.05, dec: -1.2, pixscale: 1.5, orientation: 0, parity: 1.0 }),
@@ -677,6 +683,8 @@ describe('reuseSubmission()', () => {
 
     fetchMock
       .mockResolvedValueOnce(jsonResp({ status: 'success' }))
+      // job details: the name of the file solved (a JPEG: rows from the top)
+      .mockResolvedValueOnce(jsonResp({ original_filename: 'photo.jpg' }))
       .mockResolvedValueOnce(textResp('CRPIX1 = 960'))
       .mockResolvedValueOnce(
         jsonResp({ ra: 84.05, dec: -1.2, pixscale: 1.5, orientation: 0, parity: 1 }),

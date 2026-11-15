@@ -494,6 +494,63 @@ describe('reuse()', () => {
     });
   });
 
+  it('reads the solution of a FITS solved by astrometry.net with its rows from the bottom', async () => {
+    const solvedAs = (name: string | null) =>
+      setup({
+        route: (r) =>
+          r.url === `${API}/jobs/10796000`
+            ? json({ status: 'success' })
+            : r.url === `${API}/jobs/10796000/info/`
+              ? name
+                ? json({ status: 'success', original_filename: name })
+                : reply('', 404)
+              : r.url === 'https://nova.astrometry.net/wcs_file/10796000/'
+                ? reply(WCS_TEXT)
+                : reply('', 404),
+      });
+    const t = solvedAs('m13.fit');
+    const fits = (await t.service.reuse(t.file, 10796000)).correspondences!;
+    const u = solvedAs('m13.jpg');
+    const jpeg = (await u.service.reuse(u.file, 10796000)).correspondences!;
+    // The 9 points run row by row from the top: the FITS reading puts on top what the JPEG one puts at the bottom.
+    const mirrored = [6, 7, 8, 3, 4, 5, 0, 1, 2];
+    expect(fits).toHaveLength(9);
+    fits.forEach((c, i) => {
+      expect([c.photoX, c.photoY]).toEqual([jpeg[i].photoX, jpeg[i].photoY]);
+      // One pixel apart (the FITS rows count from 1 at the bottom edge).
+      expect(c.starRa).toBeCloseTo(jpeg[mirrored[i]].starRa!, 2);
+      expect(c.starDec).toBeCloseTo(jpeg[mirrored[i]].starDec!, 2);
+    });
+    expect(fits[0].starDec).not.toBeCloseTo(jpeg[0].starDec!, 2);
+    // Without the name of the file solved, the picture's own type decides (here a JPEG).
+    const v = solvedAs(null);
+    expect((await v.service.reuse(v.file, 10796000)).correspondences).toEqual(jpeg);
+  });
+
+  it('takes the name of the file solved from the list already loaded, without asking again', async () => {
+    const t = setup({
+      route: (r) => {
+        const login = loginOk(r.url);
+        if (login) return login;
+        if (r.url === `${API}/myjobs/`) return json({ jobs: [10796000] });
+        if (r.url === `${API}/jobs/10796000/info/`)
+          return json({
+            status: 'success',
+            original_filename: 'm13.fit',
+            width: 3840,
+            height: 2160,
+          });
+        if (r.url === `${API}/jobs/10796000`) return json({ status: 'success' });
+        if (r.url === 'https://nova.astrometry.net/wcs_file/10796000/') return reply(WCS_TEXT);
+        return reply('', 404);
+      },
+    });
+    await t.service.listSubmissions();
+    const before = t.calls.length;
+    expect((await t.service.reuse(t.file, 10796000)).success).toBe(true);
+    expect(t.calls.slice(before).some((c) => c.url.endsWith('/info/'))).toBe(false);
+  });
+
   it('refuses a solution of another shape, with the message the route sends', async () => {
     const t = setup({
       size: { width: 100, height: 100 },

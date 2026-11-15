@@ -523,10 +523,31 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
     }
   }
 
+  /**
+   * Whether astrometry.net solved a FITS file for this job: its solution then counts rows from the bottom. Read
+   * from the name of the file sent (the details the list already holds, else one request); `fallback` when unknown.
+   */
+  async function solvedFileIsFits(jobId: number, fallback: boolean): Promise<boolean> {
+    let fileName = finishedInfo.get(jobId)?.filename;
+    if (!fileName) {
+      try {
+        const res = checkRateLimit(
+          await http({ method: 'GET', url: `${API_BASE}/jobs/${jobId}/info/` }),
+        );
+        if (isOk(res)) fileName = (await readJson(res))?.original_filename;
+      } catch (err) {
+        if (isRateLimited(err)) throw err;
+        log?.('astrometry_job_info_failed', err, { jobId });
+      }
+    }
+    return typeof fileName === 'string' && fileName ? isFitsFile(fileName) : fallback;
+  }
+
   async function reuseSolved(
     jobId: number,
     imageWidth: number,
     imageHeight: number,
+    pictureIsFits: boolean,
   ): Promise<NovaReuseResult> {
     try {
       const jobData = await readJson(
@@ -535,6 +556,10 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
       if (jobData.status !== 'success') {
         return { success: false, error: `Job ${jobId} status: ${jobData.status}` };
       }
+      // The solution is in the pixels of the file astrometry.net solved: a FITS counts its rows from the bottom, as
+      // the app draws it, whatever the type of the picture it is reused for (a PNG exported from that FITS shows
+      // the same way up).
+      const solvedFits = await solvedFileIsFits(jobId, pictureIsFits);
 
       // The WCS file first.
       try {
@@ -566,6 +591,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
             solutionToWcs(parsed, originalWidth, originalHeight),
             originalWidth,
             originalHeight,
+            solvedFits,
           ).map((c) => ({ ...c, photoX: c.photoX * scaleX, photoY: c.photoY * scaleY }));
           if (correspondences.length >= 3) {
             return { success: true, correspondences, dsoIds: await fetchObjectsInField(jobId) };
@@ -578,7 +604,11 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
 
       // Fallback: the calibration.
       const cal = await fetchCalibration(jobId);
-      const correspondences = calibrationToCorrespondences(cal, imageWidth, imageHeight);
+      const found = calibrationToCorrespondences(cal, imageWidth, imageHeight);
+      // The calibration counts rows from the top of the picture as read; a FITS is drawn from the bottom.
+      const correspondences = solvedFits
+        ? found.map((c) => ({ ...c, photoY: imageHeight - c.photoY }))
+        : found;
       if (correspondences.length >= 3) {
         return { success: true, correspondences, dsoIds: await fetchObjectsInField(jobId) };
       }
@@ -627,7 +657,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
         throw new DomainError('invalid', 'Invalid job ID', { code: 'INVALID_JOB_ID' });
       }
       const { width, height } = await requireDimensions(file);
-      return reuseSolved(jobId, width, height);
+      return reuseSolved(jobId, width, height, isFitsFile(file.fileName));
     },
   };
 }
