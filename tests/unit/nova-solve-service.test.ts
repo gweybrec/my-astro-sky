@@ -211,7 +211,17 @@ describe('submit()', () => {
       type: 'application/octet-stream',
       bytes: t.file.bytes,
     });
-    expect(t.calls[1].headers).toBeUndefined();
+    // No Content-Type: the client sets the form's own, with its boundary.
+    expect(t.calls[1].headers).toEqual({ 'User-Agent': 'MyAstroSky' });
+  });
+
+  it('names the app in every request: astrometry.net answers a browser User-Agent with a page for crawlers', async () => {
+    const t = setup({
+      route: (r) => loginOk(r.url) ?? json({ status: 'success', subid: 5 }),
+    });
+    await t.service.submit(t.file);
+    expect(t.calls.length).toBeGreaterThan(1);
+    for (const call of t.calls) expect(call.headers?.['User-Agent']).toBe('MyAstroSky');
   });
 
   it('logs in again after resetSession()', async () => {

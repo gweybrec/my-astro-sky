@@ -33,6 +33,7 @@ import { isFitsFile } from '../photo-formats';
 
 const API_BASE = 'https://nova.astrometry.net/api';
 const WCS_FILE_BASE = 'https://nova.astrometry.net/wcs_file';
+const USER_AGENT = 'MyAstroSky';
 const API_KEY_SETTING = 'ASTROMETRY_API_KEY';
 const JOB_TTL_MS = 60 * 60 * 1000; // 1 hour
 /** Waits between two polls (the last one repeats). */
@@ -136,7 +137,11 @@ const formBody = (payload: unknown) =>
   `request-json=${encodeURIComponent(JSON.stringify(payload))}`;
 
 export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveService {
-  const { http, settings, images, now, newId, log } = deps;
+  const { settings, images, now, newId, log } = deps;
+  // astrometry.net sends a request with a browser's User-Agent (the phone's WebView) to a page of random text meant
+  // for web crawlers instead of its answer: every request names the app.
+  const http: HttpClient = (request) =>
+    deps.http({ ...request, headers: { 'User-Agent': USER_AGENT, ...request.headers } });
   const sleep = deps.sleep ?? defaultSleep;
   const jobs = new Map<string, Job>();
   /** The details of finished jobs of the account, by job id. */
