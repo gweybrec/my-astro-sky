@@ -33,10 +33,10 @@ import {
   addPendingPhoto,
   configurePendingStore,
   createMemoryPendingStore,
+  pendingPlacement,
   pendingPhotos,
 } from '../src/pending-photos';
 import { skyStarPick } from '../src/sky-modes';
-import { skyPhotoFocus } from '../src/composables/useSkySelection';
 import { identifyPoints } from '../src/star-identify-session';
 
 /** "Identifier les étoiles": a waiting photo placed by naming 2 or 3 of its stars. */
@@ -125,7 +125,6 @@ describe('identifying the stars of a waiting photo', () => {
     replace.mockReset();
     back.mockReset();
     skyStarPick.value = null;
-    skyPhotoFocus.value = null;
     globalThis.URL.createObjectURL = vi.fn(() => 'blob:photo');
     globalThis.URL.revokeObjectURL = vi.fn();
   });
@@ -255,7 +254,7 @@ describe('identifying the stars of a waiting photo', () => {
     w.unmount();
   });
 
-  it('stores the photo with its named points and the objects in it, then shows it on the map', async () => {
+  it("holds the named points and the objects in it as the placement, then opens the photo's page again", async () => {
     const { w, pending } = await mountPage();
     await tap(w, 300, 300);
     await nameByCoordinates(w, ['14', '3', '12', '54', '20', '57']);
@@ -267,8 +266,9 @@ describe('identifying the stars of a waiting photo', () => {
     expect(validateButton(w).attributes('disabled')).toBeUndefined();
     await validateButton(w).trigger('click');
     await flushPromises();
-    const [file, correspondences, manual, , meta] = uploadPhoto.mock.calls[0];
-    expect((file as File).name).toBe('M101.jpg');
+    expect(uploadPhoto).not.toHaveBeenCalled();
+    const held = (await pendingPlacement(pending.id))!;
+    const { correspondences, manualPlacement: manual } = held;
     expect(manual).toBeUndefined();
     expect(
       (correspondences as PhotoCorrespondence[]).map((c) => [
@@ -283,7 +283,7 @@ describe('identifying the stars of a waiting photo', () => {
       [2, 2000, 1800, 0],
     ]);
     expect((correspondences as PhotoCorrespondence[])[0].starRa).toBeCloseTo(210.8, 1);
-    expect(meta).toEqual({ dsoIds: ['M101'], displayName: 'M101' });
+    expect([held.dsoIds, held.by]).toEqual([['M101'], 'stars']);
     // The photo is placed by its three points: each lands on its own sky position.
     const model = findDSOsInImage.mock.calls[0][0] as PhotoSkyModel;
     for (const c of correspondences as PhotoCorrespondence[]) {
@@ -291,9 +291,13 @@ describe('identifying the stars of a waiting photo', () => {
       expect(s.ra).toBeCloseTo(c.starRa!, 4);
       expect(s.dec).toBeCloseTo(c.starDec!, 4);
     }
-    expect(pendingPhotos.value).toHaveLength(0);
-    expect(skyPhotoFocus.value).toBe('p9');
-    expect(replace).toHaveBeenCalledWith('/tabs/sky');
+    expect(pendingPhotos.value[0]).toMatchObject({
+      state: 'placed',
+      placedBy: 'stars',
+      starCount: 3,
+    });
+    expect(replace).toHaveBeenCalledWith('/tabs/gallery');
+    expect(push).toHaveBeenCalledWith(`/gallery/pending/${pending.id}`);
     // The next identification of a photo starts again with no point.
     expect(identifyPoints(pending.id).every((p) => p.at === null)).toBe(true);
     w.unmount();
@@ -304,6 +308,7 @@ describe('identifying the stars of a waiting photo', () => {
     await w.find('header.mob-topbar [aria-label="Retour"]').trigger('click');
     await flushPromises();
     expect(replace).toHaveBeenCalledWith('/tabs/gallery');
+    expect(push).toHaveBeenCalledWith(`/gallery/pending/${pendingPhotos.value[0].id}`);
     expect(pendingPhotos.value).toHaveLength(1);
     w.unmount();
   });

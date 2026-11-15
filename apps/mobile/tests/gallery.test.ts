@@ -61,14 +61,12 @@ vi.mock('../src/composables/useConfirm', () => ({ useConfirm: () => ({ confirm }
 import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
 import GalleryPage from '../src/pages/GalleryPage.vue';
 import { clearGalleryFilters, galleryFilters, loadGalleryDisplay } from '../src/gallery-display';
-import { skyPlacement } from '../src/sky-modes';
-import { clearImport, importItems } from '../src/composables/usePhotoImport';
+import { importRows, resetImport } from '../src/composables/usePhotoImport';
 import {
   addPendingPhoto,
   configurePendingStore,
-  loadPendingPhotos,
-  pendingPhotos,
   createMemoryPendingStore,
+  holdPendingPlacement,
   setPendingState,
 } from '../src/pending-photos';
 
@@ -92,7 +90,7 @@ describe('the gallery page', () => {
     pickGalleryPhotos.mockReset();
     loadServerSettings.mockReset().mockResolvedValue({ apiKeySet: true });
     submitPlateSolve.mockReset().mockResolvedValue({ jobId: 'job-1' });
-    clearImport();
+    resetImport();
     configurePendingStore(createMemoryPendingStore());
   });
 
@@ -216,7 +214,10 @@ describe('the gallery page', () => {
     await choose.trigger('click');
     await flushPromises();
     expect(pickFiles).toHaveBeenCalledWith(expect.anything(), true);
-    expect(importItems.value.map((i) => i.name)).toEqual(['M42.jpg']);
+    await flushPromises();
+    expect(
+      importRows.value.map((r) => (r.kind === 'pending' ? r.photo.name : r.file.name)),
+    ).toEqual(['M42.jpg']);
     expect(push).toHaveBeenCalledWith('/gallery/import');
   });
 
@@ -273,7 +274,7 @@ describe('the gallery page', () => {
     onLine.mockRestore();
   });
 
-  it('shows a solve astrometry.net has not finished as "Non terminée", and asks how to place it on a tap', async () => {
+  it('shows a solve astrometry.net has not finished as "Non terminée", and opens its page on a tap', async () => {
     getPhotos.mockResolvedValue([]);
     const photo = await addPendingPhoto(new Blob(['x']), 'NGC7000.tif');
     await setPendingState(photo.id, 'unfinished', { submissionId: 42 });
@@ -283,129 +284,29 @@ describe('the gallery page', () => {
     expect(tile.attributes('aria-label')).toBe('NGC7000.tif : Non terminée');
     expect(tile.find('.mob-photo-state').classes()).not.toContain('mob-photo-state--busy');
     await tile.trigger('click');
-    await flushPromises();
-    expect(wrapper.text()).toContain('Comment placer cette photo ?');
-    expect(rowWith(wrapper, 'Réutiliser une solution astrometry.net').exists()).toBe(true);
+    expect(push).toHaveBeenCalledWith(`/gallery/pending/${photo.id}`);
   });
 
-  const openMethods = async (wrapper: ReturnType<typeof mountPage>) => {
-    await wrapper.find('.mob-photo-card:has(.mob-photo-state)').trigger('click');
-    await flushPromises();
-    return rowWith(wrapper, 'Résoudre en ligne');
-  };
-
-  it('asks how to place a waiting photo and sends it to the online solver', async () => {
+  it('opens the page "Photo à ajouter" of a waiting photo on a tap, even while it is being solved', async () => {
     getPhotos.mockResolvedValue([]);
     const photo = await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
+    await setPendingState(photo.id, 'solving', { jobId: 'job-1' });
     const wrapper = mountPage();
     await flushPromises();
-    const online = await openMethods(wrapper);
-    expect(wrapper.text()).toContain('Comment placer cette photo ?');
-    expect(online.text()).toContain('astrometry.net, nécessite une connexion');
-    expect(wrapper.text()).not.toContain("Résoudre sur l'ordinateur");
-    expect(rowWith(wrapper, 'Identifier 3 étoiles').text()).toContain('Touchez 3 étoiles');
-    expect(rowWith(wrapper, 'Placer à la main').text()).toContain('Déplacer, agrandir et tourner');
-    await online.trigger('click');
-    await flushPromises();
-    expect(submitPlateSolve.mock.calls[0][0].name).toBe('NGC7000.tif');
-    expect(wrapper.find('.mob-photo-card').attributes('aria-label')).toBe(
-      'NGC7000.tif : Résolution',
-    );
-    // A photo being solved does not ask again.
     await wrapper.find('.mob-photo-card').trigger('click');
-    await setPendingState(photo.id, 'failed', { error: 'no stars' });
-    await flushPromises();
-    expect(wrapper.find('.mob-photo-card').attributes('aria-label')).toBe(
-      'NGC7000.tif : Échec de la résolution',
-    );
+    expect(push).toHaveBeenCalledWith(`/gallery/pending/${photo.id}`);
   });
 
-  it('deletes a waiting photo from the red last row, after asking', async () => {
+  it('says how a placed photo not saved yet was placed, and leaves the photos of an open import to the import', async () => {
     getPhotos.mockResolvedValue([]);
-    await addPendingPhoto(new Blob(['y']), 'M101.jpg');
+    const placed = await addPendingPhoto(new Blob(['y']), 'M101.jpg');
+    await holdPendingPlacement(placed.id, { correspondences: [], dsoIds: [], by: 'hand' });
+    await addPendingPhoto(new Blob(['z']), 'M33.jpg', undefined, undefined, { inImport: true });
     const wrapper = mountPage();
     await flushPromises();
-    await openMethods(wrapper);
-    const row = rowWith(wrapper, 'Supprimer cette photo');
-    expect(row.classes()).toContain('mob-row--danger');
-    confirm.mockReset().mockResolvedValueOnce(false);
-    await row.trigger('click');
-    await flushPromises();
-    expect(confirm.mock.calls[0][0].message).toContain('M101.jpg');
-    expect(wrapper.findAll('.mob-photo-card')).toHaveLength(1);
-    await openMethods(wrapper);
-    confirm.mockResolvedValueOnce(true);
-    await rowWith(wrapper, 'Supprimer cette photo').trigger('click');
-    await flushPromises();
-    expect(wrapper.findAll('.mob-photo-card')).toHaveLength(0);
-    // gone from the phone's store too, not only from the list
-    await loadPendingPhotos();
-    expect(pendingPhotos.value).toEqual([]);
-  });
-
-  it('places a waiting photo by hand on the sky map', async () => {
-    getPhotos.mockResolvedValue([]);
-    const photo = await addPendingPhoto(new Blob(['y']), 'M101.jpg');
-    const wrapper = mountPage();
-    await flushPromises();
-    await openMethods(wrapper);
-    await rowWith(wrapper, 'Placer à la main').trigger('click');
-    expect(skyPlacement.value).toEqual({ pendingId: photo.id });
-    expect(push).toHaveBeenCalledWith('/tabs/sky');
-    skyPlacement.value = null;
-  });
-
-  it('opens the star identification of a waiting photo', async () => {
-    getPhotos.mockResolvedValue([]);
-    const photo = await addPendingPhoto(new Blob(['y']), 'M101.jpg');
-    const wrapper = mountPage();
-    await flushPromises();
-    await openMethods(wrapper);
-    await rowWith(wrapper, 'Identifier 3 étoiles').trigger('click');
-    expect(push).toHaveBeenCalledWith(`/gallery/identify/${photo.id}`);
-  });
-
-  it('opens the page that reuses an astrometry.net solution for a waiting photo', async () => {
-    getPhotos.mockResolvedValue([]);
-    const photo = await addPendingPhoto(new Blob(['y']), 'M35.fit');
-    const wrapper = mountPage();
-    await flushPromises();
-    await openMethods(wrapper);
-    const row = rowWith(wrapper, 'Réutiliser une solution astrometry.net');
-    expect(row.text()).toContain('Une photo déjà résolue sur votre compte astrometry.net');
-    await row.trigger('click');
-    expect(push).toHaveBeenCalledWith(`/gallery/reuse/${photo.id}`);
-  });
-
-  it('greys out the online solve without a connection, and without the astrometry.net key', async () => {
-    getPhotos.mockResolvedValue([]);
-    await addPendingPhoto(new Blob(['y']), 'NGC7000.tif');
-    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
-    const wrapper = mountPage();
-    await flushPromises();
-    let online = await openMethods(wrapper);
-    expect(online.classes()).toContain('mob-row--disabled');
-    expect(online.text()).toContain('Aucune connexion internet');
-    await online.trigger('click');
-    await flushPromises();
-    expect(submitPlateSolve).not.toHaveBeenCalled();
-    // Reusing a solution needs the same, and says the same.
-    const reuse = rowWith(wrapper, 'Réutiliser une solution astrometry.net');
-    expect(reuse.classes()).toContain('mob-row--disabled');
-    expect(reuse.text()).toContain('Aucune connexion internet');
-    await reuse.trigger('click');
-    expect(push).not.toHaveBeenCalled();
-    onLine.mockRestore();
-
-    loadServerSettings.mockResolvedValue({ apiKeySet: false });
-    const second = mountPage();
-    await flushPromises();
-    online = await openMethods(second);
-    expect(online.classes()).toContain('mob-row--disabled');
-    expect(online.text()).toContain('Clé API non configurée');
-    expect(rowWith(second, 'Réutiliser une solution astrometry.net').text()).toContain(
-      'Clé API non configurée',
-    );
+    expect(wrapper.findAll('.mob-photo-card').map((t) => t.attributes('aria-label'))).toEqual([
+      'M101.jpg : ✓ Placée à la main',
+    ]);
   });
 
   it('hides the waiting photos with the user own ones when "Mon ciel" is not ticked', async () => {
@@ -717,7 +618,10 @@ describe('the gallery page', () => {
     await wrapper.find('.mob-empty button').trigger('click');
     await rowWith(wrapper, 'Depuis la galerie du téléphone').trigger('click');
     await flushPromises();
-    expect(importItems.value.map((i) => i.name)).toEqual(['IMG_0001.jpg']);
+    await flushPromises();
+    expect(
+      importRows.value.map((r) => (r.kind === 'pending' ? r.photo.name : r.file.name)),
+    ).toEqual(['IMG_0001.jpg']);
     expect(push).toHaveBeenCalledWith('/gallery/import');
   });
 });

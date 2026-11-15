@@ -1,172 +1,147 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { IonPage, IonContent, IonList, onIonViewDidLeave } from '@ionic/vue';
+import { IonPage, IonContent, IonList } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
+import { useBackClose } from '../composables/useBackClose';
+import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
-import { skyPlacement } from '../sky-modes';
-import { endIdentify } from '../star-identify-session';
 import {
-  clearImport,
+  discardImport,
   importAll,
   importBusy,
-  importItems,
+  importRows,
   importableCount,
-  keepImportPending,
-  solveImportOnline,
-  type ImportItem,
+  type ImportRow,
 } from '../composables/usePhotoImport';
+import { pendingStateText, pendingStatus } from '../pending-display';
+import { solvedPhotoCount } from '../pending-solve';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneFooter from '../components/PhoneFooter.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import PhoneRow from '../components/PhoneRow.vue';
-import PlacementMethodSheet from './gallery/PlacementMethodSheet.vue';
 import imageIcon from '@icons/image.svg?raw';
 
-// The page "Importer des photos": one row per chosen file with where it stands, and the button that imports them all.
-// A solved TIFF, FITS or XISF says where the photo is on the sky, so it is stored placed; the other photos are kept
-// waiting and shown in the gallery as "À placer". A tap on a photo to place, or on one whose solve failed, asks how to
-// place it (boards "Importer, méthode de placement" and "Importer, échec de la résolution"); solved online from here,
-// the row shows "Résolution" and leaves the list once the photo is placed.
+// The page "Importer des photos": one row per chosen file with where it stands; a tap opens its page "Photo à ajouter"
+// (placement methods and metadata), which comes back here. The list stays as it is while those pages are open.
+// Importer stores the placed photos with their metadata and sends the others to the gallery as waiting photos, with
+// theirs. Leaving with photos in the list asks first (board "Importer, abandonner l'import"): they are not added.
 const router = useRouter();
+const { confirm } = useConfirm();
 const { showError } = useErrorToast();
 const importing = ref(false);
-/** The photo whose placement method is being chosen (shallow: what its file said is kept on the phone as it is). */
-const placing = shallowRef<ImportItem | null>(null);
-const methodOpen = ref(false);
-
-const canChoose = (item: ImportItem) =>
-  item.status === 'toPlace' ||
-  item.status === 'solveFailed' ||
-  item.status === 'solveOffline' ||
-  item.status === 'solveUnfinished';
-
-function chooseMethod(item: ImportItem) {
-  if (!canChoose(item)) return;
-  placing.value = item;
-  methodOpen.value = true;
-}
-
-function solveOnline() {
-  if (placing.value) void solveImportOnline(placing.value);
-}
-
-// Placing by hand is done on the sky map: the photo is kept as a waiting photo first, as for a solve.
-async function placeByHand() {
-  if (!placing.value) return;
-  try {
-    skyPlacement.value = { pendingId: await keepImportPending(placing.value) };
-    await router.push('/tabs/sky');
-  } catch (error) {
-    void showError(error);
-  }
-}
-
-// Identifying stars is done on its own page: the photo is kept as a waiting photo first, as for a solve, and its page is
-// opened from the gallery, as a tap on the waiting photo does (this page empties its list when it is left anyway). Opened
-// over this page, two levels above the tabs, its way to the map showed the Galerie tab under the Ciel tab's address.
-async function identify() {
-  if (!placing.value) return;
-  try {
-    const id = await keepImportPending(placing.value);
-    endIdentify(id);
-    await router.replace('/tabs/gallery');
-    await router.push(`/gallery/identify/${id}`);
-  } catch (error) {
-    void showError(error);
-  }
-}
-
-// Reusing a solution of the astrometry.net account: the photo is kept waiting first, and its page opened from the gallery,
-// as for identifying stars.
-async function reuse() {
-  if (!placing.value) return;
-  try {
-    const id = await keepImportPending(placing.value);
-    await router.replace('/tabs/gallery');
-    await router.push(`/gallery/reuse/${id}`);
-  } catch (error) {
-    void showError(error);
-  }
-}
+let leaving = false;
 
 const title = computed(() =>
-  importItems.value.length === 1
+  importRows.value.length === 1
     ? t('mobile.gallery.importOne')
-    : t('mobile.gallery.importMany', { n: importItems.value.length }),
+    : t('mobile.gallery.importMany', { n: importRows.value.length }),
 );
 
-const stateOf = (item: ImportItem) => {
-  switch (item.status) {
-    case 'converting':
-      return t('batch.statusConverting');
-    case 'solved':
-      return t('mobile.gallery.alreadySolved');
-    case 'importing':
-      return t('batch.statusPlacing');
-    case 'failed':
-      return item.error || t('batch.statusFailed');
-    case 'solving':
-      return t('mobile.gallery.solving');
-    case 'solveOffline':
-      return t('mobile.gallery.solvingOffline');
-    case 'solveFailed':
-      return t('batch.statusFailed');
-    case 'solveUnfinished':
-      return t('mobile.gallery.solveUnfinished');
-    default:
-      return t('mobile.gallery.toPlace');
-  }
-};
+function open(row: ImportRow) {
+  if (row.kind === 'pending') void router.push(`/gallery/pending/${row.photo.id}`);
+}
 
-const BUSY = new Set(['converting', 'importing', 'solving']);
-const statusOf = (item: ImportItem) =>
-  item.status === 'solved'
-    ? 'success'
-    : BUSY.has(item.status)
+const subOf = (row: ImportRow) =>
+  row.kind === 'pending'
+    ? pendingStateText(row.photo)
+    : row.file.status === 'converting'
+      ? t('batch.statusConverting')
+      : row.file.error || t('batch.statusFailed');
+
+const statusOf = (row: ImportRow) =>
+  row.kind === 'pending'
+    ? pendingStatus(row.photo)
+    : row.file.status === 'converting'
       ? 'busy'
-      : item.status === 'solveFailed'
-        ? 'danger'
-        : item.status === 'solveUnfinished'
-          ? 'warn'
-          : undefined;
+      : 'danger';
+
+function goBack() {
+  leaving = true;
+  if (window.history.state?.back) router.back();
+  else void router.replace('/tabs/gallery');
+}
+
+/** Leaving with photos in the list gives the import up, after a question. */
+async function mayLeave(): Promise<boolean> {
+  const n = importRows.value.length;
+  if (leaving || n === 0) return true;
+  const ok = await confirm({
+    title: t('mobile.gallery.leaveTitle'),
+    message:
+      n === 1
+        ? t('mobile.gallery.leaveMessageOne', { button: t('mobile.gallery.import') })
+        : t('mobile.gallery.leaveMessageMany', { n, button: t('mobile.gallery.import') }),
+    confirmLabel: t('mobile.gallery.leaveConfirm'),
+    destructive: true,
+  });
+  if (!ok) return false;
+  try {
+    await discardImport();
+  } catch (error) {
+    void showError(error);
+    return false;
+  }
+  return true;
+}
+
+async function leave() {
+  if (await mayLeave()) goBack();
+}
+useBackClose(
+  () => !leaving && importRows.value.length > 0,
+  () => void leave(),
+);
 
 async function run() {
   importing.value = true;
   try {
-    await importAll();
-    if (importItems.value.length === 0) await router.replace('/tabs/gallery');
+    const { stored, errors } = await importAll();
+    if (stored.length) solvedPhotoCount.value += 1;
+    if (errors.length) {
+      void showError(
+        errors
+          .map((e) => t('mobile.format.labelValue', { label: e.name, value: e.message }))
+          .join('\n'),
+      );
+    }
+    if (importRows.value.length === 0) {
+      leaving = true;
+      await router.replace('/tabs/gallery');
+    }
   } catch (error) {
     void showError(error);
   } finally {
     importing.value = false;
   }
 }
-
-onIonViewDidLeave(clearImport);
 </script>
 
 <template>
   <IonPage>
     <PhoneTopBar>
-      <PhoneBackButton fallback="/tabs/gallery" />
+      <PhoneBackButton fallback="/tabs/gallery" :before="mayLeave" />
       <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ title }}</h1>
     </PhoneTopBar>
     <IonContent :scroll-y="false">
       <div class="mob-scroll mob-page-fill mob-page-pad">
         <IonList class="mob-list" lines="none">
           <PhoneRow
-            v-for="item in importItems"
-            :key="item.id"
+            v-for="row in importRows"
+            :key="row.key"
             :thumb="imageIcon"
-            :title="item.name"
-            :subs="[stateOf(item)]"
-            :status="statusOf(item)"
-            :warning="item.noSolution ? t('mobile.gallery.noSolutionLoaded') : undefined"
-            :button="canChoose(item)"
-            :chevron="canChoose(item)"
-            @click="chooseMethod(item)"
+            :title="row.kind === 'pending' ? row.photo.name : row.file.name"
+            :subs="[subOf(row)]"
+            :status="statusOf(row)"
+            :warning="
+              row.kind === 'pending' && row.photo.noSolution
+                ? t('mobile.gallery.noSolutionLoaded')
+                : undefined
+            "
+            :button="row.kind === 'pending'"
+            :chevron="row.kind === 'pending'"
+            @click="open(row)"
           />
         </IonList>
       </div>
@@ -181,12 +156,5 @@ onIonViewDidLeave(clearImport);
         >{{ t('mobile.gallery.import') }}</PhoneButton
       >
     </PhoneFooter>
-    <PlacementMethodSheet
-      v-model:open="methodOpen"
-      @online="solveOnline"
-      @reuse="reuse"
-      @identify="identify"
-      @hand="placeByHand"
-    />
   </IonPage>
 </template>

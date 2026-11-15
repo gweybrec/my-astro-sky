@@ -1,283 +1,198 @@
-import { computed, shallowRef, toRaw, watch } from 'vue';
-import type { Photo, PhotoCorrespondence } from '@myastrosky/core/types';
+import { computed, ref, shallowRef } from 'vue';
+import type { Photo } from '@myastrosky/core/types';
 import { ANY_PHOTO_EXT_RE, isFitsFile, isRawAstroFile } from '@myastrosky/core/photo-formats';
-import { sanitizeCaptureDetails } from '@myastrosky/core/capture-fields';
-import {
-  wcsCaptureMetadata,
-  wcsPhotoMetadata,
-  type WcsCaptureMetadata,
-  type WcsPhotoMetadata,
-} from '@myastrosky/core/wcs-photo-metadata';
-import { convertRawPhoto, setPhotoFitsHeaders, uploadPhoto } from '@myastrosky/app-state/api';
+import { wcsCaptureMetadata, wcsPhotoMetadata } from '@myastrosky/core/wcs-photo-metadata';
+import { convertRawPhoto } from '@myastrosky/app-state/api';
 import { suggestedSetupFor } from '@myastrosky/app-state/wcs-load-flow';
-import { addPendingPhoto, pendingPhotos, type PendingCapture } from '../pending-photos';
-import { solvePendingOnline } from '../pending-solve';
+import {
+  addPendingPhoto,
+  leaveImport,
+  pendingPhotos,
+  removePendingPhoto,
+  storePendingPhoto,
+  type PendingCapture,
+  type PendingPhoto,
+} from '../pending-photos';
 
 /**
- * - `converting`: a solved-format file (TIFF, FITS) is being read: its picture is made and its header's WCS is read.
- * - `solved`: the file says where it is on the sky ("Déjà résolue"); it is imported as a placed photo.
- * - `toPlace`: nothing says where the photo is; it is imported as a photo waiting for a placement method.
- * - `failed`: the file could not be read or stored.
- * - `importing` / `imported`: the photo is being stored / is stored.
- * - `solving`: the photo was sent to the online solver from this list; it is already kept as a waiting photo, and
- *   leaves the list once it is solved and placed.
- * - `solveOffline`: that solve stopped for want of the network; it goes on once the phone is online.
- * - `solveFailed`: that solve did not succeed; another method can be chosen.
- * - `solveUnfinished`: astrometry.net had not finished after the time the app follows a solve; its solution is reused
- *   later.
+ * The list of "Importer des photos". Each picked file is read first (`reading`: a TIFF, FITS or XISF is converted and
+ * its header's WCS read), then kept as a waiting photo of the import (`inImport`): it stays in the list while its page
+ * "Photo à ajouter" or a placement method is open, and after a restart it goes to the gallery. A file whose header
+ * places it is kept `placed` at once ("✓ Déjà résolue").
  */
-export type ImportStatus =
-  | 'converting'
-  | 'solved'
-  | 'toPlace'
-  | 'failed'
-  | 'importing'
-  | 'imported'
-  | 'solving'
-  | 'solveOffline'
-  | 'solveFailed'
-  | 'solveUnfinished';
-
-export interface ImportItem {
-  id: number;
+export interface ReadingFile {
+  key: string;
   name: string;
-  /** The picture to store: the file itself, or the PNG made from a TIFF / FITS. */
-  file: File;
-  /** The original FITS file, kept for astrometry.net after conversion (it reads no TIFF or XISF: those go as the PNG). */
-  rawFile?: File;
-  status: ImportStatus;
-  /** Where the photo is on the sky (status `solved`). */
-  correspondences: PhotoCorrespondence[] | null;
-  metadata: WcsPhotoMetadata | null;
-  /**
-   * What a TIFF/FITS/XISF said besides its picture, solved or not: capture data and header cards. For a file without
-   * a plate solution (`noSolution`), it goes with the photo still to place.
-   */
-  capture?: WcsCaptureMetadata | null;
-  /** The saved setup the file's header points to. */
-  gearSetupId?: string | null;
-  /** The file was read but has no plate solution: only its capture data was taken. */
-  noSolution?: boolean;
+  /** `converting`: being read. `failed`: it could not be read (`error`). */
+  status: 'converting' | 'failed';
   error: string;
-  /** The waiting photo this file became when a placement method was chosen for it here. */
-  pendingId?: string;
+  /** When it was picked: the list keeps that order. */
+  pickedAt: number;
 }
 
-const items = shallowRef<ImportItem[]>([]);
-let nextId = 1;
+/** A row of the list: a file being read, or a photo kept for the import. */
+export type ImportRow =
+  | { kind: 'reading'; key: string; file: ReadingFile }
+  | { kind: 'pending'; key: string; photo: PendingPhoto };
 
-/** The files chosen to import, in the order they were added. */
-export const importItems = computed(() => items.value);
+const reading = shallowRef<ReadingFile[]>([]);
+let nextKey = 1;
 
-const stripExtension = (name: string) => name.replace(/\.[^.]+$/, '');
+/** The photos of the import, in the order their files were picked. */
+export const importPhotos = computed(() => pendingPhotos.value.filter((p) => p.inImport));
 
-function update(item: ImportItem, changes: Partial<ImportItem>) {
-  Object.assign(item, changes);
+/** The rows of the list: the files being read or that failed, and the photos kept, in the order they were picked. */
+export const importRows = computed<ImportRow[]>(() =>
+  [
+    ...reading.value.map((file) => ({
+      at: file.pickedAt,
+      row: { kind: 'reading', key: file.key, file } as const,
+    })),
+    ...importPhotos.value.map((photo) => ({
+      at: photo.addedAt,
+      row: { kind: 'pending', key: photo.id, photo } as const,
+    })),
+  ]
+    .sort((a, b) => a.at - b.at)
+    .map(({ row }) => row),
+);
+
+function setReading(file: ReadingFile, changes: Partial<ReadingFile> | null) {
+  reading.value = changes
+    ? reading.value.map((f) => (f === file ? Object.assign(file, changes) : f))
+    : reading.value.filter((f) => f !== file);
   // A new list, so that the screen draws the changed row.
-  items.value = [...items.value];
+  reading.value = [...reading.value];
 }
+
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 // One conversion at a time: a large raw file and its decode buffers are not held in memory for several photos at once.
 let converting = Promise.resolve();
 
-async function readSolvedFile(item: ImportItem) {
+/** Reads a TIFF, FITS or XISF, then keeps it for the import, placed when its header has a plate solution. */
+async function readRawFile(file: File, entry: ReadingFile) {
   try {
-    const { png, meta } = await convertRawPhoto(item.file);
+    const { png, meta } = await convertRawPhoto(file);
     const wcs = wcsPhotoMetadata(meta, meta.width, meta.height);
     // The raw file is the photo itself: nothing to compare it with, but its header may point to a saved setup.
     const gearSetupId = await suggestedSetupFor(meta);
-    update(item, {
-      file: png,
-      rawFile: isFitsFile(item.file.name) ? item.file : undefined,
-      status: wcs ? 'solved' : 'toPlace',
-      correspondences: wcs ? (meta.correspondences ?? null) : null,
-      metadata: wcs,
-      capture: wcs ?? wcsCaptureMetadata(meta),
-      gearSetupId,
-      noSolution: !wcs,
-    });
+    const capture = wcs ?? wcsCaptureMetadata(meta);
+    const kept: PendingCapture = {
+      ...(capture?.integrations.length ? { integrations: capture.integrations } : {}),
+      ...(capture?.observationDate ? { observationDate: capture.observationDate } : {}),
+      ...(capture?.captureDetails ? { captureDetails: capture.captureDetails } : {}),
+      ...(gearSetupId ? { gearSetupId } : {}),
+      ...(capture?.fitsHeaders?.length ? { fitsHeaders: capture.fitsHeaders } : {}),
+    };
+    const placed = wcs && meta.correspondences?.length;
+    await addPendingPhoto(
+      png,
+      file.name,
+      Object.keys(kept).length ? kept : undefined,
+      // astrometry.net reads the original FITS; it reads no TIFF or XISF: those go as the PNG.
+      isFitsFile(file.name) ? file : undefined,
+      {
+        inImport: true,
+        addedAt: entry.pickedAt,
+        noSolution: !wcs,
+        ...(placed
+          ? {
+              placement: { correspondences: meta.correspondences!, dsoIds: wcs.dsoIds, by: 'file' },
+              dsoIds: wcs.dsoIds,
+            }
+          : {}),
+      },
+    );
+    setReading(entry, null);
   } catch (error) {
-    update(item, {
-      status: 'failed',
-      error: error instanceof Error ? error.message : String(error),
-    });
+    setReading(entry, { status: 'failed', error: messageOf(error) });
   }
 }
 
-/** What a photo still to place keeps of its file until it is placed; undefined when the file said nothing. */
-function pendingCapture(item: ImportItem): PendingCapture | undefined {
-  const capture = item.capture;
-  if (!capture && !item.gearSetupId) return undefined;
-  return {
-    ...(capture?.integrations.length ? { integrations: capture.integrations } : {}),
-    ...(capture?.observationDate ? { observationDate: capture.observationDate } : {}),
-    ...(capture?.captureDetails ? { captureDetails: capture.captureDetails } : {}),
-    ...(item.gearSetupId ? { gearSetupId: item.gearSetupId } : {}),
-    ...(capture?.fitsHeaders?.length ? { fitsHeaders: capture.fitsHeaders } : {}),
-  };
+/** Keeps a JPEG, PNG or WebP for the import as it is. */
+async function keepPicture(file: File, entry: ReadingFile) {
+  try {
+    await addPendingPhoto(file, file.name, undefined, undefined, {
+      inImport: true,
+      addedAt: entry.pickedAt,
+    });
+    setReading(entry, null);
+  } catch (error) {
+    setReading(entry, { status: 'failed', error: messageOf(error) });
+  }
 }
 
 /** Adds the picked files to the import. Files that are not photos are left out; returns how many were added. */
 export function addImportFiles(files: File[]): number {
-  const added: ImportItem[] = [];
+  const now = Date.now();
+  const added: [File, ReadingFile][] = [];
   for (const file of files) {
     if (!ANY_PHOTO_EXT_RE.test(file.name)) continue;
-    const raw = isRawAstroFile(file.name);
-    added.push({
-      id: nextId++,
-      name: file.name,
+    added.push([
       file,
-      status: raw ? 'converting' : 'toPlace',
-      correspondences: null,
-      metadata: null,
-      error: '',
-    });
+      {
+        key: `reading-${nextKey++}`,
+        name: file.name,
+        status: 'converting',
+        error: '',
+        pickedAt: now + added.length,
+      },
+    ]);
   }
-  items.value = [...items.value, ...added];
-  for (const item of added) {
-    if (item.status === 'converting') converting = converting.then(() => readSolvedFile(item));
+  reading.value = [...reading.value, ...added.map(([, entry]) => entry)];
+  for (const [file, entry] of added) {
+    if (isRawAstroFile(file.name)) converting = converting.then(() => readRawFile(file, entry));
+    else void keepPicture(file, entry);
   }
   return added.length;
 }
 
-/** The number of photos whose file says where they are on the sky. */
-export const solvedCount = computed(() => items.value.filter((i) => i.status === 'solved').length);
+const storing = ref(false);
 
-/**
- * The number of photos "Importer" would take now: the solved ones, the ones still to place, and the ones already
- * kept because a placement method was chosen for them here.
- */
-export const importableCount = computed(
-  () =>
-    items.value.filter(
-      (i) => i.status === 'solved' || i.status === 'toPlace' || i.pendingId !== undefined,
-    ).length,
+/** True while a file is being read, or the photos stored. */
+export const importBusy = computed(
+  () => storing.value || reading.value.some((f) => f.status === 'converting'),
 );
 
-/**
- * Keeps a photo of the list as a waiting photo (once), so that it is in the gallery whatever happens to this list;
- * returns its id. It then follows that waiting photo: it leaves the list once the photo is placed.
- */
-export async function keepImportPending(reactiveItem: ImportItem): Promise<string> {
-  // The phone's database stores no Vue proxy: an item held in a deep ref has its header data wrapped in them.
-  const item = toRaw(reactiveItem);
-  if (item.pendingId) return item.pendingId;
-  const pendingId = (
-    await addPendingPhoto(item.file, item.name, pendingCapture(item), item.rawFile)
-  ).id;
-  update(item, { pendingId });
-  return pendingId;
-}
+/** The number of photos "Importer" takes: every photo kept for the import. */
+export const importableCount = computed(() => importPhotos.value.length);
 
 /**
- * Sends a photo of the list to the online solver. It is kept as a waiting photo first, so that it is in the gallery
- * whatever happens to this list; the row then shows "Résolution".
+ * Imports everything at once: a placed photo is stored with its metadata; the others (to place, being solved) go to the
+ * gallery as waiting photos, with theirs. A photo that cannot be stored stays in the list; its reason is returned.
+ * The files that could not be read leave the list.
  */
-export async function solveImportOnline(item: ImportItem): Promise<void> {
-  if (
-    item.status !== 'toPlace' &&
-    item.status !== 'solveFailed' &&
-    item.status !== 'solveOffline' &&
-    item.status !== 'solveUnfinished'
-  )
-    return;
-  try {
-    const pendingId = await keepImportPending(item);
-    update(item, { pendingId, status: 'solving', error: '' });
-    await solvePendingOnline(pendingId);
-  } catch (error) {
-    update(item, {
-      status: 'solveFailed',
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
-
-// A photo sent to the solver from this list follows its waiting photo: it leaves the list once that photo is placed
-// (it is then an ordinary photo of the gallery), and shows the failure when the solve does not succeed.
-watch(pendingPhotos, (waiting) => {
-  let changed = false;
-  const next: ImportItem[] = [];
-  for (const item of items.value) {
-    if (item.pendingId === undefined) {
-      next.push(item);
-      continue;
-    }
-    const kept = waiting.find((p) => p.id === item.pendingId);
-    if (!kept) {
-      changed = true;
-      continue;
-    }
-    const status =
-      kept.state === 'failed'
-        ? 'solveFailed'
-        : kept.state === 'offline'
-          ? 'solveOffline'
-          : kept.state === 'unfinished'
-            ? 'solveUnfinished'
-            : 'solving';
-    if (item.status !== status) {
-      Object.assign(item, { status, error: kept.error ?? '' });
-      changed = true;
-    }
-    next.push(item);
-  }
-  if (changed) items.value = next;
-});
-
-/** True while a file is being read or stored. */
-export const importBusy = computed(() =>
-  items.value.some((i) => i.status === 'converting' || i.status === 'importing'),
-);
-
-/**
- * Imports everything at once: a solved photo is stored, placed where its file says; a photo still to place is kept
- * as a waiting photo, which the gallery shows as "À placer". A photo that cannot be stored stays in the list as
- * failed; the others leave it. Returns the photos stored with their placement.
- */
-export async function importAll(): Promise<Photo[]> {
+export async function importAll(): Promise<{
+  stored: Photo[];
+  errors: { name: string; message: string }[];
+}> {
   const stored: Photo[] = [];
-  const ready = items.value.filter((i) => i.status === 'solved' || i.status === 'toPlace');
-  for (const item of ready) {
-    const solved = item.status === 'solved';
-    update(item, { status: 'importing' });
-    try {
-      if (solved) {
-        const meta = item.metadata!;
-        let photo = await uploadPhoto(item.file, item.correspondences!, undefined, undefined, {
-          dsoIds: meta.dsoIds,
-          integrations: meta.integrations,
-          observationDate: meta.observationDate ?? null,
-          captureDetails: meta.captureDetails ? sanitizeCaptureDetails(meta.captureDetails) : null,
-          gearSetupId: item.gearSetupId ?? null,
-          displayName: stripExtension(item.name),
-        });
-        if (meta.fitsHeaders?.length) {
-          try {
-            await setPhotoFitsHeaders(photo.id, meta.fitsHeaders);
-            photo = { ...photo, hasFitsHeaders: true };
-          } catch {
-            // The photo is placed; only its header cards are missing.
-          }
-        }
-        stored.push(photo);
-      } else {
-        await addPendingPhoto(item.file, item.name, pendingCapture(item), item.rawFile);
+  const errors: { name: string; message: string }[] = [];
+  storing.value = true;
+  try {
+    for (const photo of importPhotos.value) {
+      try {
+        if (photo.state === 'placed') stored.push(await storePendingPhoto(photo.id));
+        else await leaveImport(photo.id);
+      } catch (error) {
+        errors.push({ name: photo.name, message: messageOf(error) });
       }
-      update(item, { status: 'imported' });
-    } catch (error) {
-      update(item, {
-        status: 'failed',
-        error: error instanceof Error ? error.message : String(error),
-      });
     }
+    reading.value = reading.value.filter((f) => f.status === 'converting');
+  } finally {
+    storing.value = false;
   }
-  // The stored ones leave the list, and so do the ones already kept as waiting photos.
-  items.value = items.value.filter((i) => i.status !== 'imported' && i.pendingId === undefined);
-  return stored;
+  return { stored, errors };
 }
 
-/** Empties the import (the page was left). */
-export function clearImport() {
-  items.value = [];
+/** Gives the import up: its photos are forgotten, nothing is added. */
+export async function discardImport(): Promise<void> {
+  reading.value = [];
+  for (const photo of importPhotos.value) await removePendingPhoto(photo.id);
+}
+
+/** Empties the list of files being read (tests). */
+export function resetImport(): void {
+  reading.value = [];
 }

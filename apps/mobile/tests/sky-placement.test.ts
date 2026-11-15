@@ -1,11 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
-import type {
-  ManualPlacement,
-  Photo,
-  PhotoCorrespondence,
-  ViewState,
-} from '@myastrosky/core/types';
+import type { ManualPlacement, Photo, ViewState } from '@myastrosky/core/types';
 import { ionicStubs } from './helpers';
 import { project } from '@myastrosky/core/projection';
 
@@ -29,6 +24,7 @@ import {
   addPendingPhoto,
   configurePendingStore,
   createMemoryPendingStore,
+  pendingPlacement,
   pendingPhotos,
 } from '../src/pending-photos';
 
@@ -175,43 +171,32 @@ describe('placing a photo by hand', () => {
     expect(Math.atan2(b, a) * (180 / Math.PI)).toBeCloseTo(-135);
   });
 
-  it('stores the photo with its placement, three points of the sky and the objects in it, and forgets the waiting one', async () => {
+  it('holds the placement, three points of the sky and the objects in it for the photo, not stored yet', async () => {
     const { w, pending } = await mountPlacement();
     await w
       .findAll('button')
       .find((b) => b.text() === 'Valider')!
       .trigger('click');
     await flushPromises();
-    const [file, correspondences, placement, , meta] = uploadPhoto.mock.calls[0] as [
-      File,
-      PhotoCorrespondence[],
-      ManualPlacement,
-      undefined,
-      { dsoIds: string[]; displayName: string },
-    ];
-    expect(file.name).toBe('M101.jpg');
-    expect(correspondences).toHaveLength(3);
-    expect(correspondences.every((c) => c.starRa !== undefined && c.starDec !== undefined)).toBe(
-      true,
-    );
-    expect(placement).toMatchObject({ centerRa: 210.8, centerDec: 54.35, rotationDeg: 0 });
-    expect(placement.projPerPx).toBeCloseTo(0.06 / 1000);
-    expect(meta).toEqual({ dsoIds: ['M101', 'NGC5474'], displayName: 'M101' });
-    expect(pendingPhotos.value.find((p) => p.id === pending.id)).toBeUndefined();
-    expect(w.emitted('placed')).toEqual([[{ id: 'p9' }]]);
-  });
-
-  it('keeps the photo waiting and shows the error when it cannot be stored', async () => {
-    uploadPhoto.mockRejectedValue(new Error('disk full'));
-    const { w, pending } = await mountPlacement();
-    await w
-      .findAll('button')
-      .find((b) => b.text() === 'Valider')!
-      .trigger('click');
-    await flushPromises();
-    expect(showError).toHaveBeenCalled();
-    expect(pendingPhotos.value.some((p) => p.id === pending.id)).toBe(true);
-    expect(w.emitted('placed')).toBeUndefined();
+    expect(uploadPhoto).not.toHaveBeenCalled();
+    const held = (await pendingPlacement(pending.id))!;
+    expect(held.by).toBe('hand');
+    expect(held.correspondences).toHaveLength(3);
+    expect(
+      held.correspondences.every((c) => c.starRa !== undefined && c.starDec !== undefined),
+    ).toBe(true);
+    expect(held.manualPlacement).toMatchObject({
+      centerRa: 210.8,
+      centerDec: 54.35,
+      rotationDeg: 0,
+    });
+    expect(held.manualPlacement!.projPerPx).toBeCloseTo(0.06 / 1000);
+    expect(held.dsoIds).toEqual(['M101', 'NGC5474']);
+    expect(pendingPhotos.value.find((p) => p.id === pending.id)).toMatchObject({
+      state: 'placed',
+      placedBy: 'hand',
+    });
+    expect(w.emitted('placed')).toEqual([[pending.id]]);
   });
 
   it('goes along to a searched object at the same size on screen, then keeps to the sky again', async () => {

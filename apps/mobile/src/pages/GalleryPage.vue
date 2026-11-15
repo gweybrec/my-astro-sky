@@ -19,17 +19,12 @@ import PhoneSheet from '../components/PhoneSheet.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 import { addImportFiles } from '../composables/usePhotoImport';
 import { useLandscape } from '../composables/useLandscape';
-import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
 import { useGrowingList } from '../composables/useGrowingList';
 import { useKeptScroll } from '../composables/useKeptScroll';
-import {
-  loadPendingPhotos,
-  pendingPhotos,
-  removePendingPhoto,
-  type PendingState,
-} from '../pending-photos';
-import { resumePendingSolves, solvePendingOnline, solvedPhotoCount } from '../pending-solve';
+import { loadPendingPhotos, pendingPhotos } from '../pending-photos';
+import { pendingStateText } from '../pending-display';
+import { resumePendingSolves, solvedPhotoCount } from '../pending-solve';
 import {
   clearGalleryFilters,
   galleryFilters,
@@ -46,9 +41,6 @@ import {
   GALLERY_SORTS,
   type GallerySort,
 } from '@myastrosky/core/gallery-filter';
-import { skyPlacement } from '../sky-modes';
-import { endIdentify } from '../star-identify-session';
-import PlacementMethodSheet from './gallery/PlacementMethodSheet.vue';
 import GalleryDisplaySheet from './gallery/GalleryDisplaySheet.vue';
 import PhotoTile from '../components/PhotoTile.vue';
 import PhoneRadioSheet from '../components/PhoneRadioSheet.vue';
@@ -66,18 +58,14 @@ import plusIcon from '@icons/plus.svg?raw';
 // are not on the sky yet with where they stand; the plus that opens the sheet to add photos; and the "Affichage"
 // button, which sets how many photos a line holds.
 // Choosing files, or pictures of the phone's gallery, opens the import ("Importer des photos"). A tap on a photo that
-// waits, or whose solve failed, asks how to place it; a photo solved online becomes an ordinary tile. A tap on a
-// placed photo opens its own screen.
+// waits opens its page "Photo à ajouter" (placement methods and metadata); once stored it becomes an ordinary tile. A
+// tap on a stored photo opens its own screen.
 const router = useRouter();
 const { showError } = useErrorToast();
-const { confirm } = useConfirm();
 
 // null until the photos are read; the empty state shows only once the backend has answered with none.
 const photos = ref<Photo[] | null>(null);
 const adding = ref(false);
-/** The waiting photo whose placement method is being chosen. */
-const placingId = ref<string | null>(null);
-const methodOpen = ref(false);
 
 /** The equipments' names by id: a photo's equipment is its first chip. */
 const setupNames = ref(new Map<string, string>());
@@ -160,72 +148,20 @@ const gridStyle = computed(() => ({
 // Three photos or more to a line: tighter spacing, so a card keeps room for "NGC 7000" beside the "+N" chip.
 const dense = computed(() => photosPerLine[orientation.value] >= 3);
 
-/** What the chip of a waiting photo says. */
-const PENDING_TEXT: Record<PendingState, string> = {
-  toPlace: 'mobile.gallery.toPlace',
-  solving: 'mobile.gallery.solving',
-  offline: 'mobile.gallery.solvingOffline',
-  failed: 'batch.statusFailed',
-  unfinished: 'mobile.gallery.unfinished',
-};
-// The waiting photos are the user's own: shown only while "Mon ciel" is ticked, like the placed ones.
+// The waiting photos are the user's own: shown only while "Mon ciel" is ticked, like the placed ones. The photos of an
+// import still open are shown there, not here.
 const waiting = computed(() =>
   sharedSkies.ownShown
-    ? pendingPhotos.value.map((p) => ({
-        id: p.id,
-        name: p.name,
-        busy: p.state === 'solving',
-        state: t(PENDING_TEXT[p.state]),
-      }))
+    ? pendingPhotos.value
+        .filter((p) => !p.inImport)
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          busy: p.state === 'solving',
+          state: pendingStateText(p, true),
+        }))
     : [],
 );
-
-function chooseMethod(tile: { id: string; busy: boolean }) {
-  if (tile.busy) return;
-  placingId.value = tile.id;
-  methodOpen.value = true;
-}
-
-function placeByHand() {
-  if (!placingId.value) return;
-  skyPlacement.value = { pendingId: placingId.value };
-  void router.push('/tabs/sky');
-}
-
-// Reusing a solution of the astrometry.net account has its own page, where the submission is chosen.
-function reuse() {
-  if (!placingId.value) return;
-  void router.push(`/gallery/reuse/${placingId.value}`);
-}
-
-// Identifying stars starts with no point, even when an earlier identification of this photo was left.
-function identify() {
-  if (!placingId.value) return;
-  endIdentify(placingId.value);
-  void router.push(`/gallery/identify/${placingId.value}`);
-}
-
-// A waiting photo is deleted after the same question as a placed one; it was only kept on the phone.
-async function deleteWaiting() {
-  const photo = pendingPhotos.value.find((p) => p.id === placingId.value);
-  if (!photo) return;
-  const ok = await confirm({
-    title: t('photos.deleteConfirmTitle'),
-    message: t('photos.deleteConfirmMessage', { name: photo.name }),
-    confirmLabel: t('photos.deleteConfirmAction'),
-    destructive: true,
-  });
-  if (!ok) return;
-  try {
-    await removePendingPhoto(photo.id);
-  } catch (error) {
-    await showError(error);
-  }
-}
-
-function solveOnline() {
-  if (placingId.value) void solvePendingOnline(placingId.value);
-}
 const isEmpty = computed(
   () => listed.value !== null && listed.value.length === 0 && waiting.value.length === 0,
 );
@@ -347,7 +283,7 @@ async function addPicked(pick: () => Promise<File[]>) {
             :name="tile.name"
             :state="tile.state"
             :busy="tile.busy"
-            @click="chooseMethod(tile)"
+            @click="router.push(`/gallery/pending/${tile.id}`)"
           />
           <PhotoTile
             v-for="tile in tiles"
@@ -369,15 +305,6 @@ async function addPicked(pick: () => Promise<File[]>) {
         @click="adding = true"
       />
     </IonContent>
-    <PlacementMethodSheet
-      v-model:open="methodOpen"
-      deletable
-      @delete="deleteWaiting"
-      @online="solveOnline"
-      @reuse="reuse"
-      @identify="identify"
-      @hand="placeByHand"
-    />
     <GalleryDisplaySheet
       v-model:open="displayOpen"
       :orientation="orientation"

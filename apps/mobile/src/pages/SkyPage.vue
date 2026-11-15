@@ -34,6 +34,7 @@ import {
   skyStarPick,
   skyTargetView,
 } from '../sky-modes';
+import { openPendingPage } from '../pending-display';
 import { skyDrawOrder } from '../sky-draw-order';
 import { framesSheetOpen } from '../sky-frames';
 import { openPageStill, swapPagesUnseen } from '../tab-navigation';
@@ -185,8 +186,8 @@ useBackClose(
 );
 
 // Placing a waiting photo by hand (board "Placer la photo"): the map takes the whole screen with the photo over it and
-// its settings under it. Annuler and the back button go back to where the placement was asked; a placed photo stays on
-// the map. Repositionner of a photo's sheet moves a placed photo again on the same screen: once done or given up, the
+// its settings under it. Annuler and the back button go back to where the placement was asked; Valider opens the photo's
+// page "Photo à ajouter" again. Repositionner of a photo's sheet moves a placed photo again on the same screen: once done or given up, the
 // photo's sheet opens again.
 const placing = computed(() => skyPlacement.value);
 const placingKey = computed(() => {
@@ -219,9 +220,10 @@ function photoRepositioned(photo: Photo) {
   skySelection.value = { kind: 'photo', photo };
   void reloadPhotos();
 }
-function photoPlaced(photo: Photo) {
+// A waiting photo placed by hand: its page "Photo à ajouter" opens again, the photo placed but not stored yet.
+function photoPlaced(pendingId: string) {
   skyPlacement.value = null;
-  void reloadPhotos().then(() => sky?.showPhoto(photo.id));
+  void openPendingPage(router, pendingId);
 }
 useBackClose(() => placing.value !== null, cancelPlacement);
 

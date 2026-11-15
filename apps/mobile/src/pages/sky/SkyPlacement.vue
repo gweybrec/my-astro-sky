@@ -13,14 +13,14 @@ import {
 import { fromCanvas, project, toCanvas, unproject } from '@myastrosky/core/projection';
 import { normalizeRotationDeg } from '@myastrosky/core/sky-map-types';
 import type { ManualPlacement, Photo, ViewState } from '@myastrosky/core/types';
-import { photoFileUrl, updatePhotoManualPlacement, uploadPhoto } from '@myastrosky/app-state/api';
+import { photoFileUrl, updatePhotoManualPlacement } from '@myastrosky/app-state/api';
 import type { PhotoLayer } from '@myastrosky/render/photo-layer';
 import type { SkyMap } from '@myastrosky/render/sky-map';
 import { catalogsReady } from '../../catalogs';
 import { useErrorToast } from '../../composables/useErrorToast';
 import { useLandscape } from '../../composables/useLandscape';
 import { useSheetDrag, useSheetExpand } from '../../composables/useSheetDrag';
-import { pendingPhotoFile, storePlacedPendingPhoto } from '../../pending-photos';
+import { holdPendingPlacement, pendingPhotoFile } from '../../pending-photos';
 import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneSearch from '../../components/PhoneSearch.vue';
 import PhoneSheetGrab from '../../components/PhoneSheetGrab.vue';
@@ -29,8 +29,9 @@ import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 
 // The board "Placer la photo", as the desktop's manual placement does it (`openManualPlacement`): the photo, half seen
 // through, lies over the map where it was being looked at. One finger on the photo moves it, two fingers make it larger
-// or smaller and turn it; the map itself still moves under a finger put beside the photo. Valider stores the photo with
-// that placement and three points of the sky taken from it, and the objects that fall in it.
+// or smaller and turn it; the map itself still moves under a finger put beside the photo. Valider keeps that placement
+// for the waiting photo, with three points of the sky taken from it and the objects that fall in it (`placed`): its page
+// "Photo à ajouter" stores it.
 // A photo already placed is moved again the same way (the desktop's `startRepositioning`): it starts where it is, at
 // "Zoom photo" 100 %, hidden on the map meanwhile; Valider stores its new placement, Annuler leaves it as it was.
 const props = defineProps<{
@@ -47,7 +48,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   cancel: [];
-  placed: [photo: Photo];
+  placed: [pendingId: string];
   repositioned: [photo: Photo];
   search: [];
 }>();
@@ -312,8 +313,6 @@ function onUp(e: PointerEvent) {
 
 // ── Valider ──────────────────────────────────────────────────────────────────────────────────────
 
-const stripExtension = (name: string) => name.replace(/\.[^.]+$/, '');
-
 async function validate() {
   if (props.photo) return reposition(props.photo);
   if (!file.value || !size.value || saving.value) return;
@@ -331,13 +330,14 @@ async function validate() {
     await catalogsReady();
     const model = photoSkyModel({ width, height, correspondences: [], manualPlacement: placed });
     const dsoIds = model ? findDSOsInImage(model, width, height).map((dso) => dso.id) : [];
-    const photo = props.pendingId
-      ? await storePlacedPendingPhoto(props.pendingId, file.value, correspondences, placed, dsoIds)
-      : await uploadPhoto(file.value, correspondences, placed, undefined, {
-          dsoIds,
-          displayName: stripExtension(file.value.name),
-        });
-    emit('placed', photo);
+    if (!props.pendingId) return;
+    await holdPendingPlacement(props.pendingId, {
+      correspondences,
+      manualPlacement: placed,
+      dsoIds,
+      by: 'hand',
+    });
+    emit('placed', props.pendingId);
   } catch (error) {
     void showError(error);
   } finally {

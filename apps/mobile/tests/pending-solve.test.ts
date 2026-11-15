@@ -28,12 +28,14 @@ import {
   addPendingPhoto,
   configurePendingStore,
   createMemoryPendingStore,
+  pendingPlacement,
   pendingPhotos,
   setPendingState,
 } from '../src/pending-photos';
 import {
   POLL_INTERVAL_MS,
   resumePendingSolves,
+  shownPendingId,
   reusePendingSolution,
   solvePendingOnline,
   solvedPhotoCount,
@@ -63,7 +65,7 @@ describe('solving a waiting photo online', () => {
     vi.restoreAllMocks();
   });
 
-  it('sends the picture, follows the job, then stores the photo placed and forgets the waiting one', async () => {
+  it('sends the picture, follows the job, then stores a waiting photo of the gallery with its metadata', async () => {
     const photo = await addPendingPhoto(new Blob(['x'], { type: 'image/jpeg' }), 'M45_RGB.jpg');
     submitPlateSolve.mockResolvedValue({ jobId: 'job-1' });
     pollPlateSolve
@@ -84,9 +86,34 @@ describe('solving a waiting photo online', () => {
     expect([file.name, correspondences, manual]).toEqual(['M45_RGB.jpg', corr, undefined]);
     // The solver named no object: they are found from the solution and the picture's size.
     expect(findDsoIds).toHaveBeenCalledWith(corr, 300, 200);
-    expect(metadata).toEqual({ dsoIds: ['M45'], displayName: 'M45_RGB' });
+    expect(metadata).toMatchObject({ dsoIds: ['M45'], displayName: 'M45_RGB', labels: [] });
     expect(pendingPhotos.value).toEqual([]);
     expect(solvedPhotoCount.value).toBe(before + 1);
+  });
+
+  it('holds the placement of a photo of the import, or whose page is open, until Importer or Enregistrer', async () => {
+    const inImport = await addPendingPhoto(new Blob(['x']), 'M45.jpg', undefined, undefined, {
+      inImport: true,
+    });
+    const shown = await addPendingPhoto(new Blob(['y']), 'M31.jpg');
+    shownPendingId.value = shown.id;
+    submitPlateSolve.mockResolvedValue({ jobId: 'job-1' });
+    pollPlateSolve.mockResolvedValue({ jobId: 'job-1', status: 'solved', correspondences: corr });
+    await solvePendingOnline(inImport.id);
+    await solvePendingOnline(shown.id);
+    await nextPoll();
+    await nextPoll();
+    expect(uploadPhoto).not.toHaveBeenCalled();
+    expect(pendingPhotos.value.map((p) => [p.name, p.state, p.placedBy])).toEqual([
+      ['M45.jpg', 'placed', 'solved'],
+      ['M31.jpg', 'placed', 'solved'],
+    ]);
+    expect(await pendingPlacement(inImport.id)).toEqual({
+      correspondences: corr,
+      dsoIds: ['M45'],
+      by: 'solved',
+    });
+    shownPendingId.value = null;
   });
 
   it('submits the original raw file while the pending picture remains the converted PNG', async () => {
@@ -314,7 +341,7 @@ describe('reusing a solution of the astrometry.net account', () => {
     findDsoIds.mockReturnValue([]);
   });
 
-  it('reads the solution of the job for the kept picture, then stores the photo placed', async () => {
+  it('reads the solution of the job for the kept picture, then holds the placement for its page', async () => {
     const photo = await addPendingPhoto(new Blob(['png'], { type: 'image/png' }), 'M35.fit');
     let settle: (v: unknown) => void = () => {};
     reuseAstrometrySubmission.mockReturnValue(new Promise((r) => (settle = r)));
@@ -329,10 +356,14 @@ describe('reusing a solution of the astrometry.net account', () => {
 
     settle({ success: true, correspondences: corr, dsoIds: ['M35'] });
     await running;
-    const [, correspondences, , , metadata] = uploadPhoto.mock.calls[0];
-    expect(correspondences).toEqual(corr);
-    expect(metadata.dsoIds).toEqual(['M35']);
-    expect(pendingPhotos.value).toEqual([]);
+    // Reusing is asked from the photo's page, where Enregistrer stores it.
+    expect(uploadPhoto).not.toHaveBeenCalled();
+    expect(pendingPhotos.value[0]).toMatchObject({ state: 'placed', placedBy: 'solved' });
+    expect(await pendingPlacement(photo.id)).toEqual({
+      correspondences: corr,
+      dsoIds: ['M35'],
+      by: 'solved',
+    });
   });
 
   it('puts the photo back as it was and shows why when the solution cannot be used', async () => {

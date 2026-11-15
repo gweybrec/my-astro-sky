@@ -1,6 +1,6 @@
 /**
  * Online solving of the photos that wait for a placement: the picture is sent to astrometry.net, its job is followed
- * until it ends, and a solved photo is stored placed, as the desktop's "Ajouter des photos" window does. The job is
+ * until it ends, and a solved photo is placed, as the desktop's "Ajouter des photos" window does (`holdSolved`). The job is
  * written on the waiting photo with its astrometry.net submission, so a solve started earlier is followed again when the
  * app comes back (the solver's jobs live in memory and are lost when it restarts). Without a network the following
  * stops and the photo shows "Hors ligne": astrometry.net goes on solving, and the result is fetched once the phone is
@@ -24,7 +24,8 @@ import {
   pendingPhotoSolveFile,
   pendingPhotos,
   setPendingState,
-  storePlacedPendingPhoto,
+  holdPendingPlacement,
+  storePendingPhoto,
 } from './pending-photos';
 
 /** How often a job is asked where it stands, as on the desktop. */
@@ -64,23 +65,34 @@ async function sizeOf(file: File): Promise<{ width: number; height: number }> {
   }
 }
 
-async function storeSolved(
+/** The waiting photo whose page "Photo à ajouter" is open, or null: a solve that ends for it waits for Enregistrer. */
+export const shownPendingId = ref<string | null>(null);
+
+/**
+ * Holds the placement of a solved photo. A photo of the import list, or whose page is open, waits for Importer or
+ * Enregistrer; a waiting photo of the gallery is stored at once, with the metadata typed for it.
+ */
+async function holdSolved(
   id: string,
   file: File,
   correspondences: PhotoCorrespondence[],
   solverDsoIds: string[] | undefined,
+  storeIfWaiting: boolean,
 ): Promise<void> {
   let dsoIds = solverDsoIds ?? [];
   if (dsoIds.length === 0) {
     const { width, height } = await sizeOf(file);
     dsoIds = findDSOIdsFromCorrespondences(correspondences, width, height);
   }
-  await storePlacedPendingPhoto(id, file, correspondences, undefined, dsoIds);
+  await holdPendingPlacement(id, { correspondences, dsoIds, by: 'solved' });
+  const photo = pendingPhotos.value.find((p) => p.id === id);
+  if (!storeIfWaiting || !photo || photo.inImport || shownPendingId.value === id) return;
+  await storePendingPhoto(id);
   solvedPhotoCount.value += 1;
 }
 
 /**
- * Follows a job until it ends: the photo is then stored placed, or marked as failed with the reason. A job the solver
+ * Follows a job until it ends: the photo is then placed, or marked as failed with the reason. A job the solver
  * no longer knows (the app restarted) is started again from its submission, as is one followed again after a loss of
  * the network (`again`: its job may have given up meanwhile). Without a network the following stops (`stopOffline`).
  */
@@ -123,7 +135,7 @@ async function follow(id: string, firstJobId: string, again = false): Promise<vo
       }
       if (status.status === 'solved' && status.correspondences) {
         const file = await pendingPhotoFile(id);
-        if (file) await storeSolved(id, file, status.correspondences, status.dsoIds);
+        if (file) await holdSolved(id, file, status.correspondences, status.dsoIds, true);
         return;
       }
       if (status.status === 'timeout') {
@@ -173,7 +185,7 @@ export async function solvePendingOnline(id: string): Promise<void> {
 /**
  * Places a waiting photo with the solution of a job already solved on the astrometry.net account (the desktop's
  * "Réutiliser une solution astrometry.net…"): the picture is not sent to astrometry.net. The photo shows "Résolution"
- * meanwhile, and is stored placed. When the solution cannot be used (another picture's, astrometry.net refusing), the
+ * meanwhile, and is then placed, waiting for Enregistrer on its page. When the solution cannot be used (another picture's, astrometry.net refusing), the
  * photo is back as it was and the reason shows in a red toast.
  */
 export async function reusePendingSolution(id: string, jobId: number): Promise<void> {
@@ -185,7 +197,7 @@ export async function reusePendingSolution(id: string, jobId: number): Promise<v
   try {
     const result = await reuseAstrometrySubmission(file, jobId);
     if (result.success && result.correspondences && result.correspondences.length > 0) {
-      await storeSolved(id, file, result.correspondences, result.dsoIds);
+      await holdSolved(id, file, result.correspondences, result.dsoIds, false);
       return;
     }
     await setPendingState(id, photo.state, before);

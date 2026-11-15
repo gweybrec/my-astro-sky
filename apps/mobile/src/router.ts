@@ -31,6 +31,8 @@ const routes: RouteRecordRaw[] = [
   { path: '/gallery/import', component: () => import('./pages/ImportPhotosPage.vue') },
   { path: '/gallery/photo/:id', component: () => import('./pages/PhotoPage.vue') },
   { path: '/gallery/photo/:id/edit', component: () => import('./pages/PhotoEditPage.vue') },
+  // A photo not stored yet: its placement methods and metadata (boards "Photo à ajouter", "…, placée").
+  { path: '/gallery/pending/:id', component: () => import('./pages/PendingPhotoPage.vue') },
   // The identifications of a solved photo and "Ajouter un point d'intérêt" (boards "Identifier un astéroïde",
   // "Identifier des supernovae", "Identifier des comètes", "Ajouter un point d'intérêt", "Types de points d'intérêt").
   {

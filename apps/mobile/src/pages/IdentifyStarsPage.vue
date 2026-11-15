@@ -17,8 +17,8 @@ import { catalogsReady } from '../catalogs';
 import type { Size } from '../composables/usePhotoZoom';
 import { useBackClose } from '../composables/useBackClose';
 import { useErrorToast } from '../composables/useErrorToast';
-import { skyPhotoFocus } from '../composables/useSkySelection';
-import { pendingPhotoFile, storePlacedPendingPhoto } from '../pending-photos';
+import { holdPendingPlacement, pendingPhotoFile } from '../pending-photos';
+import { openPendingPage } from '../pending-display';
 import { skyStarPick } from '../sky-modes';
 import {
   clearPointStar,
@@ -42,7 +42,8 @@ import mapIcon from '../icons/map.svg?raw';
 // The boards "Identifier les étoiles", "…, choisir une étoile" and "…, RA/Déc", as the desktop's star identification
 // does it (`openManualIdentifyModal`): a tap on the photo puts the next point on a star, and each point is named by a
 // star's name, a star chosen on the map, or its coordinates. A point is dragged to move it, with a magnifier above the
-// finger. Valider, once the three points are named (MIN_IDENTIFIED_POINTS), stores the photo with these matches and the objects that fall in it.
+// finger. Valider, once the three points are named (MIN_IDENTIFIED_POINTS), keeps these matches and the objects that
+// fall in the photo as its placement, and opens its page "Photo à ajouter" again, where it is stored.
 const route = useRoute();
 const router = useRouter();
 const { showError } = useErrorToast();
@@ -232,11 +233,11 @@ function setCoordinates(index: number) {
 
 // ── Annuler, Valider ─────────────────────────────────────────────────────────────────────────────
 
-// The photo stays waiting in the gallery, where the identification was asked (this page may have been opened again by
-// the map, so going back is not always going to the gallery).
+// The photo stays as it was; its page "Photo à ajouter" opens again (this page may have been opened again by the map,
+// so going back is not always going to that page).
 function cancel() {
   endIdentify(pendingId);
-  void router.replace('/tabs/gallery');
+  void openPendingPage(router, pendingId);
 }
 useBackClose(() => true, cancel);
 
@@ -253,17 +254,9 @@ async function validate() {
     // Points on one line give no placement to look in: the photo is stored without objects.
     const model = photoSkyModel({ width, height, correspondences, manualPlacement: undefined });
     const dsoIds = model ? findDSOsInImage(model, width, height).map((dso) => dso.id) : [];
-    const photo = await storePlacedPendingPhoto(
-      pendingId,
-      file.value,
-      correspondences,
-      undefined,
-      dsoIds,
-    );
+    await holdPendingPlacement(pendingId, { correspondences, dsoIds, by: 'stars' });
     endIdentify(pendingId);
-    // As the hand placement: the map shows the photo where it now is.
-    skyPhotoFocus.value = photo.id;
-    await router.replace('/tabs/sky');
+    await openPendingPage(router, pendingId);
   } catch (error) {
     void showError(error);
   } finally {

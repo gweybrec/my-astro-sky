@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ref } from 'vue';
 
 const convertRawPhoto = vi.fn();
 const uploadPhoto = vi.fn();
@@ -32,21 +31,24 @@ vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
 
 import {
   addImportFiles,
-  clearImport,
+  discardImport,
   importAll,
   importBusy,
-  importItems,
+  importRows,
   importableCount,
-  keepImportPending,
-  solvedCount,
+  resetImport,
 } from '../src/composables/usePhotoImport';
 import {
   configurePendingStore,
   createMemoryPendingStore,
+  holdPendingPlacement,
+  loadPendingPhotos,
+  pendingDraft,
   pendingPhotoFile,
   pendingPhotoSolveFile,
   pendingPhotos,
-  storePlacedPendingPhoto,
+  resetPendingLoad,
+  setPendingDraft,
 } from '../src/pending-photos';
 
 const corr = [
@@ -65,11 +67,18 @@ const solvedMeta = {
   stackCnt: 30,
   filter: 'L',
 };
-const settle = () => new Promise((r) => setTimeout(r, 0));
+const settle = async () => {
+  for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0));
+};
+/** The rows as their names and where they stand. */
+const rows = () =>
+  importRows.value.map((r) =>
+    r.kind === 'pending' ? [r.photo.name, r.photo.state] : [r.file.name, r.file.status],
+  );
 
 describe('the photo import', () => {
   beforeEach(() => {
-    clearImport();
+    resetImport();
     configurePendingStore(createMemoryPendingStore());
     convertRawPhoto.mockReset();
     uploadPhoto.mockReset();
@@ -77,52 +86,47 @@ describe('the photo import', () => {
     getGearSetups.mockReset().mockResolvedValue([{ id: 's30', name: 'Seestar' }]);
   });
 
-  it('leaves out files that are not photos, and counts the added ones', () => {
+  it('leaves out files that are not photos, and keeps the others for the import, not in the gallery', async () => {
     const added = addImportFiles([new File(['x'], 'notes.txt'), new File(['x'], 'M42.jpg')]);
     expect(added).toBe(1);
-    expect(importItems.value.map((i) => [i.name, i.status])).toEqual([['M42.jpg', 'toPlace']]);
+    await settle();
+    expect(rows()).toEqual([['M42.jpg', 'toPlace']]);
+    expect(pendingPhotos.value[0].inImport).toBe(true);
+    expect(await pendingDraft(pendingPhotos.value[0].id)).toMatchObject({ displayName: 'M42' });
   });
 
-  it('reads a solved FITS: its picture is stored and the photo is placed by its WCS', async () => {
+  it('reads a solved FITS: its picture is kept, placed by its WCS, with what its header says', async () => {
     convertRawPhoto.mockResolvedValue({ png, meta: solvedMeta });
     addImportFiles([new File(['raw'], 'M1-CCD.fit')]);
-    expect(importItems.value[0].status).toBe('converting');
+    expect(rows()).toEqual([['M1-CCD.fit', 'converting']]);
     expect(importBusy.value).toBe(true);
     await settle();
-    const [item] = importItems.value;
-    expect(item.status).toBe('solved');
-    expect(item.file).toBe(png);
-    expect(item.correspondences).toEqual(corr);
-    expect(item.metadata).toMatchObject({
+    expect(rows()).toEqual([['M1-CCD.fit', 'placed']]);
+    const [photo] = pendingPhotos.value;
+    expect(photo.placedBy).toBe('file');
+    const picture = await pendingPhotoFile(photo.id);
+    expect([picture!.name, await picture!.text()]).toEqual(['M1-CCD.png', 'png']);
+    expect(await pendingDraft(photo.id)).toMatchObject({
       dsoIds: ['M1'],
       observationDate: '2025-01-01T00:00:00',
       integrations: [{ frames: 30, seconds: 10, filter: 'L' }],
     });
-    expect(solvedCount.value).toBe(1);
     expect(importBusy.value).toBe(false);
   });
 
-  it('a raw file without WCS still has to be placed', async () => {
+  it('a raw file without WCS still has to be placed, and says its capture data was loaded', async () => {
     convertRawPhoto.mockResolvedValue({ png, meta: { success: false, width: 10, height: 10 } });
     addImportFiles([new File(['raw'], 'M1.tif')]);
     await settle();
-    expect(importItems.value[0].status).toBe('toPlace');
-    expect(solvedCount.value).toBe(0);
+    expect(rows()).toEqual([['M1.tif', 'toPlace']]);
+    expect(pendingPhotos.value[0].noSolution).toBe(true);
   });
 
-  it('keeps the original FITS file for online solving while storing its PNG as the pending picture', async () => {
+  it('keeps the original FITS file for online solving while keeping its PNG as the picture', async () => {
     const raw = new File(['fits-bytes'], 'M1-CCD.fit', { type: 'application/fits' });
-    convertRawPhoto.mockResolvedValue({
-      png,
-      meta: { success: false, width: 10, height: 10 },
-    });
+    convertRawPhoto.mockResolvedValue({ png, meta: { success: false, width: 10, height: 10 } });
     addImportFiles([raw]);
     await settle();
-
-    const item = importItems.value[0];
-    expect(item.file).toBe(png);
-    await keepImportPending(item);
-
     const id = pendingPhotos.value[0].id;
     const picture = await pendingPhotoFile(id);
     const solveFile = await pendingPhotoSolveFile(id);
@@ -138,13 +142,11 @@ describe('the photo import', () => {
     convertRawPhoto.mockResolvedValue({ png, meta: { success: false, width: 10, height: 10 } });
     addImportFiles([new File(['tiff-bytes'], 'M1-CCD.tiff', { type: 'image/tiff' })]);
     await settle();
-    expect(importItems.value[0].rawFile).toBeUndefined();
-    await keepImportPending(importItems.value[0]);
     const solveFile = await pendingPhotoSolveFile(pendingPhotos.value[0].id);
     expect([solveFile!.type, await solveFile!.text()]).toEqual(['image/png', 'png']);
   });
 
-  it('keeps a photo held in a deep ref (the import page) without Vue proxies, which the phone database cannot store', async () => {
+  it('keeps a file and the metadata typed for it without Vue proxies, which the phone database cannot store', async () => {
     // The phone's IndexedDB clones what it stores, and refuses a Vue proxy ("… could not be cloned").
     const memory = createMemoryPendingStore();
     configurePendingStore({ ...memory, put: (record) => memory.put(structuredClone(record)) });
@@ -161,13 +163,15 @@ describe('the photo import', () => {
     });
     addImportFiles([new File(['raw'], 'M2.fit')]);
     await settle();
-    await settle();
-    const held = ref(importItems.value[0]);
-    const id = await keepImportPending(held.value);
-    expect(pendingPhotos.value.map((p) => p.id)).toEqual([id]);
+    const { reactive } = await import('vue');
+    const id = pendingPhotos.value[0].id;
+    const draft = reactive((await pendingDraft(id))!);
+    draft.labels.push('Galaxies');
+    await setPendingDraft(id, draft);
+    expect((await pendingDraft(id))!.labels).toEqual(['Galaxies']);
   });
 
-  it('a raw file without a plate solution keeps its capture data, setup and headers until it is placed', async () => {
+  it('a raw file without a plate solution keeps its capture data, setup and headers until it is stored', async () => {
     const cards = [{ key: 'EXPTIME', value: '30.' }];
     convertRawPhoto.mockResolvedValue({
       png,
@@ -185,19 +189,14 @@ describe('the photo import', () => {
     });
     addImportFiles([new File(['raw'], 'M2.fit')]);
     await settle();
-    await settle();
-    // The row: "À placer", and the line of the board "Importer, fichier non résolu".
-    expect(importItems.value[0]).toMatchObject({
-      status: 'toPlace',
-      noSolution: true,
-      gearSetupId: 's30',
-      capture: { integrations: [{ frames: 44, seconds: 30, filter: '' }], fitsHeaders: cards },
-    });
-    await importAll();
-    expect(uploadPhoto).not.toHaveBeenCalled();
     const [waiting] = pendingPhotos.value;
-    // Placed later (by hand here): the photo is stored with what its file said, and its headers are saved.
-    uploadPhoto.mockResolvedValue({ id: 'p9' });
+    expect(await pendingDraft(waiting.id)).toMatchObject({
+      integrations: [{ frames: 44, seconds: 30, filter: '' }],
+      observationDate: '2025-02-02T21:00:00',
+      captureDetails: { ccdTemp: 9.9 },
+      gearSetupId: 's30',
+    });
+    // Placed by hand, the metadata typed for it, then Importer: it is stored with all of it, and its headers.
     const placement = {
       centerRa: 10,
       centerDec: 41,
@@ -206,71 +205,94 @@ describe('the photo import', () => {
       mirrorX: false,
       mirrorY: false,
     };
-    const stored = await storePlacedPendingPhoto(waiting.id, png, [], placement, ['M2']);
-    const [, , manual, , metadata] = uploadPhoto.mock.calls[0];
+    await holdPendingPlacement(waiting.id, {
+      correspondences: [],
+      manualPlacement: placement,
+      dsoIds: ['M2'],
+      by: 'hand',
+    });
+    const draft = (await pendingDraft(waiting.id))!;
+    await setPendingDraft(waiting.id, { ...draft, labels: ['Amas'], notes: 'Balcon' });
+    uploadPhoto.mockResolvedValue({ id: 'p9' });
+    const { stored } = await importAll();
+    const [file, , manual, , metadata] = uploadPhoto.mock.calls[0];
+    expect(file.name).toBe('M2.png');
     expect(manual).toEqual(placement);
     expect(metadata).toEqual({
       dsoIds: ['M2'],
-      displayName: 'M1-CCD',
+      labels: ['Amas'],
+      pointsOfInterest: [],
+      notes: 'Balcon',
+      displayName: 'M2',
       integrations: [{ frames: 44, seconds: 30, filter: '' }],
       observationDate: '2025-02-02T21:00:00',
       captureDetails: { ccdTemp: 9.9 },
       gearSetupId: 's30',
     });
     expect(setPhotoFitsHeaders).toHaveBeenCalledWith('p9', cards);
-    expect(stored).toEqual({ id: 'p9', hasFitsHeaders: true });
+    expect(stored).toEqual([{ id: 'p9', hasFitsHeaders: true }]);
     expect(pendingPhotos.value).toEqual([]);
   });
 
-  it('a placed photo stays stored when its headers cannot be saved', async () => {
+  it('a stored photo stays stored when its headers cannot be saved', async () => {
     convertRawPhoto.mockResolvedValue({
       png,
-      meta: { success: false, width: 10, height: 10, fitsHeaders: [{ key: 'A', value: '1' }] },
+      meta: { ...solvedMeta, fitsHeaders: [{ key: 'A', value: '1' }] },
     });
     addImportFiles([new File(['raw'], 'M2.fit')]);
     await settle();
-    await settle();
-    await importAll();
     uploadPhoto.mockResolvedValue({ id: 'p9' });
     setPhotoFitsHeaders.mockRejectedValue(new Error('offline'));
-    const stored = await storePlacedPendingPhoto(pendingPhotos.value[0].id, png, [], undefined, []);
-    expect(stored).toEqual({ id: 'p9' });
+    expect((await importAll()).stored).toEqual([{ id: 'p9' }]);
     expect(pendingPhotos.value).toEqual([]);
   });
 
-  it('a file that cannot be read fails with the reason', async () => {
+  it('a file that cannot be read fails with the reason, and leaves the list on Importer', async () => {
     convertRawPhoto.mockRejectedValue(new Error('unreadable'));
     addImportFiles([new File(['raw'], 'bad.fits')]);
     await settle();
-    expect(importItems.value[0]).toMatchObject({ status: 'failed', error: 'unreadable' });
+    expect(importRows.value[0]).toMatchObject({
+      kind: 'reading',
+      file: { status: 'failed', error: 'unreadable' },
+    });
+    await importAll();
+    expect(importRows.value).toEqual([]);
   });
 
-  it('reads the raw files one after the other', async () => {
+  it('reads the raw files one after the other, and lists them in the order they were picked', async () => {
     let release!: () => void;
     convertRawPhoto.mockImplementationOnce(
       () => new Promise((r) => (release = () => r({ png, meta: solvedMeta }))),
     );
     convertRawPhoto.mockResolvedValue({ png, meta: solvedMeta });
-    addImportFiles([new File(['a'], 'a.fit'), new File(['b'], 'b.fit')]);
+    addImportFiles([
+      new File(['a'], 'a.fit'),
+      new File(['b'], 'b.fit'),
+      new File(['c'], 'c.jpg', { type: 'image/jpeg' }),
+    ]);
     await settle();
     expect(convertRawPhoto).toHaveBeenCalledTimes(1);
     release();
     await settle();
     expect(convertRawPhoto).toHaveBeenCalledTimes(2);
+    expect(rows().map(([name]) => name)).toEqual(['a.fit', 'b.fit', 'c.jpg']);
   });
 
-  it('imports everything: the solved photo with its placement and metadata, the other one as a waiting photo', async () => {
+  it('imports everything: the placed photo is stored, the other one goes to the gallery with its metadata', async () => {
     convertRawPhoto.mockResolvedValue({ png, meta: solvedMeta });
     uploadPhoto.mockResolvedValue({ id: 'p1' });
     const jpg = new File(['x'], 'M42.jpg', { type: 'image/jpeg' });
     addImportFiles([new File(['raw'], 'M1-CCD.fit'), jpg]);
     await settle();
     expect(importableCount.value).toBe(2);
-    const stored = await importAll();
-    expect(stored).toEqual([{ id: 'p1' }]);
+    const waiting = pendingPhotos.value.find((p) => p.name === 'M42.jpg')!;
+    const draft = (await pendingDraft(waiting.id))!;
+    await setPendingDraft(waiting.id, { ...draft, labels: ['Orion'] });
+    const { stored, errors } = await importAll();
+    expect([stored, errors]).toEqual([[{ id: 'p1' }], []]);
     expect(uploadPhoto).toHaveBeenCalledTimes(1);
     const [file, correspondences, manual, , metadata] = uploadPhoto.mock.calls[0];
-    expect(file).toBe(png);
+    expect(await file.text()).toBe('png');
     expect(correspondences).toEqual(corr);
     expect(manual).toBeUndefined();
     expect(metadata).toMatchObject({
@@ -280,11 +302,14 @@ describe('the photo import', () => {
     });
     // No header cards in this file: nothing to save beside the photo.
     expect(setPhotoFitsHeaders).not.toHaveBeenCalled();
-    // Both leave the list; the one without a placement is kept, with its picture, to be placed later.
-    expect(importItems.value).toEqual([]);
-    expect(pendingPhotos.value.map((p) => [p.name, p.state])).toEqual([['M42.jpg', 'toPlace']]);
+    // The list is empty; the one without a placement waits in the gallery, with its picture and metadata.
+    expect(importRows.value).toEqual([]);
+    expect(pendingPhotos.value.map((p) => [p.name, p.state, p.inImport])).toEqual([
+      ['M42.jpg', 'toPlace', false],
+    ]);
     const kept = await pendingPhotoFile(pendingPhotos.value[0].id);
     expect([kept!.name, kept!.type, await kept!.text()]).toEqual(['M42.jpg', 'image/jpeg', 'x']);
+    expect((await pendingDraft(pendingPhotos.value[0].id))!.labels).toEqual(['Orion']);
   });
 
   it("saves a solved file's headers with its photo", async () => {
@@ -293,17 +318,42 @@ describe('the photo import', () => {
     uploadPhoto.mockResolvedValue({ id: 'p1' });
     addImportFiles([new File(['raw'], 'M1-CCD.fit')]);
     await settle();
-    await settle();
-    expect(await importAll()).toEqual([{ id: 'p1', hasFitsHeaders: true }]);
+    expect((await importAll()).stored).toEqual([{ id: 'p1', hasFitsHeaders: true }]);
     expect(setPhotoFitsHeaders).toHaveBeenCalledWith('p1', cards);
   });
 
-  it('a photo that cannot be stored stays as failed', async () => {
+  it('a photo that cannot be stored stays in the list, placed, and its reason is given', async () => {
     convertRawPhoto.mockResolvedValue({ png, meta: solvedMeta });
     uploadPhoto.mockRejectedValue(new Error('disk full'));
     addImportFiles([new File(['raw'], 'M1-CCD.fit')]);
     await settle();
-    expect(await importAll()).toEqual([]);
-    expect(importItems.value[0]).toMatchObject({ status: 'failed', error: 'disk full' });
+    expect(await importAll()).toEqual({
+      stored: [],
+      errors: [{ name: 'M1-CCD.fit', message: 'disk full' }],
+    });
+    expect(rows()).toEqual([['M1-CCD.fit', 'placed']]);
+  });
+
+  it('gives the import up: its photos are forgotten, the waiting photos of the gallery stay', async () => {
+    addImportFiles([new File(['x'], 'M42.jpg')]);
+    await settle();
+    await importAll();
+    addImportFiles([new File(['y'], 'M45.jpg')]);
+    await settle();
+    await discardImport();
+    expect(importRows.value).toEqual([]);
+    expect(pendingPhotos.value.map((p) => p.name)).toEqual(['M42.jpg']);
+  });
+
+  it('after a restart, the photos left in an import wait in the gallery, with their metadata', async () => {
+    addImportFiles([new File(['x'], 'M42.jpg')]);
+    await settle();
+    const id = pendingPhotos.value[0].id;
+    await setPendingDraft(id, { ...(await pendingDraft(id))!, notes: 'Belle nuit' });
+    resetPendingLoad();
+    await loadPendingPhotos();
+    expect(importRows.value).toEqual([]);
+    expect(pendingPhotos.value.map((p) => [p.name, p.inImport])).toEqual([['M42.jpg', false]]);
+    expect((await pendingDraft(id))!.notes).toBe('Belle nuit');
   });
 });

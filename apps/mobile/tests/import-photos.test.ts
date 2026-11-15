@@ -4,14 +4,10 @@ import { ionicStubs } from './helpers';
 
 const convertRawPhoto = vi.fn();
 const uploadPhoto = vi.fn();
-const submitPlateSolve = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
   convertRawPhoto: (...a: unknown[]) => convertRawPhoto(...a),
   uploadPhoto: (...a: unknown[]) => uploadPhoto(...a),
-  loadServerSettings: () => Promise.resolve({ apiKeySet: true }),
-  submitPlateSolve: (...a: unknown[]) => submitPlateSolve(...a),
-  // The job never answers here: the tests move the waiting photo themselves.
-  pollPlateSolve: () => new Promise(() => {}),
+  setPhotoFitsHeaders: () => Promise.resolve(),
   // No saved setup for a raw file's header to point to.
   getGearSetups: () => Promise.resolve([]),
 }));
@@ -20,52 +16,81 @@ vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
 }));
 const replace = vi.fn();
 const push = vi.fn();
-vi.mock('vue-router', () => ({ useRouter: () => ({ replace, push }) }));
+const back = vi.fn();
+vi.mock('vue-router', () => ({ useRouter: () => ({ replace, push, back }) }));
+const confirm = vi.fn();
+vi.mock('../src/composables/useConfirm', () => ({ useConfirm: () => ({ confirm }) }));
+const showError = vi.fn();
+vi.mock('../src/composables/useErrorToast', () => ({ useErrorToast: () => ({ showError }) }));
+vi.mock('../src/composables/useBackClose', () => ({ useBackClose: vi.fn() }));
 
 import ImportPhotosPage from '../src/pages/ImportPhotosPage.vue';
-import { addImportFiles, clearImport } from '../src/composables/usePhotoImport';
-import { skyPlacement } from '../src/sky-modes';
+import PhoneBackButton from '../src/components/PhoneBackButton.vue';
+import { addImportFiles, resetImport } from '../src/composables/usePhotoImport';
 import {
   configurePendingStore,
   createMemoryPendingStore,
+  holdPendingPlacement,
   pendingPhotos,
-  removePendingPhoto,
   setPendingState,
 } from '../src/pending-photos';
 
-const png = new File(['png'], 'M1.png');
+const png = new File(['png'], 'M1.png', { type: 'image/png' });
 const corr = [{ pointIndex: 0, photoX: 1, photoY: 1, starHip: 0, starName: '' }];
 const solved = { png, meta: { success: true, correspondences: corr, width: 10, height: 10 } };
 
 const mountPage = () => mount(ImportPhotosPage, { global: { stubs: ionicStubs } });
-/** The rows of the chosen files (the placement-method sheet has rows of its own). */
 const fileRows = (wrapper: ReturnType<typeof mountPage>) => wrapper.findAll('.mob-list .mob-row');
+const settle = async () => {
+  for (let i = 0; i < 4; i++) await flushPromises();
+};
+const idOf = (name: string) => pendingPhotos.value.find((p) => p.name === name)!.id;
 
 describe('the import page', () => {
   beforeEach(() => {
     localStorage.setItem('lang', 'fr');
-    clearImport();
+    resetImport();
     configurePendingStore(createMemoryPendingStore());
     replace.mockReset();
+    push.mockReset();
+    back.mockReset();
+    confirm.mockReset();
+    showError.mockReset();
     uploadPhoto.mockReset();
     convertRawPhoto.mockReset();
-    submitPlateSolve.mockReset().mockResolvedValue({ jobId: 'job-1' });
   });
 
-  it('lists each file with where it stands, and a solved one can be imported', async () => {
+  it('lists each file with where it stands; every photo opens its page "Photo à ajouter"', async () => {
     convertRawPhoto.mockResolvedValue(solved);
-    addImportFiles([new File(['r'], 'M31.fits'), new File(['x'], 'M45.jpg')]);
+    addImportFiles([
+      new File(['r'], 'M31.fits'),
+      new File(['x'], 'M45.jpg'),
+      new File(['y'], 'M101.jpg'),
+      new File(['z'], 'NGC7000.jpg'),
+    ]);
     const wrapper = mountPage();
+    await settle();
+    await holdPendingPlacement(idOf('M101.jpg'), { correspondences: [], dsoIds: [], by: 'hand' });
+    await setPendingState(idOf('NGC7000.jpg'), 'solving', { jobId: 'job-1' });
     await flushPromises();
-    expect(wrapper.find('h1').text()).toBe('Importer 2 photos');
+    expect(wrapper.find('h1').text()).toBe('Importer 4 photos');
     const rows = fileRows(wrapper);
-    expect(rows.map((r) => r.find('.mob-row-title').text())).toEqual(['M31.fits', 'M45.jpg']);
-    expect(rows[0].find('.mob-row-sub').text()).toBe('✓ Déjà résolue');
+    expect(rows.map((r) => r.find('.mob-row-title').text())).toEqual([
+      'M31.fits',
+      'M45.jpg',
+      'M101.jpg',
+      'NGC7000.jpg',
+    ]);
+    expect(rows.map((r) => r.find('.mob-row-sub').text())).toEqual([
+      '✓ Déjà résolue',
+      'À placer',
+      '✓ Placée à la main',
+      'Résolution',
+    ]);
     expect(rows[0].find('.mob-row-sub').classes()).toContain('mob-status--success');
-    expect(rows[1].find('.mob-row-sub').text()).toBe('À placer');
-    // Only the photo to place opens the choice of a placement method.
-    expect(rows[0].find('.mob-row-chevron').exists()).toBe(false);
-    expect(rows[1].find('.mob-row-chevron').exists()).toBe(true);
+    expect(rows.every((r) => r.find('.mob-row-chevron').exists())).toBe(true);
+    await rows[0].trigger('click');
+    expect(push).toHaveBeenCalledWith(`/gallery/pending/${idOf('M31.fits')}`);
     expect(wrapper.find('footer button').attributes('disabled')).toBeUndefined();
   });
 
@@ -76,7 +101,7 @@ describe('the import page', () => {
     });
     addImportFiles([new File(['r'], 'M42_SeeStarS50.fit'), new File(['x'], 'M45.jpg')]);
     const wrapper = mountPage();
-    await flushPromises();
+    await settle();
     const rows = fileRows(wrapper);
     // The board "Importer, fichier non résolu": "À placer", then the line in the warning colour.
     expect(rows[0].findAll('.mob-row-sub').map((s) => s.text())).toEqual([
@@ -84,7 +109,6 @@ describe('the import page', () => {
       'Non résolu astrométriquement : données de prise de vue chargées',
     ]);
     expect(rows[0].findAll('.mob-row-sub')[1].classes()).toContain('mob-status--warn');
-    expect(rows[0].find('.mob-row-chevron').exists()).toBe(true);
     // A photo that is not a raw file has no such line.
     expect(rows[1].findAll('.mob-row-sub').map((s) => s.text())).toEqual(['À placer']);
   });
@@ -94,194 +118,78 @@ describe('the import page', () => {
     convertRawPhoto.mockReturnValue(new Promise((_resolve, reject) => (fail = reject)));
     addImportFiles([new File(['r'], 'M31.fits')]);
     const wrapper = mountPage();
-    await flushPromises();
+    await settle();
     expect(wrapper.find('h1').text()).toBe('Importer 1 photo');
     expect(wrapper.find('footer button').attributes('disabled')).toBeDefined();
     fail(new Error('unreadable'));
-    await flushPromises();
+    await settle();
     expect(wrapper.find('.mob-row-sub').text()).toBe('unreadable');
+    expect(fileRows(wrapper)[0].find('.mob-row-chevron').exists()).toBe(false);
     expect(wrapper.find('footer button').attributes('disabled')).toBeDefined();
   });
 
-  it('imports everything at once: the solved photo is stored, the other one waits in the gallery', async () => {
+  it('imports everything at once: the placed photo is stored, the other one waits in the gallery', async () => {
     convertRawPhoto.mockResolvedValue(solved);
     uploadPhoto.mockResolvedValue({ id: 'p1' });
     addImportFiles([new File(['r'], 'M31.fits'), new File(['x'], 'M45.jpg')]);
     const wrapper = mountPage();
-    await flushPromises();
+    await settle();
     await wrapper.find('footer button').trigger('click');
-    await flushPromises();
+    await settle();
     expect(uploadPhoto).toHaveBeenCalledTimes(1);
-    expect(pendingPhotos.value.map((p) => p.name)).toEqual(['M45.jpg']);
+    expect(pendingPhotos.value.map((p) => [p.name, p.inImport])).toEqual([['M45.jpg', false]]);
     expect(replace).toHaveBeenCalledWith('/tabs/gallery');
   });
 
-  it('keeps a photo that could not be stored on the page, with the reason', async () => {
+  it('keeps a photo that could not be stored in the list, and says why', async () => {
     convertRawPhoto.mockResolvedValue(solved);
     uploadPhoto.mockRejectedValue(new Error('disk full'));
     addImportFiles([new File(['r'], 'M31.fits'), new File(['x'], 'M45.jpg')]);
     const wrapper = mountPage();
-    await flushPromises();
+    await settle();
     await wrapper.find('footer button').trigger('click');
-    await flushPromises();
+    await settle();
     expect(fileRows(wrapper).map((r) => r.find('.mob-row-title').text())).toEqual(['M31.fits']);
-    expect(wrapper.find('.mob-row-sub').text()).toBe('disk full');
+    expect(showError).toHaveBeenCalledWith('M31.fits : disk full');
     expect(replace).not.toHaveBeenCalled();
   });
 
-  it('goes back to the gallery once every photo is stored', async () => {
-    convertRawPhoto.mockResolvedValue(solved);
-    uploadPhoto.mockResolvedValue({ id: 'p1' });
-    addImportFiles([new File(['r'], 'M31.fits')]);
-    const wrapper = mountPage();
-    await flushPromises();
-    await wrapper.find('footer button').trigger('click');
-    await flushPromises();
-    expect(replace).toHaveBeenCalledWith('/tabs/gallery');
-  });
-
-  const chooseOnline = async (wrapper: ReturnType<typeof mountPage>, fileName: string) => {
-    await fileRows(wrapper)
-      .find((r) => r.text().includes(fileName))!
-      .trigger('click');
-    await flushPromises();
-    await wrapper
-      .findAll('.mob-sheet .mob-row')
-      .find((r) => r.text().includes('Résoudre en ligne'))!
-      .trigger('click');
-    await flushPromises();
-  };
-
-  it('keeps a photo placed by hand as a waiting photo, and opens the sky map to place it', async () => {
-    push.mockReset();
-    skyPlacement.value = null;
-    addImportFiles([new File(['x'], 'M101.jpg')]);
-    const wrapper = mountPage();
-    await flushPromises();
-    await fileRows(wrapper)[0].trigger('click');
-    await flushPromises();
-    await wrapper
-      .findAll('.mob-sheet .mob-row')
-      .find((r) => r.text().includes('Placer à la main'))!
-      .trigger('click');
-    await flushPromises();
-    expect(pendingPhotos.value.map((p) => [p.name, p.state])).toEqual([['M101.jpg', 'toPlace']]);
-    expect(skyPlacement.value).toEqual({ pendingId: pendingPhotos.value[0].id });
-    expect(push).toHaveBeenCalledWith('/tabs/sky');
-    // Placed (it leaves the waiting photos), it leaves the list.
-    await removePendingPhoto(pendingPhotos.value[0].id);
-    await flushPromises();
-    expect(fileRows(wrapper)).toHaveLength(0);
-    skyPlacement.value = null;
-  });
-
-  it('keeps a photo whose stars are identified as a waiting photo, and opens its identification', async () => {
-    push.mockReset();
-    addImportFiles([new File(['x'], 'M101.jpg')]);
-    const wrapper = mountPage();
-    await flushPromises();
-    await fileRows(wrapper)[0].trigger('click');
-    await flushPromises();
-    await wrapper
-      .findAll('.mob-sheet .mob-row')
-      .find((r) => r.text().includes('Identifier 3 étoiles'))!
-      .trigger('click');
-    await flushPromises();
-    expect(pendingPhotos.value.map((p) => [p.name, p.state])).toEqual([['M101.jpg', 'toPlace']]);
-    expect(replace).toHaveBeenCalledWith('/tabs/gallery');
-    expect(push).toHaveBeenCalledWith(`/gallery/identify/${pendingPhotos.value[0].id}`);
-    await removePendingPhoto(pendingPhotos.value[0].id);
-  });
-
-  it('keeps a photo whose solution is reused as a waiting photo, and opens the list of solutions', async () => {
-    push.mockReset();
-    addImportFiles([new File(['x'], 'M35.jpg')]);
-    const wrapper = mountPage();
-    await flushPromises();
-    await fileRows(wrapper)[0].trigger('click');
-    await flushPromises();
-    await wrapper
-      .findAll('.mob-sheet .mob-row')
-      .find((r) => r.text().includes('Réutiliser une solution astrometry.net'))!
-      .trigger('click');
-    await flushPromises();
-    expect(pendingPhotos.value.map((p) => [p.name, p.state])).toEqual([['M35.jpg', 'toPlace']]);
-    expect(replace).toHaveBeenCalledWith('/tabs/gallery');
-    expect(push).toHaveBeenCalledWith(`/gallery/reuse/${pendingPhotos.value[0].id}`);
-    await removePendingPhoto(pendingPhotos.value[0].id);
-  });
-
-  it('asks how to place a photo, sends it to the online solver and shows "Résolution"', async () => {
-    addImportFiles([new File(['x'], 'M45.jpg')]);
-    const wrapper = mountPage();
-    await flushPromises();
-    await fileRows(wrapper)[0].trigger('click');
-    await flushPromises();
-    expect(wrapper.find('.mob-sheet').text()).toContain('Comment placer cette photo ?');
-    await chooseOnline(wrapper, 'M45.jpg');
-    expect(submitPlateSolve.mock.calls[0][0].name).toBe('M45.jpg');
-    // It is kept at once as a waiting photo, so it is in the gallery whatever happens to this list.
-    expect(pendingPhotos.value.map((p) => [p.name, p.state])).toEqual([['M45.jpg', 'solving']]);
-    const row = fileRows(wrapper)[0];
-    expect(row.find('.mob-row-sub').classes()).toContain('mob-row-sub--busy');
-    expect(row.text()).toContain('Résolution');
-    expect(row.find('.mob-row-chevron').exists()).toBe(false);
-    expect(wrapper.find('footer button').attributes('disabled')).toBeUndefined();
-  });
-
-  it('shows a failed solve in red, lets another try be made, and drops the row once the photo is placed', async () => {
-    addImportFiles([new File(['x'], 'M45.jpg')]);
-    const wrapper = mountPage();
-    await flushPromises();
-    await chooseOnline(wrapper, 'M45.jpg');
-    const id = pendingPhotos.value[0].id;
-
-    await setPendingState(id, 'failed', { error: 'no stars' });
-    await flushPromises();
-    let row = fileRows(wrapper)[0];
-    expect(row.find('.mob-row-sub').text()).toBe('Échec de la résolution');
-    expect(row.find('.mob-row-sub').classes()).toContain('mob-status--danger');
-    expect(row.find('.mob-row-chevron').exists()).toBe(true);
-
-    await setPendingState(id, 'offline', { jobId: 'job-1', submissionId: 42 });
-    await flushPromises();
-    row = fileRows(wrapper)[0];
-    expect(row.find('.mob-row-sub').text()).toBe('Hors ligne');
-    expect(row.find('.mob-row-chevron').exists()).toBe(true);
-
-    // Not finished on astrometry.net in time: amber, and the row still opens the ways to place it.
-    await setPendingState(id, 'unfinished', { submissionId: 42 });
-    await flushPromises();
-    row = fileRows(wrapper)[0];
-    expect(row.find('.mob-row-sub').text()).toBe('Résolution non terminée');
-    expect(row.find('.mob-row-sub').classes()).toContain('mob-status--warn');
-    expect(row.find('.mob-row-chevron').exists()).toBe(true);
-    await setPendingState(id, 'failed', { error: 'no stars' });
-    await flushPromises();
-
-    await chooseOnline(wrapper, 'M45.jpg');
-    expect(submitPlateSolve).toHaveBeenCalledTimes(2);
-    expect(pendingPhotos.value).toHaveLength(1);
-    row = fileRows(wrapper)[0];
-    expect(row.text()).toContain('Résolution');
-
-    // Solved and stored: the waiting photo is gone, and so is the row.
-    await removePendingPhoto(id);
-    await flushPromises();
-    expect(fileRows(wrapper)).toHaveLength(0);
-  });
-
-  it('"Importer" leaves a photo being solved to the gallery without storing it twice', async () => {
-    addImportFiles([new File(['x'], 'M45.jpg'), new File(['y'], 'M42.jpg')]);
-    const wrapper = mountPage();
-    await flushPromises();
-    await chooseOnline(wrapper, 'M45.jpg');
-    await wrapper.find('footer button').trigger('click');
-    await flushPromises();
-    expect(pendingPhotos.value.map((p) => [p.name, p.state])).toEqual([
-      ['M45.jpg', 'solving'],
-      ['M42.jpg', 'toPlace'],
+  it("keeps its list when it is left for a photo's page and shown again", async () => {
+    addImportFiles([new File(['x'], 'M45.jpg'), new File(['y'], 'M101.jpg')]);
+    const first = mountPage();
+    await settle();
+    first.unmount();
+    const again = mountPage();
+    await settle();
+    expect(fileRows(again).map((r) => r.find('.mob-row-title').text())).toEqual([
+      'M45.jpg',
+      'M101.jpg',
     ]);
-    expect(replace).toHaveBeenCalledWith('/tabs/gallery');
+  });
+
+  it('asks before giving the import up when it is left with photos in the list', async () => {
+    addImportFiles([new File(['x'], 'M45.jpg'), new File(['y'], 'M101.jpg')]);
+    const wrapper = mountPage();
+    await settle();
+    const before = wrapper.findComponent(PhoneBackButton).props('before')!;
+    confirm.mockResolvedValueOnce(false);
+    expect(await before()).toBe(false);
+    expect(confirm.mock.calls[0][0]).toMatchObject({
+      title: "Abandonner l'import ?",
+      message: 'Les 2 photos ne seront pas ajoutées. Pour les garder, touchez Importer.',
+      confirmLabel: 'Abandonner',
+      destructive: true,
+    });
+    expect(pendingPhotos.value).toHaveLength(2);
+    confirm.mockResolvedValueOnce(true);
+    expect(await before()).toBe(true);
+    expect(pendingPhotos.value).toEqual([]);
+  });
+
+  it('is left without a question when its list is empty', async () => {
+    const wrapper = mountPage();
+    await settle();
+    expect(await wrapper.findComponent(PhoneBackButton).props('before')!()).toBe(true);
+    expect(confirm).not.toHaveBeenCalled();
   });
 });
