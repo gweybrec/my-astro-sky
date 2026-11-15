@@ -5426,7 +5426,7 @@ details.targets-form-details[open] .targets-form-summary::before {
 .astrometry-modal-footer {
   flex-shrink: 0;
   border-top: 1px solid var(--border-subtle);
-  padding-top: var(--space-7);
+  padding: var(--space-7) var(--space-8);
 }
 .pagination-bar {
   display: flex;

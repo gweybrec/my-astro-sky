@@ -469,19 +469,19 @@ export class PhotoOverlay extends PhotoLayer {
       pageButtons.className = 'pagination-btn-group';
 
       const prevBtn = document.createElement('button');
-      prevBtn.className = 'btn-secondary';
+      prevBtn.className = 'btn-action';
       prevBtn.textContent = t('modal.prevPage');
       prevBtn.disabled = true;
       pageButtons.appendChild(prevBtn);
 
       const nextBtn = document.createElement('button');
-      nextBtn.className = 'btn-secondary';
+      nextBtn.className = 'btn-action';
       nextBtn.textContent = t('modal.nextPage');
       nextBtn.disabled = true;
       pageButtons.appendChild(nextBtn);
 
       const refreshBtn = document.createElement('button');
-      refreshBtn.className = 'btn-secondary';
+      refreshBtn.className = 'btn-action';
       refreshBtn.textContent = t('modal.refreshSubmissions');
       refreshBtn.title = t('modal.refreshSubmissions');
       pageButtons.appendChild(refreshBtn);
@@ -595,30 +595,12 @@ export class PhotoOverlay extends PhotoLayer {
         }
       };
 
-      prevBtn.onmouseenter = () => {
-        if (!prevBtn.disabled) {
-          prevBtn.style.background = 'rgba(80, 120, 200, 0.5)';
-        }
-      };
-      prevBtn.onmouseleave = () => {
-        prevBtn.style.background = 'rgba(60, 100, 180, 0.3)';
-      };
-
       nextBtn.onclick = () => {
         const totalPages = Math.ceil(allSubmissions.length / itemsPerPage);
         if (currentPage < totalPages - 1) {
           currentPage++;
           renderPage();
         }
-      };
-
-      nextBtn.onmouseenter = () => {
-        if (!nextBtn.disabled) {
-          nextBtn.style.background = 'rgba(80, 120, 200, 0.5)';
-        }
-      };
-      nextBtn.onmouseleave = () => {
-        nextBtn.style.background = 'rgba(60, 100, 180, 0.3)';
       };
 
       function fetchAndRenderSubmissions(forceRefresh = false) {
