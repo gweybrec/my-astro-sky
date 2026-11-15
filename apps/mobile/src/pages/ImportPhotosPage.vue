@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonList, onIonViewDidLeave } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
@@ -32,8 +32,8 @@ import imageIcon from '@icons/image.svg?raw';
 const router = useRouter();
 const { showError } = useErrorToast();
 const importing = ref(false);
-/** The photo whose placement method is being chosen. */
-const placing = ref<ImportItem | null>(null);
+/** The photo whose placement method is being chosen (shallow: what its file said is kept on the phone as it is). */
+const placing = shallowRef<ImportItem | null>(null);
 const methodOpen = ref(false);
 
 const canChoose = (item: ImportItem) =>

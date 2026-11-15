@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref } from 'vue';
 
 const convertRawPhoto = vi.fn();
 const uploadPhoto = vi.fn();
@@ -141,6 +142,29 @@ describe('the photo import', () => {
     await keepImportPending(importItems.value[0]);
     const solveFile = await pendingPhotoSolveFile(pendingPhotos.value[0].id);
     expect([solveFile!.type, await solveFile!.text()]).toEqual(['image/png', 'png']);
+  });
+
+  it('keeps a photo held in a deep ref (the import page) without Vue proxies, which the phone database cannot store', async () => {
+    // The phone's IndexedDB clones what it stores, and refuses a Vue proxy ("… could not be cloned").
+    const memory = createMemoryPendingStore();
+    configurePendingStore({ ...memory, put: (record) => memory.put(structuredClone(record)) });
+    convertRawPhoto.mockResolvedValue({
+      png,
+      meta: {
+        success: false,
+        width: 10,
+        height: 10,
+        expTime: 30,
+        stackCnt: 44,
+        fitsHeaders: [{ key: 'A', value: '1' }],
+      },
+    });
+    addImportFiles([new File(['raw'], 'M2.fit')]);
+    await settle();
+    await settle();
+    const held = ref(importItems.value[0]);
+    const id = await keepImportPending(held.value);
+    expect(pendingPhotos.value.map((p) => p.id)).toEqual([id]);
   });
 
   it('a raw file without a plate solution keeps its capture data, setup and headers until it is placed', async () => {

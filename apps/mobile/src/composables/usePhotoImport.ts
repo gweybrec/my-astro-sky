@@ -1,4 +1,4 @@
-import { computed, shallowRef, watch } from 'vue';
+import { computed, shallowRef, toRaw, watch } from 'vue';
 import type { Photo, PhotoCorrespondence } from '@myastrosky/core/types';
 import { ANY_PHOTO_EXT_RE, isFitsFile, isRawAstroFile } from '@myastrosky/core/photo-formats';
 import { sanitizeCaptureDetails } from '@myastrosky/core/capture-fields';
@@ -158,7 +158,9 @@ export const importableCount = computed(
  * Keeps a photo of the list as a waiting photo (once), so that it is in the gallery whatever happens to this list;
  * returns its id. It then follows that waiting photo: it leaves the list once the photo is placed.
  */
-export async function keepImportPending(item: ImportItem): Promise<string> {
+export async function keepImportPending(reactiveItem: ImportItem): Promise<string> {
+  // The phone's database stores no Vue proxy: an item held in a deep ref has its header data wrapped in them.
+  const item = toRaw(reactiveItem);
   if (item.pendingId) return item.pendingId;
   const pendingId = (
     await addPendingPhoto(item.file, item.name, pendingCapture(item), item.rawFile)
