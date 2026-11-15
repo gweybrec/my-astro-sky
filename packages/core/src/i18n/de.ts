@@ -1575,6 +1575,8 @@ const de: Translations = {
     statusSolving: 'Wird gelöst… ({seconds}s)',
     statusSuccess: '✓ Gelöst — bereit zur Platzierung',
     statusCanceled: 'Abgebrochen',
+    statusUnfinished:
+      'astrometry.net ist noch nicht fertig; die Lösung läuft dort weiter. Komm später zurück und wähle sie mit „{button}“.',
     statusPlaced: '✓ Gespeichert und auf Karte platziert',
     statusFailed: 'Lösung fehlgeschlagen',
     statusWcsReady: '✓ WCS geladen — bereit',

@@ -524,7 +524,11 @@ async function pollUntilDone(
             correspondences: status.correspondences,
             dsoIds: status.dsoIds,
           });
-        } else if (status.status === 'failed' || status.status === 'timeout') {
+        } else if (status.status === 'timeout') {
+          // Not a failure: astrometry.net goes on solving after the app stopped following it.
+          stopPolling();
+          reject(Object.assign(new Error('unfinished'), { code: 'SOLVE_UNFINISHED' }));
+        } else if (status.status === 'failed') {
           stopPolling();
           reject(new Error(status.error || t('modal.solveFailed')));
         }
@@ -690,7 +694,11 @@ async function solveItem(item: BatchItem) {
       }
     }
   } catch (err: any) {
-    if (!cancelled) {
+    if (!cancelled && err?.code === 'SOLVE_UNFINISHED') {
+      item.status = 'unfinished';
+      item.error = '';
+      item.diagnostics = undefined;
+    } else if (!cancelled) {
       const wasCanceled = err?.name === 'AbortError' || err?.code === 'SOLVE_CANCELED';
       item.status = wasCanceled ? 'canceled' : 'failed';
       item.error = wasCanceled ? '' : err.message || t('batch.statusFailed');
@@ -754,6 +762,9 @@ function startSolving() {
       continue;
     }
     if (item.status === 'placing' || item.status === 'placed' || item.status === 'converting')
+      continue;
+    // Still solving on astrometry.net: sending it again would upload the picture a second time.
+    if (item.status === 'unfinished' && item.solver === 'astrometry' && item.wcsResult == null)
       continue;
     if (item.status === 'failed' && needsConversion(item)) {
       retryConversion(item);

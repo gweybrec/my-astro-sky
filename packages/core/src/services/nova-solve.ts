@@ -35,8 +35,13 @@ const API_BASE = 'https://nova.astrometry.net/api';
 const WCS_FILE_BASE = 'https://nova.astrometry.net/wcs_file';
 const API_KEY_SETTING = 'ASTROMETRY_API_KEY';
 const JOB_TTL_MS = 60 * 60 * 1000; // 1 hour
-/** Seconds between two polls (the last one repeats); about 80 s to get a job id, as many polls again to solve it. */
-const POLL_DELAYS_MS = [3000, 5000, 8000, 13000, 13000, 13000, 13000, 13000];
+/** Waits between two polls (the last one repeats). */
+const POLL_DELAYS_MS = [3000, 5000, 8000, 13000];
+/**
+ * How long a job is followed in all. astrometry.net goes on solving after it: the job then ends `timeout`, which is not
+ * a failure, and the solution can be reused from the list of submissions once it is there.
+ */
+export const POLL_BUDGET_MS = 15 * 60 * 1000;
 /** Submissions per page when the caller does not say, and the most a page may hold. */
 const LIST_PAGE_SIZE = 5;
 const LIST_PAGE_MAX = 20;
@@ -326,13 +331,25 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
   /** Waits for the submission to become a job, then for the job to finish, and stores the solution. */
   async function pollJob(job: Job): Promise<void> {
     if (!job.submissionId) return;
-    const delays = POLL_DELAYS_MS;
     let attempt = 0;
+    let waited = 0;
+    /** Waits before the next poll; false once the time given to the job is spent. */
+    const pause = async () => {
+      if (waited >= POLL_BUDGET_MS) return false;
+      const delay = POLL_DELAYS_MS[Math.min(attempt, POLL_DELAYS_MS.length - 1)];
+      attempt++;
+      waited += delay;
+      await sleep(delay);
+      return true;
+    };
+    /** The time is spent and astrometry.net has not finished: no error, the solve goes on there. */
+    const unfinished = () => {
+      job.status = 'timeout';
+      job.error = undefined;
+    };
 
     // First: poll the submission to get the job id.
-    while (attempt < delays.length) {
-      await sleep(delays[Math.min(attempt, delays.length - 1)]);
-      attempt++;
+    while (await pause()) {
       if (job.status !== 'solving') return;
       try {
         const subRes = await http({
@@ -349,15 +366,12 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
       }
     }
     if (!job.jobId) {
-      job.status = 'timeout';
-      job.error = 'Timeout: pas de job créé';
+      if (job.status === 'solving') unfinished();
       return;
     }
 
     // Then poll the job.
-    while (attempt < delays.length + 8) {
-      await sleep(delays[Math.min(attempt, delays.length - 1)]);
-      attempt++;
+    while (await pause()) {
       if (job.status !== 'solving') return;
       try {
         const jobData = await readJson(
@@ -411,8 +425,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
         // Retry
       }
     }
-    job.status = 'timeout';
-    job.error = 'Timeout: résolution trop longue';
+    if (job.status === 'solving') unfinished();
   }
 
   async function fetchSubmissionInfo(jobId: number): Promise<AstrometrySubmission> {

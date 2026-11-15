@@ -357,12 +357,15 @@ describe('submitJob — upload response handling', () => {
       .mockResolvedValue(jsonResp({ jobs: [null] }));
 
     const localId = await submitJob(bytesOf('img'), 'photo.jpg', 800, 600);
-    await vi.advanceTimersByTimeAsync(200000);
+    await vi.advanceTimersByTimeAsync(14 * 60 * 1000);
+    expect((await getJobStatus(localId))!.status).toBe('solving');
+    await vi.advanceTimersByTimeAsync(2 * 60 * 1000);
 
     const job = await getJobStatus(localId);
     expect(job).toBeDefined();
+    // Not a failure: astrometry.net goes on solving.
     expect(job!.status).toBe('timeout');
-    expect(job!.error).toBeTruthy();
+    expect(job!.error).toBeUndefined();
   });
 
   it('polling marks job as failed when astrometry job status is failure', async () => {

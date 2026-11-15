@@ -191,6 +191,37 @@ function items(
     .items;
 }
 
+describe('BatchUploadModal — astrometry.net not finished in time', () => {
+  it('leaves the item unfinished, not failed, and Start does not send it again', async () => {
+    state.pendingFiles = [jpeg('m35.jpg')];
+    state.availability = { solveField: false, astap: false, astrometry: true };
+    pollPlateSolve.mockResolvedValue({ jobId: 'online-job', status: 'timeout' });
+
+    const wrapper = mountModal();
+    await flushPromises();
+    const item = items(wrapper)[0] as unknown as { solver: string; status: string; error: string };
+    item.solver = 'astrometry';
+
+    await wrapper.find('.batch-footer-buttons .btn-action').trigger('click'); // Start
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(2000);
+    await flushPromises();
+    expect(item.status).toBe('unfinished');
+    expect(item.error).toBe('');
+    expect(submitPlateSolve).toHaveBeenCalledTimes(1);
+
+    // Start again: the picture is not uploaded a second time.
+    await wrapper.find('.batch-footer-buttons .btn-action').trigger('click');
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(2000);
+    await flushPromises();
+    expect(submitPlateSolve).toHaveBeenCalledTimes(1);
+    expect(item.status).toBe('unfinished');
+
+    wrapper.unmount();
+  });
+});
+
 describe('BatchUploadModal — raw file conversion', () => {
   it('submits the original raw file to astrometry.net after converting its stored picture to PNG', async () => {
     const raw = fit('M101.fit');

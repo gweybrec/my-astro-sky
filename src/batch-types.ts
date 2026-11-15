@@ -17,6 +17,8 @@ export type BatchItemStatus =
   | 'solving'
   | 'success'
   | 'failed'
+  /** astrometry.net had not finished when the app stopped following it; its solution is reused later. */
+  | 'unfinished'
   | 'waiting'
   | 'canceled'
   | 'placing'

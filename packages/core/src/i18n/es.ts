@@ -1570,6 +1570,8 @@ const es: Translations = {
     statusSolving: 'Resolviendo… ({seconds}s)',
     statusSuccess: '✓ Resuelto — listo para colocar',
     statusCanceled: 'Cancelada',
+    statusUnfinished:
+      'astrometry.net aún no ha terminado; la resolución continúa allí. Vuelve más tarde y elígela con «{button}».',
     statusPlaced: '✓ Guardado y colocado en el mapa',
     statusFailed: 'La solución falló',
     statusWcsReady: '✓ WCS cargado — listo',

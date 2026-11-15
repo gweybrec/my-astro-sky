@@ -11,7 +11,7 @@ import path from 'path';
 import { describe, it, expect, vi } from 'vitest';
 import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { HttpRequest, HttpResponse } from '@myastrosky/core/ports/http-client';
-import { createNovaSolveService } from '@myastrosky/core/services/nova-solve';
+import { createNovaSolveService, POLL_BUDGET_MS } from '@myastrosky/core/services/nova-solve';
 import { buildFits } from '../fixtures/fits-builders';
 
 const FIXTURES = path.join(__dirname, '../fixtures/astrometry');
@@ -311,17 +311,50 @@ describe('the polling of a submitted job', () => {
     expect(await t.service.getJob(id)).toMatchObject({ status: 'failed', error: 'Solving failed' });
   });
 
-  it('times out when the submission never becomes a job', async () => {
+  /** The time the polling waited in all. */
+  const waitedMs = (t: ReturnType<typeof setup>) =>
+    t.sleep.mock.calls.reduce((sum, [ms]) => sum + ms, 0);
+
+  it('stops after 15 minutes when the submission never becomes a job, without an error', async () => {
     const t = setup({
       route: (r) => (r.url === `${API}/submissions/9` ? json({ jobs: [null] }) : solvedRoute(r)),
     });
     const id = await t.service.submit(t.file);
-    await t.pump(9);
-    expect(t.sleep).toHaveBeenCalledTimes(8);
-    expect(await t.service.getJob(id)).toMatchObject({
-      status: 'timeout',
-      error: 'Timeout: pas de job créé',
+    await t.pump(80);
+    expect(waitedMs(t)).toBe(POLL_BUDGET_MS);
+    expect(POLL_BUDGET_MS).toBe(15 * 60 * 1000);
+    const job = await t.service.getJob(id);
+    expect(job.status).toBe('timeout');
+    expect(job.error).toBeUndefined();
+    // Every 13 s at most: astrometry.net is not asked too often.
+    expect(Math.max(...t.sleep.mock.calls.map(([ms]) => ms))).toBe(13000);
+  });
+
+  it('stops after 15 minutes when the job is still solving, without an error', async () => {
+    const t = setup({
+      route: (r) =>
+        r.url === `${API}/jobs/10796000` ? json({ status: 'solving' }) : solvedRoute(r),
     });
+    const id = await t.service.submit(t.file);
+    await t.pump(80);
+    expect(waitedMs(t)).toBe(POLL_BUDGET_MS);
+    const job = await t.service.getJob(id);
+    expect(job).toMatchObject({ status: 'timeout', submissionId: 9 });
+    expect(job.error).toBeUndefined();
+  });
+
+  it('still gets the solution of a job astrometry.net solves after 12 minutes', async () => {
+    let solved = false;
+    const t = setup({
+      route: (r) =>
+        r.url === `${API}/jobs/10796000` && !solved ? json({ status: 'solving' }) : solvedRoute(r),
+    });
+    const id = await t.service.submit(t.file);
+    while (waitedMs(t) < 12 * 60 * 1000) await t.pump(1);
+    expect((await t.service.getJob(id)).status).toBe('solving');
+    solved = true;
+    await t.pump(2);
+    expect((await t.service.getJob(id)).status).toBe('solved');
   });
 });
 

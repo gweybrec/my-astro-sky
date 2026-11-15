@@ -63,6 +63,14 @@
       </details>
     </template>
 
+    <template v-else-if="item.status === 'unfinished'">
+      <div class="shared-solve-status-row">
+        <span class="text-small text-[var(--status-warn-text)]">{{
+          t('batch.statusUnfinished', { button: t('batch.reuseOnline') })
+        }}</span>
+      </div>
+    </template>
+
     <template v-else-if="item.status === 'canceled'">
       <div class="shared-solve-status-row">
         <span class="batch-status-text batch-status-error">{{ t('batch.statusCanceled') }}</span>

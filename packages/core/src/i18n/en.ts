@@ -1554,6 +1554,8 @@ const en: Translations = {
     statusPlaced: '✓ Saved and placed on map',
     statusFailed: 'Solve failed',
     statusCanceled: 'Canceled',
+    statusUnfinished:
+      'astrometry.net has not finished yet; the solve goes on there. Come back later and pick it with “{button}”.',
     statusWcsReady: '✓ WCS loaded — ready',
     statusWaiting: 'Waiting for a slot… (max {max} parallel)',
     retryButton: 'Retry',

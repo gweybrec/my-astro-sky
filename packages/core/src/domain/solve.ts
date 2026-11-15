@@ -57,7 +57,11 @@ export interface NovaCorrespondence {
   starDec?: number;
 }
 
-/** Where a submitted job is: `pending` and `solving` run, the others are final. */
+/**
+ * Where a submitted job is: `pending` and `solving` run, the others are final. `timeout` is not a failure: the app
+ * stopped following the job, which astrometry.net goes on solving (`resume` follows it again; once solved, it can be
+ * reused from the list of submissions). It carries no `error`.
+ */
 export type NovaJobState = 'pending' | 'solving' | 'solved' | 'failed' | 'timeout';
 
 /** What `GET /api/solve-plate/:id` returns. */

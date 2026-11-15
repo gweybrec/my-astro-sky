@@ -572,7 +572,7 @@ const fr = {
     solvingOnline: 'Résolution en cours\u2026 ({seconds}s)',
     solvingOnlineSlow: 'Toujours en cours sur astrometry.net…',
     solveTimeoutHint:
-      "Cela peut prendre jusqu'à 10 minutes. Vous pouvez fermer cette fenêtre et revenir plus tard — une fois résolu, l'image apparaêtra dans la liste des soumissions et vous pourrez la réutiliser.",
+      "Cela peut prendre jusqu'à 10 minutes. Vous pouvez fermer cette fenêtre et revenir plus tard — une fois résolu, l'image apparaîtra dans la liste des soumissions et vous pourrez la réutiliser.",
     slowSolveHint: 'Toujours en cours, cela peut prendre plusieurs minutes…',
     solvedOnline: '✓ Résolu en {seconds}s — prêt à placer',
     errorDetailsSummary: "Détails de l'erreur",
@@ -1577,6 +1577,8 @@ const fr = {
     statusPlaced: '✓ Sauvegardé et placé sur la carte',
     statusFailed: 'Échec de la résolution',
     statusCanceled: 'Annulée',
+    statusUnfinished:
+      "astrometry.net n'a pas encore fini, la résolution continue de son côté. Revenez plus tard et choisissez-la avec « {button} ».",
     statusWcsReady: '✓ WCS chargé — prêt',
     statusWaiting: "En attente d'un créneau… (max {max} en parallèle)",
     retryButton: 'Réessayer',
