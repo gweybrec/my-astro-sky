@@ -297,7 +297,37 @@ export function renderStarLabels(s: SkyScene): void {
   ctx.textBaseline = 'alphabetic';
 }
 
+/** Far enough past any canvas edge that the clip's outer rectangle holds every marker drawn. */
+const CLIP_OUTER_PX = 1e5;
+
+/**
+ * Clips the context to outside every shown photo (call between save and restore): no DSO marker or label is seen on a
+ * photo, even one made see-through by its opacity. One clip per photo, each its outside (the canvas rectangle with
+ * the photo as a hole): successive clips intersect, so what is left is outside all of them, overlapping photos
+ * included.
+ */
+function clipOutsidePhotos(s: SkyScene): void {
+  const { ctx } = s;
+  for (const edge of s.photoFootprints) {
+    if (edge.length < 3) continue;
+    ctx.beginPath();
+    ctx.rect(-CLIP_OUTER_PX, -CLIP_OUTER_PX, 2 * CLIP_OUTER_PX, 2 * CLIP_OUTER_PX);
+    ctx.moveTo(edge[0].x, edge[0].y);
+    for (let i = 1; i < edge.length; i++) ctx.lineTo(edge[i].x, edge[i].y);
+    ctx.closePath();
+    ctx.clip('evenodd');
+  }
+}
+
 export function renderDSOs(s: SkyScene): void {
+  const { ctx } = s;
+  ctx.save();
+  clipOutsidePhotos(s);
+  drawDSOMarkers(s);
+  ctx.restore();
+}
+
+function drawDSOMarkers(s: SkyScene): void {
   const { ctx, view, horizon } = s;
   // Fills one by one (each needs the marker's own turn), then every outline in a few strokes (see DsoOutlines).
   const outlines = new DsoOutlines();
@@ -347,6 +377,8 @@ export function renderDSOs(s: SkyScene): void {
 
 export function renderDSOLabels(s: SkyScene): void {
   const { ctx, view } = s;
+  ctx.save();
+  clipOutsidePhotos(s);
   ctx.textBaseline = 'middle';
 
   // Render labels for exactly the DSOs drawn this frame (shared selection).
@@ -371,7 +403,7 @@ export function renderDSOLabels(s: SkyScene): void {
     ctx.fillText(formatDsoLabel(dso), c.x + Math.max(2, rx) + 2, c.y);
   }
 
-  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
 }
 
 /**

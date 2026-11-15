@@ -31,13 +31,6 @@ export const CONSTELLATION_NAMES = {
   showFromScale: 280,
 } as const;
 
-/**
- * How placed photos combine with the sky under them, as both a CSS `mix-blend-mode` and a
- * canvas `globalCompositeOperation`: "screen" lets a photo's black background vanish into
- * the sky (no dark squares) while its light adds on top.
- */
-export const PHOTO_BLEND_MODE = 'screen';
-
 /** Grid line widths (equator drawn heavier than the regular declination circles). */
 export const GRID = { lineWidth: 0.8, equatorLineWidth: 1.5 } as const;
 

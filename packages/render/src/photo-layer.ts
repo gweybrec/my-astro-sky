@@ -18,7 +18,6 @@ import { toCanvas, borderRadiusPU, getProjectionGeneration } from '@myastrosky/c
 import type { PhotoSkyModel } from '@myastrosky/core/photo-sky-model';
 import { MEDIUM_SIZE, THUMB_SIZE } from '@myastrosky/core/services/photos';
 import { affineToCSS } from '@myastrosky/core/affine';
-import { PHOTO_BLEND_MODE } from '@myastrosky/core/canvas-theme';
 import { logDebug } from '@myastrosky/core/platform/log';
 import {
   isCentroidInsideBorder,
@@ -135,10 +134,6 @@ export class PhotoLayer {
     this.getView = getView;
     this.hooks = hooks;
     this.skyMap = hooks.skyMap ?? null;
-    // Screen blending: a photo's black background disappears into the sky instead of drawing a dark square over it,
-    // and its light adds on top. Set on the container (it holds only the photos): its border-circle clip-path makes
-    // it an isolated group, so a blend set on the photos inside would only blend with the empty container.
-    container.style.mixBlendMode = PHOTO_BLEND_MODE;
     const canvas = document.createElement('canvas');
     // Not `photo-overlay-img`: `photos-frozen` hides those while the view moves, and the photos follow the view.
     canvas.className = 'photo-gl-canvas';
@@ -544,6 +539,26 @@ export class PhotoLayer {
     }
 
     return results;
+  }
+
+  /**
+   * The edges of every photo shown on the map, in canvas px at `view`: the sky map keeps its DSO markers out of them,
+   * so none shows through a photo made see-through by its opacity.
+   */
+  getShownPhotoFootprints(view: ViewState): Point[][] {
+    const footprints: Point[][] = [];
+    if (!this.showPhotos) return footprints;
+    for (const placed of this.placedPhotos) {
+      if (placed.pendingDelete || !placed.visible || placed.borderHidden) continue;
+      if (placed.opacity <= 0 || !this.isLabelAllowed(placed) || this.hiddenByVisit(placed))
+        continue;
+      const img = placed.imgEl;
+      if (img.style.display === 'none' || !img.complete || !img.naturalWidth) continue;
+      const g = this.geometryOf(placed);
+      if (!g) continue;
+      footprints.push(meshOutline(this.fineMesh(g)).map((p) => toCanvas(p.x, p.y, view)));
+    }
+    return footprints;
   }
 
   /** Compute canvas-space outlines for sky-map hit testing. */

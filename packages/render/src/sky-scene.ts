@@ -9,7 +9,7 @@
  *
  * A scene is built once per render pass and thrown away.
  */
-import type { DSO, ViewState } from '@myastrosky/core/types';
+import type { DSO, Point, ViewState } from '@myastrosky/core/types';
 import type { HorizonParams, AltAzPoint, FovFrameSpec } from '@myastrosky/core/sky-map-types';
 import type { PhotoOutline } from '@myastrosky/core/photo-outline';
 import type { SkyPoiPin } from './poi-pins';
@@ -95,6 +95,8 @@ export interface SkyScene extends SkyLayerFlags {
   // ── Overlays ──────────────────────────────────────────────────────────────
   showPhotoOutlines: boolean;
   photoOutlines: PhotoOutline[];
+  /** The edges of the photos shown, in canvas px at `view`: no DSO marker or label is drawn inside them. */
+  photoFootprints: Point[][];
   /** Positioned POIs (e.g. supernovae) of the displayed photos, pinned above them. */
   poiPins: SkyPoiPin[];
   fovFrameSpecs: FovFrameSpec[];

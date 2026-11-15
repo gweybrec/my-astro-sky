@@ -347,6 +347,38 @@ describe('PhotoLayer', () => {
     expect(img.style.display).toBe('block');
   });
 
+  it('gives the edges of the photos shown, at the view asked, so no DSO marker is drawn under them', () => {
+    const { container, layer } = make();
+    layer.loadPhotos([placedPhoto('1'), placedPhoto('2', { filename: '2.jpg' })]);
+    const [img1] = container.querySelectorAll('img');
+    // A picture not loaded yet is not shown: its place keeps its markers.
+    Object.defineProperty(img1, 'complete', { value: true });
+    Object.defineProperty(img1, 'naturalWidth', { value: 100 });
+    layer.updateTransforms();
+    const footprints = layer.getShownPhotoFootprints(VIEW);
+    expect(footprints).toHaveLength(1);
+    expect(footprints[0].length).toBeGreaterThanOrEqual(4);
+    // The photo is at Dec 60°, 0h: inside the view, around its centre.
+    const xs = footprints[0].map((p) => p.x);
+    const ys = footprints[0].map((p) => p.y);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    expect(cx).toBeGreaterThan(0);
+    expect(cx).toBeLessThan(VIEW.width);
+    expect(cy).toBeGreaterThan(0);
+    expect(cy).toBeLessThan(VIEW.height);
+    // Another view (an export of the whole map): the same photo, placed at that view.
+    const zoomedOut = layer.getShownPhotoFootprints({ ...VIEW, scale: 250 });
+    expect(
+      Math.max(...zoomedOut[0].map((p) => p.x)) - Math.min(...zoomedOut[0].map((p) => p.x)),
+    ).toBeCloseTo((Math.max(...xs) - Math.min(...xs)) / 2, 3);
+    layer.hidePhoto('1');
+    expect(layer.getShownPhotoFootprints(VIEW)).toEqual([]);
+    layer.unhidePhoto('1');
+    layer.setShowPhotos(false);
+    expect(layer.getShownPhotoFootprints(VIEW)).toEqual([]);
+  });
+
   it('redraws the map when the photos pins or visibility change', () => {
     const requestRender = vi.fn();
     const { layer } = make({ skyMap: { requestRender } });
