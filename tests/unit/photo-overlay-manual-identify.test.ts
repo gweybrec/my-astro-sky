@@ -63,6 +63,50 @@ describe('PhotoOverlay manual identify: host backdrop over the map', () => {
     expect(hostBackdrop.style.display).toBe('');
   });
 
+  it('shows a window with the point to pick while picking on the map', () => {
+    void open();
+    document
+      .querySelector<HTMLButtonElement>('.point-entry[data-index="1"] .btn-pick-map')!
+      .click();
+    const bar = document.querySelector('.star-pick-toolbar')!;
+    expect(bar).not.toBeNull();
+    expect(bar.querySelector('.manual-toolbar-label')!.textContent).toContain('2');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); // leave no pick open
+  });
+
+  it("the pick window's Cancel returns to the identify dialog without closing it", async () => {
+    let settled = false;
+    void open().then(() => (settled = true));
+    const identifyBackdrop = document.querySelectorAll<HTMLElement>('.modal-backdrop')[1];
+    document.querySelector<HTMLButtonElement>('.btn-pick-map')!.click();
+    expect(identifyBackdrop.style.display).toBe('none');
+    skyMap.exitPickingMode.mockClear();
+
+    document.querySelector<HTMLButtonElement>('.star-pick-toolbar .btn-cancel')!.click();
+    await Promise.resolve();
+    expect(skyMap.exitPickingMode).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.star-pick-toolbar')).toBeNull();
+    expect(identifyBackdrop.style.display).toBe('');
+    expect(hostBackdrop.style.display).toBe('');
+    expect(identifyBackdrop.isConnected).toBe(true);
+    expect(settled).toBe(false);
+  });
+
+  it('picking a star or Escape removes the pick window; Escape after a pick does nothing', () => {
+    void open();
+    document.querySelector<HTMLButtonElement>('.btn-pick-map')!.click();
+    onPick!({ ra: 83.8, dec: -5.4, mag: 1, name: 'Test' });
+    expect(document.querySelector('.star-pick-toolbar')).toBeNull();
+
+    skyMap.exitPickingMode.mockClear();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(skyMap.exitPickingMode).not.toHaveBeenCalled();
+
+    document.querySelector<HTMLButtonElement>('.btn-pick-map')!.click();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.querySelector('.star-pick-toolbar')).toBeNull();
+  });
+
   it('hides both dialogs during the free-drag placement; cancelling returns to the identify dialog', async () => {
     let settled = false;
     void open().then(() => (settled = true));

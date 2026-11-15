@@ -563,6 +563,7 @@ const de: Translations = {
     invalidCoordinates: 'Ungültige Koordinaten',
     mapPick: 'Karte',
     mapPickTooltip: 'Auf der Karte auswählen',
+    mapPickInstruction: 'Klicken Sie auf der Karte auf den Stern von Punkt {n}',
     validate: 'Bestätigen',
     cancel: 'Abbrechen',
     cancelSolve: 'Lösung abbrechen',

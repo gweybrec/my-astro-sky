@@ -1139,21 +1139,41 @@ export class PhotoOverlay extends PhotoLayer {
             const hostBackdrop = opts?.hostBackdrop;
             backdrop.style.display = 'none';
             if (hostBackdrop) hostBackdrop.style.display = 'none';
-            skyMap.enterPickingMode((star: Star) => {
+
+            // Small window over the map, like manual placement's: what to do, and Cancel
+            // to come back to this dialog.
+            const pickBar = document.createElement('div');
+            pickBar.className = 'manual-toolbar star-pick-toolbar';
+            const pickLabel = document.createElement('span');
+            pickLabel.className = 'manual-toolbar-label';
+            pickLabel.textContent = t('modal.mapPickInstruction', { n: i + 1 });
+            const pickButtons = document.createElement('div');
+            pickButtons.className = 'manual-toolbar-buttons';
+            const pickCancel = document.createElement('button');
+            pickCancel.type = 'button';
+            pickCancel.className = 'btn-cancel';
+            pickCancel.textContent = t('modal.cancel');
+            pickButtons.appendChild(pickCancel);
+            pickBar.append(pickLabel, pickButtons);
+            document.body.appendChild(pickBar);
+
+            // The three ways out (star picked, Cancel, Escape) end the same way.
+            const endPick = () => {
               skyMap.exitPickingMode();
+              pickBar.remove();
+              window.removeEventListener('keydown', escHandler);
               backdrop.style.display = '';
               if (hostBackdrop) hostBackdrop.style.display = '';
+            };
+            const escHandler = (e: KeyboardEvent) => {
+              if (e.key === 'Escape') endPick();
+            };
+            pickCancel.addEventListener('click', endPick);
+            window.addEventListener('keydown', escHandler);
+            skyMap.enterPickingMode((star: Star) => {
+              endPick();
               selectStar(i, star, starDisplayLabel(star));
             });
-            const escHandler = (e: KeyboardEvent) => {
-              if (e.key === 'Escape') {
-                skyMap.exitPickingMode();
-                backdrop.style.display = '';
-                if (hostBackdrop) hostBackdrop.style.display = '';
-                window.removeEventListener('keydown', escHandler);
-              }
-            };
-            window.addEventListener('keydown', escHandler);
           });
         }
 
