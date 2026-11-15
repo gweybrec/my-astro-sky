@@ -64,6 +64,8 @@ Before taking a file's data for a photo, the app checks that it is probably that
 
 Uploads the image to [nova.astrometry.net](https://nova.astrometry.net) for solving. Requires a free API key configured in Settings. Typically takes 30–60 seconds. A FITS file is uploaded as it is, with its headers; a TIFF or XISF is uploaded as its converted PNG. The app asks for a field from 0.1° to 180° wide and tries both image parities, like the astrometry.net web form.
 
+The app follows a solve for up to 15 minutes. If astrometry.net has not finished by then, the photo is marked as not finished rather than failed: the solve goes on on astrometry.net, so come back later and pick it with **Re-use astrometry.net solution…**, which lists the solutions of your account without uploading the picture again.
+
 Best choice if you don't have a local solver installed and don't mind cloud upload. See [Installing Plate Solvers](/user/installing-solvers.md) for API key setup.
 
 ### 3. solve-field (local) — most accurate

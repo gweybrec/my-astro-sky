@@ -23,6 +23,8 @@ import { solvePendingOnline } from '../pending-solve';
  *   leaves the list once it is solved and placed.
  * - `solveOffline`: that solve stopped for want of the network; it goes on once the phone is online.
  * - `solveFailed`: that solve did not succeed; another method can be chosen.
+ * - `solveUnfinished`: astrometry.net had not finished after the time the app follows a solve; its solution is reused
+ *   later.
  */
 export type ImportStatus =
   | 'converting'
@@ -33,7 +35,8 @@ export type ImportStatus =
   | 'imported'
   | 'solving'
   | 'solveOffline'
-  | 'solveFailed';
+  | 'solveFailed'
+  | 'solveUnfinished';
 
 export interface ImportItem {
   id: number;
@@ -169,7 +172,12 @@ export async function keepImportPending(item: ImportItem): Promise<string> {
  * whatever happens to this list; the row then shows "Résolution".
  */
 export async function solveImportOnline(item: ImportItem): Promise<void> {
-  if (item.status !== 'toPlace' && item.status !== 'solveFailed' && item.status !== 'solveOffline')
+  if (
+    item.status !== 'toPlace' &&
+    item.status !== 'solveFailed' &&
+    item.status !== 'solveOffline' &&
+    item.status !== 'solveUnfinished'
+  )
     return;
   try {
     const pendingId = await keepImportPending(item);
@@ -203,7 +211,9 @@ watch(pendingPhotos, (waiting) => {
         ? 'solveFailed'
         : kept.state === 'offline'
           ? 'solveOffline'
-          : 'solving';
+          : kept.state === 'unfinished'
+            ? 'solveUnfinished'
+            : 'solving';
     if (item.status !== status) {
       Object.assign(item, { status, error: kept.error ?? '' });
       changed = true;

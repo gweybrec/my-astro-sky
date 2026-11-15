@@ -218,6 +218,14 @@ function raiseError() {
           </PhoneRow>
           <PhoneRow title="Désactivée" :subs="['La raison reste lisible']" disabled chevron />
           <PhoneRow
+            title="NGC7000_HaOIII.tif"
+            :thumb="imageIcon"
+            :subs="['Résolution non terminée']"
+            status="warn"
+            chevron
+            button
+          />
+          <PhoneRow
             title="M42_SeeStarS50.fit"
             :thumb="imageIcon"
             :subs="['À placer']"

@@ -18,9 +18,11 @@ import { setPhotoFitsHeaders, uploadPhoto } from '@myastrosky/app-state/api';
 
 /**
  * `toPlace`: needs a placement method. `solving`: sent to the online solver. `offline`: sent, but its following stopped
- * for want of the network (astrometry.net goes on). `failed`: the solve did not succeed.
+ * for want of the network (astrometry.net goes on). `failed`: the solve did not succeed. `unfinished`: astrometry.net
+ * had not finished when the app stopped following it; its solution is reused later ("Réutiliser une solution
+ * astrometry.net").
  */
-export type PendingState = 'toPlace' | 'solving' | 'offline' | 'failed';
+export type PendingState = 'toPlace' | 'solving' | 'offline' | 'failed' | 'unfinished';
 
 export interface PendingPhoto {
   id: string;

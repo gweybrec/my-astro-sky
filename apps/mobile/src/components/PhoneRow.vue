@@ -26,8 +26,9 @@ withDefaults(
     thumb?: string;
     /** A number in the lead's round holder (a point of a star identification). */
     number?: number;
-    /** How the line under the title reads: a finished state (green), a running operation (spinner and accent), or a failure (red). */
-    status?: 'success' | 'busy' | 'danger';
+    /** How the line under the title reads: a finished state (green), a running operation (spinner and accent), a state
+     * to come back to (amber: a solve not finished yet), or a failure (red). */
+    status?: 'success' | 'busy' | 'warn' | 'danger';
     /** A last line in the warning colour, under the others (a file read without its plate solution). */
     warning?: string;
     /** The delete row: lead and title in the danger colour. */
@@ -81,6 +82,7 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
           :class="{
             'mob-status--success': status === 'success',
             'mob-status--danger': status === 'danger',
+            'mob-status--warn': status === 'warn',
             'mob-row-sub--busy': status === 'busy',
           }"
           ><PhoneBusy v-if="status === 'busy'" :label="line" /><span

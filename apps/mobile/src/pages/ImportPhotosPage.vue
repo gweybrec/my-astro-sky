@@ -37,7 +37,10 @@ const placing = ref<ImportItem | null>(null);
 const methodOpen = ref(false);
 
 const canChoose = (item: ImportItem) =>
-  item.status === 'toPlace' || item.status === 'solveFailed' || item.status === 'solveOffline';
+  item.status === 'toPlace' ||
+  item.status === 'solveFailed' ||
+  item.status === 'solveOffline' ||
+  item.status === 'solveUnfinished';
 
 function chooseMethod(item: ImportItem) {
   if (!canChoose(item)) return;
@@ -110,6 +113,8 @@ const stateOf = (item: ImportItem) => {
       return t('mobile.gallery.solvingOffline');
     case 'solveFailed':
       return t('batch.statusFailed');
+    case 'solveUnfinished':
+      return t('mobile.gallery.solveUnfinished');
     default:
       return t('mobile.gallery.toPlace');
   }
@@ -123,7 +128,9 @@ const statusOf = (item: ImportItem) =>
       ? 'busy'
       : item.status === 'solveFailed'
         ? 'danger'
-        : undefined;
+        : item.status === 'solveUnfinished'
+          ? 'warn'
+          : undefined;
 
 async function run() {
   importing.value = true;

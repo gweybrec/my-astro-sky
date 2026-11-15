@@ -126,7 +126,17 @@ async function follow(id: string, firstJobId: string, again = false): Promise<vo
         if (file) await storeSolved(id, file, status.correspondences, status.dsoIds);
         return;
       }
-      if (status.status === 'failed' || status.status === 'timeout') {
+      if (status.status === 'timeout') {
+        // Not a failure: astrometry.net goes on solving after the app stopped following it.
+        await setPendingState(id, 'unfinished', {
+          submissionId: status.submissionId ?? photo.submissionId,
+        });
+        await useErrorToast().showWarning(
+          t('batch.statusUnfinished', { button: t('mobile.gallery.reuseSolution') }),
+        );
+        return;
+      }
+      if (status.status === 'failed') {
         await setPendingState(id, 'failed', { error: status.error || t('modal.solveFailed') });
         return;
       }

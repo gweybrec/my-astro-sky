@@ -125,7 +125,7 @@ describe('solving a waiting photo online', () => {
     expect(uploadPhoto.mock.calls[0][4].dsoIds).toEqual(['NGC7000']);
   });
 
-  it('marks the photo as failed with the reason when the solve fails, times out or cannot be sent', async () => {
+  it('marks the photo as failed with the reason when the solve fails or cannot be sent', async () => {
     const failing = await addPendingPhoto(new Blob(['x']), 'a.jpg');
     submitPlateSolve.mockResolvedValue({ jobId: 'j' });
     pollPlateSolve.mockResolvedValue({ jobId: 'j', status: 'failed', error: 'no stars' });
@@ -134,15 +134,29 @@ describe('solving a waiting photo online', () => {
     expect(pendingPhotos.value[0]).toMatchObject({ state: 'failed', error: 'no stars' });
     expect(pendingPhotos.value[0].jobId).toBeUndefined();
 
-    pollPlateSolve.mockResolvedValue({ jobId: 'j', status: 'timeout' });
-    await solvePendingOnline(failing.id);
-    await nextPoll();
-    expect(pendingPhotos.value[0]).toMatchObject({ state: 'failed', error: 'Résolution échouée' });
-
     submitPlateSolve.mockRejectedValue(new Error('no connection'));
     await solvePendingOnline(failing.id);
     expect(pendingPhotos.value[0]).toMatchObject({ state: 'failed', error: 'no connection' });
     expect(uploadPhoto).not.toHaveBeenCalled();
+  });
+
+  it('marks a solve astrometry.net has not finished in time as unfinished, not failed, and says to reuse it later', async () => {
+    const photo = await addPendingPhoto(new Blob(['x']), 'NGC7000.tif');
+    submitPlateSolve.mockResolvedValue({ jobId: 'j' });
+    pollPlateSolve.mockResolvedValue({ jobId: 'j', status: 'timeout', submissionId: 42 });
+    await solvePendingOnline(photo.id);
+    await nextPoll();
+    expect(pendingPhotos.value[0]).toMatchObject({ state: 'unfinished', submissionId: 42 });
+    expect(pendingPhotos.value[0].error).toBeUndefined();
+    expect(showWarning).toHaveBeenCalledWith(
+      "astrometry.net n'a pas encore fini, la résolution continue de son côté. Revenez plus tard et choisissez-la avec « Réutiliser une solution astrometry.net ».",
+    );
+    // Not followed again when the app comes back: its solution is reused instead.
+    pollPlateSolve.mockClear();
+    await resumePendingSolves();
+    await nextPoll();
+    expect(pollPlateSolve).not.toHaveBeenCalled();
+    expect(pendingPhotos.value[0].state).toBe('unfinished');
   });
 
   it('marks the photo as failed when it is solved but cannot be stored', async () => {

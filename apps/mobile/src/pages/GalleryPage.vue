@@ -166,6 +166,7 @@ const PENDING_TEXT: Record<PendingState, string> = {
   solving: 'mobile.gallery.solving',
   offline: 'mobile.gallery.solvingOffline',
   failed: 'batch.statusFailed',
+  unfinished: 'mobile.gallery.unfinished',
 };
 // The waiting photos are the user's own: shown only while "Mon ciel" is ticked, like the placed ones.
 const waiting = computed(() =>

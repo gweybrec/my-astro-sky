@@ -30,6 +30,8 @@ const fr = {
     solveOnlineSub: 'astrometry.net, nécessite une connexion',
     reuseSolution: 'Réutiliser une solution astrometry.net',
     reuseSolutionSub: 'Une photo déjà résolue sur votre compte astrometry.net',
+    solveUnfinished: 'Résolution non terminée',
+    unfinished: 'Non terminée',
     offline: 'Aucune connexion internet',
     identifyStars: 'Identifier 3 étoiles',
     identifyStarsSub:

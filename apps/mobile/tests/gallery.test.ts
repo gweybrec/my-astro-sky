@@ -273,6 +273,21 @@ describe('the gallery page', () => {
     onLine.mockRestore();
   });
 
+  it('shows a solve astrometry.net has not finished as "Non terminée", and asks how to place it on a tap', async () => {
+    getPhotos.mockResolvedValue([]);
+    const photo = await addPendingPhoto(new Blob(['x']), 'NGC7000.tif');
+    await setPendingState(photo.id, 'unfinished', { submissionId: 42 });
+    const wrapper = mountPage();
+    await flushPromises();
+    const tile = wrapper.find('.mob-photo-card');
+    expect(tile.attributes('aria-label')).toBe('NGC7000.tif : Non terminée');
+    expect(tile.find('.mob-photo-state').classes()).not.toContain('mob-photo-state--busy');
+    await tile.trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('Comment placer cette photo ?');
+    expect(rowWith(wrapper, 'Réutiliser une solution astrometry.net').exists()).toBe(true);
+  });
+
   const openMethods = async (wrapper: ReturnType<typeof mountPage>) => {
     await wrapper.find('.mob-photo-card:has(.mob-photo-state)').trigger('click');
     await flushPromises();

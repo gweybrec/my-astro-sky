@@ -32,6 +32,8 @@ const de: Translations['mobile'] = {
     solveOnlineSub: 'astrometry.net, benötigt eine Verbindung',
     reuseSolution: 'Eine astrometry.net-Lösung wiederverwenden',
     reuseSolutionSub: 'Ein bereits gelöstes Foto in deinem astrometry.net-Konto',
+    solveUnfinished: 'Lösung nicht abgeschlossen',
+    unfinished: 'Nicht abgeschlossen',
     offline: 'Keine Internetverbindung',
     identifyStars: '3 Sterne identifizieren',
     identifyStarsSub:

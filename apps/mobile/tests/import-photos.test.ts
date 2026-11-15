@@ -249,6 +249,13 @@ describe('the import page', () => {
     expect(row.find('.mob-row-sub').text()).toBe('Hors ligne');
     expect(row.find('.mob-row-chevron').exists()).toBe(true);
 
+    // Not finished on astrometry.net in time: amber, and the row still opens the ways to place it.
+    await setPendingState(id, 'unfinished', { submissionId: 42 });
+    await flushPromises();
+    row = fileRows(wrapper)[0];
+    expect(row.find('.mob-row-sub').text()).toBe('Résolution non terminée');
+    expect(row.find('.mob-row-sub').classes()).toContain('mob-status--warn');
+    expect(row.find('.mob-row-chevron').exists()).toBe(true);
     await setPendingState(id, 'failed', { error: 'no stars' });
     await flushPromises();
 
