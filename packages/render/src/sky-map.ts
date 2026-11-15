@@ -287,7 +287,6 @@ export class SkyMap {
   private highlightedStar: number | null = null; // HIP number of star to highlight
   private photoOutlines: PhotoOutline[] = [];
   private poiPinSource: (() => SkyPoiPin[]) | null = null;
-  private photoFootprintSource: ((view: ViewState) => Point[][]) | null = null;
   private showPhotoOutlines = true;
   private fovFrameSpecs: FovFrameSpec[] = [];
   private fovRotationDeg = 0;
@@ -660,12 +659,6 @@ export class SkyMap {
   /** Pulled every frame, so pins always follow photo visibility and the POI filter. */
   setPoiPinSource(source: (() => SkyPoiPin[]) | null) {
     this.poiPinSource = source;
-    this.requestRender();
-  }
-
-  /** Pulled every frame, at the view drawn: the edges of the photos shown, which no DSO marker is drawn inside. */
-  setPhotoFootprintSource(source: ((view: ViewState) => Point[][]) | null) {
-    this.photoFootprintSource = source;
     this.requestRender();
   }
 
@@ -1674,7 +1667,6 @@ export class SkyMap {
 
       showPhotoOutlines: this.showPhotoOutlines,
       photoOutlines: this.photoOutlines,
-      photoFootprints: this.photoFootprintSource?.(view) ?? [],
       poiPins: this.poiPinSource?.() ?? [],
       fovFrameSpecs: this.fovFrameSpecs,
       fovRotationDeg: this.fovRotationDeg,

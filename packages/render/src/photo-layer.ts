@@ -541,26 +541,6 @@ export class PhotoLayer {
     return results;
   }
 
-  /**
-   * The edges of every photo shown on the map, in canvas px at `view`: the sky map keeps its DSO markers out of them,
-   * so none shows through a photo made see-through by its opacity.
-   */
-  getShownPhotoFootprints(view: ViewState): Point[][] {
-    const footprints: Point[][] = [];
-    if (!this.showPhotos) return footprints;
-    for (const placed of this.placedPhotos) {
-      if (placed.pendingDelete || !placed.visible || placed.borderHidden) continue;
-      if (placed.opacity <= 0 || !this.isLabelAllowed(placed) || this.hiddenByVisit(placed))
-        continue;
-      const img = placed.imgEl;
-      if (img.style.display === 'none' || !img.complete || !img.naturalWidth) continue;
-      const g = this.geometryOf(placed);
-      if (!g) continue;
-      footprints.push(meshOutline(this.fineMesh(g)).map((p) => toCanvas(p.x, p.y, view)));
-    }
-    return footprints;
-  }
-
   /** Compute canvas-space outlines for sky-map hit testing. */
   getPhotoCanvasOutlines(view: ViewState): PhotoOutline[] {
     return this.getPhotoCanvasQuads(view).map(({ name, corners, edge, sharedSkyId }) => ({

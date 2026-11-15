@@ -108,8 +108,6 @@ async function init() {
   const overlay = new PhotoOverlay(overlayDiv, () => skyMap.getView(), skyMap);
   // Supernova (and other positioned POI) pins, pulled by the sky map every frame.
   skyMap.setPoiPinSource(() => overlay.getPoiPins());
-  // The shown photos' edges, pulled every frame: no DSO marker is drawn under a photo.
-  skyMap.setPhotoFootprintSource((view) => overlay.getShownPhotoFootprints(view));
 
   // Init gallery
   const gallery = new Gallery();

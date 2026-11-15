@@ -161,7 +161,6 @@ export function createPhoneSkyMap(
   });
   port.overlay = layer;
   map.setPoiPinSource(() => layer.getPoiPins());
-  map.setPhotoFootprintSource((view) => layer.getShownPhotoFootprints(view));
   const categories = usePoiCategoriesStore();
   const pushCategories = () => layer.setPoiCategories(categories.categories);
   const stopCategories = categories.$subscribe(pushCategories);
