@@ -488,10 +488,12 @@ describe('listUserSubmissions()', () => {
     fetchMock
       .mockResolvedValueOnce(jsonResp({ status: 'success', session: 's' }))
       .mockResolvedValueOnce(jsonResp({ jobs: [101, 200] }))
-      .mockResolvedValueOnce(jsonResp({ status: 'success', original_filename: 'M42.jpg' }))
-      .mockResolvedValueOnce(jsonResp({ status: 'success', original_filename: 'M31.jpg' }));
+      // The ids are sorted before the details are asked for: 200 first.
+      .mockResolvedValueOnce(jsonResp({ status: 'success', original_filename: 'M31.jpg' }))
+      .mockResolvedValueOnce(jsonResp({ status: 'success', original_filename: 'M42.jpg' }));
 
-    const result = await listUserSubmissions();
+    const { submissions: result, total } = await listUserSubmissions();
+    expect(total).toBe(2);
     expect(result).toHaveLength(2);
     // sorted descending by jobId
     expect(result[0].jobId).toBe(200);
@@ -506,7 +508,7 @@ describe('listUserSubmissions()', () => {
       .mockResolvedValueOnce(jsonResp({ status: 'success', session: 's' }))
       .mockResolvedValueOnce(jsonResp({ something: 'else' }));
 
-    expect(await listUserSubmissions()).toEqual([]);
+    expect(await listUserSubmissions()).toEqual({ submissions: [], total: 0 });
   });
 
   it('returns empty array when jobs array is empty', async () => {
@@ -515,7 +517,7 @@ describe('listUserSubmissions()', () => {
       .mockResolvedValueOnce(jsonResp({ status: 'success', session: 's' }))
       .mockResolvedValueOnce(jsonResp({ jobs: [] }));
 
-    expect(await listUserSubmissions()).toEqual([]);
+    expect(await listUserSubmissions()).toEqual({ submissions: [], total: 0 });
   });
 
   it('returns empty array when myjobs endpoint returns non-ok', async () => {
@@ -524,14 +526,14 @@ describe('listUserSubmissions()', () => {
       .mockResolvedValueOnce(jsonResp({ status: 'success', session: 's' }))
       .mockResolvedValueOnce(failResp(403));
 
-    expect(await listUserSubmissions()).toEqual([]);
+    expect(await listUserSubmissions()).toEqual({ submissions: [], total: 0 });
   });
 
   it('returns empty array on network error', async () => {
     mockGetSetting.mockReturnValue('api-key');
     fetchMock.mockRejectedValue(new Error('network error'));
 
-    expect(await listUserSubmissions()).toEqual([]);
+    expect(await listUserSubmissions()).toEqual({ submissions: [], total: 0 });
   });
 });
 

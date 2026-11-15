@@ -367,37 +367,82 @@ describe('resume()', () => {
 });
 
 describe('listSubmissions()', () => {
-  it('fetches the details five jobs at a time and sorts by descending id', async () => {
-    let inFlight = 0;
-    let peak = 0;
+  const details = (status = 'success') =>
+    json({ status, original_filename: 'f.jpg', width: 10, height: 20 });
+  const infoUrls = (calls: HttpRequest[]) =>
+    calls.filter((c) => c.url.includes('/info/')).map((c) => c.url);
+
+  it('looks up the five most recent jobs by default, and gives the total', async () => {
     const t = setup({
-      route: async (r) => {
-        const login = loginOk(r.url);
-        if (login) return login;
-        if (r.url === `${API}/myjobs/`) return json({ jobs: [1, 2, 3, 4, 5, 6, 7] });
-        inFlight++;
-        peak = Math.max(peak, inFlight);
-        await new Promise((resolve) => setTimeout(resolve, 1));
-        inFlight--;
-        return json({ status: 'success', original_filename: 'f.jpg', width: 10, height: 20 });
-      },
+      route: (r) =>
+        loginOk(r.url) ??
+        (r.url === `${API}/myjobs/` ? json({ jobs: [1, 2, null, 3, 4, 5, 6, 7] }) : details()),
     });
-    const list = await t.service.listSubmissions();
-    expect(list.map((s) => s.jobId)).toEqual([7, 6, 5, 4, 3, 2, 1]);
-    expect(peak).toBe(5);
+    const page = await t.service.listSubmissions();
+    expect(page.total).toBe(7);
+    expect(page.submissions.map((s) => s.jobId)).toEqual([7, 6, 5, 4, 3]);
+    expect(infoUrls(t.calls)).toEqual([7, 6, 5, 4, 3].map((id) => `${API}/jobs/${id}/info/`));
   });
 
-  it('answers an empty list and logs when the account cannot be read', async () => {
+  it('looks up only the page asked for, 20 at most', async () => {
+    const ids = Array.from({ length: 30 }, (_, i) => i + 1);
+    const t = setup({
+      route: (r) =>
+        loginOk(r.url) ?? (r.url === `${API}/myjobs/` ? json({ jobs: ids }) : details()),
+    });
+    const page = await t.service.listSubmissions({ offset: 5, limit: 5 });
+    expect(page.submissions.map((s) => s.jobId)).toEqual([25, 24, 23, 22, 21]);
+    expect(infoUrls(t.calls)).toHaveLength(5);
+    expect((await t.service.listSubmissions({ limit: 500 })).submissions).toHaveLength(20);
+    expect((await t.service.listSubmissions({ offset: 40 })).submissions).toEqual([]);
+  });
+
+  it('keeps the details of a finished job, and asks again for one still running', async () => {
+    const t = setup({
+      route: (r) => {
+        const login = loginOk(r.url);
+        if (login) return login;
+        if (r.url === `${API}/myjobs/`) return json({ jobs: [1, 2] });
+        return details(r.url.includes('/2/') ? 'solving' : 'success');
+      },
+    });
+    await t.service.listSubmissions();
+    await t.service.listSubmissions();
+    expect(infoUrls(t.calls)).toEqual([
+      `${API}/jobs/2/info/`,
+      `${API}/jobs/1/info/`,
+      `${API}/jobs/2/info/`,
+    ]);
+  });
+
+  it('answers an empty page and logs when the account cannot be read', async () => {
     const t = setup({ route: (r) => loginOk(r.url) ?? reply('', 403) });
-    expect(await t.service.listSubmissions()).toEqual([]);
+    expect(await t.service.listSubmissions()).toEqual({ submissions: [], total: 0 });
     expect(t.log).toHaveBeenCalledWith('astrometry_myjobs_failed', expect.any(Error));
     const u = setup({ route: () => json({ status: 'error' }) });
-    expect(await u.service.listSubmissions()).toEqual([]);
+    expect(await u.service.listSubmissions()).toEqual({ submissions: [], total: 0 });
     expect(u.log).toHaveBeenCalledWith('astrometry_list_failed', expect.any(Error));
+  });
+
+  it('throws rateLimited when astrometry.net refuses the list or the details of a job', async () => {
+    const page = reply('<!DOCTYPE html><html>429 Too Many Requests</html>', 429);
+    const t = setup({ route: (r) => loginOk(r.url) ?? page });
+    expect(await failure(t.service.listSubmissions())).toBe('rateLimited:ASTROMETRY_RATE_LIMITED');
+    const u = setup({
+      route: (r) => loginOk(r.url) ?? (r.url === `${API}/myjobs/` ? json({ jobs: [1] }) : page),
+    });
+    expect(await failure(u.service.listSubmissions())).toBe('rateLimited:ASTROMETRY_RATE_LIMITED');
   });
 });
 
 describe('reuse()', () => {
+  it('throws rateLimited when astrometry.net refuses for too many requests', async () => {
+    const t = setup({ route: () => reply('<!DOCTYPE html><html>429</html>', 429) });
+    expect(await failure(t.service.reuse(t.file, 10796000))).toBe(
+      'rateLimited:ASTROMETRY_RATE_LIMITED',
+    );
+  });
+
   it('rejects a job id that is not a number or is zero, and a picture of unknown size', async () => {
     const t = setup();
     for (const bad of [0, NaN, 'x' as unknown as number]) {

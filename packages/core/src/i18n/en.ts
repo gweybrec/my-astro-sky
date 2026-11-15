@@ -603,6 +603,8 @@ const en: Translations = {
     prevPage: '← Previous',
     nextPage: 'Next →',
     refreshSubmissions: 'Refresh list',
+    submissionsRateLimitedCached:
+      'Astrometry.net is refusing for now: too many requests. The list shown is the last one loaded; try again later.',
     reusingSubmission: 'Reusing submission {jobId}…',
     reuseSuccess: 'Submission reused!',
     reuseFailed: 'Reuse failed',
@@ -865,6 +867,9 @@ const en: Translations = {
     STAR_NOT_FOUND: 'Star not found',
 
     ASTROMETRY_LOGIN_FAILED: 'Could not log in to Astrometry.net. Check your key.',
+
+    ASTROMETRY_RATE_LIMITED:
+      'Astrometry.net is refusing for now: too many requests. Try again later.',
     CATEGORY_NOT_FOUND: 'This type no longer exists.',
     COMET_ELEMENTS_FAILED: 'Could not load comet orbits (MPC): {err}',
     DUPLICATE_ENTRY: 'This target is already in the plan.',

@@ -609,6 +609,8 @@ const de: Translations = {
     prevPage: '← Zurück',
     nextPage: 'Weiter →',
     refreshSubmissions: 'Liste aktualisieren',
+    submissionsRateLimitedCached:
+      'Astrometry.net lehnt gerade ab: zu viele Anfragen. Die angezeigte Liste ist die zuletzt geladene; versuche es später erneut.',
     reusingSubmission: 'Einreichung {jobId} wird wiederverwendet…',
     reuseSuccess: 'Einreichung wiederverwendet!',
     reuseFailed: 'Wiederverwendung fehlgeschlagen',
@@ -877,6 +879,9 @@ const de: Translations = {
     STAR_NOT_FOUND: 'Stern nicht gefunden',
 
     ASTROMETRY_LOGIN_FAILED: 'Anmeldung bei Astrometry.net fehlgeschlagen. Prüfe deinen Schlüssel.',
+
+    ASTROMETRY_RATE_LIMITED:
+      'Astrometry.net lehnt gerade ab: zu viele Anfragen. Versuche es später erneut.',
     CATEGORY_NOT_FOUND: 'Diese Art gibt es nicht mehr.',
     COMET_ELEMENTS_FAILED: 'Die Kometenbahnen (MPC) konnten nicht geladen werden: {err}',
     DUPLICATE_ENTRY: 'Dieses Ziel ist bereits im Plan.',

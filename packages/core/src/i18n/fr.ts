@@ -609,6 +609,8 @@ const fr = {
     prevPage: '← Précédent',
     nextPage: 'Suivant →',
     refreshSubmissions: 'Rafraîchir la liste',
+    submissionsRateLimitedCached:
+      "Astrometry.net refuse pour l'instant : trop de requêtes. La liste affichée est la dernière chargée, réessayez plus tard.",
     reusingSubmission: 'Réutilisation de la soumission {jobId}…',
     reuseSuccess: 'Soumission réutilisée !',
     reuseFailed: 'Échec de réutilisation',
@@ -876,6 +878,9 @@ const fr = {
     STAR_NOT_FOUND: 'Étoile introuvable',
 
     ASTROMETRY_LOGIN_FAILED: 'Connexion à Astrometry.net impossible. Vérifiez votre clé.',
+
+    ASTROMETRY_RATE_LIMITED:
+      "Astrometry.net refuse pour l'instant : trop de requêtes. Réessayez plus tard.",
     CATEGORY_NOT_FOUND: "Ce type n'existe plus.",
     COMET_ELEMENTS_FAILED: 'Impossible de charger les orbites des comètes (MPC) : {err}',
     DUPLICATE_ENTRY: 'Cette cible est déjà dans le plan.',

@@ -607,6 +607,8 @@ const es: Translations = {
     prevPage: '← Anterior',
     nextPage: 'Siguiente →',
     refreshSubmissions: 'Actualizar lista',
+    submissionsRateLimitedCached:
+      'Astrometry.net rechaza por ahora: demasiadas solicitudes. La lista mostrada es la última cargada; inténtalo más tarde.',
     reusingSubmission: 'Reutilizando el envío {jobId}…',
     reuseSuccess: '¡Envío reutilizado!',
     reuseFailed: 'Error al reutilizar',
@@ -875,6 +877,9 @@ const es: Translations = {
     STAR_NOT_FOUND: 'Estrella no encontrada',
 
     ASTROMETRY_LOGIN_FAILED: 'No se pudo iniciar sesión en Astrometry.net. Revisa tu clave.',
+
+    ASTROMETRY_RATE_LIMITED:
+      'Astrometry.net rechaza por ahora: demasiadas solicitudes. Inténtalo más tarde.',
     CATEGORY_NOT_FOUND: 'Este tipo ya no existe.',
     COMET_ELEMENTS_FAILED: 'No se pudieron cargar las órbitas de los cometas (MPC): {err}',
     DUPLICATE_ENTRY: 'Este objetivo ya está en el plan.',

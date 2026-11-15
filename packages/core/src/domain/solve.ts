@@ -22,6 +22,12 @@ export interface AstrometrySubmission {
   height?: number;
 }
 
+/** One page of the account's submissions, most recent first, and how many the account has in all. */
+export interface AstrometrySubmissionPage {
+  submissions: AstrometrySubmission[];
+  total: number;
+}
+
 /** A plate-solve search hint sent to astrometry.net. A NaN value is sent as the host gave it. */
 export interface NovaSolveHints {
   /** Centre of the search, degrees. Used only together with `dec`. */

@@ -1302,6 +1302,7 @@ describe('online solving routes (astrometry.net)', () => {
           height: 600,
         },
       ]);
+      expect(r.body.total).toBe(3);
       const myjobs = recorded.find((x) => x.url === `${API}/myjobs/`)!;
       expect(myjobs.method).toBe('POST');
       expect(myjobs.headers['content-type']).toBe('application/x-www-form-urlencoded');
@@ -1309,18 +1310,43 @@ describe('online solving routes (astrometry.net)', () => {
     });
 
     it('answers an empty list when the upstream refuses or fails', async () => {
+      const empty = { submissions: [], total: 0 };
       upstream = { status: 403, body: '' };
-      expect((await call('GET', '/api/astrometry/submissions')).body).toEqual({
-        submissions: [],
-      });
+      expect((await call('GET', '/api/astrometry/submissions')).body).toEqual(empty);
       upstream = { reject: 'network down' };
-      expect((await call('GET', '/api/astrometry/submissions')).body).toEqual({
-        submissions: [],
-      });
+      expect((await call('GET', '/api/astrometry/submissions')).body).toEqual(empty);
       upstream = json({ something: 'else' });
-      expect((await call('GET', '/api/astrometry/submissions')).body).toEqual({
-        submissions: [],
-      });
+      expect((await call('GET', '/api/astrometry/submissions')).body).toEqual(empty);
+    });
+
+    it('looks up only the submissions of the page asked for', async () => {
+      upstream = (url) => {
+        if (url === `${API}/myjobs/`) return json({ jobs: [1, 2, 3, 4, 5, 6, 7] });
+        return json({ status: 'success', original_filename: 'f.jpg', width: 10, height: 20 });
+      };
+      const r = await call('GET', '/api/astrometry/submissions?offset=2&limit=2');
+      expect(r.status).toBe(200);
+      expect(r.body.total).toBe(7);
+      expect(r.body.submissions.map((s: { jobId: number }) => s.jobId)).toEqual([5, 4]);
+      expect(recorded.filter((x) => x.url.includes('/info/')).map((x) => x.url)).toEqual([
+        `${API}/jobs/5/info/`,
+        `${API}/jobs/4/info/`,
+      ]);
+    });
+
+    it('answers 429 ASTROMETRY_RATE_LIMITED when astrometry.net refuses for too many requests', async () => {
+      const page = '<!DOCTYPE html><html><body>429 Too Many Requests</body></html>';
+      upstream = { status: 429, body: page };
+      const list = await call('GET', '/api/astrometry/submissions');
+      expect(list.status).toBe(429);
+      expect(list.body.code).toBe('ASTROMETRY_RATE_LIMITED');
+      const reuse = await post(
+        '/api/astrometry/reuse',
+        { name: 'a.png', bytes: png },
+        { jobId: '7' },
+      );
+      expect(reuse.status).toBe(429);
+      expect(reuse.body.code).toBe('ASTROMETRY_RATE_LIMITED');
     });
 
     it('reuses a solved job from its WCS file and lists the objects of the field', async () => {

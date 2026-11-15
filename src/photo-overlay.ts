@@ -23,6 +23,7 @@ import {
   listAstrometrySubmissions,
   updatePhotoManualPlacement,
   photoFileUrl,
+  type AstrometrySubmissionPage,
 } from './api';
 import { searchUnified } from '@myastrosky/core/search';
 
@@ -79,51 +80,41 @@ function sanitizeIntegrationRows(rows: PhotoIntegration[]): PhotoIntegration[] {
 }
 
 const ASTROMETRY_SUBMISSIONS_CACHE_TTL_MS = 2 * 60 * 1000;
-let astrometrySubmissionsCache: { at: number; submissions: any[] } | null = null;
-let astrometrySubmissionsInFlight: Promise<any[]> | null = null;
+/** Submissions per page: each page asks astrometry.net for the details of these only. */
+const ASTROMETRY_SUBMISSIONS_PAGE_SIZE = 5;
+/** The pages loaded, by their first position; kept past their two minutes to show when astrometry.net refuses. */
+const astrometrySubmissionPages = new Map<number, { at: number; page: AstrometrySubmissionPage }>();
 
-async function loadAstrometrySubmissionsWithCache(forceRefresh = false): Promise<any[]> {
-  const now = Date.now();
+const isRateLimitError = (err: unknown) =>
+  (err as { code?: string } | null)?.code === 'ASTROMETRY_RATE_LIMITED';
 
-  // Avoid re-querying astrometry.net if we just fetched submissions.
-  if (
-    !forceRefresh &&
-    astrometrySubmissionsCache &&
-    now - astrometrySubmissionsCache.at < ASTROMETRY_SUBMISSIONS_CACHE_TTL_MS
-  ) {
-    return astrometrySubmissionsCache.submissions;
+/**
+ * One page of submissions: the page loaded less than two minutes ago, else a new request (always one
+ * with `forceRefresh`). When astrometry.net refuses for too many requests, the page loaded before is
+ * returned with `rateLimited`; without one, the error is thrown.
+ */
+async function loadAstrometrySubmissionPage(
+  offset: number,
+  forceRefresh: boolean,
+): Promise<{ page: AstrometrySubmissionPage; rateLimited: boolean }> {
+  const cached = astrometrySubmissionPages.get(offset);
+  if (!forceRefresh && cached && Date.now() - cached.at < ASTROMETRY_SUBMISSIONS_CACHE_TTL_MS) {
+    return { page: cached.page, rateLimited: false };
   }
-
-  if (astrometrySubmissionsInFlight) {
-    return astrometrySubmissionsInFlight;
-  }
-
-  astrometrySubmissionsInFlight = (async () => {
-    try {
-      const submissions = await listAstrometrySubmissions();
-
-      if (submissions.length > 0) {
-        astrometrySubmissionsCache = { at: Date.now(), submissions };
-        return submissions;
-      }
-
-      // If a transient API issue returns an empty list, keep showing the last known list.
-      if (astrometrySubmissionsCache && astrometrySubmissionsCache.submissions.length > 0) {
-        return astrometrySubmissionsCache.submissions;
-      }
-
-      return submissions;
-    } catch (err) {
-      if (astrometrySubmissionsCache && astrometrySubmissionsCache.submissions.length > 0) {
-        return astrometrySubmissionsCache.submissions;
-      }
-      throw err;
-    } finally {
-      astrometrySubmissionsInFlight = null;
+  try {
+    const page = await listAstrometrySubmissions(offset, ASTROMETRY_SUBMISSIONS_PAGE_SIZE);
+    // An empty answer from a transient API issue keeps the page known.
+    if (page.submissions.length === 0 && cached && cached.page.submissions.length > 0) {
+      return { page: cached.page, rateLimited: false };
     }
-  })();
-
-  return astrometrySubmissionsInFlight;
+    // A refresh can shift every page: the others are loaded again when shown.
+    if (forceRefresh) astrometrySubmissionPages.clear();
+    astrometrySubmissionPages.set(offset, { at: Date.now(), page });
+    return { page, rateLimited: false };
+  } catch (err) {
+    if (isRateLimitError(err) && cached) return { page: cached.page, rateLimited: true };
+    throw err;
+  }
 }
 
 function escapeHtml(value: string): string {
@@ -397,9 +388,10 @@ export class PhotoOverlay extends PhotoLayer {
   }): Promise<{ action: 'upload' | 'reuse' | 'cancel'; jobId?: number }> {
     return new Promise((resolve) => {
       const allowUpload = options?.allowUpload ?? true;
+      const pageSize = ASTROMETRY_SUBMISSIONS_PAGE_SIZE;
       let currentPage = 0;
-      let allSubmissions: any[] = [];
-      const itemsPerPage = 20;
+      /** The page on screen; null until one is loaded. */
+      let shown: AstrometrySubmissionPage | null = null;
 
       // Create modal backdrop
       const backdrop = document.createElement('div');
@@ -510,16 +502,12 @@ export class PhotoOverlay extends PhotoLayer {
       backdrop.appendChild(modal);
       document.body.appendChild(backdrop);
 
-      // Function to render current page
-      function renderPage() {
-        const totalPages = Math.ceil(allSubmissions.length / itemsPerPage);
-        const start = currentPage * itemsPerPage;
-        const end = start + itemsPerPage;
-        const pageSubmissions = allSubmissions.slice(start, end);
+      function renderPage(page: AstrometrySubmissionPage) {
+        const totalPages = Math.ceil(page.total / pageSize);
 
         content.innerHTML = '';
 
-        if (allSubmissions.length === 0) {
+        if (page.total === 0) {
           const noSubmissions = document.createElement('div');
           noSubmissions.className = 'modal-loading-placeholder';
           noSubmissions.textContent = t('modal.noSubmissions');
@@ -533,16 +521,15 @@ export class PhotoOverlay extends PhotoLayer {
         pageInfo.textContent =
           t('modal.submissionPage', { current: currentPage + 1, total: totalPages }) +
           ' — ' +
-          t('modal.submissionCount', { count: allSubmissions.length });
-        prevBtn.disabled = currentPage === 0;
-        nextBtn.disabled = currentPage >= totalPages - 1;
+          t('modal.submissionCount', { count: page.total });
 
         // Render submissions
         const list = document.createElement('div');
         list.className = 'submission-list';
 
-        for (const sub of pageSubmissions) {
+        for (const sub of page.submissions) {
           if (!sub.jobId) continue;
+          const jobId = sub.jobId;
 
           const item = document.createElement('button');
           item.className = 'submission-item';
@@ -552,7 +539,7 @@ export class PhotoOverlay extends PhotoLayer {
 
           const itemTitle = document.createElement('div');
           itemTitle.className = 'submission-item-title';
-          itemTitle.textContent = sub.filename || `Job #${sub.jobId}`;
+          itemTitle.textContent = sub.filename || `Job #${jobId}`;
           itemInfo.appendChild(itemTitle);
 
           const itemSubtitle = document.createElement('div');
@@ -561,7 +548,7 @@ export class PhotoOverlay extends PhotoLayer {
             typeof sub.width === 'number' && typeof sub.height === 'number'
               ? ` - ${sub.width}x${sub.height}px`
               : '';
-          itemSubtitle.textContent = `Job #${sub.jobId}${dimsText}`;
+          itemSubtitle.textContent = `Job #${jobId}${dimsText}`;
           itemInfo.appendChild(itemSubtitle);
 
           item.appendChild(itemInfo);
@@ -579,7 +566,7 @@ export class PhotoOverlay extends PhotoLayer {
 
           item.onclick = () => {
             document.body.removeChild(backdrop);
-            resolve({ action: 'reuse', jobId: sub.jobId });
+            resolve({ action: 'reuse', jobId });
           };
           list.appendChild(item);
         }
@@ -587,52 +574,81 @@ export class PhotoOverlay extends PhotoLayer {
         content.appendChild(list);
       }
 
-      // Pagination button handlers
-      prevBtn.onclick = () => {
-        if (currentPage > 0) {
-          currentPage--;
-          renderPage();
-        }
-      };
-
-      nextBtn.onclick = () => {
-        const totalPages = Math.ceil(allSubmissions.length / itemsPerPage);
-        if (currentPage < totalPages - 1) {
-          currentPage++;
-          renderPage();
-        }
-      };
-
-      function fetchAndRenderSubmissions(forceRefresh = false) {
-        refreshBtn.disabled = true;
-        refreshBtn.textContent = forceRefresh ? '…' : t('modal.refreshSubmissions');
-        return loadAstrometrySubmissionsWithCache(forceRefresh)
-          .then((submissions) => {
-            allSubmissions = submissions;
-            currentPage = 0;
-            renderPage();
-          })
-          .catch((err) => {
-            reportUnknownRendererError('astrometry_list_submissions', err);
-            content.innerHTML = '';
-
-            const error = document.createElement('div');
-            error.className = 'modal-loading-error';
-            error.innerHTML = `<div style="font-size: 24px; margin-bottom: 8px;">⚠</div><div>${err.message || 'Failed to load submissions'}</div>`;
-            content.appendChild(error);
-          })
-          .finally(() => {
-            refreshBtn.disabled = false;
-            refreshBtn.textContent = t('modal.refreshSubmissions');
-          });
+      function updateButtons(busy: boolean) {
+        const totalPages = shown ? Math.ceil(shown.total / pageSize) : 0;
+        prevBtn.disabled = busy || currentPage === 0;
+        nextBtn.disabled = busy || currentPage >= totalPages - 1;
+        refreshBtn.disabled = busy;
       }
 
+      function showLoading() {
+        content.innerHTML = '';
+        content.appendChild(loading);
+      }
+
+      function showLoadError(message: string) {
+        content.innerHTML = '';
+        const error = document.createElement('div');
+        error.className = 'modal-loading-error';
+        error.innerHTML = '<div style="font-size: 24px; margin-bottom: 8px;">⚠</div>';
+        const text = document.createElement('div');
+        text.textContent = message;
+        error.appendChild(text);
+        content.appendChild(error);
+        // Refresh stays at hand to try again.
+        pageInfo.textContent = '';
+        paginationContainer.classList.remove('hidden');
+      }
+
+      /** Shows page `pageIndex`, loading it when needed; a page that cannot be loaded leaves the one on screen. */
+      async function goToPage(pageIndex: number, forceRefresh = false) {
+        const previousPage = currentPage;
+        updateButtons(true);
+        if (!shown) showLoading();
+        try {
+          const { page, rateLimited } = await loadAstrometrySubmissionPage(
+            pageIndex * pageSize,
+            forceRefresh,
+          );
+          currentPage = pageIndex;
+          shown = page;
+          renderPage(page);
+          if (rateLimited) {
+            showToast({
+              message: t('modal.submissionsRateLimitedCached'),
+              type: 'warning',
+              duration: 6000,
+            });
+          }
+        } catch (err) {
+          const message = (err as Error).message || t('errors.listSubmissionsFailed');
+          if (isRateLimitError(err)) {
+            showToast({ message, type: 'warning', duration: 6000 });
+          } else {
+            reportUnknownRendererError('astrometry_list_submissions', err);
+          }
+          if (shown) {
+            currentPage = previousPage;
+            renderPage(shown);
+          } else {
+            showLoadError(message);
+          }
+        } finally {
+          updateButtons(false);
+        }
+      }
+
+      prevBtn.onclick = () => {
+        if (currentPage > 0) void goToPage(currentPage - 1);
+      };
+      nextBtn.onclick = () => {
+        void goToPage(currentPage + 1);
+      };
       refreshBtn.onclick = () => {
-        void fetchAndRenderSubmissions(true);
+        void goToPage(0, true);
       };
 
-      // Fetch submissions
-      void fetchAndRenderSubmissions(false);
+      void goToPage(0);
     });
   }
 

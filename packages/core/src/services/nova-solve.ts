@@ -15,9 +15,10 @@ import {
   type NovaCalibration,
 } from '../astrometry-solution';
 import { normalizeDSOAliases } from '../dso-aliases';
-import { DomainError } from '../domain/errors';
+import { DomainError, isDomainError } from '../domain/errors';
 import type {
   AstrometrySubmission,
+  AstrometrySubmissionPage,
   NovaCorrespondence,
   NovaJobState,
   NovaJobStatus,
@@ -36,7 +37,9 @@ const API_KEY_SETTING = 'ASTROMETRY_API_KEY';
 const JOB_TTL_MS = 60 * 60 * 1000; // 1 hour
 /** Seconds between two polls (the last one repeats); about 80 s to get a job id, as many polls again to solve it. */
 const POLL_DELAYS_MS = [3000, 5000, 8000, 13000, 13000, 13000, 13000, 13000];
-const LIST_BATCH_SIZE = 5;
+/** Submissions per page when the caller does not say, and the most a page may hold. */
+const LIST_PAGE_SIZE = 5;
+const LIST_PAGE_MAX = 20;
 
 export interface NovaSolveServiceDeps {
   http: HttpClient;
@@ -75,12 +78,18 @@ export interface NovaSolveService {
    * first; `INVALID_SUBMISSION_ID`, `CANNOT_DETERMINE_DIMENSIONS`). It sends no request itself.
    */
   resume(file: NovaSolveFile, submissionId: number): Promise<string>;
-  /** The jobs of the account, most recent first; an empty list when the account cannot be read. Throws `invalid` (`ASTROMETRY_NOT_CONFIGURED`) without a key. */
-  listSubmissions(): Promise<AstrometrySubmission[]>;
+  /**
+   * One page of the account's jobs, most recent first (`limit` 5 by default, 20 at most): the details are
+   * fetched for that page only, and kept for a finished job. An empty page when the account cannot be read.
+   * Throws `invalid` (`ASTROMETRY_NOT_CONFIGURED`) without a key, `rateLimited` (`ASTROMETRY_RATE_LIMITED`)
+   * when astrometry.net refuses for too many requests.
+   */
+  listSubmissions(page?: { offset?: number; limit?: number }): Promise<AstrometrySubmissionPage>;
   /**
    * Builds the correspondences of an already solved astrometry.net job for this picture.
-   * Throws `invalid` (`ASTROMETRY_NOT_CONFIGURED` without a key, checked first; `INVALID_JOB_ID`, `CANNOT_DETERMINE_DIMENSIONS`); a job that is not solved,
-   * a solution of another shape or a network failure is a result with `success: false`.
+   * Throws `invalid` (`ASTROMETRY_NOT_CONFIGURED` without a key, checked first; `INVALID_JOB_ID`, `CANNOT_DETERMINE_DIMENSIONS`)
+   * and `rateLimited` (`ASTROMETRY_RATE_LIMITED`); a job that is not solved, a solution of another shape or a
+   * network failure is a result with `success: false`.
    */
   reuse(file: NovaSolveFile, jobId: number): Promise<NovaReuseResult>;
 }
@@ -102,7 +111,22 @@ interface Job {
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const isOk = (res: HttpResponse) => res.status >= 200 && res.status <= 299;
-const readJson = async (res: HttpResponse): Promise<any> => JSON.parse(await res.text());
+
+const rateLimited = () =>
+  new DomainError('rateLimited', 'astrometry.net: too many requests', {
+    code: 'ASTROMETRY_RATE_LIMITED',
+  });
+const isRateLimited = (err: unknown) => isDomainError(err) && err.kind === 'rateLimited';
+
+/** Throws `rateLimited` when astrometry.net refused for too many requests (its answer is then an HTML page). */
+function checkRateLimit(res: HttpResponse): HttpResponse {
+  if (res.status === 429) throw rateLimited();
+  return res;
+}
+const readJson = async (res: HttpResponse): Promise<any> =>
+  JSON.parse(await checkRateLimit(res).text());
+/** A job whose details no longer change. */
+const isFinished = (s: AstrometrySubmission) => s.status === 'success' || s.status === 'failure';
 const formBody = (payload: unknown) =>
   `request-json=${encodeURIComponent(JSON.stringify(payload))}`;
 
@@ -110,6 +134,8 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
   const { http, settings, images, now, newId, log } = deps;
   const sleep = deps.sleep ?? defaultSleep;
   const jobs = new Map<string, Job>();
+  /** The details of finished jobs of the account, by job id. */
+  const finishedInfo = new Map<number, AstrometrySubmission>();
   let sessionKey: string | null = null;
 
   function evictStaleJobs(): void {
@@ -189,7 +215,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
 
   /** The WCS file of a job, parsed; null when it is missing or not a WCS header. */
   async function fetchWcsHeader(jobId: number) {
-    const res = await http({ method: 'GET', url: `${WCS_FILE_BASE}/${jobId}/` });
+    const res = checkRateLimit(await http({ method: 'GET', url: `${WCS_FILE_BASE}/${jobId}/` }));
     const text = await res.text();
     if (text && text.includes('CRPIX1')) return parseFITSHeader(text);
     return null;
@@ -399,8 +425,12 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
       width: undefined,
       height: undefined,
     });
+    const known = finishedInfo.get(jobId);
+    if (known) return known;
     try {
-      const infoRes = await http({ method: 'GET', url: `${API_BASE}/jobs/${jobId}/info/` });
+      const infoRes = checkRateLimit(
+        await http({ method: 'GET', url: `${API_BASE}/jobs/${jobId}/info/` }),
+      );
       if (!isOk(infoRes)) return unknown();
 
       const info = await readJson(infoRes);
@@ -409,7 +439,9 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
       // Some accounts do not expose pixel dimensions in /info. The WCS header usually holds IMAGEW/IMAGEH.
       if (dims.width === undefined || dims.height === undefined) {
         try {
-          const wcsRes = await http({ method: 'GET', url: `${WCS_FILE_BASE}/${jobId}/` });
+          const wcsRes = checkRateLimit(
+            await http({ method: 'GET', url: `${WCS_FILE_BASE}/${jobId}/` }),
+          );
           if (isOk(wcsRes)) {
             const wcsText = await wcsRes.text();
             if (wcsText && wcsText.includes('CRPIX1')) {
@@ -418,11 +450,12 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
             }
           }
         } catch (wcsErr) {
+          if (isRateLimited(wcsErr)) throw wcsErr;
           log?.('astrometry_wcs_dimensions_failed', wcsErr, { jobId });
         }
       }
 
-      return {
+      const submission: AstrometrySubmission = {
         submissionId: jobId,
         jobId,
         status: info.status || 'unknown',
@@ -431,7 +464,10 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
         width: dims.width,
         height: dims.height,
       };
+      if (isFinished(submission)) finishedInfo.set(jobId, submission);
+      return submission;
     } catch (err) {
+      if (isRateLimited(err)) throw err;
       log?.('astrometry_job_info_failed', err, { jobId });
       return unknown();
     }
@@ -445,36 +481,45 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
     }
   }
 
-  async function listSubmissions(): Promise<AstrometrySubmission[]> {
+  async function listSubmissions(
+    page: { offset?: number; limit?: number } = {},
+  ): Promise<AstrometrySubmissionPage> {
     await requireConfigured();
+    const offset = Math.max(0, Math.floor(page.offset ?? 0) || 0);
+    const limit = Math.min(
+      LIST_PAGE_MAX,
+      Math.max(1, Math.floor(page.limit ?? LIST_PAGE_SIZE) || LIST_PAGE_SIZE),
+    );
+    const empty: AstrometrySubmissionPage = { submissions: [], total: 0 };
     try {
       const session = await getSession();
-      const res = await http({
-        method: 'POST',
-        url: `${API_BASE}/myjobs/`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formBody({ session }),
-      });
+      const res = checkRateLimit(
+        await http({
+          method: 'POST',
+          url: `${API_BASE}/myjobs/`,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formBody({ session }),
+        }),
+      );
       if (!isOk(res)) {
         log?.('astrometry_myjobs_failed', new Error(`myjobs API returned ${res.status}`));
-        return [];
+        return empty;
       }
       const data = await readJson(res);
-      if (!data || !data.jobs) return [];
+      if (!data || !data.jobs) return empty;
 
-      const jobIds: number[] = data.jobs.filter((id: unknown) => id !== null && id !== undefined);
-      const submissions: AstrometrySubmission[] = [];
-      // The details are fetched five jobs at a time.
-      for (let i = 0; i < jobIds.length; i += LIST_BATCH_SIZE) {
-        const batch = jobIds.slice(i, i + LIST_BATCH_SIZE);
-        submissions.push(...(await Promise.all(batch.map(fetchSubmissionInfo))));
-      }
-      // Higher ids are more recent.
-      submissions.sort((a, b) => (b.jobId || 0) - (a.jobId || 0));
-      return submissions;
+      // Higher ids are more recent; only the details of the page asked for are fetched.
+      const jobIds = (data.jobs as unknown[])
+        .filter((id): id is number => typeof id === 'number')
+        .sort((a, b) => b - a);
+      const submissions = await Promise.all(
+        jobIds.slice(offset, offset + limit).map(fetchSubmissionInfo),
+      );
+      return { submissions, total: jobIds.length };
     } catch (err) {
+      if (isRateLimited(err)) throw err;
       log?.('astrometry_list_failed', err);
-      return [];
+      return empty;
     }
   }
 
@@ -527,6 +572,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
           }
         }
       } catch (err) {
+        if (isRateLimited(err)) throw err;
         log?.('astrometry_reuse_wcs_failed', err, { jobId });
       }
 
@@ -538,6 +584,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
       }
       return { success: false, error: 'No correspondences found' };
     } catch (err) {
+      if (isRateLimited(err)) throw err;
       log?.('astrometry_reuse_failed', err, { jobId });
       return { success: false, error: (err as Error).message || 'Failed to reuse submission' };
     }

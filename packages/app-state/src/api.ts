@@ -36,7 +36,7 @@ import type {
 import type { StarSearchResult } from '@myastrosky/core/domain/stars';
 import type {
   ConvertRawPhotoResult as CoreConvertRawPhotoResult,
-  AstrometrySubmission,
+  AstrometrySubmissionPage,
   LocalSolverApi,
   LocalSolverName,
   ProbeKind,
@@ -73,7 +73,7 @@ export type {
 } from '@myastrosky/core/domain/settings';
 export type { StarMultiplicity } from '@myastrosky/core/types';
 export type { StarSearchResult } from '@myastrosky/core/domain/stars';
-export type { AstrometrySubmission } from '@myastrosky/core/domain/solve';
+export type { AstrometrySubmission, AstrometrySubmissionPage } from '@myastrosky/core/domain/solve';
 export type {
   ExportOptions,
   ImportPreviewImage,
@@ -457,10 +457,20 @@ export async function probeLocalSolver(
   return guard('errors.networkError', async () => localSolvers().probe(kind, request));
 }
 
-export async function listAstrometrySubmissions(): Promise<AstrometrySubmission[]> {
+/**
+ * One page of the account's astrometry.net submissions, most recent first. A refusal for too many
+ * requests throws an error whose `code` is `ASTROMETRY_RATE_LIMITED`, so the caller can keep what it shows.
+ */
+export async function listAstrometrySubmissions(
+  offset: number,
+  limit: number,
+): Promise<AstrometrySubmissionPage> {
   try {
-    return await getBackend().novaSolve.listSubmissions();
+    return await getBackend().novaSolve.listSubmissions({ offset, limit });
   } catch (err) {
+    if (err instanceof DomainError && err.kind === 'rateLimited') {
+      throw toUserError(err, 'errors.listSubmissionsFailed');
+    }
     throw new Error(t('errors.listSubmissionsFailed'), { cause: err });
   }
 }

@@ -3,6 +3,8 @@ import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { NovaSolveHints } from '@myastrosky/core/domain/solve';
 import { upload, uploadSolve } from './shared.js';
 import { novaSolve } from '../services.js';
+import { sendError } from './http-errors.js';
+import { logServerError } from '../logger.js';
 
 export const novaSolveRouter = express.Router();
 
@@ -243,22 +245,55 @@ novaSolveRouter.get('/api/solve-plate/:id', async (req, res) => {
  * @swagger
  * /api/astrometry/submissions:
  *   get:
- *     summary: List user's Astrometry.net submissions
+ *     summary: One page of the user's Astrometry.net submissions, most recent first
+ *     description: Only the submissions of the page are looked up on Astrometry.net.
+ *     parameters:
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *         description: How many of the most recent submissions to skip
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 5
+ *           maximum: 20
+ *         description: How many submissions the page holds
  *     responses:
  *       200:
- *         description: Submissions returned successfully
+ *         description: The page and the number of submissions in all
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 submissions:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 total:
+ *                   type: integer
+ *       400:
+ *         description: No API key (ASTROMETRY_NOT_CONFIGURED)
+ *       429:
+ *         description: Astrometry.net refuses for too many requests (ASTROMETRY_RATE_LIMITED)
+ *       500:
+ *         description: Server error
  */
 // --- List user's astrometry.net submissions ---
 novaSolveRouter.get('/api/astrometry/submissions', async (req, res) => {
   try {
-    const submissions = await novaSolve.listSubmissions();
-    res.json({ submissions });
+    const offset = req.query.offset === undefined ? undefined : Number(req.query.offset);
+    const limit = req.query.limit === undefined ? undefined : Number(req.query.limit);
+    res.json(await novaSolve.listSubmissions({ offset, limit }));
   } catch (err: any) {
     if (sendRule(res, err, { ASTROMETRY_NOT_CONFIGURED: 'ASTROMETRY_API_KEY not configured' })) {
       return;
     }
-    console.error('List submissions error:', err);
-    res.status(500).json({ error: err.message });
+    logServerError('astrometry_list_submissions_failed', err);
+    sendError(res, err);
   }
 });
 
@@ -272,6 +307,8 @@ novaSolveRouter.get('/api/astrometry/submissions', async (req, res) => {
  *     responses:
  *       200:
  *         description: Submission reused successfully
+ *       429:
+ *         description: Astrometry.net refuses for too many requests (ASTROMETRY_RATE_LIMITED)
  */
 // --- Reuse existing astrometry.net submission ---
 novaSolveRouter.post('/api/astrometry/reuse', upload.single('photo'), async (req, res) => {
@@ -323,7 +360,7 @@ novaSolveRouter.post('/api/astrometry/reuse', upload.single('photo'), async (req
       res.json({ success: false, error: result.error });
     }
   } catch (err: any) {
-    console.error('Reuse submission error:', err);
-    res.status(500).json({ error: err.message });
+    logServerError('astrometry_reuse_failed', err);
+    sendError(res, err);
   }
 });

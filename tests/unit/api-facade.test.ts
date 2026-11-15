@@ -33,7 +33,13 @@ function fake() {
     stars: { search: vi.fn(), nearby: vi.fn() },
     version: { getLatest: vi.fn() },
     identify: { getCometElements: vi.fn() },
-    novaSolve: { getJob: vi.fn(), reuse: vi.fn(), submit: vi.fn(), resume: vi.fn() },
+    novaSolve: {
+      getJob: vi.fn(),
+      reuse: vi.fn(),
+      submit: vi.fn(),
+      resume: vi.fn(),
+      listSubmissions: vi.fn(),
+    },
     solvedImport: { solveWcs: vi.fn(), convert: vi.fn() },
     backup: { exportToUser: vi.fn() },
     localSolvers: { submit: vi.fn(), poll: vi.fn(), cancel: vi.fn(), probe: vi.fn() },
@@ -164,6 +170,23 @@ describe('special cases', () => {
       error: 'raw',
     });
     expect(backend.novaSolve.reuse.mock.calls[0][1]).toBe(7);
+  });
+
+  it('listAstrometrySubmissions asks for a page, and keeps the code of a refusal for too many requests', async () => {
+    backend.novaSolve.listSubmissions.mockResolvedValueOnce({ submissions: [], total: 0 });
+    expect(await api.listAstrometrySubmissions(5, 5)).toEqual({ submissions: [], total: 0 });
+    expect(backend.novaSolve.listSubmissions).toHaveBeenCalledWith({ offset: 5, limit: 5 });
+
+    backend.novaSolve.listSubmissions.mockRejectedValueOnce(
+      fail('rateLimited', 'raw', 'ASTROMETRY_RATE_LIMITED'),
+    );
+    const limited = await api.listAstrometrySubmissions(0, 5).catch((e) => e);
+    expect(limited.code).toBe('ASTROMETRY_RATE_LIMITED');
+    expect(limited.message).toBe(t('serverErrors.ASTROMETRY_RATE_LIMITED'));
+
+    backend.novaSolve.listSubmissions.mockRejectedValueOnce(fail('upstream', 'raw', 'HTTP_502'));
+    const other = await api.listAstrometrySubmissions(0, 5).catch((e) => e);
+    expect(other.message).toBe(t('errors.listSubmissionsFailed'));
   });
 
   it('pollPlateSolve answers "solving" when rate limited, and throws other errors', async () => {

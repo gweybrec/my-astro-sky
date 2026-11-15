@@ -526,13 +526,12 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
 
     novaSolve: {
       getJob: (jobId) => call('GET', `/api/solve-plate/${id(jobId)}`),
-      async listSubmissions() {
-        return (
-          await call<{ submissions: Awaited<ReturnType<Backend['novaSolve']['listSubmissions']>> }>(
-            'GET',
-            '/api/astrometry/submissions',
-          )
-        ).submissions;
+      listSubmissions(page) {
+        const params = new URLSearchParams();
+        if (page?.offset !== undefined) params.set('offset', String(page.offset));
+        if (page?.limit !== undefined) params.set('limit', String(page.limit));
+        const query = params.toString() ? `?${params}` : '';
+        return call('GET', `/api/astrometry/submissions${query}`);
       },
       async submit(file: FileSource, hints?: NovaSolveHints) {
         const form = await formOf('photo', file, {

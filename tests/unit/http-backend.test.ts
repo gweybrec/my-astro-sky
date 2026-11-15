@@ -115,12 +115,20 @@ describe('requests', () => {
 
   it('unwraps the response wrappers', async () => {
     const answers: Record<string, unknown> = {
-      '/api/astrometry/submissions': { submissions: [{ submissionId: 1 }] },
+      '/api/astrometry/submissions': { submissions: [{ submissionId: 1 }], total: 1 },
+      '/api/astrometry/submissions?offset=5&limit=5': { submissions: [], total: 1 },
       '/api/comets/elements?lang=fr': { comets: [{ designation: '10P' }] },
       '/api/photos': { ok: true, deleted: 4 },
     };
     const { backend } = makeBackend((url) => json(answers[url.replace('http://app', '')]));
-    expect(await backend.novaSolve.listSubmissions()).toEqual([{ submissionId: 1 }]);
+    expect(await backend.novaSolve.listSubmissions()).toEqual({
+      submissions: [{ submissionId: 1 }],
+      total: 1,
+    });
+    expect(await backend.novaSolve.listSubmissions({ offset: 5, limit: 5 })).toEqual({
+      submissions: [],
+      total: 1,
+    });
     expect(await backend.identify.getCometElements()).toEqual([{ designation: '10P' }]);
     expect(await backend.photos.removeMany(['a'])).toBe(4);
   });
