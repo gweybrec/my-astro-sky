@@ -1,27 +1,32 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import BatchUploadModal from '../../src/components/modals/BatchUploadModal.vue';
+import type { BatchItem } from '../../src/batch-types';
+import type { Photo } from '@myastrosky/core/types';
 
 // ─── Shared mutable state for the mocks ─────────────────────────────────────────
-// `vi.hoisted` makes this available inside the (hoisted) vi.mock factories below.
 const state = vi.hoisted(() => ({
   pendingFiles: [] as File[],
+  pendingPhotos: null as unknown[] | null,
   maxParallel: '2',
   availability: { solveField: true, astap: true, astrometry: true },
   jobSeq: 0,
-  // Per-test poll behaviour, keyed by jobId. Default: still running.
   pollResponder: (_jobId: string) => ({
     status: 'running' as string,
     result: undefined as unknown,
   }),
+  finishChoice: 'back' as 'back' | 'discard' | 'save',
 }));
 
 // ─── Module mocks ───────────────────────────────────────────────────────────────
-vi.mock('../../src/i18n', () => ({ t: (key: string) => key }));
-vi.mock('../../src/toast', () => ({ showToast: vi.fn() }));
+// A text shows its key, then its parameters: "batch.solveMany|3".
+vi.mock('../../src/i18n', () => ({
+  t: (key: string, params?: Record<string, string>) =>
+    params ? `${key}|${Object.values(params).join(',')}` : key,
+}));
+const showToast = vi.hoisted(() => vi.fn());
+vi.mock('../../src/toast', () => ({ showToast }));
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
-vi.mock('../../src/batch-place', () => ({ placeBatchItem: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('@myastrosky/core/photo-metadata-draft', () => ({ filterLabelCandidates: () => [] }));
 vi.mock('../../src/dso-catalog', () => ({ findDSOIdsFromCorrespondences: () => [] }));
 vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   findDSOIdsFromCorrespondences: () => [],
@@ -30,14 +35,19 @@ vi.mock('../../src/file-utils', () => ({
   stripExtension: (s: string) => s.replace(/\.[^.]+$/, ''),
 }));
 vi.mock('../../src/icons/add-photo.svg?raw', () => ({ default: '<svg/>' }));
-vi.mock('../../src/batch-utils', () => ({
-  sanitizeIntegrationRows: (rows: unknown) => rows,
-  DEFAULT_INTEGRATION_FILTERS: [] as string[],
-  normalizeIntegrationFilterKey: (s: string) => s.toLowerCase(),
-}));
+const confirmFinishBatch = vi.hoisted(() => vi.fn(async () => state.finishChoice));
+vi.mock('../../src/photo-delete-confirm', () => ({ confirmFinishBatch }));
 
+const overlay = vi.hoisted(() => ({
+  getPlacedPhotos: () => [],
+  placeUploadedPhoto: vi.fn(),
+  updatePhotoData: vi.fn(),
+}));
 vi.mock('../../src/stores/canvas', () => ({
-  useCanvasStore: () => ({ overlay: null, gallery: null }),
+  useCanvasStore: () => ({ overlay, gallery: { loadPhotos: vi.fn() } }),
+}));
+vi.mock('../../src/stores/photos', () => ({
+  usePhotosStore: () => ({ syncFromOverlay: vi.fn() }),
 }));
 vi.mock('@myastrosky/app-state/stores/settings', () => ({
   useSettingsStore: () => ({
@@ -46,7 +56,10 @@ vi.mock('@myastrosky/app-state/stores/settings', () => ({
   }),
 }));
 vi.mock('../../src/stores/ui', () => ({
-  useUiStore: () => ({ pendingBatchFiles: state.pendingFiles }),
+  useUiStore: () => ({
+    pendingBatchFiles: state.pendingFiles,
+    pendingBatchPhotos: state.pendingPhotos,
+  }),
 }));
 
 const submitLocalSolveJob = vi.fn(async () => ({ jobId: `job-${state.jobSeq++}` }));
@@ -54,70 +67,99 @@ const pollLocalSolveJob = vi.fn(async (_endpoint: string, jobId: string) =>
   state.pollResponder(jobId),
 );
 const cancelLocalSolveJob = vi.fn(async () => {});
-const convertRawPhoto = vi.fn();
-const submitPlateSolve = vi.fn(async (_file: File, _hints?: unknown) => ({ jobId: 'online-job' }));
-const pollPlateSolve = vi.fn(async (_jobId: string) => ({
-  jobId: 'online-job',
-  status: 'solved',
-  correspondences: [{ pointIndex: 0 }],
-}));
+const submitPlateSolve = vi.fn();
+const pollPlateSolve = vi.fn();
+const resumePlateSolve = vi.fn();
+const uploadPhoto = vi.fn();
+const setPhotoOnlineSolve = vi.fn(async () => undefined);
+const storedPhotoFile = vi.fn(async (p: Photo) => new File(['x'], p.filename));
 vi.mock('../../src/api', () => ({
   getSolverAvailability: () => state.availability,
-  submitLocalSolveJob: (...args: unknown[]) => submitLocalSolveJob(...(args as [])),
-  pollLocalSolveJob: (...args: unknown[]) => pollLocalSolveJob(...(args as [string, string])),
-  cancelLocalSolveJob: (...args: unknown[]) => cancelLocalSolveJob(...(args as [])),
-  submitPlateSolve: (...args: unknown[]) => submitPlateSolve(...(args as [File, unknown?])),
-  pollPlateSolve: (...args: unknown[]) => pollPlateSolve(...(args as [string])),
-  uploadPhoto: vi.fn(),
-  convertRawPhoto: (...args: unknown[]) => convertRawPhoto(...(args as [])),
+  submitLocalSolveJob: (...a: unknown[]) => submitLocalSolveJob(...(a as [])),
+  pollLocalSolveJob: (...a: unknown[]) => pollLocalSolveJob(...(a as [string, string])),
+  cancelLocalSolveJob: (...a: unknown[]) => cancelLocalSolveJob(...(a as [])),
+  // astrometry.net is never reached: every online call is mocked.
+  submitPlateSolve: (...a: unknown[]) => submitPlateSolve(...a),
+  pollPlateSolve: (...a: unknown[]) => pollPlateSolve(...a),
+  resumePlateSolve: (...a: unknown[]) => resumePlateSolve(...a),
+  uploadPhoto: (...a: unknown[]) => uploadPhoto(...a),
+  updatePhotoMetadata: vi.fn(async () => undefined),
+  setPhotoPlacement: vi.fn(),
+  setPhotoOnlineSolve: (...a: unknown[]) => setPhotoOnlineSolve(...(a as [])),
   setPhotoFitsHeaders: vi.fn(),
+  storedPhotoFile: (p: Photo) => storedPhotoFile(p),
+  convertRawPhoto: vi.fn(),
   getGearSetups: vi.fn().mockResolvedValue([]),
 }));
-// The WCS reading flow (setup suggestion) is shared and calls the package's data functions.
 vi.mock('@myastrosky/app-state/api', () => ({
   solveWCS: vi.fn(),
   getGearSetups: vi.fn().mockResolvedValue([]),
 }));
+vi.mock('@myastrosky/app-state/stored-solve', () => ({ isFollowingStoredSolve: () => false }));
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
-function jpeg(name: string): File {
-  return new File(['x'], name, { type: 'image/jpeg' });
-}
-
-function fit(name: string): File {
-  return new File(['raw'], name);
-}
+const jpeg = (name: string) => new File(['x'], name, { type: 'image/jpeg' });
+const CORR = [
+  { pointIndex: 0, photoX: 1, photoY: 1, starHip: 1, starName: '' },
+  { pointIndex: 1, photoX: 9, photoY: 9, starHip: 2, starName: '' },
+];
 
 function mountModal() {
   return mount(BatchUploadModal, {
     attachTo: document.body,
-    global: { stubs: { BatchCard: true, CheckRow: true } },
+    global: { stubs: { BatchListRow: true, BatchPhotoDetail: true, BatchMultiEdit: true } },
   });
 }
+type Wrapper = ReturnType<typeof mountModal>;
+const vm = (w: Wrapper) =>
+  w.vm as unknown as { items: BatchItem[]; createBatchItem: (f: File) => BatchItem };
+const statuses = (w: Wrapper) => vm(w).items.map((i) => i.status);
+const button = (w: Wrapper, name: string) => w.find(`[data-test="${name}"]`);
 
-// The card components are stubbed, so read status straight off the reactive items.
-function statuses(wrapper: ReturnType<typeof mountModal>): string[] {
-  return (wrapper.vm as unknown as { items: { status: string }[] }).items.map((i) => i.status);
+function storedPhoto(overrides: Partial<Photo> = {}): Photo {
+  return {
+    id: 'p1',
+    filename: 'p1.png',
+    originalName: 'NGC7000',
+    width: 100,
+    height: 80,
+    createdAt: '',
+    correspondences: [],
+    dsoIds: [],
+    labels: ['été'],
+    pointsOfInterest: [],
+    notes: '',
+    ...overrides,
+  };
 }
 
 beforeEach(() => {
   vi.useFakeTimers();
   state.pendingFiles = [jpeg('a.jpg'), jpeg('b.jpg'), jpeg('c.jpg')];
+  state.pendingPhotos = null;
   state.maxParallel = '2';
   state.availability = { solveField: true, astap: true, astrometry: true };
   state.jobSeq = 0;
   state.pollResponder = () => ({ status: 'running', result: undefined });
-  submitLocalSolveJob.mockClear();
-  pollLocalSolveJob.mockClear();
-  cancelLocalSolveJob.mockClear();
-  convertRawPhoto.mockReset();
-  submitPlateSolve.mockReset().mockResolvedValue({ jobId: 'online-job' });
-  pollPlateSolve.mockReset().mockResolvedValue({
-    jobId: 'online-job',
-    status: 'solved',
-    correspondences: [{ pointIndex: 0 }],
-  });
-  localStorage.setItem('batch-auto-place', 'false');
+  state.finishChoice = 'back';
+  for (const fn of [
+    submitLocalSolveJob,
+    pollLocalSolveJob,
+    cancelLocalSolveJob,
+    submitPlateSolve,
+    pollPlateSolve,
+    resumePlateSolve,
+    uploadPhoto,
+    setPhotoOnlineSolve,
+    showToast,
+    confirmFinishBatch,
+    overlay.placeUploadedPhoto,
+  ]) {
+    fn.mockClear();
+  }
+  uploadPhoto.mockImplementation(async (_f: File, correspondences: unknown) =>
+    storedPhoto({ id: `p-${Math.random()}`, correspondences: correspondences as never }),
+  );
 });
 
 afterEach(() => {
@@ -126,400 +168,180 @@ afterEach(() => {
 });
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
-describe('BatchUploadModal — cancel all solving', () => {
-  it('cancels both in-progress and queued solves, and stops the queue from launching the waiting item', async () => {
-    // 3 local items, max 2 parallel → 2 solving, 1 waiting. Polls never resolve.
-    const wrapper = mountModal();
+describe('BatchUploadModal — the counted buttons', () => {
+  it('counts the photos each button takes', async () => {
+    const w = mountModal();
     await flushPromises();
+    expect(button(w, 'solve-all').text()).toBe('batch.solveMany|3');
+    expect(button(w, 'save-all').text()).toBe('batch.saveMany|3');
+    expect(button(w, 'cancel-all').exists()).toBe(false);
+  });
 
-    // `.btn-action` also matches the "add more photos" button; scope to the footer.
-    await wrapper.find('.batch-footer-buttons .btn-action').trigger('click'); // Start plate solving
+  it('has nothing to solve when every photo is already placed', async () => {
+    const w = mountModal();
     await flushPromises();
+    for (const item of vm(w).items) {
+      item.status = 'success';
+      item.solveCorrespondences = CORR;
+    }
+    await flushPromises();
+    expect(button(w, 'solve-all').text()).toBe('batch.nothingToSolve');
+    expect(button(w, 'solve-all').attributes('disabled')).toBeDefined();
+  });
+});
 
-    expect(statuses(wrapper)).toEqual(['solving', 'solving', 'waiting']);
-    // Only the two active items reached the server; the waiting one never submitted.
+describe('BatchUploadModal — solving', () => {
+  it('runs the local solves in parallel slots, and "Annuler la résolution" stops them all', async () => {
+    const w = mountModal();
+    await flushPromises();
+    await button(w, 'solve-all').trigger('click');
+    await flushPromises();
+    expect(statuses(w)).toEqual(['solving', 'solving', 'waiting']);
     expect(submitLocalSolveJob).toHaveBeenCalledTimes(2);
 
-    await wrapper.find('.btn-danger').trigger('click'); // Cancel solving
+    await button(w, 'cancel-all').trigger('click');
     await flushPromises();
-
-    expect(statuses(wrapper)).toEqual(['canceled', 'canceled', 'canceled']);
-    // Server-side cancel fired only for the two that had actually started.
+    expect(statuses(w)).toEqual(['canceled', 'canceled', 'canceled']);
     expect(cancelLocalSolveJob).toHaveBeenCalledTimes(2);
-    // The queue must not have launched the previously-waiting item after cancel.
     expect(submitLocalSolveJob).toHaveBeenCalledTimes(2);
-
-    wrapper.unmount();
   });
 
-  it('leaves an already-solved item untouched while cancelling the rest', async () => {
-    // First job solves; the others keep running.
-    state.pollResponder = (jobId: string) =>
-      jobId === 'job-0'
-        ? {
-            status: 'success',
-            result: { success: true, correspondences: [{ pointIndex: 0 }], dsoIds: ['M1'] },
-          }
-        : { status: 'running', result: undefined };
-
-    const wrapper = mountModal();
+  it('offers to solve photos added while a run goes on', async () => {
+    const w = mountModal();
     await flushPromises();
-
-    await wrapper.find('.batch-footer-buttons .btn-action').trigger('click'); // Start
+    await button(w, 'solve-all').trigger('click');
     await flushPromises();
-    await vi.advanceTimersByTimeAsync(2000); // first poll round
+    expect(button(w, 'solve-all').text()).toBe('batch.nothingToSolve');
+
+    vm(w).items.push(vm(w).createBatchItem(jpeg('d.jpg')));
     await flushPromises();
+    expect(button(w, 'cancel-all').exists()).toBe(true);
+    expect(button(w, 'solve-all').text()).toBe('batch.solveOne');
+    expect(button(w, 'solve-all').attributes('disabled')).toBeUndefined();
+  });
 
-    // item[0] solved → its slot freed → the waiting item[2] was launched.
-    expect(statuses(wrapper)).toEqual(['success', 'solving', 'solving']);
-
-    await wrapper.find('.btn-danger').trigger('click'); // Cancel solving
+  it('keeps a solve astrometry.net has not finished as "En cours", with its submission', async () => {
+    state.pendingFiles = [jpeg('a.jpg')];
+    const w = mountModal();
     await flushPromises();
+    const item = vm(w).items[0];
+    item.solver = 'astrometry';
+    submitPlateSolve.mockResolvedValue({ jobId: 'online-job' });
+    pollPlateSolve.mockResolvedValue({ jobId: 'online-job', status: 'timeout', submissionId: 42 });
 
-    // Finished item is preserved; the two in-progress solves are cancelled.
-    expect(statuses(wrapper)).toEqual(['success', 'canceled', 'canceled']);
-
-    wrapper.unmount();
+    await button(w, 'solve-all').trigger('click');
+    await vi.advanceTimersByTimeAsync(2100);
+    await flushPromises();
+    expect(item.status).toBe('unfinished');
+    expect(item.online).toMatchObject({ submissionId: 42, fits: false });
+    expect(showToast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'batch.statusUnfinished' }),
+    );
   });
 });
 
-// The card components are stubbed, so read fields straight off the reactive items.
-function items(
-  wrapper: ReturnType<typeof mountModal>,
-): { status: string; file: File; error: string }[] {
-  return (wrapper.vm as unknown as { items: { status: string; file: File; error: string }[] })
-    .items;
-}
-
-describe('BatchUploadModal — astrometry.net not finished in time', () => {
-  it('leaves the item unfinished, not failed, and Start does not send it again', async () => {
-    state.pendingFiles = [jpeg('m35.jpg')];
-    state.availability = { solveField: false, astap: false, astrometry: true };
-    pollPlateSolve.mockResolvedValue({ jobId: 'online-job', status: 'timeout' });
-
-    const wrapper = mountModal();
+describe('BatchUploadModal — saving and finishing', () => {
+  it('saves placed and unplaced photos and stays open', async () => {
+    state.pendingFiles = [jpeg('a.jpg'), jpeg('b.jpg')];
+    const w = mountModal();
     await flushPromises();
-    const item = items(wrapper)[0] as unknown as { solver: string; status: string; error: string };
-    item.solver = 'astrometry';
+    const [placed, unplaced] = vm(w).items;
+    placed.status = 'success';
+    placed.placedBy = 'local';
+    placed.solveCorrespondences = CORR;
 
-    await wrapper.find('.batch-footer-buttons .btn-action').trigger('click'); // Start
+    await button(w, 'save-all').trigger('click');
     await flushPromises();
-    await vi.advanceTimersByTimeAsync(2000);
-    await flushPromises();
-    expect(item.status).toBe('unfinished');
-    expect(item.error).toBe('');
-    expect(submitPlateSolve).toHaveBeenCalledTimes(1);
+    expect(uploadPhoto).toHaveBeenCalledTimes(2);
+    expect(uploadPhoto.mock.calls[0][1]).toEqual(CORR);
+    expect(uploadPhoto.mock.calls[1][1]).toEqual([]);
+    expect([placed.saveState, unplaced.saveState]).toEqual(['saved', 'saved']);
+    expect(overlay.placeUploadedPhoto).toHaveBeenCalledTimes(2);
+    expect(w.emitted('close')).toBeUndefined();
+    expect(button(w, 'save-all').text()).toBe('batch.nothingToSave');
+  });
 
-    // Start again: the picture is not uploaded a second time.
-    await wrapper.find('.batch-footer-buttons .btn-action').trigger('click');
+  it('Terminer closes at once when everything is saved', async () => {
+    state.pendingFiles = [jpeg('a.jpg')];
+    const w = mountModal();
     await flushPromises();
-    await vi.advanceTimersByTimeAsync(2000);
+    await button(w, 'save-all').trigger('click');
     await flushPromises();
-    expect(submitPlateSolve).toHaveBeenCalledTimes(1);
-    expect(item.status).toBe('unfinished');
+    await button(w, 'finish').trigger('click');
+    await flushPromises();
+    expect(confirmFinishBatch).not.toHaveBeenCalled();
+    expect(w.emitted('close')).toHaveLength(1);
+  });
 
-    wrapper.unmount();
+  it('Terminer with photos not saved asks: back, discard, or save and finish', async () => {
+    state.pendingFiles = [jpeg('a.jpg')];
+    const w = mountModal();
+    await flushPromises();
+
+    state.finishChoice = 'back';
+    await button(w, 'finish').trigger('click');
+    await flushPromises();
+    expect(confirmFinishBatch).toHaveBeenCalledWith(1);
+    expect(w.emitted('close')).toBeUndefined();
+
+    state.finishChoice = 'save';
+    await button(w, 'finish').trigger('click');
+    await flushPromises();
+    expect(uploadPhoto).toHaveBeenCalledTimes(1);
+    expect(w.emitted('close')).toHaveLength(1);
+  });
+
+  it('Abandonner closes without saving', async () => {
+    const w = mountModal();
+    await flushPromises();
+    state.finishChoice = 'discard';
+    await button(w, 'finish').trigger('click');
+    await flushPromises();
+    expect(uploadPhoto).not.toHaveBeenCalled();
+    expect(w.emitted('close')).toHaveLength(1);
   });
 });
 
-describe('BatchUploadModal — raw file conversion', () => {
-  it('submits the original raw file to astrometry.net after converting its stored picture to PNG', async () => {
-    const raw = fit('M101.fit');
-    state.pendingFiles = [raw];
-    state.availability = { solveField: false, astap: false, astrometry: true };
-    pollPlateSolve.mockResolvedValue({
-      jobId: 'online-job',
-      status: 'failed',
-      error: 'no solve',
-    });
-    convertRawPhoto.mockResolvedValue({
-      png: new File(['png'], 'M101.png', { type: 'image/png' }),
-      meta: { success: false },
-    });
-
-    const wrapper = mountModal();
+describe('BatchUploadModal — list and batch edit', () => {
+  it('edits the ticked photos together once two or more are ticked', async () => {
+    const w = mountModal();
     await flushPromises();
-    expect(items(wrapper)[0].file.name).toBe('M101.png');
-
-    const item = items(wrapper)[0] as unknown as { solver: string };
-    item.solver = 'astrometry';
-    const solveItem = (wrapper.vm as unknown as { solveItem(item: unknown): Promise<void> })
-      .solveItem;
-    const solving = solveItem(item);
+    expect(w.find('batch-multi-edit-stub').exists()).toBe(false);
+    vm(w).items[0].ticked = true;
+    vm(w).items[1].ticked = true;
     await flushPromises();
+    expect(w.find('batch-multi-edit-stub').exists()).toBe(true);
 
-    expect(submitPlateSolve).toHaveBeenCalledWith(raw, undefined);
-    await vi.advanceTimersByTimeAsync(2000);
-    await flushPromises();
-    await solving;
-    expect(items(wrapper)[0].status).toBe('failed');
-
-    wrapper.unmount();
+    // A half-ticked box ticks every photo, then unticks them all.
+    await w.find('[data-test="tick-all"]').setValue(true);
+    expect(vm(w).items.every((i) => i.ticked)).toBe(true);
+    await w.find('[data-test="tick-all"]').setValue(false);
+    expect(vm(w).items.every((i) => !i.ticked)).toBe(true);
   });
 
-  it('joins a raw .fit file as "converting" rather than "pending"', async () => {
-    state.pendingFiles = [fit('M101.fit')];
-    let resolveConvert: (v: unknown) => void = () => {};
-    convertRawPhoto.mockReturnValue(new Promise((resolve) => (resolveConvert = resolve)));
-
-    const wrapper = mountModal();
-    expect(statuses(wrapper)).toEqual(['converting']);
-    expect(convertRawPhoto).toHaveBeenCalledTimes(1);
-
-    resolveConvert({
-      png: new File(['png'], 'M101.png', { type: 'image/png' }),
-      meta: { success: false },
+  it('opens a saved photo "À résoudre" with its astrometry.net solve still going on', async () => {
+    state.pendingFiles = [];
+    state.pendingPhotos = [
+      storedPhoto({
+        onlineSolve: {
+          state: 'unfinished',
+          submissionId: 42,
+          sentAt: '2026-11-15T21:42:00.000Z',
+          fits: true,
+        },
+      }),
+    ];
+    const w = mountModal();
+    await flushPromises();
+    const [item] = vm(w).items;
+    expect(item).toMatchObject({
+      status: 'unfinished',
+      saveState: 'saved',
+      customName: 'NGC7000',
+      labels: ['été'],
+      online: { submissionId: 42, fits: true },
     });
-    await flushPromises();
-    expect(statuses(wrapper)).toEqual(['pending']); // no WCS → falls back to solving
-
-    wrapper.unmount();
-  });
-
-  it('reaches "success" directly (no solver) when the raw file already carries WCS', async () => {
-    state.pendingFiles = [fit('M101.fit')];
-    convertRawPhoto.mockResolvedValue({
-      png: new File(['png'], 'M101.png', { type: 'image/png' }),
-      meta: {
-        success: true,
-        correspondences: [
-          { pointIndex: 0, photoX: 1, photoY: 1, starHip: 1, starRa: 10, starDec: 20 },
-          { pointIndex: 1, photoX: 2, photoY: 2, starHip: 2, starRa: 11, starDec: 21 },
-          { pointIndex: 2, photoX: 3, photoY: 3, starHip: 3, starRa: 12, starDec: 22 },
-        ],
-        width: 100,
-        height: 100,
-      },
-    });
-
-    const wrapper = mountModal();
-    await flushPromises();
-
-    expect(statuses(wrapper)).toEqual(['success']);
-    expect(items(wrapper)[0].file.name).toBe('M101.png');
-    // Never reached a solver — placed straight from the raw file's own WCS.
-    expect(submitLocalSolveJob).not.toHaveBeenCalled();
-
-    wrapper.unmount();
-  });
-
-  it('keeps the capture data and headers of a raw file without a solution, and says it is not placed', async () => {
-    state.pendingFiles = [fit('M2.fit')];
-    convertRawPhoto.mockResolvedValue({
-      png: new File(['png'], 'M2.png', { type: 'image/png' }),
-      meta: {
-        success: false,
-        code: 'NO_WCS_DATA',
-        expTime: 30,
-        stackCnt: 44,
-        captureDetails: { ccdTemp: 9.9 },
-        fitsHeaders: [{ key: 'EXPTIME', value: '30.' }],
-        width: 100,
-        height: 100,
-      },
-    });
-
-    const wrapper = mountModal();
-    await flushPromises();
-
-    expect(statuses(wrapper)).toEqual(['pending']);
-    const item = items(wrapper)[0];
-    expect(item.integrations).toEqual([{ frames: 44, seconds: 30, filter: '' }]);
-    expect(item.captureDetails).toEqual({ ccdTemp: 9.9 });
-    expect(item.fitsHeaders).toEqual([{ key: 'EXPTIME', value: '30.' }]);
-    expect(item.wcsNotice).toBeTruthy();
-
-    wrapper.unmount();
-  });
-
-  it('Start saves a raw file placed from its own WCS when Auto save/place is on', async () => {
-    localStorage.setItem('batch-auto-place', 'true');
-    state.pendingFiles = [fit('M101.fit')];
-    convertRawPhoto.mockResolvedValue({
-      png: new File(['png'], 'M101.png', { type: 'image/png' }),
-      meta: {
-        success: true,
-        correspondences: [
-          { pointIndex: 0, photoX: 1, photoY: 1, starHip: 1, starRa: 10, starDec: 20 },
-        ],
-        width: 100,
-        height: 100,
-      },
-    });
-    const { placeBatchItem } = await import('../../src/batch-place');
-    vi.mocked(placeBatchItem).mockClear();
-
-    const wrapper = mountModal();
-    await flushPromises();
-    expect(placeBatchItem).not.toHaveBeenCalled(); // nothing saved before Start
-
-    await wrapper.find('.batch-footer-buttons .btn-action').trigger('click');
-    await flushPromises();
-
-    expect(placeBatchItem).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(placeBatchItem).mock.calls[0][0]).toBe(items(wrapper)[0]);
-    expect(submitLocalSolveJob).not.toHaveBeenCalled();
-
-    wrapper.unmount();
-  });
-
-  it('serializes conversions — the second file is not sent until the first resolves', async () => {
-    state.pendingFiles = [fit('a.fit'), fit('b.fit')];
-    let resolveFirst: (v: unknown) => void = () => {};
-    convertRawPhoto.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveFirst = resolve;
-        }),
-    );
-    convertRawPhoto.mockResolvedValueOnce({
-      png: new File(['png'], 'b.png', { type: 'image/png' }),
-      meta: { success: false },
-    });
-
-    const wrapper = mountModal();
-    await flushPromises();
-
-    expect(convertRawPhoto).toHaveBeenCalledTimes(1);
-    expect(statuses(wrapper)).toEqual(['converting', 'converting']);
-
-    resolveFirst({
-      png: new File(['png'], 'a.png', { type: 'image/png' }),
-      meta: { success: false },
-    });
-    await flushPromises();
-
-    expect(convertRawPhoto).toHaveBeenCalledTimes(2);
-    expect(statuses(wrapper)).toEqual(['pending', 'pending']);
-
-    wrapper.unmount();
-  });
-
-  it('does not send queued raw files after the dialog closes', async () => {
-    state.pendingFiles = [fit('a.fit'), fit('b.fit'), fit('c.fit')];
-    // The in-flight conversion rejects when the dialog aborts it, as a real fetch would.
-    convertRawPhoto.mockImplementation(
-      (_file: File, _onProgress: unknown, signal: AbortSignal) =>
-        new Promise((_resolve, reject) => {
-          signal.addEventListener('abort', () => reject(new Error('aborted')));
-        }),
-    );
-
-    const wrapper = mountModal();
-    await flushPromises();
-    expect(convertRawPhoto).toHaveBeenCalledTimes(1);
-
-    wrapper.unmount();
-    await flushPromises();
-
-    expect(convertRawPhoto).toHaveBeenCalledTimes(1);
-  });
-
-  it('marks the item "failed" with an error message when conversion rejects', async () => {
-    state.pendingFiles = [fit('bad.fit')];
-    convertRawPhoto.mockRejectedValue(new Error('unsupported raw format'));
-
-    const wrapper = mountModal();
-    await flushPromises();
-
-    expect(statuses(wrapper)).toEqual(['failed']);
-    // The mocked t() in this file returns the key itself, ignoring interpolation params.
-    expect(items(wrapper)[0].error).toBe('errors.convertRawFailed');
-
-    wrapper.unmount();
-  });
-
-  it('Retry after a failed conversion converts again instead of solving the raw file', async () => {
-    state.pendingFiles = [fit('M101.fit')];
-    convertRawPhoto.mockRejectedValueOnce(new Error('network down'));
-    convertRawPhoto.mockResolvedValueOnce({
-      png: new File(['png'], 'M101.png', { type: 'image/png' }),
-      meta: { success: false },
-    });
-
-    const wrapper = mountModal();
-    await flushPromises();
-    expect(statuses(wrapper)).toEqual(['failed']);
-
-    (wrapper.vm as unknown as { retryItem: (i: unknown) => void }).retryItem(items(wrapper)[0]);
-    await flushPromises();
-
-    expect(convertRawPhoto).toHaveBeenCalledTimes(2);
-    expect(statuses(wrapper)).toEqual(['pending']);
-    expect(items(wrapper)[0].file.name).toBe('M101.png');
-    expect(submitLocalSolveJob).not.toHaveBeenCalled();
-
-    wrapper.unmount();
-  });
-
-  it('Start converts a photo whose conversion failed instead of solving the raw file', async () => {
-    state.pendingFiles = [fit('M101.fit')];
-    convertRawPhoto.mockRejectedValueOnce(new Error('network down'));
-    let resolveConvert: (v: unknown) => void = () => {};
-    convertRawPhoto.mockReturnValueOnce(new Promise((resolve) => (resolveConvert = resolve)));
-
-    const wrapper = mountModal();
-    await flushPromises();
-    expect(statuses(wrapper)).toEqual(['failed']);
-
-    await wrapper.find('.batch-footer-buttons .btn-action').trigger('click');
-    await flushPromises();
-
-    expect(convertRawPhoto).toHaveBeenCalledTimes(2);
-    expect(statuses(wrapper)).toEqual(['converting']);
-    expect(submitLocalSolveJob).not.toHaveBeenCalled();
-
-    resolveConvert({
-      png: new File(['png'], 'M101.png', { type: 'image/png' }),
-      meta: { success: false },
-    });
-    await flushPromises();
-    expect(statuses(wrapper)).toEqual(['pending']);
-
-    wrapper.unmount();
-  });
-
-  it('updates the window when a raw file added with "Add more" finishes converting', async () => {
-    state.pendingFiles = [jpeg('a.jpg')];
-    let resolveConvert: (v: unknown) => void = () => {};
-    convertRawPhoto.mockReturnValue(new Promise((resolve) => (resolveConvert = resolve)));
-    // The file picker is never shown: clicking it hands back the chosen file straight away.
-    const pick = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function (
-      this: HTMLInputElement,
-    ) {
-      Object.defineProperty(this, 'files', { value: [fit('M101.fit')] });
-      (this.onchange as () => void)();
-    });
-
-    const wrapper = mountModal();
-    await flushPromises();
-    const startBtn = () => wrapper.find('.batch-footer-buttons .btn-action');
-
-    await wrapper.find('.batch-add-more-btn').trigger('click');
-    await flushPromises();
-    expect(startBtn().attributes('disabled')).toBeDefined(); // converting
-
-    resolveConvert({
-      png: new File(['png'], 'M101.png', { type: 'image/png' }),
-      meta: { success: false },
-    });
-    await flushPromises();
-
-    // Read from what is drawn: the item object itself changes even when the window does not.
-    expect(startBtn().attributes('disabled')).toBeUndefined();
-
-    pick.mockRestore();
-    wrapper.unmount();
-  });
-
-  it('does not enqueue plain jpg/png files for conversion', async () => {
-    state.pendingFiles = [jpeg('a.jpg')];
-    const wrapper = mountModal();
-    await flushPromises();
-
-    expect(convertRawPhoto).not.toHaveBeenCalled();
-    expect(statuses(wrapper)).toEqual(['pending']);
-
-    wrapper.unmount();
+    // Nothing to save until something changes.
+    expect(button(w, 'save-all').text()).toBe('batch.nothingToSave');
   });
 });

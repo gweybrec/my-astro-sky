@@ -24,7 +24,9 @@ import type { ImageCodec, ImageInfo } from '../ports/image-codec';
 import type { SqlDb, SqlStatement, SqlValue } from '../ports/sql-db';
 import type {
   CaptureDetails,
+  OnlineSolve,
   Photo,
+  PhotoCorrespondence,
   PhotoIntegration,
   PointOfInterest,
   QuarterTurns,
@@ -110,12 +112,29 @@ export interface PhotoService {
   insert(input: NewPhotoInput): Promise<Photo>;
   /**
    * The checks of `POST /api/photos` that need no image, in their order: the extension of `fileName`, then
-   * the `correspondences` field (present, JSON, 2 to 100 items, each item valid). Returns the correspondences
-   * in the form they are stored. Throws `invalid` with the codes `INVALID_EXTENSION`, `MISSING_CORRESPONDENCES`,
-   * `INVALID_JSON`, `MIN_CORRESPONDENCES`, `MAX_CORRESPONDENCES`, `INVALID_POINT_INDEX`, `INVALID_PHOTO_X`,
-   * `INVALID_PHOTO_Y`, `INVALID_STAR_HIP`.
+   * the `correspondences` field (JSON, none or 2 to 100 items, each item valid; none stores the photo without a
+   * placement, "À résoudre"). Returns the correspondences in the form they are stored. Throws `invalid` with the codes
+   * `INVALID_EXTENSION`, `INVALID_JSON`, `MIN_CORRESPONDENCES`, `MAX_CORRESPONDENCES`, `INVALID_POINT_INDEX`,
+   * `INVALID_PHOTO_X`, `INVALID_PHOTO_Y`, `INVALID_STAR_HIP`, `DUPLICATE_POINT_INDEX`.
    */
   validateUpload(fileName: string, fields: UploadFields): PhotoCorrespondenceInput[];
+  /**
+   * Places a stored photo, or places it again: its correspondences and manual placement are replaced, and its online
+   * solve ends. Either is needed. Returns the photo as stored. Throws `notFound` (`PHOTO_NOT_FOUND`), `invalid`
+   * (`EMPTY_PLACEMENT`, and the correspondence codes of `validateUpload`).
+   */
+  setPlacement(
+    id: string,
+    placement: {
+      correspondences?: readonly PhotoCorrespondence[];
+      manualPlacement?: ManualPlacementInput | null;
+    },
+  ): Promise<Photo>;
+  /**
+   * Keeps the astrometry.net solve of a photo stored without a placement (cleaned), or forgets it with null. Throws
+   * `notFound` (`PHOTO_NOT_FOUND`), `invalid` (`INVALID_ONLINE_SOLVE`).
+   */
+  setOnlineSolve(id: string, solve: OnlineSolve | null): Promise<void>;
   /** Parses and cleans the other fields of the upload form; a field that does not parse falls back to its empty value. */
   readUploadMetadata(fileName: string, fields: UploadFields): UploadMetadata;
   /**
@@ -234,6 +253,8 @@ export interface PhotoRow {
   quarter_turns: number | null;
   /** JSON list of header cards; absent in the visit photos table. */
   fits_headers?: string | null;
+  /** JSON `OnlineSolve` of a photo stored without a placement; absent in the visit photos table. */
+  online_solve?: string | null;
 }
 
 /** The longest stored header list, as JSON text: cards past it are dropped. */
@@ -278,6 +299,11 @@ const SELECT_NAMES = 'SELECT id, original_name FROM photos ORDER BY rowid ASC';
 const DELETE_PHOTO = 'DELETE FROM photos WHERE id = ?';
 const DELETE_ALL_PHOTOS = 'DELETE FROM photos';
 const UPDATE_PLACEMENT = 'UPDATE photos SET manual_placement = ? WHERE id = ?';
+/** A placement found later: it replaces the old one and ends the photo's online solve. */
+const UPDATE_FULL_PLACEMENT =
+  'UPDATE photos SET manual_placement = ?, online_solve = NULL WHERE id = ?';
+const DELETE_CORRESPONDENCES_OF = 'DELETE FROM star_correspondences WHERE photo_id = ?';
+const UPDATE_ONLINE_SOLVE = 'UPDATE photos SET online_solve = ? WHERE id = ?';
 const UPDATE_TURN_RIGHT = 'UPDATE photos SET quarter_turns = (quarter_turns + 1) % 4 WHERE id = ?';
 const UPDATE_METADATA =
   'UPDATE photos SET dso_ids = ?, labels = ?, points_of_interest = ?, notes = ?, integrations = ?, observation_date = ?, capture_details = ?, gear_setup_id = ? WHERE id = ?';
@@ -386,6 +412,45 @@ function cleanQuarterTurns(val: unknown): QuarterTurns {
   return val === 1 || val === 2 || val === 3 ? val : 0;
 }
 
+const ONLINE_SOLVE_STATES: ReadonlySet<string> = new Set([
+  'solving',
+  'offline',
+  'unfinished',
+  'failed',
+]);
+
+/** An online solve as it may be stored, or null when it is not one (unknown state, no send date). */
+export function sanitizeOnlineSolve(val: unknown): OnlineSolve | null {
+  if (!val || typeof val !== 'object') return null;
+  const v = val as Record<string, unknown>;
+  if (typeof v.state !== 'string' || !ONLINE_SOLVE_STATES.has(v.state)) return null;
+  if (typeof v.sentAt !== 'string' || !v.sentAt) return null;
+  const text = (x: unknown, max: number) =>
+    typeof x === 'string' && x ? x.slice(0, max) : undefined;
+  const submissionId =
+    Number.isInteger(v.submissionId) && (v.submissionId as number) > 0
+      ? (v.submissionId as number)
+      : undefined;
+  const jobId = text(v.jobId, 100);
+  const checkedAt = text(v.checkedAt, 50);
+  const error = text(v.error, 1000);
+  return {
+    state: v.state as OnlineSolve['state'],
+    sentAt: v.sentAt.slice(0, 50),
+    ...(submissionId ? { submissionId } : {}),
+    ...(jobId ? { jobId } : {}),
+    ...(checkedAt ? { checkedAt } : {}),
+    ...(v.fits === true ? { fits: true } : {}),
+    ...(error ? { error } : {}),
+  };
+}
+
+/** The `onlineSolve` field of a photo read from its row: absent when there is none. */
+function onlineSolveOf(json: string | null | undefined): { onlineSolve?: OnlineSolve } {
+  const solve = parseSanitized(json ?? null, sanitizeOnlineSolve, null);
+  return solve ? { onlineSolve: solve } : {};
+}
+
 function parseJsonArray(val: string | null): string[] {
   if (!val) return [];
   try {
@@ -432,6 +497,7 @@ export function rowToPhoto(p: PhotoRow, corr: readonly CorrespondenceRow[]): Pho
     mediumFilename: p.medium_filename || null,
     quarterTurns: cleanQuarterTurns(p.quarter_turns),
     ...(p.fits_headers ? { hasFitsHeaders: true } : {}),
+    ...onlineSolveOf(p.online_solve),
     correspondences: corr.map((c) => ({
       pointIndex: c.point_index,
       photoX: c.photo_x,
@@ -460,6 +526,76 @@ function correspondenceStatements(
       c.starRa ?? null,
       c.starDec ?? null,
     ] as SqlValue[],
+  }));
+}
+
+/**
+ * The correspondences of an upload form (JSON text) or of a placement (a list): none, or 2 to 100 items, each valid,
+ * no repeated `pointIndex`. Returns them as they are stored. Throws `invalid` (`INVALID_JSON`, `MIN_CORRESPONDENCES`,
+ * `MAX_CORRESPONDENCES`, `INVALID_POINT_INDEX`, `INVALID_PHOTO_X`, `INVALID_PHOTO_Y`, `INVALID_STAR_HIP`,
+ * `DUPLICATE_POINT_INDEX`).
+ */
+function checkCorrespondences(raw: string | readonly unknown[]): PhotoCorrespondenceInput[] {
+  let correspondences: any[];
+  if (typeof raw === 'string') {
+    try {
+      correspondences = JSON.parse(raw);
+    } catch {
+      throw invalidUpload('JSON des correspondances invalide', 'INVALID_JSON');
+    }
+  } else {
+    correspondences = [...raw];
+  }
+  if (Array.isArray(correspondences) && correspondences.length === 0) return [];
+  if (!Array.isArray(correspondences) || correspondences.length < 2) {
+    throw invalidUpload('Au moins 2 correspondances requises', 'MIN_CORRESPONDENCES');
+  }
+  if (correspondences.length > MAX_CORRESPONDENCES) {
+    throw invalidUpload(
+      `Trop de correspondances (max ${MAX_CORRESPONDENCES})`,
+      'MAX_CORRESPONDENCES',
+    );
+  }
+
+  // Validate each correspondence field
+  for (const c of correspondences) {
+    if (!Number.isInteger(c.pointIndex) || c.pointIndex < 0) {
+      throw invalidUpload('pointIndex invalide (entier >= 0 attendu)', 'INVALID_POINT_INDEX');
+    }
+    if (typeof c.photoX !== 'number' || !Number.isFinite(c.photoX) || c.photoX < 0) {
+      throw invalidUpload('photoX invalide (nombre positif attendu)', 'INVALID_PHOTO_X');
+    }
+    if (typeof c.photoY !== 'number' || !Number.isFinite(c.photoY) || c.photoY < 0) {
+      throw invalidUpload('photoY invalide (nombre positif attendu)', 'INVALID_PHOTO_Y');
+    }
+    // starHip=0 is allowed when starRa/starDec are provided (direct RA/Dec input)
+    if (c.starHip === 0) {
+      if (
+        typeof c.starRa !== 'number' ||
+        !Number.isFinite(c.starRa) ||
+        typeof c.starDec !== 'number' ||
+        !Number.isFinite(c.starDec)
+      ) {
+        throw invalidUpload('starRa/starDec requis quand starHip=0', 'INVALID_STAR_HIP');
+      }
+    } else if (!Number.isInteger(c.starHip) || c.starHip <= 0) {
+      throw invalidUpload('starHip invalide (entier positif attendu)', 'INVALID_STAR_HIP');
+    }
+  }
+
+  // The table has UNIQUE(photo_id, point_index): refuse a repeat before any file is written.
+  if (new Set(correspondences.map((c) => c.pointIndex)).size !== correspondences.length) {
+    throw invalidUpload('pointIndex en double', 'DUPLICATE_POINT_INDEX');
+  }
+
+  return correspondences.map((c) => ({
+    pointIndex: c.pointIndex,
+    photoX: c.photoX,
+    photoY: c.photoY,
+    starHip: c.starHip,
+    starName: c.starName || '',
+    starRa: c.starRa ?? null,
+    starDec: c.starDec ?? null,
   }));
 }
 
@@ -666,65 +802,38 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       if (!ALLOWED_PHOTO_EXTENSIONS.has(ext)) {
         throw invalidUpload(`Extension non autorisée : ${ext}`, 'INVALID_EXTENSION');
       }
+      // No correspondences: the photo is stored without a placement ("À résoudre"), placed later (`setPlacement`).
       const corrJson = fields?.correspondences;
-      if (!corrJson) throw invalidUpload('Correspondances manquantes', 'MISSING_CORRESPONDENCES');
+      if (!corrJson) return [];
+      return checkCorrespondences(corrJson);
+    },
 
-      let correspondences: any[];
-      try {
-        correspondences = JSON.parse(corrJson);
-      } catch {
-        throw invalidUpload('JSON des correspondances invalide', 'INVALID_JSON');
+    async setPlacement(id, placement) {
+      const correspondences = Array.isArray(placement?.correspondences)
+        ? checkCorrespondences(placement.correspondences)
+        : [];
+      const manual = placement?.manualPlacement ? JSON.stringify(placement.manualPlacement) : null;
+      if (correspondences.length === 0 && !manual) {
+        throw invalidUpload('Placement vide', 'EMPTY_PLACEMENT');
       }
-      if (!Array.isArray(correspondences) || correspondences.length < 2) {
-        throw invalidUpload('Au moins 2 correspondances requises', 'MIN_CORRESPONDENCES');
-      }
-      if (correspondences.length > MAX_CORRESPONDENCES) {
-        throw invalidUpload(
-          `Trop de correspondances (max ${MAX_CORRESPONDENCES})`,
-          'MAX_CORRESPONDENCES',
-        );
-      }
+      if (!(await db.get<{ filename: string }>(SELECT_FILENAME, [id]))) throw photoNotFound();
+      await db.batch([
+        { sql: DELETE_CORRESPONDENCES_OF, params: [id] },
+        { sql: UPDATE_FULL_PLACEMENT, params: [manual, id] },
+        ...correspondenceStatements(id, correspondences),
+      ]);
+      return (await readOne(id))!;
+    },
 
-      // Validate each correspondence field
-      for (const c of correspondences) {
-        if (!Number.isInteger(c.pointIndex) || c.pointIndex < 0) {
-          throw invalidUpload('pointIndex invalide (entier >= 0 attendu)', 'INVALID_POINT_INDEX');
-        }
-        if (typeof c.photoX !== 'number' || !Number.isFinite(c.photoX) || c.photoX < 0) {
-          throw invalidUpload('photoX invalide (nombre positif attendu)', 'INVALID_PHOTO_X');
-        }
-        if (typeof c.photoY !== 'number' || !Number.isFinite(c.photoY) || c.photoY < 0) {
-          throw invalidUpload('photoY invalide (nombre positif attendu)', 'INVALID_PHOTO_Y');
-        }
-        // starHip=0 is allowed when starRa/starDec are provided (direct RA/Dec input)
-        if (c.starHip === 0) {
-          if (
-            typeof c.starRa !== 'number' ||
-            !Number.isFinite(c.starRa) ||
-            typeof c.starDec !== 'number' ||
-            !Number.isFinite(c.starDec)
-          ) {
-            throw invalidUpload('starRa/starDec requis quand starHip=0', 'INVALID_STAR_HIP');
-          }
-        } else if (!Number.isInteger(c.starHip) || c.starHip <= 0) {
-          throw invalidUpload('starHip invalide (entier positif attendu)', 'INVALID_STAR_HIP');
-        }
+    async setOnlineSolve(id, solve) {
+      const clean = solve ? sanitizeOnlineSolve(solve) : null;
+      if (solve && !clean) {
+        throw new DomainError('invalid', 'Résolution en ligne invalide', {
+          code: 'INVALID_ONLINE_SOLVE',
+        });
       }
-
-      // The table has UNIQUE(photo_id, point_index): refuse a repeat before any file is written.
-      if (new Set(correspondences.map((c) => c.pointIndex)).size !== correspondences.length) {
-        throw invalidUpload('pointIndex en double', 'DUPLICATE_POINT_INDEX');
-      }
-
-      return correspondences.map((c) => ({
-        pointIndex: c.pointIndex,
-        photoX: c.photoX,
-        photoY: c.photoY,
-        starHip: c.starHip,
-        starName: c.starName || '',
-        starRa: c.starRa ?? null,
-        starDec: c.starDec ?? null,
-      }));
+      const json = clean ? JSON.stringify(clean) : null;
+      if ((await db.run(UPDATE_ONLINE_SOLVE, [json, id])).changes === 0) throw photoNotFound();
     },
 
     readUploadMetadata(fileName, fields) {

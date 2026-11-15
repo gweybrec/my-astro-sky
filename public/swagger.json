@@ -2321,6 +2321,231 @@
         }
       }
     },
+    "/api/photos/{id}/placement": {
+      "put": {
+        "summary": "Place a stored photo, or place it again",
+        "description": "Replaces the photo's star correspondences and manual placement; a photo stored without a placement (\"À résoudre\") is then shown on the sky map. Its online solve, if any, ends. Either correspondences (2 to 100) or a manual placement is needed.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "UUID of the photo to place"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "correspondences": {
+                    "type": "array",
+                    "description": "Star correspondences, as in the upload form (empty for a manual placement alone)",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "manualPlacement": {
+                    "type": "object",
+                    "nullable": true,
+                    "description": "Manual placement (centre, angle, projPerPx, mirrors), or null"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The photo as stored, placed"
+          },
+          "400": {
+            "description": "Invalid placement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "EMPTY_PLACEMENT",
+                        "MIN_CORRESPONDENCES",
+                        "MAX_CORRESPONDENCES",
+                        "INVALID_POINT_INDEX",
+                        "INVALID_PHOTO_X",
+                        "INVALID_PHOTO_Y",
+                        "INVALID_STAR_HIP",
+                        "DUPLICATE_POINT_INDEX"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Photo not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Photo introuvable"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "PHOTO_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/photos/{id}/online-solve": {
+      "put": {
+        "summary": "Keep or forget the astrometry.net solve of a stored photo",
+        "description": "The solve of a photo stored without a placement goes on on astrometry.net's server: its submission is kept with the photo so that the result is fetched later without a new upload. null forgets it.\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "UUID of the photo"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "onlineSolve": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "solving",
+                          "offline",
+                          "unfinished",
+                          "failed"
+                        ]
+                      },
+                      "submissionId": {
+                        "type": "integer"
+                      },
+                      "jobId": {
+                        "type": "string"
+                      },
+                      "sentAt": {
+                        "type": "string"
+                      },
+                      "checkedAt": {
+                        "type": "string"
+                      },
+                      "fits": {
+                        "type": "boolean"
+                      },
+                      "error": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid online solve",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "INVALID_ONLINE_SOLVE"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Photo not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Photo introuvable"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "PHOTO_NOT_FOUND"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
     "/api/photos/{id}/rotate": {
       "post": {
         "summary": "Turn a photo a quarter to the right",
@@ -2683,6 +2908,14 @@
                   },
                   "submissionId": {
                     "type": "integer"
+                  },
+                  "fits": {
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ],
+                    "description": "The picture sent was a FITS file (rows count from the bottom), though the photo given is not; by default its own name tells"
                   }
                 }
               }

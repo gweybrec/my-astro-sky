@@ -10,19 +10,41 @@ import type {
 import type { FitsCard } from '@myastrosky/core/fits-header';
 
 export type SolverType = 'solve-field' | 'astap' | 'astrometry';
+
+/**
+ * Where a photo of "Ajouter des photos" stands for its placement:
+ * `pending` À résoudre · `converting` a raw file being read · `waiting` queued for a local solver · `solving` ·
+ * `success` placed · `failed` · `canceled` · `unfinished` astrometry.net had not finished ("En cours").
+ */
 export type BatchItemStatus =
   | 'pending'
   | 'converting'
-  | 'wcs-ready'
+  | 'waiting'
   | 'solving'
   | 'success'
   | 'failed'
-  /** astrometry.net had not finished when the app stopped following it; its solution is reused later. */
-  | 'unfinished'
-  | 'waiting'
   | 'canceled'
-  | 'placing'
-  | 'placed';
+  | 'unfinished';
+
+/**
+ * Where it stands for saving: `new` never saved · `saving` · `saved` the stored photo is as shown · `modified` saved,
+ * then changed ("À réenregistrer").
+ */
+export type BatchSaveState = 'new' | 'saving' | 'saved' | 'modified';
+
+/** How a placed photo was placed: the method row it shows ticked. */
+export type BatchPlacedBy = 'local' | 'online' | 'file' | 'reuse' | 'stars' | 'hand';
+
+/** The astrometry.net solve of a photo: kept with it, so that the result is fetched later without a new upload. */
+export interface BatchOnlineSolve {
+  submissionId?: number;
+  jobId?: string;
+  /** When the picture was sent (ISO date). */
+  sentAt: string;
+  checkedAt?: string;
+  /** The picture sent was a FITS file (its rows count from the bottom). */
+  fits: boolean;
+}
 
 export interface BatchItem {
   id: string;
@@ -43,6 +65,18 @@ export interface BatchItem {
   /** Set when the photo was dragged into place on the map (saved with the photo). */
   manualPlacement?: ManualPlacement | null;
   status: BatchItemStatus;
+  saveState: BatchSaveState;
+  /** How the placement was found (the ticked method), when placed. */
+  placedBy?: BatchPlacedBy;
+  /** The name of the solved file read for it ("Déjà résolue : …"). */
+  wcsFileName?: string;
+  /** The stored photo has the placement shown (false once it is placed or placed again after saving). */
+  placementSaved: boolean;
+  /** Its astrometry.net solve, while one runs or waits ("En cours"). */
+  online: BatchOnlineSolve | null;
+  /** Ticked in the list, for "Modifier N photos". */
+  ticked: boolean;
+  /** The stored photo, once saved. */
   photo: Photo | null;
   error: string;
   diagnostics?: string;
@@ -53,9 +87,9 @@ export interface BatchItem {
   observationDate: string;
   captureDetails: CaptureDetails;
   gearSetupId: string | null;
-  /** The header cards of the raw or solved file read for this photo, saved with it once placed. */
+  /** The header cards of the raw or solved file read for this photo, saved with it. */
   fitsHeaders?: FitsCard[] | null;
-  /** Shown on the card when the file read has no plate solution (its capture data was still taken). */
+  /** Shown when the file read has no plate solution (its capture data was still taken). */
   wcsNotice?: string;
   notes: string;
   customName: string;
@@ -64,6 +98,6 @@ export interface BatchItem {
   solveTimer: ReturnType<typeof setInterval> | null;
   pollingTimer: ReturnType<typeof setInterval> | null;
   solveAbort: AbortController | null;
-  metaOpen: boolean;
-  uploadError?: string;
+  /** Why the last save failed. */
+  saveError?: string;
 }

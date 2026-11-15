@@ -106,6 +106,8 @@ const EXPECTED_API_ROUTES = [
   'DELETE /api/photos',
   'DELETE /api/photo-metadata',
   'PATCH /api/photos/:id/manual-placement',
+  'PUT /api/photos/:id/placement',
+  'PUT /api/photos/:id/online-solve',
   'PATCH /api/photos/:id/metadata',
   'POST /api/photos/:id/rotate',
   'GET /api/photos/:id/fits-headers',
@@ -211,10 +213,10 @@ describe('route table', () => {
     ]);
   });
 
-  it('registers exactly the 93 documented /api routes', () => {
+  it('registers exactly the 95 documented /api routes', () => {
     const all = listRoutes(app);
     const api = all.filter((r) => r.split(' ')[1].startsWith('/api/'));
-    expect(EXPECTED_API_ROUTES).toHaveLength(93);
+    expect(EXPECTED_API_ROUTES).toHaveLength(95);
     expect([...api].sort()).toEqual([...EXPECTED_API_ROUTES].sort());
   });
 
@@ -982,6 +984,30 @@ describe('photos', () => {
     expect((await call('GET', '/api/photos')).body).toEqual([]);
   });
 
+  it('stores a photo without a placement, keeps its online solve, and places it later', async () => {
+    const form = await makePhotoForm();
+    form.delete('correspondences');
+    const up = await call('POST', '/api/photos', form);
+    expect(up.status).toBe(200);
+    const id: string = up.body.id;
+    expect(up.body.correspondences).toEqual([]);
+    expect(up.body).not.toHaveProperty('manualPlacement');
+
+    const solve = { state: 'unfinished', submissionId: 42, sentAt: '2026-11-15T21:42:00.000Z' };
+    expect(await call('PUT', `/api/photos/${id}/online-solve`, { onlineSolve: solve })).toEqual(OK);
+    expect((await call('GET', '/api/photos')).body[0].onlineSolve).toEqual(solve);
+
+    const correspondences = [
+      { pointIndex: 0, photoX: 5, photoY: 5, starHip: 32349, starName: 'Sirius' },
+      { pointIndex: 1, photoX: 20, photoY: 15, starHip: 27989, starName: '' },
+    ];
+    const placed = await call('PUT', `/api/photos/${id}/placement`, { correspondences });
+    expect(placed.status).toBe(200);
+    expect(placed.body.correspondences).toEqual(correspondences);
+    expect(placed.body).not.toHaveProperty('onlineSolve');
+    expect((await call('GET', '/api/photos')).body[0].correspondences).toEqual(correspondences);
+  });
+
   it('rejects bad requests', async () => {
     const noFile = new FormData();
     noFile.append('correspondences', '[]');
@@ -990,14 +1016,28 @@ describe('photos', () => {
       body: { error: 'Aucun fichier fourni', code: 'NO_FILE' },
     });
 
-    const noCorr = await makePhotoForm();
-    noCorr.delete('correspondences');
-    expect(await call('POST', '/api/photos', noCorr)).toEqual({
+    const oneCorr = await makePhotoForm();
+    oneCorr.set(
+      'correspondences',
+      JSON.stringify([{ pointIndex: 0, photoX: 1, photoY: 1, starHip: 1, starName: '' }]),
+    );
+    expect(await call('POST', '/api/photos', oneCorr)).toEqual({
       status: 400,
-      body: {
-        error: 'Correspondances manquantes',
-        code: 'MISSING_CORRESPONDENCES',
-      },
+      body: { error: 'Au moins 2 correspondances requises', code: 'MIN_CORRESPONDENCES' },
+    });
+    expect(await call('PUT', '/api/photos/nope/placement', {})).toEqual({
+      status: 400,
+      body: { error: 'Placement vide', code: 'EMPTY_PLACEMENT' },
+    });
+    expect(await call('PUT', '/api/photos/nope/online-solve', { onlineSolve: null })).toEqual({
+      status: 404,
+      body: { error: 'Photo introuvable', code: 'PHOTO_NOT_FOUND' },
+    });
+    expect(
+      await call('PUT', '/api/photos/nope/online-solve', { onlineSolve: { state: 'x' } }),
+    ).toEqual({
+      status: 400,
+      body: { error: 'Résolution en ligne invalide', code: 'INVALID_ONLINE_SOLVE' },
     });
 
     expect(await call('PATCH', '/api/photos/order', { photoIds: 'x' })).toEqual({

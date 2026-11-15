@@ -67,7 +67,7 @@ import {
 import { showToast } from '../../toast';
 
 // `photo` is optional/nullable because PoiEditor is also used before a photo
-// exists yet (a BatchUploadModal card, pre-placement — see BatchCard.vue). Every
+// exists yet (a photo of "Ajouter des photos" not saved yet — see BatchPhotoDetail.vue). Every
 // trigger here opens a modal that needs a real, already-solved, server-hosted
 // photo (to show the image and turn a click into RA/Dec): until one is
 // available the identify buttons don't render, and "+ Ajouter un point

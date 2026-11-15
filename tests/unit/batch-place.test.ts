@@ -1,52 +1,66 @@
 import { describe, it, expect, vi } from 'vitest';
-import { placeBatchItem } from '../../src/batch-place';
-import type { BatchItem } from '../../src/batch-types';
+import { onlineSolveOf, saveBatchItem, type BatchSaveApi } from '../../src/batch-place';
 import type { Photo } from '@myastrosky/core/types';
+import { makeItem } from '../helpers/batch-item';
 
-const t = (key: string) => key;
+const CORR = [
+  { pointIndex: 0, photoX: 1, photoY: 1, starHip: 1, starName: '' },
+  { pointIndex: 1, photoX: 9, photoY: 9, starHip: 2, starName: '' },
+];
 
-const fakePhoto: Photo = {
-  id: 'photo-1',
-  filename: 'uploads/photo-1.jpg',
-  originalName: 'test.jpg',
-  width: 1000,
-  height: 800,
-  correspondences: [],
-  thumbnailFilename: 'uploads/photo-1-thumb.jpg',
-  labels: [],
-} as any;
-
-function makeItem(overrides: Partial<BatchItem> = {}): BatchItem {
+function stored(overrides: Partial<Photo> = {}): Photo {
   return {
-    id: 'item-1',
-    file: new File([''], 'test.jpg', { type: 'image/jpeg' }),
-    thumbBlobUrl: null,
-    solver: 'solve-field',
-    hintCoords: null,
-    hintTargetName: '',
-    fovDeg: null,
-    wcsResult: null,
-    solveCorrespondences: [{ pointIndex: 0, photoX: 100, photoY: 100, starHip: 1 } as any],
-    status: 'success',
-    photo: null,
-    error: '',
+    id: 'photo-1',
+    filename: 'photo-1.jpg',
+    originalName: 'test',
+    width: 100,
+    height: 80,
+    createdAt: '',
+    correspondences: [],
     dsoIds: [],
     labels: [],
-    integrations: [],
-    observationDate: '',
+    pointsOfInterest: [],
     notes: '',
-    customName: '',
-    elapsedSeconds: 0,
-    solveTimer: null,
-    pollingTimer: null,
-    solveAbort: null,
-    metaOpen: false,
     ...overrides,
   };
 }
 
-describe('placeBatchItem — state transitions', () => {
-  it('saves a photo dragged into place on the map with its placement and the card metadata', async () => {
+function fakeApi(): BatchSaveApi & { [k: string]: ReturnType<typeof vi.fn> } {
+  return {
+    upload: vi.fn(async (_f, correspondences) => stored({ correspondences })),
+    updateMetadata: vi.fn(async () => undefined),
+    setPlacement: vi.fn(async (_id, p) => stored({ correspondences: p.correspondences ?? [] })),
+    setOnlineSolve: vi.fn(async () => undefined),
+    saveFitsHeaders: vi.fn(async () => undefined),
+  } as never;
+}
+
+const placedItem = () =>
+  makeItem({
+    status: 'success',
+    placedBy: 'local',
+    solveCorrespondences: CORR,
+    customName: 'Orion',
+    labels: ['hiver'],
+  });
+
+describe('saveBatchItem', () => {
+  it('stores a placed photo with its placement and metadata, and the window keeps it as saved', async () => {
+    const api = fakeApi();
+    const item = placedItem();
+    const photo = await saveBatchItem(item, api);
+    expect(api.upload).toHaveBeenCalledWith(
+      item.file,
+      CORR,
+      undefined,
+      undefined,
+      expect.objectContaining({ displayName: 'Orion', labels: ['hiver'] }),
+    );
+    expect(item).toMatchObject({ saveState: 'saved', placementSaved: true, photo });
+  });
+
+  it('stores a photo dragged into place with its manual placement', async () => {
+    const api = fakeApi();
     const placement = {
       centerRa: 83.8,
       centerDec: -5.4,
@@ -54,129 +68,96 @@ describe('placeBatchItem — state transitions', () => {
       projPerPx: 0.001,
       mirrorX: false,
       mirrorY: false,
-      angleOnSky: true,
     };
-    const item = makeItem({ manualPlacement: placement, customName: 'Orion', notes: 'edited' });
-    const uploadFn = vi.fn().mockResolvedValue(fakePhoto);
-
-    await placeBatchItem(item, [], uploadFn as any, vi.fn(), t);
-
-    const [, , sentPlacement, , meta] = uploadFn.mock.calls[0];
-    expect(sentPlacement).toEqual(placement);
-    expect(meta).toMatchObject({ displayName: 'Orion', notes: 'edited' });
-  });
-
-  it('sends no placement for a plate-solved photo', async () => {
-    const uploadFn = vi.fn().mockResolvedValue(fakePhoto);
-    await placeBatchItem(makeItem(), [], uploadFn as any, vi.fn(), t);
-    expect(uploadFn.mock.calls[0][2]).toBeUndefined();
-  });
-
-  it('transitions success → placing → placed on successful upload', async () => {
-    const item = makeItem();
-    const onPlaced = vi.fn();
-    const uploadFn = vi.fn().mockResolvedValue(fakePhoto);
-
-    await placeBatchItem(item, [], uploadFn as any, onPlaced, t);
-
-    expect(item.status).toBe('placed');
-    expect(item.photo).toBe(fakePhoto);
-    expect(onPlaced).toHaveBeenCalledWith(fakePhoto);
-    expect(item.uploadError).toBeUndefined();
-  });
-
-  it('transitions success → placing → success (with uploadError) on failure', async () => {
-    const item = makeItem();
-    const onPlaced = vi.fn();
-    const uploadFn = vi.fn().mockRejectedValue(new Error('Server error'));
-
-    await placeBatchItem(item, [], uploadFn as any, onPlaced, t);
-
-    expect(item.status).toBe('success');
-    expect(item.photo).toBeNull();
-    expect(item.uploadError).toBe('Server error');
-    expect(onPlaced).not.toHaveBeenCalled();
-  });
-
-  it('sets status to placing synchronously before the upload resolves', async () => {
-    const item = makeItem();
-    let observedStatus = '';
-    const uploadFn = () =>
-      new Promise<Photo>((resolve) => {
-        observedStatus = item.status;
-        setTimeout(() => resolve(fakePhoto), 0);
-      });
-
-    await placeBatchItem(item, [], uploadFn as any, vi.fn(), t);
-
-    expect(observedStatus).toBe('placing');
-    expect(item.status).toBe('placed');
-  });
-
-  it('clears a previous uploadError before uploading', async () => {
-    const item = makeItem({ uploadError: 'Previous error' } as any);
-    const uploadFn = vi.fn().mockResolvedValue(fakePhoto);
-
-    await placeBatchItem(item, [], uploadFn as any, vi.fn(), t);
-
-    expect(item.uploadError).toBeUndefined();
-    expect(item.status).toBe('placed');
-  });
-
-  it('merges batchLabels with item.labels (deduped)', async () => {
-    const item = makeItem({ labels: ['A', 'B'] });
-    let capturedLabels: string[] = [];
-    const uploadFn = vi.fn().mockImplementation((_file, _corr, _mp, _prog, meta) => {
-      capturedLabels = meta?.labels ?? [];
-      return Promise.resolve(fakePhoto);
+    const item = makeItem({
+      status: 'success',
+      placedBy: 'hand',
+      solveCorrespondences: CORR,
+      manualPlacement: placement,
     });
-
-    await placeBatchItem(item, ['B', 'C'], uploadFn as any, vi.fn(), t);
-
-    expect(capturedLabels).toContain('A');
-    expect(capturedLabels).toContain('B');
-    expect(capturedLabels).toContain('C');
-    expect(capturedLabels.filter((l) => l === 'B').length).toBe(1);
+    await saveBatchItem(item, api);
+    expect(api.upload.mock.calls[0][2]).toEqual(placement);
   });
 
-  it('does not call onPlaced on failure', async () => {
+  it('stores a photo not placed without a placement ("À résoudre")', async () => {
+    const api = fakeApi();
     const item = makeItem();
-    const onPlaced = vi.fn();
-    const uploadFn = vi.fn().mockRejectedValue(new Error('Network error'));
-
-    await placeBatchItem(item, [], uploadFn as any, onPlaced, t);
-
-    expect(onPlaced).not.toHaveBeenCalled();
+    await saveBatchItem(item, api);
+    expect(api.upload.mock.calls[0][1]).toEqual([]);
+    expect(api.upload.mock.calls[0][2]).toBeUndefined();
+    expect(api.setOnlineSolve).not.toHaveBeenCalled();
+    expect(item.placementSaved).toBe(false);
   });
 
-  it('uses t() fallback message when error has no message', async () => {
-    const item = makeItem();
-    const uploadFn = vi.fn().mockRejectedValue({});
-
-    await placeBatchItem(item, [], uploadFn as any, vi.fn(), t);
-
-    expect(item.uploadError).toBe('batch.statusFailed');
+  it('keeps the astrometry.net solve with a photo saved while astrometry.net has not finished', async () => {
+    const api = fakeApi();
+    const item = makeItem({
+      status: 'unfinished',
+      online: { submissionId: 42, sentAt: '2026-11-15T21:42:00.000Z', fits: true },
+    });
+    const photo = await saveBatchItem(item, api);
+    const solve = {
+      state: 'unfinished',
+      submissionId: 42,
+      sentAt: '2026-11-15T21:42:00.000Z',
+      fits: true,
+    };
+    expect(api.setOnlineSolve).toHaveBeenCalledWith('photo-1', solve);
+    expect(photo.onlineSolve).toEqual(solve);
   });
 
-  it('stores the header cards with the new photo, and places it even when that fails', async () => {
-    const cards = [{ key: 'EXPTIME', value: '30.' }];
-    const save = vi.fn().mockResolvedValue(undefined);
-    const item = makeItem({ fitsHeaders: cards });
-    const onPlaced = vi.fn();
-    await placeBatchItem(item, [], vi.fn().mockResolvedValue(fakePhoto) as any, onPlaced, t, save);
-    expect(save).toHaveBeenCalledWith(fakePhoto.id, cards);
-    expect(onPlaced.mock.calls[0][0].hasFitsHeaders).toBe(true);
-
-    const failing = makeItem({ fitsHeaders: cards });
-    await placeBatchItem(
-      failing,
-      [],
-      vi.fn().mockResolvedValue(fakePhoto) as any,
-      vi.fn(),
-      t,
-      vi.fn().mockRejectedValue(new Error('down')),
+  it('saves a changed photo again: its metadata, and its placement when it was placed since', async () => {
+    const api = fakeApi();
+    const item = placedItem();
+    item.photo = stored({ originalName: 'Orion' });
+    item.saveState = 'modified';
+    item.placementSaved = false;
+    await saveBatchItem(item, api);
+    expect(api.upload).not.toHaveBeenCalled();
+    expect(api.updateMetadata).toHaveBeenCalledWith(
+      'photo-1',
+      expect.objectContaining({ labels: ['hiver'], originalName: 'Orion' }),
     );
-    expect(failing.status).toBe('placed');
-    expect(failing.photo?.hasFitsHeaders).toBeUndefined();
+    expect(api.setPlacement).toHaveBeenCalledWith('photo-1', {
+      correspondences: CORR,
+      manualPlacement: null,
+    });
+    expect(item).toMatchObject({ saveState: 'saved', placementSaved: true });
+    expect(item.photo!.correspondences).toEqual(CORR);
+  });
+
+  it('does not send the placement again when only the metadata changed', async () => {
+    const api = fakeApi();
+    const item = placedItem();
+    item.photo = stored({ correspondences: CORR });
+    item.saveState = 'modified';
+    item.placementSaved = true;
+    await saveBatchItem(item, api);
+    expect(api.setPlacement).not.toHaveBeenCalled();
+  });
+
+  it('keeps the state and the reason when saving fails', async () => {
+    const api = fakeApi();
+    api.upload.mockRejectedValue(new Error('disk full'));
+    const item = placedItem();
+    await expect(saveBatchItem(item, api)).rejects.toThrow('disk full');
+    expect(item).toMatchObject({ saveState: 'new', saveError: 'disk full', photo: null });
+  });
+});
+
+describe('onlineSolveOf', () => {
+  it('only for a photo not placed whose solve runs or waits on astrometry.net', () => {
+    const online = { submissionId: 1, sentAt: 'x', fits: false };
+    expect(onlineSolveOf(makeItem({ status: 'unfinished', online }))).toMatchObject({
+      state: 'unfinished',
+    });
+    expect(onlineSolveOf(makeItem({ status: 'solving', online }))).toMatchObject({
+      state: 'solving',
+    });
+    expect(onlineSolveOf(makeItem({ status: 'failed', online }))).toBeNull();
+    expect(
+      onlineSolveOf(makeItem({ status: 'unfinished', online: { sentAt: 'x', fits: false } })),
+    ).toBeNull();
+    expect(onlineSolveOf(makeItem({ status: 'success', online }))).toBeNull();
   });
 });

@@ -1,122 +1,165 @@
 import { describe, it, expect } from 'vitest';
-import { clearWcsSolution, sanitizeIntegrationRows } from '../../src/batch-utils';
-import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
+import {
+  batchCounts,
+  clearWcsSolution,
+  commonLabels,
+  commonValue,
+  isSolvable,
+  markChanged,
+  matchesFilter,
+  needsSaving,
+  placementChip,
+  sanitizeIntegrationRows,
+  saveChip,
+} from '../../src/batch-utils';
 import type { BatchItem } from '../../src/batch-types';
+import { makeItem } from '../helpers/batch-item';
 
-function makeItem(overrides: Partial<BatchItem> = {}): BatchItem {
-  return {
-    id: 'item-1',
-    file: new File([''], 'test.jpg', { type: 'image/jpeg' }),
-    thumbBlobUrl: null,
-    solver: 'solve-field',
-    hintCoords: null,
-    hintTargetName: '',
-    fovDeg: null,
-    wcsResult: { success: true } as any,
-    solveCorrespondences: [{ pointIndex: 0, photoX: 100, photoY: 100, starHip: 1 } as any],
+const placed = (overrides: Partial<BatchItem> = {}) =>
+  makeItem({
     status: 'success',
-    photo: null,
-    error: '',
+    placedBy: 'file',
+    wcsResult: { success: true } as never,
+    solveCorrespondences: [{ pointIndex: 0, photoX: 1, photoY: 1, starHip: 1, starName: '' }],
     dsoIds: ['M31'],
     labels: ['galaxy'],
     integrations: [{ frames: 10, seconds: 60, filter: 'L' }],
     observationDate: '2024-01-01T00:00:00.000Z',
     notes: 'my notes',
-    customName: 'Andromeda',
-    elapsedSeconds: 0,
-    localJobId: null,
-    solveTimer: null,
-    pollingTimer: null,
-    solveAbort: null,
-    metaOpen: false,
     ...overrides,
-  };
-}
-
-describe('clearWcsSolution', () => {
-  it('drops the solution and WCS-prefilled metadata', () => {
-    const item = makeItem();
-    clearWcsSolution(item);
-    expect(item.wcsResult).toBeNull();
-    expect(item.solveCorrespondences).toBeNull();
-    expect(item.dsoIds).toEqual([]);
-    expect(item.integrations).toEqual([]);
-    expect(item.observationDate).toBe('');
   });
 
-  it('resets status success → pending (subtracts from solved count)', () => {
-    const item = makeItem({ status: 'success' });
+describe('clearWcsSolution ("Retirer le placement")', () => {
+  it('puts the photo back to "À résoudre" and drops what the solved file filled in', () => {
+    const item = placed({ wcsFileName: 'a.fits' });
     clearWcsSolution(item);
-    expect(item.status).toBe('pending');
-  });
-
-  it('resets status wcs-ready → pending', () => {
-    const item = makeItem({ status: 'wcs-ready' });
-    clearWcsSolution(item);
-    expect(item.status).toBe('pending');
-  });
-
-  it('leaves placed / placing status untouched', () => {
-    const placed = makeItem({ status: 'placed' });
-    clearWcsSolution(placed);
-    expect(placed.status).toBe('placed');
-
-    const placing = makeItem({ status: 'placing' });
-    clearWcsSolution(placing);
-    expect(placing.status).toBe('placing');
-  });
-
-  it('leaves non-WCS fields untouched', () => {
-    const file = new File([''], 'keep.jpg', { type: 'image/jpeg' });
-    const item = makeItem({ file, labels: ['galaxy'], customName: 'Andromeda', notes: 'my notes' });
-    clearWcsSolution(item);
+    expect(item).toMatchObject({
+      status: 'pending',
+      wcsResult: null,
+      solveCorrespondences: null,
+      placedBy: undefined,
+      wcsFileName: undefined,
+      dsoIds: [],
+      observationDate: '',
+      integrations: [],
+    });
+    // What the user typed stays.
     expect(item.labels).toEqual(['galaxy']);
-    expect(item.customName).toBe('Andromeda');
     expect(item.notes).toBe('my notes');
-    expect(item.file).toBe(file);
+  });
+
+  it('makes a saved photo "À réenregistrer"', () => {
+    const item = placed({ saveState: 'saved', placementSaved: true });
+    clearWcsSolution(item);
+    expect(item.saveState).toBe('modified');
   });
 });
 
-describe('formatIntegrationTotal', () => {
-  it('formats an exact-hours total as clock style with zero-padded minutes', () => {
-    expect(formatIntegrationTotal(21600)).toBe('6h00');
+describe('what the buttons take', () => {
+  it('"Résoudre N photos" takes photos to place, failed or canceled ones', () => {
+    expect(isSolvable(makeItem())).toBe(true);
+    expect(isSolvable(makeItem({ status: 'failed' }))).toBe(true);
+    expect(isSolvable(makeItem({ status: 'canceled' }))).toBe(true);
+    for (const status of ['success', 'solving', 'waiting', 'converting', 'unfinished'] as const) {
+      expect(isSolvable(makeItem({ status }))).toBe(false);
+    }
   });
 
-  it('formats hours + minutes as clock style', () => {
-    expect(formatIntegrationTotal(5400)).toBe('1h30');
-    expect(formatIntegrationTotal(3660)).toBe('1h01');
+  it('"Enregistrer N photos" takes photos never saved or changed since, not while they are solved or saved', () => {
+    expect(needsSaving(makeItem())).toBe(true);
+    expect(needsSaving(makeItem({ status: 'failed' }))).toBe(true);
+    expect(needsSaving(placed({ saveState: 'modified' }))).toBe(true);
+    expect(needsSaving(placed({ saveState: 'saved' }))).toBe(false);
+    expect(needsSaving(makeItem({ saveState: 'saving' }))).toBe(false);
+    expect(needsSaving(makeItem({ status: 'solving' }))).toBe(false);
+    expect(needsSaving(makeItem({ status: 'converting' }))).toBe(false);
+    // A solve going on on astrometry.net ("En cours") can be saved: its submission is kept with the photo.
+    expect(needsSaving(makeItem({ status: 'unfinished' }))).toBe(true);
   });
 
-  it('formats a sub-hour total in minutes', () => {
-    expect(formatIntegrationTotal(2700)).toBe('45min');
-    expect(formatIntegrationTotal(90)).toBe('2min');
+  it('counts both buttons and each filter', () => {
+    const items = [
+      placed(),
+      placed({ saveState: 'saved', placementSaved: true }),
+      makeItem(),
+      makeItem({ status: 'failed' }),
+      makeItem({ status: 'solving' }),
+    ];
+    expect(batchCounts(items)).toEqual({
+      toSolve: 2,
+      toSave: 3,
+      solving: 1,
+      byFilter: { all: 5, toPlace: 2, failed: 1, unsaved: 4, saved: 1 },
+    });
   });
 
-  it('formats a sub-minute total in seconds', () => {
-    expect(formatIntegrationTotal(45)).toBe('45s');
+  it('nothing to solve when only solved files were loaded', () => {
+    expect(batchCounts([placed(), placed()]).toSolve).toBe(0);
+  });
+});
+
+describe('markChanged', () => {
+  it('turns a saved photo into "À réenregistrer", and leaves a new one new', () => {
+    const saved = placed({ saveState: 'saved', placementSaved: true });
+    markChanged(saved);
+    expect(saved.saveState).toBe('modified');
+    expect(saved.placementSaved).toBe(true);
+    markChanged(saved, { placement: true });
+    expect(saved.placementSaved).toBe(false);
+    const fresh = makeItem();
+    markChanged(fresh);
+    expect(fresh.saveState).toBe('new');
+  });
+});
+
+describe('chips', () => {
+  it('shows where the placement stands', () => {
+    expect(placementChip(makeItem()).key).toBe('batch.chipToSolve');
+    expect(placementChip(makeItem({ status: 'solving' })).key).toBe('mobile.gallery.solving');
+    expect(placementChip(makeItem({ status: 'unfinished' })).key).toBe('mobile.gallery.unfinished');
+    expect(placementChip(makeItem({ status: 'failed' })).tone).toBe('fail');
+    expect(placementChip(placed()).key).toBe('mobile.gallery.alreadySolved');
+    expect(placementChip(placed({ placedBy: 'hand' })).key).toBe('mobile.gallery.placedByHand');
+    expect(placementChip(placed({ placedBy: 'local' })).key).toBe('mobile.gallery.placedSolved');
+    expect(placementChip(placed({ placedBy: 'stars' }))).toMatchObject({
+      key: 'mobile.gallery.placedByStars',
+      params: { n: '1' },
+    });
   });
 
-  it('returns "0min" for zero, negative, or non-finite input', () => {
-    expect(formatIntegrationTotal(0)).toBe('0min');
-    expect(formatIntegrationTotal(-5)).toBe('0min');
-    expect(formatIntegrationTotal(Number.NaN)).toBe('0min');
+  it('shows where the saving stands', () => {
+    expect(saveChip(makeItem()).key).toBe('batch.chipUnsaved');
+    expect(saveChip(makeItem({ saveState: 'saved' })).key).toBe('batch.chipSaved');
+    expect(saveChip(makeItem({ saveState: 'modified' })).key).toBe('batch.chipResave');
+  });
+});
+
+describe('batch edit', () => {
+  it('finds the value the ticked photos share, or tells they differ', () => {
+    const a = makeItem({ gearSetupId: 's1' });
+    const b = makeItem({ gearSetupId: 's1' });
+    const c = makeItem({ gearSetupId: null });
+    expect(commonValue([a, b], (i) => i.gearSetupId)).toEqual({ mixed: false, value: 's1' });
+    expect(commonValue([a, c], (i) => i.gearSetupId)).toEqual({ mixed: true });
+  });
+
+  it('splits the labels into those all have and those only some have', () => {
+    const a = makeItem({ labels: ['été', 'nébuleuse'] });
+    const b = makeItem({ labels: ['été'] });
+    expect(commonLabels([a, b])).toEqual({ all: ['été'], some: ['nébuleuse'] });
+  });
+
+  it('filters the list', () => {
+    expect(matchesFilter(makeItem({ status: 'unfinished' }), 'toPlace')).toBe(true);
+    expect(matchesFilter(placed(), 'toPlace')).toBe(false);
+    expect(matchesFilter(makeItem({ saveState: 'modified' }), 'unsaved')).toBe(true);
   });
 });
 
 describe('sanitizeIntegrationRows', () => {
-  it('trims filters and keeps valid frames/seconds', () => {
-    const rows = sanitizeIntegrationRows([{ frames: 10, seconds: 60, filter: '  L  ' }]);
-    expect(rows).toEqual([{ frames: 10, seconds: 60, filter: 'L' }]);
-  });
-
-  it('coerces invalid / negative / non-integer numbers to 0', () => {
-    const rows = sanitizeIntegrationRows([
-      { frames: -5, seconds: 1.5, filter: 'R' } as any,
-      { frames: NaN, seconds: -1, filter: 'G' } as any,
-    ]);
-    expect(rows).toEqual([
-      { frames: 0, seconds: 0, filter: 'R' },
-      { frames: 0, seconds: 0, filter: 'G' },
+  it('keeps whole non-negative numbers and trims the filter', () => {
+    expect(sanitizeIntegrationRows([{ frames: -1, seconds: 1.5, filter: ' Ha ' }])).toEqual([
+      { frames: 0, seconds: 0, filter: 'Ha' },
     ]);
   });
 });

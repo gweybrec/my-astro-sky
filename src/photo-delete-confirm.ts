@@ -191,12 +191,67 @@ export function confirmMosaicDelete(mosaicName: string): Promise<boolean> {
   );
 }
 
-export function confirmDiscardUnsavedSolves(count: number): Promise<boolean> {
-  return confirmDeleteDialog(
-    t('batch.confirmCloseTitle'),
-    t('batch.confirmCloseMessage', { count: String(count) }),
-    t('batch.confirmCloseAction'),
-  );
+/**
+ * "Terminer" in "Ajouter des photos" with photos not saved: Revenir (back to the window), Abandonner (close, the changes
+ * are lost) or Enregistrer et terminer. Escape and a click outside go back.
+ */
+export function confirmFinishBatch(count: number): Promise<'back' | 'discard' | 'save'> {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'dialog-overlay';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'dialog';
+    dialog.setAttribute('role', 'dialog');
+    dialog.addEventListener('click', (e) => e.stopPropagation());
+
+    const titleEl = document.createElement('h3');
+    titleEl.textContent = t('batch.finishTitle');
+
+    const messageEl = document.createElement('p');
+    messageEl.className = 'dialog-message';
+    messageEl.textContent =
+      count === 1
+        ? t('batch.finishMessageOne')
+        : t('batch.finishMessageMany', { n: String(count) });
+
+    const buttons = document.createElement('div');
+    buttons.className = 'dialog-buttons';
+    const button = (label: string, cls: string, choice: 'back' | 'discard' | 'save') => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = cls;
+      b.textContent = label;
+      b.addEventListener('click', () => closeWith(choice));
+      buttons.appendChild(b);
+      return b;
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeWith('back');
+      }
+    };
+    const closeWith = (choice: 'back' | 'discard' | 'save') => {
+      document.removeEventListener('keydown', onKeyDown);
+      overlay.remove();
+      resolve(choice);
+    };
+
+    button(t('batch.finishBack'), 'btn-cancel', 'back');
+    button(t('batch.finishDiscard'), 'btn-danger', 'discard');
+    const save = button(t('batch.finishSave'), 'btn-confirm', 'save');
+    overlay.addEventListener('click', () => closeWith('back'));
+
+    dialog.appendChild(titleEl);
+    dialog.appendChild(messageEl);
+    dialog.appendChild(buttons);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', onKeyDown);
+    requestAnimationFrame(() => save.focus());
+  });
 }
 
 /**

@@ -92,6 +92,8 @@ export interface Backend {
     | 'removeAll'
     | 'updateMetadata'
     | 'setManualPlacement'
+    | 'setPlacement'
+    | 'setOnlineSolve'
     | 'setOrder'
     | 'rotateRight'
     | 'getFitsHeaders'
@@ -124,7 +126,7 @@ export interface Backend {
   version: Pick<VersionService, 'getLatest'>;
   novaSolve: Pick<NovaSolveService, 'getJob' | 'listSubmissions'> & {
     submit(file: FileSource, hints?: NovaSolveHints): Promise<string>;
-    resume(file: FileSource, submissionId: number): Promise<string>;
+    resume(file: FileSource, submissionId: number, options?: { fits?: boolean }): Promise<string>;
     reuse(file: FileSource, jobId: number): Promise<NovaReuseResult>;
   };
   solvedImport: {

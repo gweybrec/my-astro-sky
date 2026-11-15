@@ -1281,9 +1281,9 @@ describe('POST /api/photos', () => {
     expect(uploadsList()).toEqual([]);
   });
 
-  it('rejects fewer than two correspondences', async () => {
+  it('rejects one correspondence or a value that is not a list (none stores the photo "À résoudre")', async () => {
     const body = { error: 'Au moins 2 correspondances requises', code: 'MIN_CORRESPONDENCES' };
-    for (const corr of [[], [GOOD_CORR[0]], '{}', '5', '"x"']) {
+    for (const corr of [[GOOD_CORR[0]], '{}', '5', '"x"']) {
       expect(await call('POST', '/api/photos', await photoForm({ corr }))).toEqual({
         status: 400,
         body,

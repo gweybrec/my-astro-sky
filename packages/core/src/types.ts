@@ -112,6 +112,29 @@ export interface Photo {
   sharedSkyId?: string; // Set on a photo of a visited sky (someone else's, read-only); absent on the user's own photos
   sharedGear?: { setup?: string; telescope?: string; camera?: string; accessory?: string }; // A visited photo's gear, as text
   author?: string; // A visited photo's author: the name its sender shared it under, never editable here
+  onlineSolve?: OnlineSolve; // The astrometry.net solve of a photo stored without a placement (absent once placed)
+}
+
+/**
+ * Where an astrometry.net solve of a stored photo stands. The solve goes on on astrometry.net's server whatever the app
+ * does, so its submission is kept with the photo and followed again later: the result is fetched without a new upload.
+ * `solving`: followed now. `offline`: following stopped for want of the network. `unfinished`: astrometry.net had not
+ * finished when the app stopped waiting ("En cours"). `failed`: the solve ended without a solution (`error`).
+ */
+export interface OnlineSolve {
+  state: 'solving' | 'offline' | 'unfinished' | 'failed';
+  /** astrometry.net's submission: a later check follows it (absent while the picture is being sent). */
+  submissionId?: number;
+  /** The solver's own job while this device follows it; unknown to it after a restart (the submission is then used). */
+  jobId?: string;
+  /** When the picture was sent (ISO date). */
+  sentAt: string;
+  /** When astrometry.net was last asked (ISO date). */
+  checkedAt?: string;
+  /** The picture sent was a FITS file: its rows count from the bottom, which the solution's pixels follow. */
+  fits?: boolean;
+  /** Why the solve failed (`failed`). */
+  error?: string;
 }
 
 export type QuarterTurns = 0 | 1 | 2 | 3;

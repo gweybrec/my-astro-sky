@@ -1,6 +1,6 @@
 <template>
   <!-- Display name -->
-  <div class="metadata-field">
+  <div class="metadata-field" v-if="shows('rest')">
     <label class="metadata-label">{{ t('modal.metadataFilename') }}</label>
     <input
       type="text"
@@ -11,7 +11,7 @@
   </div>
 
   <!-- DSOs -->
-  <div class="metadata-field">
+  <div class="metadata-field" v-if="shows('rest')">
     <label class="metadata-label">{{ t('modal.metadataDsos') }}</label>
     <div class="tag-chips">
       <span v-for="dsoId in sortedDsoIds" :key="dsoId" class="tag-chip">
@@ -43,7 +43,7 @@
   </div>
 
   <!-- Labels -->
-  <div class="metadata-field">
+  <div class="metadata-field" v-if="shows('top')">
     <label class="metadata-label">{{ t('modal.metadataLabels') }}</label>
     <div class="tag-chips">
       <span v-for="lbl in labels" :key="lbl" class="tag-chip label-chip">
@@ -77,13 +77,14 @@
 
   <!-- Points of Interest -->
   <PoiEditor
+    v-if="shows('rest')"
     :pois="pointsOfInterest"
     :photo="photo"
     @update:pois="emit('update:pointsOfInterest', $event)"
   />
 
   <!-- Integrations -->
-  <div class="metadata-field">
+  <div class="metadata-field" v-if="shows('rest')">
     <label class="metadata-label">{{ t('modal.metadataIntegrations') }}</label>
     <div class="integration-rows">
       <template v-for="(row, idx) in rows" :key="row._id">
@@ -171,7 +172,7 @@
   </div>
 
   <!-- Observation date -->
-  <div class="metadata-field">
+  <div class="metadata-field" v-if="shows('rest')">
     <label class="metadata-label">{{ t('modal.metadataObsDate') }}</label>
     <input
       type="datetime-local"
@@ -183,7 +184,7 @@
   </div>
 
   <!-- Gear setup link -->
-  <div class="metadata-field">
+  <div class="metadata-field" v-if="shows('top')">
     <label class="metadata-label">{{ t('modal.metadataGearSetup') }}</label>
     <select
       class="dialog-input"
@@ -197,7 +198,7 @@
   </div>
 
   <!-- Capture details (dynamic, opt-in fields) -->
-  <div class="metadata-field">
+  <div class="metadata-field" v-if="shows('rest')">
     <label class="metadata-label">{{ t('modal.metadataCapture') }}</label>
     <div
       v-if="presentCaptureFields.length > 0"
@@ -240,7 +241,7 @@
   </div>
 
   <!-- Notes -->
-  <div class="metadata-field">
+  <div class="metadata-field" v-if="shows('rest')">
     <label class="metadata-label">{{ t('modal.metadataNotes') }}</label>
     <textarea
       class="notes-textarea"
@@ -290,11 +291,19 @@ const props = defineProps<{
   displayName: string;
   knownFilterMap: Map<string, string>;
   knownLabels?: string[];
+  /**
+   * Which fields: 'top' the equipment and labels only (shown first in "Ajouter des photos"), 'rest' all the others;
+   * every field by default.
+   */
+  fields?: 'top' | 'rest';
   /** Passed straight through to PoiEditor — gates its "Identifier un astéroïde"
    *  trigger, which needs a real, already-solved, server-hosted photo. Absent
    *  (undefined) before a BatchUploadModal card has been placed. */
   photo?: Photo | null;
 }>();
+
+/** The field belongs to the group asked for (all of them when none is). */
+const shows = (group: 'top' | 'rest') => !props.fields || props.fields === group;
 
 // The objects' chips, the most important catalogue first (Messier, NGC, IC, …); the list itself keeps its order.
 const sortedDsoIds = computed(() => sortDsoIdsByImportance(props.dsoIds));

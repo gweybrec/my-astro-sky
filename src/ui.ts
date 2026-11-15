@@ -98,6 +98,8 @@ import { positionPopup } from './popup-utils';
 
 export let triggerSelectDSOForPhotoChip: (dsoId: string) => void = () => {};
 export let triggerBatchModal: (files: File[]) => void = () => {};
+/** Opens "Ajouter des photos" with stored photos (a gallery photo "À résoudre"), to place them. */
+export let triggerBatchModalWithPhotos: (photos: Photo[]) => void = () => {};
 export let triggerAsteroidModal: (
   photo: Photo,
   onIdentified: (photo: Photo, pois: PointOfInterest[]) => void,
@@ -203,6 +205,12 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
     usePhotosStore(pinia).syncFromOverlay();
   };
 
+  // A gallery photo "À résoudre": "Ajouter des photos" opens with it, over the map (placing by hand works there).
+  gallery.onPlacePhoto = (photo) => {
+    useUiStore(pinia).switchView('skymap');
+    triggerBatchModalWithPhotos([photo]);
+  };
+
   // Sync metadata edits from gallery back to overlay and photos panel
   gallery.onPhotoMetadataUpdated = (updated) => {
     overlay.updatePhotoData(updated);
@@ -215,6 +223,10 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   };
   triggerBatchModal = (files) => {
     useUiStore(pinia).pendingBatchFiles = files;
+    openVueModal('batchUpload');
+  };
+  triggerBatchModalWithPhotos = (photos) => {
+    useUiStore(pinia).pendingBatchPhotos = photos;
     openVueModal('batchUpload');
   };
   triggerAsteroidModal = (photo, onIdentified) => {

@@ -36,7 +36,7 @@ export function applyWcsMetadataToItem(
 }
 
 /**
- * Apply a WCS solve/convert result to a batch item. Shared by the WCS companion-file picker (`BatchCard`'s
+ * Apply a WCS solve/convert result to a batch item. Shared by the WCS companion-file picker (`BatchPhotoDetail`'s
  * `handleWcsFile`) and raw-file conversion (a converted TIFF/FITS often already carries WCS in its own header). The
  * header data is always taken (`applyWcsMetadataToItem`); with a plate solution the item is also placed "without
  * running a plate solver". Pure state mutation — no DOM, no toasts; the caller decides how to tell the user.

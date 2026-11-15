@@ -635,6 +635,26 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
       'a manual placement cleared',
     );
 
+    // A photo stored without a placement ("À résoudre"), its astrometry.net solve kept, then placed.
+    const waiting = await b.photos.upload(fixtures.jpeg(), {});
+    expectEqual(waiting.correspondences, [], 'a photo stored without a placement');
+    const solve = {
+      state: 'unfinished' as const,
+      submissionId: 7,
+      sentAt: '2026-11-15T21:42:00.000Z',
+      fits: true,
+    };
+    await b.photos.setOnlineSolve(waiting.id, solve);
+    const keptSolve = (await b.photos.listWithSizes()).find((p) => p.id === waiting.id);
+    expectEqual(keptSolve?.onlineSolve, solve, 'the online solve kept with the photo');
+    const placed = await b.photos.setPlacement(waiting.id, { correspondences: CORRESPONDENCES });
+    expectEqual(
+      [placed.correspondences, placed.onlineSolve ?? null],
+      [CORRESPONDENCES, null],
+      'a placement given later ends the online solve',
+    );
+    await b.photos.remove(waiting.id);
+
     await b.photos.setOrder([second.id, first.id]);
     expectEqual(
       (await b.photos.listWithSizes()).map((p) => p.id),

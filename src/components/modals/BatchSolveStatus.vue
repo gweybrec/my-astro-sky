@@ -1,9 +1,21 @@
 <template>
-  <div class="batch-item-status">
-    <template v-if="item.status === 'solving'">
-      <div class="shared-solve-status-row">
+  <div class="flex flex-col gap-2" data-test="batch-status">
+    <!-- Where the placement stands -->
+    <template v-if="item.status === 'converting'">
+      <div class="flex items-center gap-4 text-secondary">
         <span class="auto-solve-spinner"></span>
-        <span class="batch-status-text">{{ solvingText }}</span>
+        <span>{{
+          item.convertProgress < 1
+            ? t('batch.convertingUpload', { pct: String(Math.round(item.convertProgress * 100)) })
+            : t('batch.convertingDecode')
+        }}</span>
+      </div>
+    </template>
+
+    <template v-else-if="item.status === 'solving'">
+      <div class="flex items-center gap-4 flex-wrap text-secondary">
+        <span class="auto-solve-spinner"></span>
+        <span>{{ solvingText }}</span>
         <button
           v-if="item.solveAbort"
           type="button"
@@ -14,48 +26,16 @@
           @click.stop="$emit('cancel')"
         ></button>
       </div>
-      <div v-if="slowHint" class="batch-status-dso-line">{{ slowHint }}</div>
-      <div v-if="timeoutHint" class="batch-status-dso-line">{{ timeoutHint }}</div>
+      <div v-if="slowHint" class="text-base text-dim">{{ slowHint }}</div>
     </template>
 
-    <template v-else-if="item.status === 'placing'">
-      <div class="shared-solve-status-row">
-        <span class="auto-solve-spinner"></span>
-        <span class="batch-status-text">{{ t('batch.statusPlacing') }}</span>
-      </div>
-    </template>
-
-    <template v-else-if="item.status === 'success'">
-      <div class="shared-solve-status-row">
-        <span class="batch-status-text batch-status-success">{{ t('batch.statusSuccess') }}</span>
-      </div>
-      <div class="batch-status-dso-line">
-        {{
-          item.dsoIds.length > 0 ? t('batch.dsosFound', { count: String(item.dsoIds.length) }) : ''
-        }}
-      </div>
-      <div v-if="item.uploadError" class="shared-solve-status-row batch-status-upload-error">
-        <span>{{ item.uploadError }}</span>
-        <button type="button" class="batch-retry-btn" @click="$emit('retry-upload')">
-          {{ t('batch.retryButton') }}
-        </button>
-      </div>
-    </template>
-
-    <template v-else-if="item.status === 'placed'">
-      <div class="shared-solve-status-row">
-        <span class="batch-status-text batch-status-success">{{ t('batch.statusPlaced') }}</span>
-      </div>
+    <template v-else-if="item.status === 'waiting'">
+      <div class="text-secondary">{{ t('batch.statusWaiting', { max: String(maxParallel) }) }}</div>
     </template>
 
     <template v-else-if="item.status === 'failed'">
-      <div class="shared-solve-status-row">
-        <span class="batch-status-text batch-status-error"
-          >✗ {{ item.error || t('batch.statusFailed') }}</span
-        >
-        <button type="button" class="batch-retry-btn" @click="$emit('retry')">
-          {{ t('batch.retryButton') }}
-        </button>
+      <div class="text-[var(--status-error-text)]">
+        {{ t('batch.statusFailedWith', { error: item.error || t('batch.statusFailed') }) }}
       </div>
       <details v-if="item.diagnostics">
         <summary class="solve-error-summary">{{ t('modal.errorDetailsSummary') }}</summary>
@@ -63,76 +43,127 @@
       </details>
     </template>
 
-    <template v-else-if="item.status === 'unfinished'">
-      <div class="shared-solve-status-row">
-        <span class="text-small text-[var(--status-warn-text)]">{{
-          t('batch.statusUnfinished', { button: t('batch.reuseOnline') })
-        }}</span>
-      </div>
-    </template>
-
     <template v-else-if="item.status === 'canceled'">
-      <div class="shared-solve-status-row">
-        <span class="batch-status-text batch-status-error">{{ t('batch.statusCanceled') }}</span>
-        <button type="button" class="batch-retry-btn" @click="$emit('retry')">
-          {{ t('batch.retryButton') }}
-        </button>
+      <div class="text-[var(--status-error-text)]">{{ t('batch.statusCanceled') }}</div>
+    </template>
+
+    <template v-else-if="item.status === 'unfinished'">
+      <div class="text-[var(--status-warn-text)]">{{ t('batch.statusUnfinishedLine') }}</div>
+      <div v-if="sentAt" class="text-base text-dim">{{ sentAt }}</div>
+    </template>
+
+    <template v-else-if="item.status === 'success'">
+      <div class="text-[var(--status-success-text)]">
+        {{
+          item.dsoIds.length
+            ? t('batch.statusObjects', { how: placedText, count: String(item.dsoIds.length) })
+            : placedText
+        }}
       </div>
     </template>
 
-    <template v-else-if="item.status === 'wcs-ready'">
-      <div class="shared-solve-status-row">
-        <span class="batch-status-text batch-status-wcs">{{ t('batch.statusWcsReady') }}</span>
+    <template v-else>
+      <div class="text-[var(--status-info-text)]">
+        {{ item.saveState === 'new' ? t('batch.chipToSolve') : t('batch.statusSavedUnplaced') }}
       </div>
     </template>
 
-    <template v-else-if="item.status === 'waiting'">
-      <div class="shared-solve-status-row">
-        <span class="batch-status-text">{{
-          t('batch.statusWaiting', { max: String(maxParallel) })
-        }}</span>
+    <!-- Where the saving stands, once the photo is placed or saved -->
+    <div v-if="item.saveState === 'saving'" class="flex items-center gap-4 text-secondary">
+      <span class="auto-solve-spinner"></span>
+      <span>{{ t('batch.statusSaving') }}</span>
+    </div>
+    <div
+      v-else-if="item.saveState === 'modified'"
+      class="flex items-center gap-2 text-[var(--status-warn-text)]"
+      data-test="status-modified"
+    >
+      <span class="[&_svg]:w-3 [&_svg]:h-3" v-html="penSvg"></span>
+      {{ t('batch.statusModified') }}
+    </div>
+    <template v-else-if="item.status === 'success'">
+      <div v-if="item.saveState === 'new'" class="text-[var(--status-warn-text)]">
+        {{ t('batch.statusNotSaved') }}
       </div>
+      <div v-else class="text-dim">{{ t('batch.statusSaved') }}</div>
     </template>
+    <div v-if="item.saveError" class="text-[var(--status-error-text)]">
+      {{ t('batch.saveFailed', { error: item.saveError }) }}
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { BatchItem } from '../../batch-types';
+import type { BatchItem, SolverType } from '../../batch-types';
 import { t } from '../../i18n';
+import { getLang } from '@myastrosky/core/i18n/index';
 import { useSettingsStore } from '@myastrosky/app-state/stores/settings';
 import closeXSvg from '../../icons/close-x.svg?raw';
+import penSvg from '../../icons/pen.svg?raw';
 
 const props = defineProps<{ item: BatchItem }>();
-defineEmits<{ cancel: []; retry: []; 'retry-upload': [] }>();
+defineEmits<{ cancel: [] }>();
 
 const settingsStore = useSettingsStore();
 const maxParallel = computed(() =>
   Math.max(1, parseInt(settingsStore.serverSettings?.MAX_PARALLEL_SOLVES || '4', 10) || 4),
 );
 
-// Online (astrometry.net) solves are slow; once past this threshold show the
-// "still solving online" + "can take up to 10 minutes" hints the single modal had.
-const ONLINE_SLOW_THRESHOLD_S = 82;
-// Local solvers (solve-field / ASTAP) past a minute get the generic slow hint.
-const LOCAL_SLOW_THRESHOLD_S = 60;
+const SOLVER_NAMES: Record<SolverType, string> = {
+  'solve-field': 'solve-field',
+  astap: 'ASTAP',
+  astrometry: 'astrometry.net',
+};
 
-const isOnline = computed(() => props.item.solver === 'astrometry' && props.item.wcsResult == null);
+const isOnline = computed(() => props.item.solver === 'astrometry');
+
+// astrometry.net is slow: past this, the line says the solve goes on online. Local solvers past a minute get a hint.
+const ONLINE_SLOW_THRESHOLD_S = 82;
+const LOCAL_SLOW_THRESHOLD_S = 60;
 
 const solvingText = computed(() => {
   if (isOnline.value && props.item.elapsedSeconds > ONLINE_SLOW_THRESHOLD_S) {
     return t('modal.solvingOnlineSlow');
   }
-  return t('batch.statusSolving', { seconds: String(props.item.elapsedSeconds) });
+  return t('batch.statusSolvingWith', {
+    solver: SOLVER_NAMES[props.item.solver],
+    seconds: String(props.item.elapsedSeconds),
+  });
 });
 
 const slowHint = computed(() => {
-  if (isOnline.value) return '';
+  if (isOnline.value) {
+    return props.item.elapsedSeconds > ONLINE_SLOW_THRESHOLD_S ? t('modal.solveTimeoutHint') : '';
+  }
   return props.item.elapsedSeconds > LOCAL_SLOW_THRESHOLD_S ? t('modal.slowSolveHint') : '';
 });
 
-const timeoutHint = computed(() => {
-  if (!isOnline.value) return '';
-  return props.item.elapsedSeconds > ONLINE_SLOW_THRESHOLD_S ? t('modal.solveTimeoutHint') : '';
+const placedText = computed(() => {
+  switch (props.item.placedBy) {
+    case 'file':
+      return t('mobile.gallery.alreadySolved');
+    case 'hand':
+      return t('mobile.gallery.placedByHand');
+    case 'stars':
+      return t('mobile.gallery.placedByStars', {
+        n: String(props.item.solveCorrespondences?.length ?? 3),
+      });
+    default:
+      return t('mobile.gallery.placedSolved');
+  }
+});
+
+/** "Envoyée le … à …", in the app's language. */
+const sentAt = computed(() => {
+  const iso = props.item.online?.sentAt;
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const locale = getLang();
+  return t('batch.statusSentAt', {
+    date: d.toLocaleDateString(locale),
+    time: d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
+  });
 });
 </script>

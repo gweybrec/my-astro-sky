@@ -1,5 +1,6 @@
 import type { FitsCard } from '@myastrosky/core/fits-header';
 import type {
+  OnlineSolve,
   Photo,
   PhotoCorrespondence,
   PlateSolveResult,
@@ -285,6 +286,22 @@ export async function updatePhotoManualPlacement(
   );
 }
 
+/** Places a stored photo (one saved "À résoudre", or one placed again); its online solve ends. Returns it as stored. */
+export async function setPhotoPlacement(
+  photoId: string,
+  placement: { correspondences?: PhotoCorrespondence[]; manualPlacement?: ManualPlacement | null },
+): Promise<Photo> {
+  return guard('errors.updatePhoto', () => getBackend().photos.setPlacement(photoId, placement));
+}
+
+/** Keeps the astrometry.net solve of a photo stored without a placement, or forgets it (null). */
+export async function setPhotoOnlineSolve(
+  photoId: string,
+  solve: OnlineSolve | null,
+): Promise<void> {
+  return guard('errors.updatePhoto', () => getBackend().photos.setOnlineSolve(photoId, solve));
+}
+
 export async function updatePhotoMetadata(
   photoId: string,
   metadata: {
@@ -392,9 +409,10 @@ export async function submitPlateSolve(
 export async function resumePlateSolve(
   file: File,
   submissionId: number,
+  options?: { fits?: boolean },
 ): Promise<{ jobId: string }> {
   const jobId = await guard('errors.pollFailed', () =>
-    getBackend().novaSolve.resume(fileSource(file), submissionId),
+    getBackend().novaSolve.resume(fileSource(file), submissionId, options),
   );
   return { jobId };
 }
@@ -599,6 +617,16 @@ export async function clearAstrometryApiKey(): Promise<void> {
 /** The address of a stored photo or thumbnail file, for an image's `src` or a download. */
 export function photoFileUrl(fileName: string): string {
   return getBackend().files.url(fileName);
+}
+
+/** A stored photo's picture as a file (to follow its astrometry.net solve again, or to place it). */
+export async function storedPhotoFile(photo: Pick<Photo, 'filename'>): Promise<File> {
+  return guard('errors.loadPhotos', async () => {
+    const res = await fetch(photoFileUrl(photo.filename));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    return new File([blob], photo.filename, { type: blob.type });
+  });
 }
 
 /** The address of the star catalogue file to load. */

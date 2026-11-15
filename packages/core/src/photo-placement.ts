@@ -62,6 +62,14 @@ export function getCorrRaDec(corr: PhotoCorrespondence): { ra: number; dec: numb
 type PlaceablePhoto = Pick<Photo, 'width' | 'height' | 'correspondences' | 'manualPlacement'>;
 
 /**
+ * The photo has a placement (reference points or a manual placement); one stored without ("À résoudre") waits in the
+ * gallery and is on neither the sky map nor its photo list.
+ */
+export function isPlacedPhoto(photo: Pick<Photo, 'correspondences' | 'manualPlacement'>): boolean {
+  return !!photo.manualPlacement || (photo.correspondences?.length ?? 0) > 0;
+}
+
+/**
  * The model of a photo placed by hand: its placement draws it in the default projection (pole-centred stereographic)
  * as an affine map; the model is the one that matches it at its centre (same position, scale, angle and mirroring)
  * and follows the sky's curvature away from it, as a photo's own pixels do.

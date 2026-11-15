@@ -98,6 +98,7 @@ import { useCanvasStore } from '../../stores/canvas';
 import { usePhotosStore } from '../../stores/photos';
 import { useUiStore } from '../../stores/ui';
 import { buildPhotoQueryMatches, smartSortPhotos } from '@myastrosky/core/photo-search';
+import { isPlacedPhoto } from '@myastrosky/core/photo-placement';
 import { triggerSelectDSOForPhotoChip, triggerBatchModal } from '../../ui';
 import { showToast } from '../../toast';
 import { ANY_PHOTO_EXT_RE, PHOTO_PICKER_ACCEPT } from '@myastrosky/core/photo-formats';
@@ -124,7 +125,8 @@ const selectedPlaced = computed(() =>
 const searchMatches = computed(() => {
   const query = searchInput.value.trim().toLowerCase();
   if (!query) return [];
-  const all = photosStore.placedPhotos;
+  // A photo stored without a placement waits in the gallery: it is not on the map, nor in its photo list.
+  const all = photosStore.placedPhotos.filter((p) => isPlacedPhoto(p.photo));
   const matches = buildPhotoQueryMatches(
     all.map((p) => p.photo),
     query,

@@ -648,6 +648,8 @@ export class PhotoOverlay extends PhotoLayer {
       };
       /** A dialog backdrop behind this one (the batch dialog), hidden while the user works on the map. */
       hostBackdrop?: HTMLElement | null;
+      /** Star identification only: "Placer à la main" is a method of its own where the dialog is opened from. */
+      starsOnly?: boolean;
     },
   ): Promise<ManualIdentifyResult> {
     return new Promise<ManualIdentifyResult>((resolve) => {
@@ -729,7 +731,7 @@ export class PhotoOverlay extends PhotoLayer {
       manualBtn.className = 'btn-auto-solve full-width';
       manualBtn.textContent = t('modal.manualButton');
       manualBtn.title = t('modal.manualTooltip');
-      formSide.appendChild(manualBtn);
+      if (!opts?.starsOnly) formSide.appendChild(manualBtn);
 
       manualBtn.addEventListener('click', () => {
         // Free-drag placement on the map: this dialog steps aside meanwhile. Validating
@@ -745,7 +747,7 @@ export class PhotoOverlay extends PhotoLayer {
       // Divider between map placement and star identification
       const divider = document.createElement('div');
       divider.className = 'modal-panel-divider';
-      formSide.appendChild(divider);
+      if (!opts?.starsOnly) formSide.appendChild(divider);
 
       // --- Hint + "suggest stars" helper ---
       const hintsSection = document.createElement('div');

@@ -20,7 +20,11 @@ import {
   sortGalleryPhotos,
   type GallerySort,
 } from '@myastrosky/core/gallery-filter';
-import { buildLabelFilterItems, photoSkyModel } from '@myastrosky/core/photo-placement';
+import {
+  buildLabelFilterItems,
+  isPlacedPhoto,
+  photoSkyModel,
+} from '@myastrosky/core/photo-placement';
 import { photoAsShown, quarterTurnsOf } from '@myastrosky/core/photo-rotation';
 import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import { drawPhotoOverlay } from '@myastrosky/render/photo-dso-overlay-render';
@@ -101,6 +105,8 @@ export class Gallery {
   onNavigateToMap: ((photo: Photo) => void) | null = null;
   onPhotoMetadataUpdated: ((photo: Photo) => void) | null = null;
   onDeletePhoto: ((photo: Photo) => void) | null = null;
+  /** A photo stored without a placement ("À résoudre") was chosen: "Ajouter des photos" opens with it. */
+  onPlacePhoto: ((photo: Photo) => void) | null = null;
   /** A photo was turned a quarter: its picture and the pixel-measured data changed. */
   onPhotoTurned: ((photo: Photo) => void) | null = null;
 
@@ -394,6 +400,17 @@ export class Gallery {
       nameEl.textContent = photo.originalName;
       caption.appendChild(nameEl);
 
+      // A photo stored without a placement waits here: it is on neither the map nor its list.
+      const toPlace = !photo.sharedSkyId && !isPlacedPhoto(photo);
+      if (toPlace) {
+        img.classList.add('opacity-55');
+        const chip = document.createElement('span');
+        chip.className = 'bw-chip--todo self-start';
+        chip.dataset.test = 'gallery-to-place';
+        chip.textContent = t('batch.chipToSolve');
+        caption.appendChild(chip);
+      }
+
       // A visited photo's setup is the name the sender gave it.
       const setupName = photo.sharedSkyId
         ? photo.sharedGear?.setup
@@ -441,7 +458,10 @@ export class Gallery {
         item.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg)';
       });
 
-      item.addEventListener('click', () => void this.openDetailModal(photo));
+      item.addEventListener('click', () => {
+        if (toPlace && this.onPlacePhoto) this.onPlacePhoto(photo);
+        else void this.openDetailModal(photo);
+      });
       mosaic.appendChild(item);
       this.lazyObserver.observe(item);
     }
@@ -589,7 +609,12 @@ export class Gallery {
 
     goTo(0, false);
 
-    imgWrapper.addEventListener('click', () => void this.openDetailModal(photos[index]));
+    imgWrapper.addEventListener('click', () => {
+      const shown = photos[index];
+      if (!shown.sharedSkyId && !isPlacedPhoto(shown) && this.onPlacePhoto)
+        this.onPlacePhoto(shown);
+      else void this.openDetailModal(shown);
+    });
     imgWrapper.appendChild(imgFrame);
     wrap.appendChild(imgWrapper);
     wrap.appendChild(captionEl);

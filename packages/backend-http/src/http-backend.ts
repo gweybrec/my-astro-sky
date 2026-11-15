@@ -351,6 +351,14 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
           manualPlacement: placement ?? null,
         });
       },
+      setPlacement: (photoId, placement) =>
+        call<Photo>('PUT', `/api/photos/${id(photoId)}/placement`, {
+          correspondences: placement.correspondences ?? [],
+          manualPlacement: placement.manualPlacement ?? null,
+        }),
+      async setOnlineSolve(photoId, solve) {
+        await call('PUT', `/api/photos/${id(photoId)}/online-solve`, { onlineSolve: solve });
+      },
       async setOrder(photoIds) {
         await call('PATCH', '/api/photos/order', { photoIds });
       },
@@ -544,8 +552,12 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
         });
         return (await sendForm<{ jobId: string }>('/api/solve-plate', form)).jobId;
       },
-      async resume(file, submissionId) {
-        const form = await formOf('photo', file, { submissionId, lang: options.lang() });
+      async resume(file, submissionId, opts) {
+        const form = await formOf('photo', file, {
+          submissionId,
+          ...(opts?.fits !== undefined ? { fits: String(opts.fits) } : {}),
+          lang: options.lang(),
+        });
         return (await sendForm<{ jobId: string }>('/api/solve-plate/resume', form)).jobId;
       },
       async reuse(file, jobId) {

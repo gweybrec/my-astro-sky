@@ -393,6 +393,21 @@ describe('resume()', () => {
     expect(t.calls.some((c) => c.url === `${API}/upload` || c.url === `${API}/login`)).toBe(false);
   });
 
+  it('reads the solution with FITS rows when told the picture sent was a FITS file, though the one given is not', async () => {
+    const plain = setup({ route: solvedRoute });
+    const plainId = await plain.service.resume(plain.file, 9);
+    await plain.pump(3);
+    const asSent = setup({ route: solvedRoute });
+    const fitsId = await asSent.service.resume(asSent.file, 9, { fits: true });
+    await asSent.pump(3);
+    const a = (await plain.service.getJob(plainId)).correspondences!;
+    const b = (await asSent.service.getJob(fitsId)).correspondences!;
+    expect(b).toHaveLength(a.length);
+    // The same pixels, but their rows count from the other edge: each takes another place on the sky.
+    expect(b.map((c) => [c.photoX, c.photoY])).toEqual(a.map((c) => [c.photoX, c.photoY]));
+    expect(b.map((c) => c.starDec)).not.toEqual(a.map((c) => c.starDec));
+  });
+
   it('refuses without a key, then a submission id that is not a positive integer, then an unreadable picture', async () => {
     const none = setup({ key: undefined });
     expect(await failure(none.service.resume(none.file, Number.NaN))).toBe(

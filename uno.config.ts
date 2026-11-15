@@ -315,5 +315,40 @@ export default defineConfig({
     'probe-error': 'text-[var(--status-error-text)] text-sm',
     'probe-status-line': 'mt-2 text-sm',
     'probe-summary-ok': 'cursor-pointer text-[var(--status-success-text)] text-sm',
+
+    // ── "Ajouter des photos" (BatchUploadModal and its parts) ────────────────
+    // A photo's chips: where its placement stands, where its saving stands.
+    'bw-chip':
+      'inline-flex items-center gap-1 px-3 rounded-pill text-small border whitespace-nowrap',
+    'bw-chip--todo': 'bw-chip status-info',
+    'bw-chip--run': 'bw-chip bg-surface border-[var(--border-input)] text-secondary',
+    'bw-chip--fail': 'bw-chip status-error',
+    'bw-chip--ok': 'bw-chip status-success',
+    'bw-chip--warn': 'bw-chip status-warn',
+    'bw-chip--saved': 'bw-chip bg-transparent border-[var(--border-input)] text-dim',
+    // The list's filters, with their counts.
+    'bw-filter': [
+      'inline-flex items-baseline gap-2 px-4 py-1h rounded-pill text-base cursor-pointer',
+      'bg-transparent border border-[var(--border-input)] text-secondary',
+      '[&_b]:font-semibold [&_b]:text-primary',
+      'hover:not-disabled:border-[var(--border-focus)]',
+      'disabled:opacity-45 disabled:cursor-default',
+    ].join(' '),
+    'bw-filter--on':
+      'bw-filter !bg-[var(--accent-fill-md)] !border-[var(--accent-fill-xl)] !text-bright',
+    // A row of the photo list: tick box, then the button that shows the photo.
+    'bw-row': 'flex items-center gap-5 w-full box-border p-4 border border-transparent rounded-lg',
+    'bw-row--sel': 'bw-row bg-[var(--accent-fill-sm)] !border-[var(--accent-fill-lg)]',
+    'bw-row--ticked': 'bw-row bg-[var(--bg-hover)]',
+    'bw-thumb': [
+      'shrink-0 w-[44px] h-[33px] rounded-sm overflow-hidden',
+      'bg-[var(--bg-input)] border border-[var(--border-white-xs)]',
+      'flex items-center justify-center text-muted [&_svg]:w-4 [&_svg]:h-4',
+    ].join(' '),
+    // A placement method: title and short line at the left, its action at the right.
+    'bw-method': 'flex flex-col gap-4 px-7 py-5 border-t border-subtle first:border-t-0',
+    'bw-method--done': 'bw-method bg-[var(--status-success-bg)]',
+    'bw-section-title': 'm-0 text-sub font-medium text-secondary',
+    'bw-field-label': 'text-base text-label',
   },
 });

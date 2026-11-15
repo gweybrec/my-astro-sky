@@ -430,11 +430,10 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect(invalid(() => svc.validateUpload('a.gif', {})).code).toBe('INVALID_EXTENSION');
     });
 
-    it('refuses a missing or unparsable correspondences field', () => {
-      expect(invalid(() => svc.validateUpload('a.png', {})).code).toBe('MISSING_CORRESPONDENCES');
-      expect(invalid(() => svc.validateUpload('a.png', { correspondences: '' })).code).toBe(
-        'MISSING_CORRESPONDENCES',
-      );
+    it('takes no correspondences for a photo stored without a placement, refuses unparsable ones', () => {
+      expect(svc.validateUpload('a.png', {})).toEqual([]);
+      expect(svc.validateUpload('a.png', { correspondences: '' })).toEqual([]);
+      expect(svc.validateUpload('a.png', { correspondences: '[]' })).toEqual([]);
       const e = invalid(() => svc.validateUpload('a.png', { correspondences: 'not json' }));
       expect([e.code, e.message]).toEqual(['INVALID_JSON', 'JSON des correspondances invalide']);
     });
@@ -451,7 +450,7 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
             })),
           ),
         });
-      for (const bad of ['{}', '"x"', '[]', JSON.stringify([corr(1)[0]])]) {
+      for (const bad of ['{}', '"x"', JSON.stringify([corr(1)[0]])]) {
         const e = invalid(() => svc.validateUpload('a.png', { correspondences: bad }));
         expect([e.code, e.message]).toEqual([
           'MIN_CORRESPONDENCES',
@@ -1404,7 +1403,10 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       expect((await rejection(svc.upload(file('x.gif'), validFields()))).code).toBe(
         'INVALID_EXTENSION',
       );
-      expect((await rejection(svc.upload(file(), {}))).code).toBe('MISSING_CORRESPONDENCES');
+      expect(
+        (await rejection(svc.upload(file(), { correspondences: JSON.stringify([corr(1)[0]]) })))
+          .code,
+      ).toBe('MIN_CORRESPONDENCES');
       expect(probed).toBe(0);
       expect(stored()).toEqual([]);
     });

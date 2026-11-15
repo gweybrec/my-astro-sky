@@ -1,0 +1,40 @@
+import type { BatchItem } from '../../src/batch-types';
+
+/** A photo of "Ajouter des photos" as the window makes it, never solved nor saved. */
+export function makeItem(overrides: Partial<BatchItem> = {}): BatchItem {
+  return {
+    id: 'item-1',
+    file: new File([''], 'test.jpg', { type: 'image/jpeg' }),
+    rawName: null,
+    convertProgress: 0,
+    thumbBlobUrl: null,
+    solver: 'solve-field',
+    hintCoords: null,
+    hintTargetName: '',
+    fovDeg: null,
+    wcsResult: null,
+    solveCorrespondences: null,
+    status: 'pending',
+    saveState: 'new',
+    placementSaved: false,
+    online: null,
+    ticked: false,
+    photo: null,
+    error: '',
+    dsoIds: [],
+    labels: [],
+    pointsOfInterest: [],
+    integrations: [],
+    observationDate: '',
+    captureDetails: {},
+    gearSetupId: null,
+    notes: '',
+    customName: 'test',
+    elapsedSeconds: 0,
+    localJobId: null,
+    solveTimer: null,
+    pollingTimer: null,
+    solveAbort: null,
+    ...overrides,
+  };
+}

@@ -62,6 +62,7 @@ import { showToast } from '../../toast';
 import { reportUnknownRendererError } from '../../error-reporter';
 import { formatBytes } from '@myastrosky/core/format-utils';
 import { selectedPhotoBytes } from '@myastrosky/core/backup-selection';
+import { isPlacedPhoto } from '@myastrosky/core/photo-placement';
 import {
   cleanSkyName,
   MAX_SKY_NAME_LENGTH,
@@ -72,7 +73,10 @@ const emit = defineEmits<{ close: [] }>();
 
 const photosStore = usePhotosStore();
 const sharedSkies = useSharedSkiesStore();
-const photos = computed(() => photosStore.placedPhotos.map((p) => p.photo));
+// A shared sky is seen on the map: a photo stored without a placement has nothing to show there.
+const photos = computed(() =>
+  photosStore.placedPhotos.map((p) => p.photo).filter((p) => isPlacedPhoto(p)),
+);
 
 const senderName = ref('');
 const includeGear = ref(true);

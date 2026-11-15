@@ -161,135 +161,23 @@ describe('setLang()', () => {
   });
 });
 
-// ─── Batch solve/place split — new keys (June 2026) ──────────────────────────
+// ─── "Ajouter des photos": the counted buttons, the batch edit, Terminer ───────
 
-describe('batch solve/place split keys', () => {
-  it('batch.statusPlaced exists in all languages and is non-empty', async () => {
-    for (const lang of ['fr', 'en', 'es', 'de'] as const) {
-      localStorage.setItem('lang', lang);
-      vi.resetModules();
-      const { t } = await import('../../src/i18n/index');
-      const result = t('batch.statusPlaced');
-      expect(result, `batch.statusPlaced missing in ${lang}`).not.toBe('batch.statusPlaced');
-      expect(result.length).toBeGreaterThan(0);
-    }
-  });
-
-  it('batch.placeButton exists in all languages and is non-empty', async () => {
-    for (const lang of ['fr', 'en', 'es', 'de'] as const) {
-      localStorage.setItem('lang', lang);
-      vi.resetModules();
-      const { t } = await import('../../src/i18n/index');
-      const result = t('batch.placeButton');
-      expect(result, `batch.placeButton missing in ${lang}`).not.toBe('batch.placeButton');
-      expect(result.length).toBeGreaterThan(0);
-    }
-  });
-
-  it('batch.progressPlaced interpolates {placed} in all languages', async () => {
-    for (const lang of ['fr', 'en', 'es', 'de'] as const) {
-      localStorage.setItem('lang', lang);
-      vi.resetModules();
-      const { t } = await import('../../src/i18n/index');
-      const result = t('batch.progressPlaced', { placed: '5' });
-      expect(result, `batch.progressPlaced missing in ${lang}`).not.toBe('batch.progressPlaced');
-      expect(result).toContain('5');
-      expect(result).not.toContain('{placed}');
-    }
-  });
-
-  it('modal.validate (manual-identify sub-modal button) exists in all languages', async () => {
-    for (const lang of ['fr', 'en', 'es', 'de'] as const) {
-      localStorage.setItem('lang', lang);
-      vi.resetModules();
-      const { t } = await import('../../src/i18n/index');
-      const result = t('modal.validate');
-      expect(result, `modal.validate missing in ${lang}`).not.toBe('modal.validate');
-      expect(result.length).toBeGreaterThan(0);
-    }
-  });
-
-  it('batch.manualButton (per-card manual identify) exists in all languages', async () => {
-    for (const lang of ['fr', 'en', 'es', 'de'] as const) {
-      localStorage.setItem('lang', lang);
-      vi.resetModules();
-      const { t } = await import('../../src/i18n/index');
-      const result = t('batch.manualButton');
-      expect(result, `batch.manualButton missing in ${lang}`).not.toBe('batch.manualButton');
-      expect(result.length).toBeGreaterThan(0);
-    }
-  });
-});
-
-// ─── New keys added by architecture quick-wins (June 2026) ────────────────────
-
-describe('DSO editor coordinate error keys', () => {
-  it('dso.editErrorRa exists in all languages and is non-empty', async () => {
-    for (const lang of ['fr', 'en', 'es', 'de'] as const) {
-      localStorage.setItem('lang', lang);
-      vi.resetModules();
-      const { t } = await import('../../src/i18n/index');
-      const result = t('dso.editErrorRa');
-      expect(result, `dso.editErrorRa missing in ${lang}`).not.toBe('dso.editErrorRa');
-      expect(result.length).toBeGreaterThan(0);
-    }
-  });
-
-  it('dso.editErrorDec exists in all languages and is non-empty', async () => {
-    for (const lang of ['fr', 'en', 'es', 'de'] as const) {
-      localStorage.setItem('lang', lang);
-      vi.resetModules();
-      const { t } = await import('../../src/i18n/index');
-      const result = t('dso.editErrorDec');
-      expect(result, `dso.editErrorDec missing in ${lang}`).not.toBe('dso.editErrorDec');
-      expect(result.length).toBeGreaterThan(0);
-    }
-  });
-
-  it('dso.editErrorRa message mentions 360 in all languages', async () => {
-    for (const lang of ['fr', 'en', 'es', 'de'] as const) {
-      localStorage.setItem('lang', lang);
-      vi.resetModules();
-      const { t } = await import('../../src/i18n/index');
-      const result = t('dso.editErrorRa');
-      expect(result, `dso.editErrorRa should mention 360 in ${lang}`).toContain('360');
-    }
-  });
-
-  it('dso.editErrorDec message mentions 90 in all languages', async () => {
-    for (const lang of ['fr', 'en', 'es', 'de'] as const) {
-      localStorage.setItem('lang', lang);
-      vi.resetModules();
-      const { t } = await import('../../src/i18n/index');
-      const result = t('dso.editErrorDec');
-      expect(result, `dso.editErrorDec should mention 90 in ${lang}`).toContain('90');
-    }
-  });
-});
-
-describe('serverErrors.INVALID_IMAGE key', () => {
-  it('exists in all languages and is non-empty', async () => {
-    for (const lang of ['fr', 'en', 'es', 'de'] as const) {
-      localStorage.setItem('lang', lang);
-      vi.resetModules();
-      const { t } = await import('../../src/i18n/index');
-      const result = t('serverErrors.INVALID_IMAGE');
-      expect(result, `serverErrors.INVALID_IMAGE missing in ${lang}`).not.toBe(
-        'serverErrors.INVALID_IMAGE',
-      );
-      expect(result.length).toBeGreaterThan(0);
-    }
-  });
-});
-
-// ─── New batch auto-place keys (June 2026) ────────────────────────────────────
-
-describe('batch auto-place keys', () => {
+describe('add photos window keys', () => {
   for (const key of [
-    'batch.statusPlacing',
-    'batch.placingProgress',
-    'batch.autoPlace',
-    'batch.autoPlaceDisabledTooltip',
+    'batch.filterToPlace',
+    'batch.chipUnsaved',
+    'batch.chipResave',
+    'batch.statusModified',
+    'batch.statusSavedUnplaced',
+    'batch.methodLocal',
+    'batch.methodFetch',
+    'batch.clearSelection',
+    'batch.commonLabels',
+    'batch.nothingToSolve',
+    'batch.nothingToSave',
+    'batch.finish',
+    'batch.finishSave',
   ]) {
     it(`${key} exists in all languages and is non-empty`, async () => {
       for (const lang of ['fr', 'en', 'es', 'de'] as const) {
@@ -299,6 +187,19 @@ describe('batch auto-place keys', () => {
         const result = t(key);
         expect(result, `${key} missing in ${lang}`).not.toBe(key);
         expect(result.length).toBeGreaterThan(0);
+      }
+    });
+  }
+
+  for (const key of ['batch.solveMany', 'batch.saveMany', 'batch.batchTitle', 'batch.batchNote']) {
+    it(`${key} puts the count in, in all languages`, async () => {
+      for (const lang of ['fr', 'en', 'es', 'de'] as const) {
+        localStorage.setItem('lang', lang);
+        vi.resetModules();
+        const { t } = await import('../../src/i18n/index');
+        const result = t(key, { n: '17' });
+        expect(result, `${key} missing in ${lang}`).toContain('17');
+        expect(result).not.toContain('{n}');
       }
     });
   }

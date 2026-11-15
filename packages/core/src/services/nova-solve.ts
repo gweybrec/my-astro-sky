@@ -80,10 +80,12 @@ export interface NovaSolveService {
   getJob(localId: string): Promise<NovaJobStatus>;
   /**
    * Follows again a submission sent earlier (the jobs are lost when the app restarts): a new local job polls it
-   * in the background; returns its id. Throws `invalid` (`ASTROMETRY_NOT_CONFIGURED` without a key, checked
-   * first; `INVALID_SUBMISSION_ID`, `CANNOT_DETERMINE_DIMENSIONS`). It sends no request itself.
+   * in the background; returns its id. `options.fits`: the picture sent was a FITS file (its rows count from the
+   * bottom) though `file` is not (a stored photo keeps only its PNG); by default the file's own name tells. Throws
+   * `invalid` (`ASTROMETRY_NOT_CONFIGURED` without a key, checked first; `INVALID_SUBMISSION_ID`,
+   * `CANNOT_DETERMINE_DIMENSIONS`). It sends no request itself.
    */
-  resume(file: NovaSolveFile, submissionId: number): Promise<string>;
+  resume(file: NovaSolveFile, submissionId: number, options?: { fits?: boolean }): Promise<string>;
   /**
    * One page of the account's jobs, most recent first (`limit` 5 by default, 20 at most): the details are
    * fetched for that page only, and kept for a finished job. An empty page when the account cannot be read.
@@ -311,7 +313,11 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
     return localId;
   }
 
-  async function resume(file: NovaSolveFile, submissionId: number): Promise<string> {
+  async function resume(
+    file: NovaSolveFile,
+    submissionId: number,
+    options?: { fits?: boolean },
+  ): Promise<string> {
     await requireConfigured();
     if (!Number.isInteger(submissionId) || submissionId <= 0) {
       throw new DomainError('invalid', 'Invalid submission ID', { code: 'INVALID_SUBMISSION_ID' });
@@ -326,7 +332,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
       status: 'solving',
       imageWidth,
       imageHeight,
-      fits: isFitsFile(file.fileName),
+      fits: options?.fits ?? isFitsFile(file.fileName),
     };
     jobs.set(localId, job);
     pollJob(job).catch((err) => log?.('astrometry_poll_failed', err, { jobId: localId }));

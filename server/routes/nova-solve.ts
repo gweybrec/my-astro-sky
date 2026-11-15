@@ -110,6 +110,10 @@ novaSolveRouter.post('/api/solve-plate', uploadSolve.single('photo'), async (req
  *                 format: binary
  *               submissionId:
  *                 type: integer
+ *               fits:
+ *                 type: string
+ *                 enum: ['true', 'false']
+ *                 description: The picture sent was a FITS file (rows count from the bottom), though the photo given is not; by default its own name tells
  *     responses:
  *       200:
  *         description: The new local job id
@@ -147,9 +151,11 @@ novaSolveRouter.post('/api/solve-plate/resume', uploadSolve.single('photo'), asy
 
     let jobId: string;
     try {
+      const fits = req.body.fits === 'true' ? true : req.body.fits === 'false' ? false : undefined;
       jobId = await novaSolve.resume(
         { fileName: file.originalname, bytes: file.buffer },
         Number(req.body.submissionId),
+        fits === undefined ? undefined : { fits },
       );
     } catch (err) {
       if (

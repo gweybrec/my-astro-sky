@@ -70,6 +70,8 @@ export const useUiStore = defineStore('ui', () => {
   const panelCollapsed = ref(false);
   const currentViewMode = ref<ViewMode>('skymap');
   const pendingBatchFiles = ref<File[] | null>(null);
+  /** Stored photos to open in "Ajouter des photos" (a gallery photo "À résoudre"), taken by the window at setup. */
+  const pendingBatchPhotos = shallowRef<Photo[] | null>(null);
 
   // Set before opening the asteroid identification modal — it always opens
   // pre-targeted at one already-solved photo now (see triggerAsteroidModal in
@@ -329,6 +331,7 @@ export const useUiStore = defineStore('ui', () => {
     setPanelCollapsed,
     switchView,
     pendingBatchFiles,
+    pendingBatchPhotos,
     pendingAsteroidPhoto,
     pendingAsteroidOnIdentified,
     pendingSupernovaPhoto,

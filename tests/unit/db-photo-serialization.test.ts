@@ -195,6 +195,11 @@ describe('photo serialization — no column left behind', () => {
       captureDetails: { gain: 1 },
       gearSetupId: 'setup-1',
     });
+    await photos.setOnlineSolve('drift-1', {
+      state: 'unfinished',
+      submissionId: 1,
+      sentAt: '2026-01-01T00:00:00.000Z',
+    });
     const serialized = (await photos.get('drift-1'))!;
 
     const columns = (conn.pragma('table_info(photos)') as { name: string }[]).map((r) => r.name);
