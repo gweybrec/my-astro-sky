@@ -323,7 +323,8 @@ describe('reusing a solution of the astrometry.net account', () => {
     const running = reusePendingSolution(photo.id, 17323748);
     await vi.waitFor(() => expect(pendingPhotos.value[0].state).toBe('solving'));
     const [file, jobId] = reuseAstrometrySubmission.mock.calls[0];
-    expect([file.name, file.type, jobId]).toEqual(['M35.fit', 'image/png', 17323748]);
+    // The PNG made from the FITS goes under a PNG name: under the FITS name its size was read from a FITS header.
+    expect([file.name, file.type, jobId]).toEqual(['M35.png', 'image/png', 17323748]);
     expect(submitPlateSolve).not.toHaveBeenCalled();
 
     settle({ success: true, correspondences: corr, dsoIds: ['M35'] });

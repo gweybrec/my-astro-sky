@@ -168,10 +168,32 @@ export async function addPendingPhoto(
   return added;
 }
 
+const PICTURE_EXTENSIONS: Record<string, string[]> = {
+  'image/png': ['.png'],
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/webp': ['.webp'],
+};
+
+/**
+ * The name of a kept picture: the file's name, with the extension of what is kept. A TIFF/FITS/XISF is kept as the
+ * PNG made from it, and the photo store and the solvers read a file by its extension.
+ */
+export function pictureName(name: string, type: string): string {
+  const extensions = PICTURE_EXTENSIONS[type];
+  if (!extensions) return name;
+  const lower = name.toLowerCase();
+  if (extensions.some((ext) => lower.endsWith(ext))) return name;
+  return `${stripExtension(name)}${extensions[0]}`;
+}
+
 /** The picture of a waiting photo as a file to place or solve; null when it is no longer kept. */
 export async function pendingPhotoFile(id: string): Promise<File | null> {
   const found = await store.get(id);
-  return found ? new File([found.picture], found.name, { type: found.picture.type }) : null;
+  return found
+    ? new File([found.picture], pictureName(found.name, found.picture.type), {
+        type: found.picture.type,
+      })
+    : null;
 }
 
 /** The original raw file for astrometry.net, or the kept picture when there is no separate solve file. */
@@ -182,7 +204,9 @@ export async function pendingPhotoSolveFile(id: string): Promise<File | null> {
     ? new File([found.solvePicture], found.solveName ?? found.name, {
         type: found.solveType ?? '',
       })
-    : new File([found.picture], found.name, { type: found.picture.type });
+    : new File([found.picture], pictureName(found.name, found.picture.type), {
+        type: found.picture.type,
+      });
 }
 
 /** Changes where a waiting photo stands; the solver's job, its submission and the failure reason are those given, or none. */

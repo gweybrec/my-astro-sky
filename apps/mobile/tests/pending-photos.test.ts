@@ -5,6 +5,7 @@ import {
   createMemoryPendingStore,
   loadPendingPhotos,
   pendingPhotoFile,
+  pictureName,
   pendingPhotoSolveFile,
   pendingPhotos,
   removePendingPhoto,
@@ -28,6 +29,14 @@ describe('the photos waiting to be placed', () => {
     expect(await pendingPhotoFile('unknown')).toBeNull();
   });
 
+  it('names a kept picture with the extension of its type', () => {
+    expect(pictureName('M38_processed.fit', 'image/png')).toBe('M38_processed.png');
+    expect(pictureName('Veil.tiff', 'image/png')).toBe('Veil.png');
+    expect(pictureName('M42.JPEG', 'image/jpeg')).toBe('M42.JPEG');
+    expect(pictureName('M42', 'image/webp')).toBe('M42.webp');
+    expect(pictureName('M42.fit', '')).toBe('M42.fit');
+  });
+
   it('keeps a separate raw solve file without exposing it in the waiting-photo list', async () => {
     const raw = new File(['fits-bytes'], 'M42.fit', { type: 'application/fits' });
     const added = await addPendingPhoto(
@@ -39,7 +48,12 @@ describe('the photos waiting to be placed', () => {
 
     const picture = await pendingPhotoFile(added.id);
     const solveFile = await pendingPhotoSolveFile(added.id);
-    expect([picture!.type, await picture!.text()]).toEqual(['image/png', 'png-bytes']);
+    // The picture is named for what it is: the photo store and the solvers read a file by its extension.
+    expect([picture!.name, picture!.type, await picture!.text()]).toEqual([
+      'M42.png',
+      'image/png',
+      'png-bytes',
+    ]);
     expect([solveFile!.name, solveFile!.type, await solveFile!.text()]).toEqual([
       'M42.fit',
       'application/fits',
