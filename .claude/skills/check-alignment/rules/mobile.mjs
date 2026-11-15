@@ -1062,8 +1062,9 @@ export const views = [
     ],
   },
   {
-    // "Comment placer cette photo ?" on the JPEG still to be placed (boards "Importer, méthode de placement").
-    name: 'import-method',
+    // "Photo à ajouter" for the JPEG still to be placed: its file row, the placement methods and the metadata form
+    // (board "Photo à ajouter").
+    name: 'photo-to-add',
     path: '/tabs/gallery',
     ready: '.mob-photo',
     open: [
@@ -1073,10 +1074,9 @@ export const views = [
       { chooseFiles: '.mob-sheet ion-item.mob-row', files: ['test-photos/M1-CCD.jpg'] },
       { wait: 'ion-item.mob-row:has-text("M1-CCD.jpg")' },
       { click: 'ion-item.mob-row:has-text("M1-CCD.jpg")' },
-      { wait: OPEN_SHEET },
+      { wait: 'ion-item.mob-row:has-text("Placer à la main")' },
       { pause: 600 },
     ],
-    scope: OPEN_SHEET,
   },
   // The submissions of the account, from the fixture (board "Importer, réutiliser une solution astrometry.net").
   { name: 'reuse-solution', path: '/gallery/reuse/check', ready: '.mob-row' },
