@@ -53,9 +53,6 @@ const es: Translations['mobile'] = {
       'Toca un envío para reutilizar su resolución, los más recientes primero. {n} envíos en tu cuenta.',
     moreOne: 'Ver el siguiente',
     moreMany: 'Ver los {n} siguientes',
-    solved: '✓ Resuelto',
-    running: 'En curso',
-    failed: 'Fallido',
   },
   identify: {
     starPlaceholder: 'Estrella…',

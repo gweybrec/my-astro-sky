@@ -607,6 +607,9 @@ const es: Translations = {
     prevPage: '← Anterior',
     nextPage: 'Siguiente →',
     refreshSubmissions: 'Actualizar lista',
+    submissionSolved: '✓ Resuelto',
+    submissionRunning: 'En curso',
+    submissionFailed: 'Fallido',
     submissionsRateLimitedCached:
       'Astrometry.net rechaza por ahora: demasiadas solicitudes. La lista mostrada es la última cargada; inténtalo más tarde.',
     reusingSubmission: 'Reutilizando el envío {jobId}…',

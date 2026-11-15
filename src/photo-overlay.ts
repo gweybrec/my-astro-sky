@@ -523,10 +523,11 @@ export class PhotoOverlay extends PhotoLayer {
           statusBadge.className = 'submission-status-badge';
           if (sub.status === 'success') {
             statusBadge.classList.add('submission-status-badge--success');
-            statusBadge.textContent = '✓ Success';
+            statusBadge.textContent = t('modal.submissionSolved');
           } else {
             statusBadge.classList.add('submission-status-badge--pending');
-            statusBadge.textContent = sub.status;
+            statusBadge.textContent =
+              sub.status === 'failure' ? t('modal.submissionFailed') : t('modal.submissionRunning');
           }
           item.appendChild(statusBadge);
 

@@ -53,9 +53,6 @@ const en: Translations['mobile'] = {
       'Tap a submission to re-use its solution, most recent first. {n} submissions on your account.',
     moreOne: 'Show the next one',
     moreMany: 'Show the next {n}',
-    solved: '✓ Solved',
-    running: 'Running',
-    failed: 'Failed',
   },
   identify: {
     starPlaceholder: 'Star name…',

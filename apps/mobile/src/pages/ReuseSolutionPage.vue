@@ -56,10 +56,10 @@ const moreLabel = computed(() =>
 const solved = (s: AstrometrySubmission) => s.status === 'success';
 const stateOf = (s: AstrometrySubmission) =>
   solved(s)
-    ? t('mobile.reuse.solved')
+    ? t('modal.submissionSolved')
     : s.status === 'failure'
-      ? t('mobile.reuse.failed')
-      : t('mobile.reuse.running');
+      ? t('modal.submissionFailed')
+      : t('modal.submissionRunning');
 const stateClass = (s: AstrometrySubmission) =>
   solved(s)
     ? 'mob-status--success'

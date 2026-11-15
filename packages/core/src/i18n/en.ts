@@ -603,6 +603,9 @@ const en: Translations = {
     prevPage: '← Previous',
     nextPage: 'Next →',
     refreshSubmissions: 'Refresh list',
+    submissionSolved: '✓ Solved',
+    submissionRunning: 'Running',
+    submissionFailed: 'Failed',
     submissionsRateLimitedCached:
       'Astrometry.net is refusing for now: too many requests. The list shown is the last one loaded; try again later.',
     reusingSubmission: 'Reusing submission {jobId}…',

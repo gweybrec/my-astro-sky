@@ -609,6 +609,9 @@ const fr = {
     prevPage: '← Précédent',
     nextPage: 'Suivant →',
     refreshSubmissions: 'Rafraîchir la liste',
+    submissionSolved: '✓ Résolue',
+    submissionRunning: 'En cours',
+    submissionFailed: 'Échouée',
     submissionsRateLimitedCached:
       "Astrometry.net refuse pour l'instant : trop de requêtes. La liste affichée est la dernière chargée, réessayez plus tard.",
     reusingSubmission: 'Réutilisation de la soumission {jobId}…',

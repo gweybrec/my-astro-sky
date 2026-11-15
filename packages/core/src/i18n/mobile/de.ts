@@ -53,9 +53,6 @@ const de: Translations['mobile'] = {
       'Tippe auf eine Einreichung, um ihre Lösung wiederzuverwenden, die neuesten zuerst. {n} Einreichungen in deinem Konto.',
     moreOne: 'Die nächste anzeigen',
     moreMany: 'Die nächsten {n} anzeigen',
-    solved: '✓ Gelöst',
-    running: 'Läuft',
-    failed: 'Fehlgeschlagen',
   },
   identify: {
     starPlaceholder: 'Sternname…',

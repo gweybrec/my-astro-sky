@@ -609,6 +609,9 @@ const de: Translations = {
     prevPage: '← Zurück',
     nextPage: 'Weiter →',
     refreshSubmissions: 'Liste aktualisieren',
+    submissionSolved: '✓ Gelöst',
+    submissionRunning: 'Läuft',
+    submissionFailed: 'Fehlgeschlagen',
     submissionsRateLimitedCached:
       'Astrometry.net lehnt gerade ab: zu viele Anfragen. Die angezeigte Liste ist die zuletzt geladene; versuche es später erneut.',
     reusingSubmission: 'Einreichung {jobId} wird wiederverwendet…',

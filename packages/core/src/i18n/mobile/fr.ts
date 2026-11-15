@@ -51,9 +51,6 @@ const fr = {
       'Touchez une soumission pour réutiliser sa résolution, les plus récentes en premier. {n} soumissions sur votre compte.',
     moreOne: 'Voir la suivante',
     moreMany: 'Voir les {n} suivantes',
-    solved: '✓ Résolue',
-    running: 'En cours',
-    failed: 'Échouée',
   },
   identify: {
     starPlaceholder: "Nom de l'étoile…",
