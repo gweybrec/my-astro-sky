@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { skyToTangent, type PhotoSkyModel } from '@myastrosky/core/photo-sky-model';
+import type { PhotoSkyModel } from '@myastrosky/core/photo-sky-model';
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import type { PhotoCorrespondence } from '@myastrosky/core/types';
 import { ionicStubs } from './helpers';
@@ -130,13 +130,19 @@ describe('identifying the stars of a waiting photo', () => {
     globalThis.URL.revokeObjectURL = vi.fn();
   });
 
-  it('shows the photo, three points to place and the instructions; Valider waits for two named points', async () => {
+  it('shows the photo, three points to place and the instructions; Valider waits for the three named points', async () => {
     const { w } = await mountPage();
     expect(w.find('.mob-topbar-title').text()).toBe('Identifier les étoiles — M101');
     expect(rowTexts(w)).toEqual(['1 Touchez la photo…', '2 En attente', '3 En attente']);
     expect(w.find('.mob-helper').text()).toBe(
-      'Touchez 2 ou 3 étoiles reconnaissables dans la photo, puis identifiez chacune par son nom ou ses coordonnées RA/Déc.',
+      'Touchez 3 étoiles reconnaissables et bien réparties dans la photo, puis identifiez chacune par son nom ou ses coordonnées RA/Déc.',
     );
+    expect(validateButton(w).attributes('disabled')).toBeDefined();
+    // Two named points cannot tell a mirrored photo: Valider still waits.
+    await tap(w, 300, 300);
+    await nameByCoordinates(w, ['14', '3', '12', '54', '20', '57']);
+    await tap(w, 100, 260);
+    await nameByCoordinates(w, ['14', '5', '1', '53', '39', '44']);
     expect(validateButton(w).attributes('disabled')).toBeDefined();
     w.unmount();
   });
@@ -256,6 +262,9 @@ describe('identifying the stars of a waiting photo', () => {
     await tap(w, 100, 260);
     await nameByCoordinates(w, ['14', '5', '1', '53', '39', '44']);
     expect(rowTexts(w)[2]).toBe('3 Touchez la photo…');
+    await tap(w, 200, 330);
+    await nameByCoordinates(w, ['14', '4', '0', '54', '0', '0']);
+    expect(validateButton(w).attributes('disabled')).toBeUndefined();
     await validateButton(w).trigger('click');
     await flushPromises();
     const [file, correspondences, manual, , meta] = uploadPhoto.mock.calls[0];
@@ -271,20 +280,17 @@ describe('identifying the stars of a waiting photo', () => {
     ).toEqual([
       [0, 3000, 1500, 0],
       [1, 1000, 1100, 0],
+      [2, 2000, 1800, 0],
     ]);
     expect((correspondences as PhotoCorrespondence[])[0].starRa).toBeCloseTo(210.8, 1);
     expect(meta).toEqual({ dsoIds: ['M101'], displayName: 'M101' });
-    // Two stars: the photo is looked in the right way round, as a photo of the sky is (east to the left of north).
+    // The photo is placed by its three points: each lands on its own sky position.
     const model = findDSOsInImage.mock.calls[0][0] as PhotoSkyModel;
-    const c = model.toSky(2000, 1300);
-    const toPlane = (x: number, y: number) => {
-      const s = model.toSky(x, y);
-      return skyToTangent(s.ra, s.dec, c.ra, c.dec)!;
-    };
-    const o = toPlane(2000, 1300);
-    const ex = toPlane(2001, 1300);
-    const ey = toPlane(2000, 1301);
-    expect((ex.x - o.x) * (ey.y - o.y) - (ex.y - o.y) * (ey.x - o.x)).toBeGreaterThan(0);
+    for (const c of correspondences as PhotoCorrespondence[]) {
+      const s = model.toSky(c.photoX, c.photoY);
+      expect(s.ra).toBeCloseTo(c.starRa!, 4);
+      expect(s.dec).toBeCloseTo(c.starDec!, 4);
+    }
     expect(pendingPhotos.value).toHaveLength(0);
     expect(skyPhotoFocus.value).toBe('p9');
     expect(replace).toHaveBeenCalledWith('/tabs/sky');

@@ -37,7 +37,11 @@ export type { PlacedPhoto };
 import type { ViewChangeCallback } from '@myastrosky/core/sky-map-types';
 import { t } from './i18n';
 import { stripExtension } from './file-utils';
-import { raDecFromSexagesimal, starDisplayLabel } from '@myastrosky/core/star-identify';
+import {
+  MIN_IDENTIFIED_POINTS,
+  raDecFromSexagesimal,
+  starDisplayLabel,
+} from '@myastrosky/core/star-identify';
 
 import trashSvg from './icons/trash.svg?raw';
 import { createImageZoomPan } from './image-zoom';
@@ -727,7 +731,7 @@ export class PhotoOverlay extends PhotoLayer {
    *
    * Resolves with:
    *  - `{ action: 'validate', correspondences }` when the user clicks Validate
-   *    (enabled once 2+ points are identified),
+   *    (enabled once all 3 points are identified, see MIN_IDENTIFIED_POINTS),
    *  - `{ action: 'manual-placement', correspondences, placement, dsoIds }` once the
    *    photo is dragged into place on the map and validated (not saved yet), or
    *  - `{ action: 'cancel' }` otherwise.
@@ -1416,7 +1420,7 @@ export class PhotoOverlay extends PhotoLayer {
         });
       }
 
-      // Footer: Validate (enabled at 2+ points) + Cancel
+      // Footer: Validate (enabled at 3 points) + Cancel
       const submitBtn = document.createElement('button');
       submitBtn.className = 'btn-confirm';
       submitBtn.textContent = t('modal.validate');
@@ -1431,7 +1435,7 @@ export class PhotoOverlay extends PhotoLayer {
 
       submitBtn.addEventListener('click', () => {
         const correspondences = points.filter((p) => isPointComplete(p)) as PhotoCorrespondence[];
-        if (correspondences.length < 2) return;
+        if (correspondences.length < MIN_IDENTIFIED_POINTS) return;
         finish({ action: 'validate', correspondences });
       });
 
@@ -1612,7 +1616,7 @@ export class PhotoOverlay extends PhotoLayer {
 
       function checkComplete() {
         const completeCount = points.filter((p) => isPointComplete(p)).length;
-        submitBtn.disabled = completeCount < 2;
+        submitBtn.disabled = completeCount < MIN_IDENTIFIED_POINTS;
       }
     });
   }

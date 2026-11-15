@@ -150,6 +150,8 @@
       <p>{{ t('batch.infoWcs') }}</p>
       <h4>{{ t('batch.infoHintTitle') }}</h4>
       <p>{{ t('batch.infoHint') }}</p>
+      <h4>{{ t('batch.infoManualTitle') }}</h4>
+      <p>{{ t('batch.infoManual') }}</p>
       <h4>{{ t('batch.infoPlacementTitle') }}</h4>
       <p>{{ t('batch.infoPlacement') }}</p>
     </div>
@@ -976,6 +978,7 @@ onBeforeUnmount(() => {
 async function toggleInfoTooltip() {
   infoTooltipVisible.value = !infoTooltipVisible.value;
   if (infoTooltipVisible.value) {
+    infoTooltipStyle.value = { position: 'fixed' }; // measure its full height, not the last opening's
     await nextTick();
     if (!infoIconEl.value) return;
     const rect = infoIconEl.value.getBoundingClientRect();
@@ -987,7 +990,15 @@ async function toggleInfoTooltip() {
     let top = rect.top;
     if (top + tipRect.height > window.innerHeight - 20)
       top = window.innerHeight - tipRect.height - 20;
-    infoTooltipStyle.value = { position: 'fixed', left: `${left}px`, top: `${top}px` };
+    // Never above the window: a window shorter than the text scrolls it instead.
+    top = Math.max(20, top);
+    infoTooltipStyle.value = {
+      position: 'fixed',
+      left: `${left}px`,
+      top: `${top}px`,
+      maxHeight: `${window.innerHeight - top - 20}px`,
+      overflowY: 'auto',
+    };
   }
 }
 </script>

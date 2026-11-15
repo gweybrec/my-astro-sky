@@ -494,7 +494,7 @@ const de: Translations = {
   modal: {
     title: 'Foto zur Karte hinzufügen',
     instructions:
-      'Klicke auf 2 oder 3 Punkte im Foto und identifiziere jeden (Stern oder RA/Dekl.-Koordinaten).',
+      'Klicke auf 3 Punkte im Foto und identifiziere jeden (Stern oder RA/Dekl.-Koordinaten).',
     autoSolve: 'Automatisches Lösen',
     wcsButton: 'Metadaten (FITS/TIFF)…',
     wcsRemove: 'WCS-Lösung entfernen',
@@ -538,7 +538,7 @@ const de: Translations = {
     localButton: 'Lokal lösen',
     astapButton: 'ASTAP (lokal)',
     manualInstructions:
-      'Klicke auf 2 oder 3 erkennbare Sterne im Foto und identifiziere jeden nach Name oder RA/Dekl.-Koordinaten.',
+      'Klicke auf 3 erkennbare, gut verteilte Sterne im Foto und identifiziere jeden nach Name oder RA/Dekl.-Koordinaten.',
     manualButton: 'Manuelle Positionierung auf der Karte',
     manualTooltip: 'Foto auf die Karte ziehen und ablegen',
     manualIdentifyTitle: 'Sterne identifizieren — {name}',
@@ -1611,6 +1611,9 @@ const de: Translations = {
     infoHintTitle: 'Positionshinweis',
     infoHint:
       'Einen Objektnamen eingeben (z. B. M42), um dem Solver zu helfen, die Himmelsregion zu finden.',
+    infoManualTitle: 'Manuelle Platzierung',
+    infoManual:
+      'Wird das Foto nicht gelöst, kann es mit «Manuell…» auf die Karte gezogen werden, oder man identifiziert darin 3 gut verteilte Sterne, nach Name, RA/Dekl.-Koordinaten oder einer Stelle auf der Karte. Drei sind nötig: Mit zwei kann die App nicht erkennen, ob das Foto gespiegelt ist (Zenitspiegel, Zeilenreihenfolge einer FITS-Datei).',
     infoPlacementTitle: 'Auf Karte platzieren',
     infoPlacement:
       'Nach Abschluss der Lösung auf «Speichern und auf Karte platzieren» klicken, um Fotos zu speichern und auf der Karte anzuzeigen. Fenster ohne Klick schließen, um zu verwerfen — nicht gespeicherte Lösungen bleiben nicht erhalten.',

@@ -67,6 +67,28 @@ describe('PhotoOverlay manual identify: host backdrop over the map', () => {
     expect(hostBackdrop.style.display).toBe('');
   });
 
+  it('Validate waits for three identified points (two cannot tell a mirrored photo)', () => {
+    void open();
+    const img = document.querySelector<HTMLImageElement>('.modal-photo')!;
+    img.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 100, height: 100, right: 100, bottom: 100 }) as DOMRect;
+    const validate = document.querySelector<HTMLButtonElement>('.btn-confirm')!;
+    const identify = (i: number, x: number, y: number) => {
+      document
+        .querySelector('.modal-photo-container')!
+        .dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: x, clientY: y }));
+      document
+        .querySelector<HTMLButtonElement>(`.point-entry[data-index="${i}"] .btn-pick-map`)!
+        .click();
+      onPoint!(80 + i, -5 + i);
+    };
+    identify(0, 20, 20);
+    identify(1, 80, 30);
+    expect(validate.disabled).toBe(true);
+    identify(2, 50, 80);
+    expect(validate.disabled).toBe(false);
+  });
+
   it('shows a window with the point to pick while picking on the map', () => {
     void open();
     document

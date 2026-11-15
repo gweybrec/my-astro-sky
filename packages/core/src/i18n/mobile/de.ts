@@ -31,9 +31,9 @@ const de: Translations['mobile'] = {
     solveOnline: 'Online lösen',
     solveOnlineSub: 'astrometry.net, benötigt eine Verbindung',
     offline: 'Keine Internetverbindung',
-    identifyStars: '2–3 Sterne identifizieren',
+    identifyStars: '3 Sterne identifizieren',
     identifyStarsSub:
-      'Tippen Sie auf 2 oder 3 erkennbare Sterne im Foto und identifizieren Sie jeden nach Name oder RA/Dekl.-Koordinaten.',
+      'Tippen Sie auf 3 erkennbare, gut verteilte Sterne im Foto und identifizieren Sie jeden nach Name oder RA/Dekl.-Koordinaten.',
     placeByHand: 'Von Hand platzieren',
     placeByHandSub: 'Das Foto auf der Karte verschieben, vergrößern und drehen',
     placeHint: 'Ein Finger: verschieben · Zwei Finger: vergrößern und drehen',

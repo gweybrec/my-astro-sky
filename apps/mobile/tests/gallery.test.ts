@@ -288,7 +288,7 @@ describe('the gallery page', () => {
     expect(wrapper.text()).toContain('Comment placer cette photo ?');
     expect(online.text()).toContain('astrometry.net, nécessite une connexion');
     expect(wrapper.text()).not.toContain("Résoudre sur l'ordinateur");
-    expect(rowWith(wrapper, 'Identifier 2–3 étoiles').text()).toContain('Touchez 2 ou 3 étoiles');
+    expect(rowWith(wrapper, 'Identifier 3 étoiles').text()).toContain('Touchez 3 étoiles');
     expect(rowWith(wrapper, 'Placer à la main').text()).toContain('Déplacer, agrandir et tourner');
     await online.trigger('click');
     await flushPromises();
@@ -346,7 +346,7 @@ describe('the gallery page', () => {
     const wrapper = mountPage();
     await flushPromises();
     await openMethods(wrapper);
-    await rowWith(wrapper, 'Identifier 2–3 étoiles').trigger('click');
+    await rowWith(wrapper, 'Identifier 3 étoiles').trigger('click');
     expect(push).toHaveBeenCalledWith(`/gallery/identify/${photo.id}`);
   });
 

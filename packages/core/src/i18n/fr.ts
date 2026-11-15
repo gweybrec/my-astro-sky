@@ -491,7 +491,7 @@ const fr = {
   modal: {
     title: 'Ajouter une photo sur la carte',
     instructions:
-      'Cliquez sur 2 ou 3 points dans la photo, puis identifiez chacun (étoile ou coordonnées RA/Déc).',
+      'Cliquez sur 3 points dans la photo, puis identifiez chacun (étoile ou coordonnées RA/Déc).',
     autoSolve: 'Résolution automatique',
     wcsButton: 'Métadonnées (FITS/TIFF)…',
     wcsRemove: 'Supprimer la solution WCS',
@@ -538,7 +538,7 @@ const fr = {
     localButton: 'Résoudre localement',
     astapButton: 'ASTAP (local)',
     manualInstructions:
-      'Cliquez sur 2 ou 3 étoiles reconnaissables dans la photo, puis identifiez chacune par son nom ou ses coordonnées RA/Déc.',
+      'Cliquez sur 3 étoiles reconnaissables et bien réparties dans la photo, puis identifiez chacune par son nom ou ses coordonnées RA/Déc.',
     manualButton: 'Placement manuel sur la carte',
     manualTooltip: 'Glisser-déposer la photo sur la carte',
     manualIdentifyTitle: 'Identifier les étoiles — {name}',
@@ -1611,6 +1611,9 @@ const fr = {
     infoHintTitle: 'Indice de position',
     infoHint:
       "Entrez le nom d'un objet (ex. M42) pour aider le solveur à localiser la zone du ciel.",
+    infoManualTitle: 'Placement manuel',
+    infoManual:
+      "Si la photo n'est pas résolue, « Manuel… » permet de la glisser sur la carte, ou d'y identifier 3 étoiles bien réparties, par leur nom, leurs coordonnées RA/Déc ou un endroit de la carte. Il en faut trois : avec deux, l'application ne peut pas savoir si la photo est inversée en miroir (renvoi coudé, ordre des lignes d'un fichier FITS).",
     infoPlacementTitle: 'Placement sur la carte',
     infoPlacement:
       'Une fois la résolution terminée, cliquez sur « Sauvegarder et placer sur la carte » pour enregistrer les photos et les afficher sur la carte. Fermez la fenêtre sans cliquer sur ce bouton pour annuler — les photos non sauvegardées ne seront pas conservées.',

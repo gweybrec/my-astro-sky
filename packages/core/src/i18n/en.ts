@@ -490,7 +490,7 @@ const en: Translations = {
   modal: {
     title: 'Add a photo to the map',
     instructions:
-      'Click on 2 or 3 points in the photo, then identify each (star or RA/Dec coordinates).',
+      'Click on 3 points in the photo, then identify each (star or RA/Dec coordinates).',
     autoSolve: 'Automatic solve',
     wcsButton: 'Metadata (FITS/TIFF)…',
     wcsRemove: 'Remove WCS solution',
@@ -533,7 +533,7 @@ const en: Translations = {
     localButton: 'Solve locally',
     astapButton: 'ASTAP (local)',
     manualInstructions:
-      'Click on 2 or 3 recognizable stars in the photo, then identify each one by name or RA/Dec coordinates.',
+      'Click on 3 recognizable, well spread stars in the photo, then identify each one by name or RA/Dec coordinates.',
     manualButton: 'Manual placement on map',
     manualTooltip: 'Drag and drop photo on the map',
     manualIdentifyTitle: 'Identify stars — {name}',
@@ -1587,6 +1587,9 @@ const en: Translations = {
       'If a photo is already solved, load its FITS or TIFF file via "Metadata (FITS/TIFF)…". Plate solving will be skipped.',
     infoHintTitle: 'Position hint',
     infoHint: 'Enter an object name (e.g. M42) to help the solver locate the sky region.',
+    infoManualTitle: 'Manual placement',
+    infoManual:
+      'If the photo is not solved, “Manual…” lets you drag it onto the map, or identify 3 well spread stars in it, by name, RA/Dec coordinates or a spot on the map. Three are needed: with two, the app cannot tell whether the photo is mirrored (star diagonal, row order of a FITS file).',
     infoPlacementTitle: 'Placing on the map',
     infoPlacement:
       'Once solving is done, click “Save and place on map” to save photos and display them on the map. Close the window without clicking that button to discard — unsaved solves will not be kept.',

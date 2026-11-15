@@ -29,9 +29,9 @@ const fr = {
     solveOnline: 'Résoudre en ligne',
     solveOnlineSub: 'astrometry.net, nécessite une connexion',
     offline: 'Aucune connexion internet',
-    identifyStars: 'Identifier 2–3 étoiles',
+    identifyStars: 'Identifier 3 étoiles',
     identifyStarsSub:
-      'Touchez 2 ou 3 étoiles reconnaissables dans la photo, puis identifiez chacune par son nom ou ses coordonnées RA/Déc.',
+      'Touchez 3 étoiles reconnaissables et bien réparties dans la photo, puis identifiez chacune par son nom ou ses coordonnées RA/Déc.',
     placeByHand: 'Placer à la main',
     placeByHandSub: 'Déplacer, agrandir et tourner la photo sur la carte',
     placeHint: 'Un doigt : déplacer · Deux doigts : agrandir et tourner',

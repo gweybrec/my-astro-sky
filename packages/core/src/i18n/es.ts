@@ -494,7 +494,7 @@ const es: Translations = {
   modal: {
     title: 'Añadir una foto al mapa',
     instructions:
-      'Haz clic en 2 o 3 puntos de la foto y luego identifica cada uno (estrella o coordenadas AR/Dec).',
+      'Haz clic en 3 puntos de la foto y luego identifica cada uno (estrella o coordenadas AR/Dec).',
     autoSolve: 'Solución automática',
     wcsButton: 'Metadatos (FITS/TIFF)…',
     wcsRemove: 'Eliminar la solución WCS',
@@ -537,7 +537,7 @@ const es: Translations = {
     localButton: 'Resolver localmente',
     astapButton: 'ASTAP (local)',
     manualInstructions:
-      'Haz clic en 2 o 3 estrellas reconocibles de la foto y luego identifica cada una por nombre o coordenadas AR/Dec.',
+      'Haz clic en 3 estrellas reconocibles y bien repartidas de la foto y luego identifica cada una por nombre o coordenadas AR/Dec.',
     manualButton: 'Posicionamiento manual en el mapa',
     manualTooltip: 'Arrastrar y soltar la foto en el mapa',
     manualIdentifyTitle: 'Identificar estrellas — {name}',
@@ -1606,6 +1606,9 @@ const es: Translations = {
     infoHintTitle: 'Indicación de posición',
     infoHint:
       'Introduce el nombre de un objeto (ej. M42) para ayudar al solver a localizar la zona del cielo.',
+    infoManualTitle: 'Colocación manual',
+    infoManual:
+      'Si la foto no se resuelve, «Manual…» permite arrastrarla al mapa, o identificar en ella 3 estrellas bien repartidas, por nombre, coordenadas AR/Dec o un punto del mapa. Hacen falta tres: con dos, la aplicación no puede saber si la foto está invertida en espejo (diagonal, orden de las filas de un archivo FITS).',
     infoPlacementTitle: 'Colocación en el mapa',
     infoPlacement:
       'Una vez finalizada la resolución, haz clic en «Guardar y colocar en el mapa» para guardar las fotos y mostrarlas en el mapa. Cerrar la ventana sin hacer clic en ese botón descarta los cambios — las soluciones no guardadas no se conservarán.',

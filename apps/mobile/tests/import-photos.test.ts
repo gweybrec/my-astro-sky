@@ -184,7 +184,7 @@ describe('the import page', () => {
     await flushPromises();
     await wrapper
       .findAll('.mob-sheet .mob-row')
-      .find((r) => r.text().includes('Identifier 2–3 étoiles'))!
+      .find((r) => r.text().includes('Identifier 3 étoiles'))!
       .trigger('click');
     await flushPromises();
     expect(pendingPhotos.value.map((p) => [p.name, p.state])).toEqual([['M101.jpg', 'toPlace']]);

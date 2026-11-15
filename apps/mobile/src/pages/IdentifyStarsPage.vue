@@ -5,7 +5,11 @@ import { IonPage, IonContent } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { findDSOsInImage } from '@myastrosky/core/catalog/dso-registry';
 import { photoSkyModel } from '@myastrosky/core/photo-placement';
-import { raDecFromSexagesimal, starDisplayLabel } from '@myastrosky/core/star-identify';
+import {
+  MIN_IDENTIFIED_POINTS,
+  raDecFromSexagesimal,
+  starDisplayLabel,
+} from '@myastrosky/core/star-identify';
 import type { StarSearchResult } from '@myastrosky/core/domain/stars';
 import type { PhotoCorrespondence } from '@myastrosky/core/types';
 import { searchStarsAPI } from '@myastrosky/app-state/api';
@@ -38,7 +42,7 @@ import mapIcon from '../icons/map.svg?raw';
 // The boards "Identifier les étoiles", "…, choisir une étoile" and "…, RA/Déc", as the desktop's star identification
 // does it (`openManualIdentifyModal`): a tap on the photo puts the next point on a star, and each point is named by a
 // star's name, a star chosen on the map, or its coordinates. A point is dragged to move it, with a magnifier above the
-// finger. Valider, once two points are named, stores the photo with these matches and the objects that fall in it.
+// finger. Valider, once the three points are named (MIN_IDENTIFIED_POINTS), stores the photo with these matches and the objects that fall in it.
 const route = useRoute();
 const router = useRouter();
 const { showError } = useErrorToast();
@@ -75,6 +79,7 @@ onBeforeUnmount(() => {
 const named = (p: IdentifyPoint) => p.star !== null;
 const active = computed(() => points.findIndex((p) => !named(p)));
 const namedCount = computed(() => points.filter(named).length);
+const enoughNamed = computed(() => namedCount.value >= MIN_IDENTIFIED_POINTS);
 
 // ── The photo on its stage: a tap places the active point ──────────────────────────────────────────
 
@@ -236,7 +241,7 @@ function cancel() {
 useBackClose(() => true, cancel);
 
 async function validate() {
-  if (!file.value || !size.value || namedCount.value < 2 || saving.value) return;
+  if (!file.value || !size.value || !enoughNamed.value || saving.value) return;
   saving.value = true;
   try {
     const correspondences: PhotoCorrespondence[] = points.flatMap((p, i) =>
@@ -452,7 +457,7 @@ async function validate() {
             <PhoneButton
               variant="confirm"
               size="lg"
-              :disabled="namedCount < 2 || !size || saving"
+              :disabled="!enoughNamed || !size || saving"
               @click="validate"
             >
               {{ saving ? t('manual.processing') : t('modal.validate') }}

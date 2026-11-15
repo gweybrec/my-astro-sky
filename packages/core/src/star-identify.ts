@@ -5,6 +5,13 @@
  */
 import type { Star } from './types';
 
+/**
+ * Points to name before the photo can be placed. Two would fix its position, size and angle but not whether it is
+ * mirrored (a diagonal, or a file's row order, flips it): the fit would then take it as unmirrored and flip the rest
+ * of the photo across the line between them. A third point tells.
+ */
+export const MIN_IDENTIFIED_POINTS = 3;
+
 /** A chosen star's name in the list of points: "Deneb (α Cyg)", else its designation, else its Hipparcos number. */
 export function starDisplayLabel(star: Star): string {
   if (star.name) {

@@ -27,7 +27,7 @@ The phone cannot run a local plate solver (ASTAP or solve-field). To place a pho
 
 - the **position stored in the file**, when the photo already carries one (WCS metadata);
 - **online solving** with astrometry.net, which needs a network connection and your astrometry.net API key ([how to get one](/user/installing-solvers.md));
-- **identifying two or three stars** yourself on the photo;
+- **identifying three stars** yourself on the photo;
 - **placing it by hand**.
 
 A photo solved on the desktop keeps its placement when you move it to the phone.
