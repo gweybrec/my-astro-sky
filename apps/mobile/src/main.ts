@@ -12,6 +12,7 @@ import { initPlatform, installBackButton, saveBackupWithoutUpdates } from './pla
 import { catalogsReady } from './catalogs';
 import { checkAstrometryKey } from './key-check';
 import { repairStoredPhotoSizes } from './photo-sizes';
+import { resumeImport } from './composables/usePhotoImport';
 
 async function start(): Promise<void> {
   try {
@@ -27,8 +28,10 @@ async function start(): Promise<void> {
   }
   createApp(App).use(IonicVue).use(createPinia()).use(router).mount('#app');
   installBackButton(router);
+  // An import left unsaved when the app was closed opens again, then the astrometry.net key is checked.
   void router
     .isReady()
+    .then(() => resumeImport(() => router.push('/gallery/import')))
     .then(() => checkAstrometryKey(() => router.push('/settings/astrometry-key')));
   // After the first screen is up: the gear lists and the star and deep-sky registries (screens wait on the same promise),
   // then, last, the sizes of the photos stored without one.

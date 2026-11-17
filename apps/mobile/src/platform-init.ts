@@ -9,7 +9,7 @@
 import { Capacitor } from '@capacitor/core';
 import { configureI18n, getLang } from '@myastrosky/core/i18n/index';
 import { configureStorage, storage } from '@myastrosky/core/platform/storage';
-import { configureErrorReporter } from '@myastrosky/core/platform/error-hook';
+import { configureErrorReporter, reportError } from '@myastrosky/core/platform/error-hook';
 import { configureLogSink, consoleLogSink } from '@myastrosky/core/platform/log';
 import { configureDeviceHints } from '@myastrosky/core/platform/device-hints';
 import { configureGearCatalogLoader } from '@myastrosky/core/platform/gear-loader';
@@ -178,4 +178,20 @@ export async function initPlatform(): Promise<void> {
   configureConstellationStyleLoader(async (style) =>
     (await import('./catalogs')).loadConstellationStyle(style),
   );
+
+  // 5. The photos of an import not saved yet, kept on the phone: the list is as it was when the app was left.
+  await restoreImport(typeof indexedDB === 'undefined' ? undefined : indexedDB);
+}
+
+/** Keeps the import list in the WebView's database and reads it back; a failure leaves it empty, never stops start-up. */
+export async function restoreImport(factory: IDBFactory | undefined): Promise<void> {
+  if (!factory) return;
+  const { configurePendingStore, createIndexedDbPendingStore, restorePendingPhotos } =
+    await import('./pending-photos');
+  configurePendingStore(createIndexedDbPendingStore(factory));
+  try {
+    await restorePendingPhotos();
+  } catch (error) {
+    reportError('platform-init.restoreImport', error);
+  }
 }

@@ -12,12 +12,14 @@ import {
   type PendingCapture,
   type PendingPhoto,
 } from '../pending-photos';
+import { resumePendingSolves } from '../pending-solve';
 
 /**
  * The list of "Importer des photos". Each picked file is read first (`reading`: a TIFF, FITS or XISF is converted and
- * its header's WCS read), then kept in memory as a photo of the import (`inImport`): it stays in the list while its
- * page "Photo à ajouter" or a placement method is open. A file whose header places it is kept `placed` at once ("✓ Déjà
- * résolue"). Importer stores them all, placed or not.
+ * its header's WCS read), then kept as a photo of the import (`inImport`), on the phone too until it is saved: it stays
+ * in the list while its page "Photo à ajouter" or a placement method is open, and after the app is closed
+ * (`resumeImport`). A file whose header places it is kept `placed` at once ("✓ Déjà résolue"). Importer stores them all,
+ * placed or not.
  */
 export interface ReadingFile {
   key: string;
@@ -188,6 +190,16 @@ export async function importAll(): Promise<{
 export async function discardImport(): Promise<void> {
   reading.value = [];
   for (const photo of importPhotos.value) await removePendingPhoto(photo.id);
+}
+
+/**
+ * At start-up, an import left unsaved when the app was closed (kept on the phone) is taken up again: its solves still
+ * going on are followed again, and its list opens ("Importer des photos"). Nothing happens when there is none.
+ */
+export async function resumeImport(openList: () => unknown): Promise<void> {
+  if (importPhotos.value.length === 0) return;
+  void resumePendingSolves();
+  await openList();
 }
 
 /** Empties the list of files being read (tests). */

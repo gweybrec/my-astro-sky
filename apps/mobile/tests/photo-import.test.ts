@@ -30,6 +30,9 @@ vi.mock('@myastrosky/core/gear-catalog', async (importOriginal) => ({
 vi.mock('@myastrosky/core/catalog/dso-registry', () => ({
   findDSOIdsFromCorrespondences: () => ['M1'],
 }));
+// The solves are followed by their own module (astrometry.net is never reached).
+const resumePendingSolves = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock('../src/pending-solve', () => ({ resumePendingSolves }));
 
 import {
   addImportFiles,
@@ -39,6 +42,7 @@ import {
   importRows,
   importableCount,
   resetImport,
+  resumeImport,
 } from '../src/composables/usePhotoImport';
 import {
   holdPendingPlacement,
@@ -338,6 +342,20 @@ describe('the photo import', () => {
     expect(importRows.value).toEqual([]);
     expect(pendingPhotos.value).toEqual([]);
     expect(uploadPhoto).not.toHaveBeenCalled();
+  });
+
+  it('at start-up, opens an import left unsaved and follows its solves again; nothing when there is none', async () => {
+    const openList = vi.fn();
+    resumePendingSolves.mockClear();
+    await resumeImport(openList);
+    expect(openList).not.toHaveBeenCalled();
+    expect(resumePendingSolves).not.toHaveBeenCalled();
+
+    addImportFiles([new File(['x'], 'M45.jpg', { type: 'image/jpeg' })]);
+    await settle();
+    await resumeImport(openList);
+    expect(openList).toHaveBeenCalledTimes(1);
+    expect(resumePendingSolves).toHaveBeenCalledTimes(1);
   });
 
   it('stores a photo astrometry.net has not finished with, its solve in the same request', async () => {

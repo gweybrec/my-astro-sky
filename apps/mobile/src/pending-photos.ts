@@ -1,12 +1,15 @@
 /**
- * The photos being worked on before they are saved, kept in memory: those of "Importer des photos" (`inImport`), and a
- * photo of the gallery stored without a placement ("À résoudre") while its page "Photo à ajouter" and its placement methods
- * are open (`storedId`, its record has the stored photo's id). Each keeps its picture, the metadata typed for it (`draft`)
- * and the placement found for it (`placement`). Saving stores it in the photo store, placed or not: a photo not placed
- * waits "À résoudre" in the gallery, with its astrometry.net solve when one runs or waits (`Photo.onlineSolve`), followed
- * again later by `@myastrosky/app-state/stored-solve`.
+ * The photos being worked on before they are saved: those of "Importer des photos" (`inImport`), and a photo of the
+ * gallery stored without a placement ("À résoudre") while its page "Photo à ajouter" and its placement methods are open
+ * (`storedId`, its record has the stored photo's id). Each keeps its picture, the metadata typed for it (`draft`) and
+ * the placement found for it (`placement`). The photos of the import are also kept on the phone (`PendingStore`, the
+ * WebView's IndexedDB, in the app's private data) until they are saved, so that closing the app loses neither them nor
+ * the astrometry.net solve going on for them: `restorePendingPhotos` reads them back at start-up. Saving stores a photo
+ * in the photo store, placed or not: a photo not placed waits "À résoudre" in the gallery, with its astrometry.net solve
+ * when one runs or waits (`Photo.onlineSolve`), followed again later by `@myastrosky/app-state/stored-solve`.
  */
 import { shallowRef, toRaw } from 'vue';
+import { reportError } from '@myastrosky/core/platform/error-hook';
 import type {
   CaptureDetails,
   ManualPlacement,
@@ -103,6 +106,113 @@ interface PendingRecord extends PendingPhoto {
 
 const records = new Map<string, PendingRecord>();
 
+/** A record as the phone keeps it: the solve file as its bytes, name and type (a `File` may not survive the store). */
+export interface SavedPending extends Omit<PendingRecord, 'solvePicture' | 'stored'> {
+  solvePicture?: Blob;
+  solveName?: string;
+  solveType?: string;
+}
+
+/** Where the photos of the import are kept on the phone until they are saved. */
+export interface PendingStore {
+  all(): Promise<SavedPending[]>;
+  put(record: SavedPending): Promise<void>;
+  delete(id: string): Promise<void>;
+}
+
+const DB_NAME = 'myastrosky-pending-photos';
+const OBJECT_STORE = 'photos';
+
+function request<T>(req: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error ?? new Error('IndexedDB request failed'));
+  });
+}
+
+/** The store in the WebView's database. */
+export function createIndexedDbPendingStore(factory: IDBFactory): PendingStore {
+  let opened: Promise<IDBDatabase> | null = null;
+  const db = () => {
+    opened ??= new Promise<IDBDatabase>((resolve, reject) => {
+      const open = factory.open(DB_NAME, 1);
+      open.onupgradeneeded = () => open.result.createObjectStore(OBJECT_STORE, { keyPath: 'id' });
+      open.onsuccess = () => resolve(open.result);
+      open.onerror = () => reject(open.error ?? new Error('IndexedDB could not be opened'));
+    });
+    return opened;
+  };
+  const objects = async (mode: IDBTransactionMode) =>
+    (await db()).transaction(OBJECT_STORE, mode).objectStore(OBJECT_STORE);
+  return {
+    all: async () => request<SavedPending[]>((await objects('readonly')).getAll()),
+    put: async (record) => void (await request((await objects('readwrite')).put(record))),
+    delete: async (id) => void (await request((await objects('readwrite')).delete(id))),
+  };
+}
+
+/** Where the photos of the import are kept; none until start-up sets one (and in tests that do not). */
+let store: PendingStore | null = null;
+
+/** Sets where the photos of the import are kept (start-up, tests). */
+export function configurePendingStore(next: PendingStore | null): void {
+  store = next;
+}
+
+/**
+ * Keeps a photo of the import on the phone as it is now. A gallery photo is not kept here: the photo store has it. A
+ * failure is reported, and the photo stays in the list while the app runs.
+ */
+async function keep(found: PendingRecord): Promise<void> {
+  if (!store || found.storedId) return;
+  const { solvePicture, stored: _stored, ...rest } = found;
+  const saved: SavedPending = {
+    ...rest,
+    ...(rest.capture ? { capture: plain(rest.capture) } : {}),
+    ...(solvePicture
+      ? { solvePicture, solveName: solvePicture.name, solveType: solvePicture.type }
+      : {}),
+  };
+  try {
+    await store.put(saved);
+  } catch (error) {
+    reportError('pending-photos.keep', error);
+  }
+}
+
+/** Forgets a photo kept on the phone. */
+async function forget(id: string): Promise<void> {
+  if (!store) return;
+  try {
+    await store.delete(id);
+  } catch (error) {
+    reportError('pending-photos.forget', error);
+  }
+}
+
+/**
+ * Reads back the photos of the import kept on the phone (start-up): the import list is as it was when the app was
+ * left, and a solve that was going on is followed again (`resumePendingSolves`).
+ */
+export async function restorePendingPhotos(): Promise<void> {
+  if (!store) return;
+  for (const saved of await store.all()) {
+    if (records.has(saved.id) || saved.storedId) continue;
+    const { solvePicture, solveName, solveType, ...rest } = saved;
+    records.set(saved.id, {
+      ...rest,
+      ...(solvePicture
+        ? {
+            solvePicture: new File([solvePicture], solveName ?? rest.name, {
+              type: solveType ?? '',
+            }),
+          }
+        : {}),
+    });
+  }
+  publish();
+}
+
 /** The photos being worked on, oldest first. */
 export const pendingPhotos = shallowRef<PendingPhoto[]>([]);
 
@@ -172,6 +282,7 @@ export async function addPendingPhoto(
   };
   records.set(record.id, record);
   publish();
+  await keep(record);
   return recordOf(record);
 }
 
@@ -239,13 +350,17 @@ export async function pendingDraft(id: string): Promise<PhotoMetadataDraft | nul
 /** Keeps the metadata typed for a photo. */
 export async function setPendingDraft(id: string, draft: PhotoMetadataDraft): Promise<void> {
   const found = records.get(id);
-  if (found) found.draft = plain(draft);
+  if (!found) return;
+  found.draft = plain(draft);
+  await keep(found);
 }
 
 /** Keeps the header cards of a file read for a photo ("Charger un fichier WCS"), saved with it. */
 export async function setPendingFitsHeaders(id: string, cards: FitsCard[]): Promise<void> {
   const found = records.get(id);
-  if (found) found.capture = { ...found.capture, fitsHeaders: plain(cards) };
+  if (!found) return;
+  found.capture = { ...found.capture, fitsHeaders: plain(cards) };
+  await keep(found);
 }
 
 /** The placement held for a photo; null when it has none. */
@@ -264,6 +379,7 @@ export async function holdPendingPlacement(id: string, placement: HeldPlacement)
   found.state = 'placed';
   found.placement = plain(placement);
   publish();
+  await keep(found);
 }
 
 const PICTURE_EXTENSIONS: Record<string, string[]> = {
@@ -340,6 +456,7 @@ export async function setPendingState(
   if (state !== 'placed') delete found.placement;
   Object.assign(found, { state }, details);
   publish();
+  await keep(found);
   if (found.storedId && state !== 'placed') {
     await setPhotoOnlineSolve(found.storedId, onlineSolveOf(found));
   }
@@ -349,6 +466,7 @@ export async function setPendingState(
 export async function removePendingPhoto(id: string): Promise<void> {
   records.delete(id);
   publish();
+  await forget(id);
 }
 
 const stripExtension = (name: string) => name.replace(/\.[^.]+$/, '');
@@ -403,6 +521,8 @@ export async function storePendingPhoto(id: string): Promise<Photo> {
         ...(solve ? { onlineSolve: solve } : {}),
       },
     );
+    // Stored: it is no longer kept on the phone, so that a restart does not offer to import it again.
+    await forget(id);
   }
   if (capture?.fitsHeaders?.length && !found.stored?.hasFitsHeaders) {
     try {
