@@ -1592,6 +1592,8 @@ const es: Translations = {
     statusSavedUnplaced: 'Por resolver · guardada sin colocación: espera en la Galería',
     statusSolvingWith: 'Resolviendo con {solver}… ({seconds} s)',
     statusFailedWith: 'Fallo: {error}',
+    fetchAlreadyAsked:
+      'Ya se está consultando a astrometry.net por esta foto. Inténtalo de nuevo en unos segundos.',
     statusUnfinishedLine: 'Resolución en curso: astrometry.net continúa por su lado',
     statusSentAt: 'Enviada el {date} a las {time}',
     statusObjects: '{how} · {count} objetos detectados',

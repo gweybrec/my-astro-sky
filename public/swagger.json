@@ -2893,30 +2893,39 @@
     "/api/solve-plate/resume": {
       "post": {
         "summary": "Follow again an Astrometry.net submission sent earlier",
-        "description": "Starts a new local job that polls the given submission (the jobs are lost when the app restarts). The photo gives the picture's size; nothing is uploaded to Astrometry.net.",
-        "consumes": [
-          "multipart/form-data"
-        ],
+        "description": "Starts a new local job that polls the given submission (the jobs are lost when the app restarts). Nothing is uploaded to Astrometry.net; the picture's size is enough to map its solution.",
         "requestBody": {
           "content": {
-            "multipart/form-data": {
+            "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "width",
+                  "height",
+                  "submissionId"
+                ],
                 "properties": {
-                  "photo": {
-                    "type": "string",
-                    "format": "binary"
+                  "width": {
+                    "type": "integer",
+                    "description": "The picture's width in pixels"
+                  },
+                  "height": {
+                    "type": "integer",
+                    "description": "The picture's height in pixels"
                   },
                   "submissionId": {
                     "type": "integer"
                   },
                   "fits": {
-                    "type": "string",
-                    "enum": [
-                      "true",
-                      "false"
-                    ],
-                    "description": "The picture sent was a FITS file (rows count from the bottom), though the photo given is not; by default its own name tells"
+                    "type": "boolean",
+                    "description": "The picture sent was a FITS file (rows count from the bottom); false by default"
+                  },
+                  "budgetMs": {
+                    "type": "integer",
+                    "description": "How long the job is followed, in milliseconds (15 minutes, the default, at most); 0 asks once where the submission stands"
+                  },
+                  "lang": {
+                    "type": "string"
                   }
                 }
               }
@@ -2940,7 +2949,7 @@
             }
           },
           "400": {
-            "description": "No API key, no file, an invalid submission id or a picture of unknown size"
+            "description": "No API key, an invalid submission id or size"
           },
           "500": {
             "description": "Server error"

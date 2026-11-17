@@ -552,13 +552,17 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
         });
         return (await sendForm<{ jobId: string }>('/api/solve-plate', form)).jobId;
       },
-      async resume(file, submissionId, opts) {
-        const form = await formOf('photo', file, {
-          submissionId,
-          ...(opts?.fits !== undefined ? { fits: String(opts.fits) } : {}),
-          lang: options.lang(),
-        });
-        return (await sendForm<{ jobId: string }>('/api/solve-plate/resume', form)).jobId;
+      async resume(size, submissionId, opts) {
+        return (
+          await call<{ jobId: string }>('POST', '/api/solve-plate/resume', {
+            width: size.width,
+            height: size.height,
+            submissionId,
+            ...(opts?.fits !== undefined ? { fits: opts.fits } : {}),
+            ...(opts?.budgetMs !== undefined ? { budgetMs: opts.budgetMs } : {}),
+            lang: options.lang(),
+          })
+        ).jobId;
       },
       async reuse(file, jobId) {
         const form = await formOf('photo', file, { jobId, lang: options.lang() });

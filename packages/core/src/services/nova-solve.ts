@@ -63,6 +63,12 @@ export interface NovaSolveServiceDeps {
   sleep?: (ms: number) => Promise<void>;
 }
 
+/** How a submission is followed again: see `NovaSolveService.resume`. */
+export interface NovaResumeOptions {
+  fits?: boolean;
+  budgetMs?: number;
+}
+
 export interface NovaSolveService {
   /** True when an API key is set (stored or in the environment). */
   isConfigured(): Promise<boolean>;
@@ -80,12 +86,19 @@ export interface NovaSolveService {
   getJob(localId: string): Promise<NovaJobStatus>;
   /**
    * Follows again a submission sent earlier (the jobs are lost when the app restarts): a new local job polls it
-   * in the background; returns its id. `options.fits`: the picture sent was a FITS file (its rows count from the
-   * bottom) though `file` is not (a stored photo keeps only its PNG); by default the file's own name tells. Throws
-   * `invalid` (`ASTROMETRY_NOT_CONFIGURED` without a key, checked first; `INVALID_SUBMISSION_ID`,
-   * `CANNOT_DETERMINE_DIMENSIONS`). It sends no request itself.
+   * in the background; returns its id. `size` is the picture's (the solution is mapped onto it): nothing is sent, so
+   * the picture itself is not needed. `options.fits`: the picture sent was a FITS file (its rows count from the
+   * bottom). `options.budgetMs`: how long the job is followed, 15 minutes by default; 0 asks where it stands once
+   * (the submission, then its job) and ends `timeout` when astrometry.net has not finished. The first questions go
+   * at once: the submission is not a new one. Throws `invalid` (`ASTROMETRY_NOT_CONFIGURED` without a key, checked
+   * first; `INVALID_SUBMISSION_ID`, `CANNOT_DETERMINE_DIMENSIONS` for a size that is not one). It sends no request
+   * itself.
    */
-  resume(file: NovaSolveFile, submissionId: number, options?: { fits?: boolean }): Promise<string>;
+  resume(
+    size: { width: number; height: number },
+    submissionId: number,
+    options?: NovaResumeOptions,
+  ): Promise<string>;
   /**
    * One page of the account's jobs, most recent first (`limit` 5 by default, 20 at most): the details are
    * fetched for that page only, and kept for a finished job. An empty page when the account cannot be read.
@@ -328,15 +341,20 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
   }
 
   async function resume(
-    file: NovaSolveFile,
+    size: { width: number; height: number },
     submissionId: number,
-    options?: { fits?: boolean },
+    options?: NovaResumeOptions,
   ): Promise<string> {
     await requireConfigured();
     if (!Number.isInteger(submissionId) || submissionId <= 0) {
       throw new DomainError('invalid', 'Invalid submission ID', { code: 'INVALID_SUBMISSION_ID' });
     }
-    const { width: imageWidth, height: imageHeight } = await requireDimensions(file);
+    const isSize = (n: number) => Number.isInteger(n) && n > 0;
+    if (!isSize(size.width) || !isSize(size.height)) {
+      throw new DomainError('invalid', 'Cannot determine image dimensions', {
+        code: 'CANNOT_DETERMINE_DIMENSIONS',
+      });
+    }
     const localId = newId();
     evictStaleJobs();
     const job: Job = {
@@ -344,23 +362,38 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
       createdAt: now(),
       submissionId,
       status: 'solving',
-      imageWidth,
-      imageHeight,
-      fits: options?.fits ?? isFitsFile(file.fileName),
+      imageWidth: size.width,
+      imageHeight: size.height,
+      fits: options?.fits ?? false,
     };
     jobs.set(localId, job);
-    pollJob(job).catch((err) => log?.('astrometry_poll_failed', err, { jobId: localId }));
+    const budgetMs = Math.min(Math.max(options?.budgetMs ?? POLL_BUDGET_MS, 0), POLL_BUDGET_MS);
+    pollJob(job, { budgetMs, askAtOnce: true }).catch((err) =>
+      log?.('astrometry_poll_failed', err, { jobId: localId }),
+    );
     return localId;
   }
 
-  /** Waits for the submission to become a job, then for the job to finish, and stores the solution. */
-  async function pollJob(job: Job): Promise<void> {
+  /**
+   * Waits for the submission to become a job, then for the job to finish, and stores the solution. `budgetMs`: the
+   * time given to the job. `askAtOnce`: the submission, then its job, are asked once each without waiting first (a
+   * submission followed again), even when the budget is 0.
+   */
+  async function pollJob(
+    job: Job,
+    { budgetMs = POLL_BUDGET_MS, askAtOnce = false } = {},
+  ): Promise<void> {
     if (!job.submissionId) return;
     let attempt = 0;
     let waited = 0;
+    let atOnce = askAtOnce;
     /** Waits before the next poll; false once the time given to the job is spent. */
     const pause = async () => {
-      if (waited >= POLL_BUDGET_MS) return false;
+      if (atOnce) {
+        atOnce = false;
+        return true;
+      }
+      if (waited >= budgetMs) return false;
       const delay = POLL_DELAYS_MS[Math.min(attempt, POLL_DELAYS_MS.length - 1)];
       attempt++;
       waited += delay;
@@ -396,6 +429,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
     }
 
     // Then poll the job.
+    atOnce = askAtOnce;
     while (await pause()) {
       if (job.status !== 'solving') return;
       try {

@@ -5,11 +5,13 @@ const pollPlateSolve = vi.fn();
 const resumePlateSolve = vi.fn();
 const uploadPhoto = vi.fn();
 const reuseAstrometrySubmission = vi.fn();
+const pictureSize = vi.fn(async (_f: Blob) => ({ width: 64, height: 48 }));
 vi.mock('@myastrosky/app-state/api', () => ({
   reuseAstrometrySubmission: (...a: unknown[]) => reuseAstrometrySubmission(...a),
   submitPlateSolve: (...a: unknown[]) => submitPlateSolve(...a),
   pollPlateSolve: (...a: unknown[]) => pollPlateSolve(...a),
   resumePlateSolve: (...a: unknown[]) => resumePlateSolve(...a),
+  pictureSize: (f: Blob) => pictureSize(f),
   uploadPhoto: (...a: unknown[]) => uploadPhoto(...a),
 }));
 const findDsoIds = vi.fn();
@@ -206,7 +208,9 @@ describe('solving a waiting photo online', () => {
     await fetchPendingResult(photo.id);
     expect(pendingPhotos.value[0].state).toBe('solving');
     await nextPoll();
-    expect(resumePlateSolve).toHaveBeenCalledWith(expect.any(File), 42, { fits: true });
+    // Only the size of the kept picture is sent, never the picture.
+    expect(resumePlateSolve).toHaveBeenCalledWith({ width: 64, height: 48 }, 42, { fits: true });
+    expect((pictureSize.mock.calls.at(-1)![0] as File).name).toBe('M1.png');
     expect(submitPlateSolve).not.toHaveBeenCalled();
   });
 
@@ -264,7 +268,7 @@ describe('solving a waiting photo online', () => {
     await nextPoll();
     // The job is unknown: it is started again from its submission at the next poll.
     await nextPoll();
-    expect(resumePlateSolve.mock.calls[0][0].name).toBe('a.jpg');
+    expect(resumePlateSolve.mock.calls[0][0]).toEqual({ width: 64, height: 48 });
     expect(resumePlateSolve.mock.calls[0][1]).toBe(42);
     expect(pendingPhotos.value[0]).toMatchObject({
       state: 'solving',
@@ -308,7 +312,9 @@ describe('solving a waiting photo online', () => {
     await nextPoll();
     expect(resumePlateSolve).not.toHaveBeenCalled();
     setOnline(true);
-    resumePlateSolve.mockImplementation(async (_f: File, sub: number) => ({ jobId: `new-${sub}` }));
+    resumePlateSolve.mockImplementation(async (_s: unknown, sub: number) => ({
+      jobId: `new-${sub}`,
+    }));
     pollPlateSolve.mockImplementation(async (jobId: string) => ({ jobId, status: 'solving' }));
     await resumePendingSolves();
     await nextPoll();

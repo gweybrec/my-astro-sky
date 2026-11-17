@@ -79,6 +79,8 @@ const cancelLocalSolveJob = vi.fn(async () => {});
 const submitPlateSolve = vi.fn();
 const pollPlateSolve = vi.fn();
 const resumePlateSolve = vi.fn();
+const pictureSize = vi.fn(async (_f: Blob) => ({ width: 64, height: 48 }));
+const following = { value: false };
 const uploadPhoto = vi.fn();
 const setPhotoOnlineSolve = vi.fn(async () => undefined);
 const storedPhotoFile = vi.fn(async (p: Photo) => new File(['x'], p.filename));
@@ -91,6 +93,7 @@ vi.mock('../../src/api', () => ({
   submitPlateSolve: (...a: unknown[]) => submitPlateSolve(...a),
   pollPlateSolve: (...a: unknown[]) => pollPlateSolve(...a),
   resumePlateSolve: (...a: unknown[]) => resumePlateSolve(...a),
+  pictureSize: (f: Blob) => pictureSize(f),
   uploadPhoto: (...a: unknown[]) => uploadPhoto(...a),
   updatePhotoMetadata: vi.fn(async () => undefined),
   setPhotoPlacement: vi.fn(),
@@ -104,7 +107,9 @@ vi.mock('@myastrosky/app-state/api', () => ({
   solveWCS: vi.fn(),
   getGearSetups: vi.fn().mockResolvedValue([]),
 }));
-vi.mock('@myastrosky/app-state/stored-solve', () => ({ isFollowingStoredSolve: () => false }));
+vi.mock('@myastrosky/app-state/stored-solve', () => ({
+  isFollowingStoredSolve: () => following.value,
+}));
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 const jpeg = (name: string) => new File(['x'], name, { type: 'image/jpeg' });
@@ -153,6 +158,7 @@ beforeEach(() => {
   state.jobSeq = 0;
   state.pollResponder = () => ({ status: 'running', result: undefined });
   state.finishChoice = 'back';
+  following.value = false;
   for (const fn of [
     submitLocalSolveJob,
     pollLocalSolveJob,
@@ -160,6 +166,7 @@ beforeEach(() => {
     submitPlateSolve,
     pollPlateSolve,
     resumePlateSolve,
+    pictureSize,
     uploadPhoto,
     setPhotoOnlineSolve,
     showToast,
@@ -499,9 +506,25 @@ describe('BatchUploadModal — kept until saved', () => {
       ['kept-2', 'M31'],
     ]);
     expect(vm(w).items[0].labels).toEqual(['hiver']);
-    // Followed from its submission: the original FITS file is not sent again.
-    expect(resumePlateSolve).toHaveBeenCalledWith(fits, 42, { fits: true });
+    // Followed from its submission: only the size is sent, read from the PNG's header, never the FITS file.
+    expect(pictureSize).toHaveBeenCalledWith(vm(w).items[1].file);
+    expect(resumePlateSolve).toHaveBeenCalledWith({ width: 64, height: 48 }, 42, { fits: true });
     expect(submitPlateSolve).not.toHaveBeenCalled();
     expect(vm(w).items[1].status).toBe('solving');
+  });
+
+  it('says so when "Récupérer" is pressed on a saved photo astrometry.net is being asked about', async () => {
+    const w = mountModal();
+    await flushPromises();
+    const item = vm(w).createBatchItem(jpeg('d.jpg'));
+    item.online = { submissionId: 42, sentAt: 's' };
+    item.photo = { id: 'p9', width: 64, height: 48 } as Photo;
+    vm(w).items.push(item);
+    following.value = true;
+    await vm(w).fetchOnline(vm(w).items.at(-1));
+    expect(showToast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'batch.fetchAlreadyAsked', type: 'info' }),
+    );
+    expect(resumePlateSolve).not.toHaveBeenCalled();
   });
 });

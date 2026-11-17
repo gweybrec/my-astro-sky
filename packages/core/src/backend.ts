@@ -20,7 +20,7 @@ import type { DsoOverrideService } from './services/dso-overrides';
 import type { GearService } from './services/gear';
 import type { HorizonService } from './services/horizon';
 import type { IdentifyService } from './services/identify';
-import type { NovaSolveService } from './services/nova-solve';
+import type { NovaResumeOptions, NovaSolveService } from './services/nova-solve';
 import type { PhotoService } from './services/photos';
 import type { PlanService } from './services/plans';
 import type { PoiCategoryService } from './services/poi-categories';
@@ -126,7 +126,12 @@ export interface Backend {
   version: Pick<VersionService, 'getLatest'>;
   novaSolve: Pick<NovaSolveService, 'getJob' | 'listSubmissions'> & {
     submit(file: FileSource, hints?: NovaSolveHints): Promise<string>;
-    resume(file: FileSource, submissionId: number, options?: { fits?: boolean }): Promise<string>;
+    /** Follows again a submission sent earlier; `size` is the picture's (nothing is sent). See `NovaSolveService.resume`. */
+    resume(
+      size: { width: number; height: number },
+      submissionId: number,
+      options?: NovaResumeOptions,
+    ): Promise<string>;
     reuse(file: FileSource, jobId: number): Promise<NovaReuseResult>;
   };
   solvedImport: {

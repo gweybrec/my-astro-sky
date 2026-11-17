@@ -14,6 +14,7 @@ import { onlineSolveHints } from '@myastrosky/core/domain/solve';
 import { useErrorToast } from './composables/useErrorToast';
 import type { AstrometrySolveStatus, PhotoCorrespondence } from '@myastrosky/core/types';
 import {
+  pictureSize,
   pollPlateSolve,
   resumePlateSolve,
   reuseAstrometrySubmission,
@@ -132,10 +133,13 @@ async function follow(id: string, firstJobId: string, again = false): Promise<vo
       try {
         if (startAgain && photo.submissionId) {
           startAgain = false;
-          const file = await pendingPhotoSolveFile(id);
+          const file = await pendingPhotoFile(id);
           if (!file) return;
-          // A stored photo keeps only its PNG: the flag tells whether the picture sent was a FITS file.
-          ({ jobId } = await resumePlateSolve(file, photo.submissionId, { fits: !!photo.fits }));
+          // Only the picture's size is sent (a FITS file has its PNG's); the flag tells whether the picture sent was a
+          // FITS file.
+          ({ jobId } = await resumePlateSolve(await pictureSize(file), photo.submissionId, {
+            fits: !!photo.fits,
+          }));
           await setPendingState(id, 'solving', { jobId, submissionId: photo.submissionId });
           continue;
         }

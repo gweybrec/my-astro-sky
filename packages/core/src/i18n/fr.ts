@@ -1597,6 +1597,8 @@ const fr = {
     statusSavedUnplaced: 'À résoudre · enregistrée sans placement : elle attend dans la Galerie',
     statusSolvingWith: 'Résolution avec {solver}… ({seconds} s)',
     statusFailedWith: 'Échec : {error}',
+    fetchAlreadyAsked:
+      'astrometry.net est déjà interrogé pour cette photo. Réessayez dans quelques secondes.',
     statusUnfinishedLine: 'Résolution en cours : astrometry.net continue de son côté',
     statusSentAt: 'Envoyée le {date} à {time}',
     statusObjects: '{how} · {count} objets détectés',

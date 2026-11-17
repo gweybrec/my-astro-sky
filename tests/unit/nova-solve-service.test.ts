@@ -441,47 +441,93 @@ describe('resume()', () => {
             ? reply(OBJECTS)
             : reply('', 404);
 
-  it('follows a submission sent by another instance under a new job, without uploading or logging in', async () => {
+  /** Waits for the job to end on its own (no wait is released). */
+  const ended = async (t: ReturnType<typeof setup>, id: string) => {
+    await vi.waitFor(async () => expect((await t.service.getJob(id)).status).not.toBe('solving'));
+    return t.service.getJob(id);
+  };
+
+  it('asks at once where a submission sent by another instance stands, without uploading or logging in', async () => {
     // A new instance stands for the app after a restart: it never saw the submission.
     const t = setup({ route: solvedRoute });
-    const id = await t.service.resume(t.file, 9);
-    expect(t.http).not.toHaveBeenCalled();
-    expect(await t.service.getJob(id)).toMatchObject({ status: 'solving', submissionId: 9 });
-    await t.pump(3);
-    const job = await t.service.getJob(id);
+    const id = await t.service.resume(BIG, 9);
+    expect(await t.service.getJob(id)).toMatchObject({ submissionId: 9 });
+    const job = await ended(t, id);
     expect(job.status).toBe('solved');
     expect(job.correspondences!.length).toBeGreaterThanOrEqual(3);
+    // An old submission: the submission, then its job, are asked about without waiting first.
+    expect(t.sleep).not.toHaveBeenCalled();
     expect(t.calls.some((c) => c.url === `${API}/upload` || c.url === `${API}/login`)).toBe(false);
   });
 
-  it('reads the solution with FITS rows when told the picture sent was a FITS file, though the one given is not', async () => {
+  it('maps the solution onto the size given', async () => {
+    const big = setup({ route: solvedRoute });
+    const half = setup({ route: solvedRoute });
+    const a = (await ended(big, await big.service.resume(BIG, 9))).correspondences!;
+    const b = (await ended(half, await half.service.resume({ width: 1920, height: 1080 }, 9)))
+      .correspondences!;
+    expect(b.map((c) => [c.photoX * 2, c.photoY * 2])).toEqual(a.map((c) => [c.photoX, c.photoY]));
+  });
+
+  it('reads the solution with FITS rows when told the picture sent was a FITS file', async () => {
     const plain = setup({ route: solvedRoute });
-    const plainId = await plain.service.resume(plain.file, 9);
-    await plain.pump(3);
+    const a = (await ended(plain, await plain.service.resume(BIG, 9))).correspondences!;
     const asSent = setup({ route: solvedRoute });
-    const fitsId = await asSent.service.resume(asSent.file, 9, { fits: true });
-    await asSent.pump(3);
-    const a = (await plain.service.getJob(plainId)).correspondences!;
-    const b = (await asSent.service.getJob(fitsId)).correspondences!;
+    const b = (await ended(asSent, await asSent.service.resume(BIG, 9, { fits: true })))
+      .correspondences!;
     expect(b).toHaveLength(a.length);
     // The same pixels, but their rows count from the other edge: each takes another place on the sky.
     expect(b.map((c) => [c.photoX, c.photoY])).toEqual(a.map((c) => [c.photoX, c.photoY]));
     expect(b.map((c) => c.starDec)).not.toEqual(a.map((c) => c.starDec));
   });
 
-  it('refuses without a key, then a submission id that is not a positive integer, then an unreadable picture', async () => {
+  it('with a budget of 0, asks once and ends unfinished when astrometry.net has not finished', async () => {
+    const solving = setup({
+      route: (r) =>
+        r.url === `${API}/submissions/9`
+          ? json({ jobs: [10796000] })
+          : r.url === `${API}/jobs/10796000`
+            ? json({ status: 'solving' })
+            : reply('', 404),
+    });
+    const job = await ended(solving, await solving.service.resume(BIG, 9, { budgetMs: 0 }));
+    expect(job.status).toBe('timeout');
+    expect(solving.calls.map((c) => c.url)).toEqual([
+      `${API}/submissions/9`,
+      `${API}/jobs/10796000`,
+    ]);
+    expect(solving.sleep).not.toHaveBeenCalled();
+
+    // A submission astrometry.net never gave a job.
+    const queued = setup({ route: () => json({ jobs: [null] }) });
+    expect((await ended(queued, await queued.service.resume(BIG, 9, { budgetMs: 0 }))).status).toBe(
+      'timeout',
+    );
+    expect(queued.calls).toHaveLength(1);
+
+    const solved = setup({ route: solvedRoute });
+    expect((await ended(solved, await solved.service.resume(BIG, 9, { budgetMs: 0 }))).status).toBe(
+      'solved',
+    );
+  });
+
+  it('refuses without a key, then a submission id that is not a positive integer, then a size that is not one', async () => {
     const none = setup({ key: undefined });
-    expect(await failure(none.service.resume(none.file, Number.NaN))).toBe(
+    expect(await failure(none.service.resume(BIG, Number.NaN))).toBe(
       'invalid:ASTROMETRY_NOT_CONFIGURED',
     );
     const t = setup();
     for (const bad of [Number.NaN, 0, -3, 1.5]) {
-      expect(await failure(t.service.resume(t.file, bad))).toBe('invalid:INVALID_SUBMISSION_ID');
+      expect(await failure(t.service.resume(BIG, bad))).toBe('invalid:INVALID_SUBMISSION_ID');
     }
-    const unreadable = setup({ size: 'unreadable' });
-    expect(await failure(unreadable.service.resume(unreadable.file, 9))).toBe(
-      'invalid:CANNOT_DETERMINE_DIMENSIONS',
-    );
+    for (const size of [
+      { width: 0, height: 1080 },
+      { width: 1920, height: Number.NaN },
+      { width: 19.5, height: 10 },
+    ]) {
+      expect(await failure(t.service.resume(size, 9))).toBe('invalid:CANNOT_DETERMINE_DIMENSIONS');
+    }
+    expect(t.http).not.toHaveBeenCalled();
   });
 });
 

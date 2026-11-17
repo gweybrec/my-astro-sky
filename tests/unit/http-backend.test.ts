@@ -210,14 +210,20 @@ describe('files', () => {
     expect(form.get('lang')).toBe('fr');
   });
 
-  it('resumes a submission with the picture and its id', async () => {
-    const file: FileSource = { name: 'a.png', size: 3, read: async () => bytes };
+  it('resumes a submission with the size of the picture and its id, sending no file', async () => {
     const { backend, sent } = makeBackend(() => json({ jobId: 'j2' }));
-    expect(await backend.novaSolve.resume(file, 42)).toBe('j2');
+    expect(
+      await backend.novaSolve.resume({ width: 640, height: 480 }, 42, { fits: true, budgetMs: 0 }),
+    ).toBe('j2');
     expect([sent[0].method, sent[0].url]).toEqual(['POST', 'http://app/api/solve-plate/resume']);
-    const form = sent[0].body as FormData;
-    expect((form.get('photo') as File).name).toBe('a.png');
-    expect(form.get('submissionId')).toBe('42');
+    expect(JSON.parse(sent[0].body as string)).toEqual({
+      width: 640,
+      height: 480,
+      submissionId: 42,
+      fits: true,
+      budgetMs: 0,
+      lang: 'fr',
+    });
   });
 
   it('builds the file from its bytes, with the type its extension says', async () => {

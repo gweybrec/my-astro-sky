@@ -1,7 +1,8 @@
 /**
  * The astrometry.net solve of a photo stored without a placement ("À résoudre"). The solve goes on on astrometry.net's
- * server whatever the app does, so its submission is kept with the photo (`Photo.onlineSolve`) and followed again later:
- * at start-up, when the photo is opened, or on "Récupérer le résultat d'astrometry.net". Nothing is uploaded again. A
+ * server whatever the app does, so its submission is kept with the photo (`Photo.onlineSolve`) and asked about again
+ * later, once each time: at start-up on the desktop, whenever the gallery is shown on the phone. "Récupérer le résultat
+ * d'astrometry.net" follows it for up to 15 minutes. Nothing is uploaded again. A
  * solved photo is placed at once (the stored photo gets its placement and the objects found in it); otherwise the photo
  * keeps where the solve stands: `unfinished` ("En cours"), `offline` or `failed`. Shared by the desktop and the phone.
  */
@@ -13,7 +14,6 @@ import {
   resumePlateSolve,
   setPhotoOnlineSolve,
   setPhotoPlacement,
-  storedPhotoFile,
   updatePhotoMetadata,
 } from './api';
 
@@ -40,6 +40,11 @@ export function canFollowStoredSolve(photo: Pick<Photo, 'onlineSolve'>): boolean
 }
 
 export interface StoredSolveOptions {
+  /**
+   * Asks astrometry.net once where the solve stands instead of following it for up to 15 minutes: a solve it has not
+   * finished stays "En cours" (`unfinished`) and is asked again next time.
+   */
+  quick?: boolean;
   /** Called each time the photo changes (the solve's state, or placed). */
   onChange?: (photo: Photo) => void;
   /** Waits between two polls (tests). */
@@ -94,8 +99,12 @@ export async function followStoredSolve(
       await keep({ ...solve, state: 'offline', checkedAt: checked() });
       return current;
     }
-    const file = await storedPhotoFile(photo);
-    const { jobId } = await resumePlateSolve(file, solve.submissionId!, { fits: !!solve.fits });
+    // The stored photo's size is its file's, orientation applied: the size its solution is mapped onto.
+    const { jobId } = await resumePlateSolve(
+      { width: photo.width, height: photo.height },
+      solve.submissionId!,
+      { fits: !!solve.fits, ...(options.quick ? { budgetMs: 0 } : {}) },
+    );
     await keep({ ...solve, state: 'solving', jobId, checkedAt: checked() });
     for (;;) {
       await wait(STORED_SOLVE_POLL_MS);
@@ -162,12 +171,26 @@ export async function followStoredSolve(
   }
 }
 
-/** Follows again, one after the other, the solves of the stored photos that wait for astrometry.net. */
+/** How many stored photos are asked about at once. */
+export const STORED_SOLVE_CHECKS_AT_ONCE = 3;
+
+/**
+ * Asks astrometry.net where the solves of the stored photos that wait for it stand, a few photos at a time, once each
+ * (`quick`): a solved photo is placed, a failed one shows it, one astrometry.net has not finished stays "En cours"
+ * and is asked again next time. A solve astrometry.net never finishes therefore holds no other photo back.
+ */
 export async function followStoredSolves(
   photos: readonly Photo[],
   options: StoredSolveOptions = {},
 ): Promise<void> {
-  for (const photo of photos) {
-    if (canFollowStoredSolve(photo)) await followStoredSolve(photo, options);
-  }
+  const waiting = photos.filter(canFollowStoredSolve);
+  let next = 0;
+  const worker = async () => {
+    while (next < waiting.length) {
+      await followStoredSolve(waiting[next++], { quick: true, ...options });
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(STORED_SOLVE_CHECKS_AT_ONCE, waiting.length) }, worker),
+  );
 }

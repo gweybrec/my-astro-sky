@@ -1512,7 +1512,7 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
         'a reuse without an API key',
       );
       await expectDomainError(
-        b.novaSolve.resume(fixtures.jpeg(), 1),
+        b.novaSolve.resume({ width: 64, height: 48 }, 1),
         'invalid',
         'ASTROMETRY_NOT_CONFIGURED',
         'a resume without an API key',

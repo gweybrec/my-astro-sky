@@ -2,6 +2,7 @@
  * `src/api.ts` is a facade over the backend: what it hands the backend, what it gives back, and how it
  * turns the backend's `DomainError` into the plain `Error` the screens show. A fake backend stands in.
  */
+import sharp from 'sharp';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Backend } from '@myastrosky/core/backend';
 import { DomainError, type DomainErrorKind } from '@myastrosky/core/domain/errors';
@@ -205,9 +206,42 @@ describe('special cases', () => {
 
   it('resumePlateSolve follows a submission again under the new job id', async () => {
     backend.novaSolve.resume.mockResolvedValue('job-2');
-    expect(await api.resumePlateSolve(new File(['x'], 'a.jpg'), 42)).toEqual({ jobId: 'job-2' });
-    expect(backend.novaSolve.resume.mock.calls[0][0].name).toBe('a.jpg');
-    expect(backend.novaSolve.resume.mock.calls[0][1]).toBe(42);
+    expect(
+      await api.resumePlateSolve({ width: 640, height: 480 }, 42, { fits: true, budgetMs: 0 }),
+    ).toEqual({ jobId: 'job-2' });
+    expect(backend.novaSolve.resume).toHaveBeenCalledWith({ width: 640, height: 480 }, 42, {
+      fits: true,
+      budgetMs: 0,
+    });
+  });
+
+  it('pictureSize reads the size from the header, before any EXIF rotation, and 0 × 0 for no picture', async () => {
+    const png = await sharp({
+      create: { width: 7, height: 5, channels: 3, background: { r: 0, g: 0, b: 0 } },
+    })
+      .png()
+      .toBuffer();
+    expect(await api.pictureSize(new Blob([new Uint8Array(png)]))).toEqual({ width: 7, height: 5 });
+    // The size stored in the file, before its EXIF rotation; and a header longer than the start read: five 64 KB
+    // segments come before the size.
+    const jpeg = await sharp({
+      create: { width: 9, height: 4, channels: 3, background: { r: 0, g: 0, b: 0 } },
+    })
+      .withMetadata({ orientation: 6 })
+      .jpeg()
+      .toBuffer();
+    const segment = Buffer.concat([Buffer.from([0xff, 0xef, 0xff, 0xff]), Buffer.alloc(0xfffd)]);
+    const long = Buffer.concat([jpeg.subarray(0, 2), ...Array(5).fill(segment), jpeg.subarray(2)]);
+    expect(long.length).toBeGreaterThan(256 * 1024);
+    expect(await api.pictureSize(new Blob([new Uint8Array(jpeg)]))).toEqual({
+      width: 9,
+      height: 4,
+    });
+    expect(await api.pictureSize(new Blob([new Uint8Array(long)]))).toEqual({
+      width: 9,
+      height: 4,
+    });
+    expect(await api.pictureSize(new Blob(['not a picture']))).toEqual({ width: 0, height: 0 });
   });
 
   it('pollLocalSolveJob answers "pending" when rate limited', async () => {

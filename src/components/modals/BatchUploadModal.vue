@@ -183,6 +183,7 @@ import { usePhotosStore } from '../../stores/photos';
 import {
   submitPlateSolve,
   pollPlateSolve,
+  pictureSize,
   resumePlateSolve,
   submitLocalSolveJob,
   pollLocalSolveJob,
@@ -904,15 +905,20 @@ async function solveItem(item: BatchItem) {
 async function fetchOnline(item: BatchItem) {
   const submissionId = item.online?.submissionId;
   if (!submissionId || item.status === 'solving') return;
-  if (item.photo && isFollowingStoredSolve(item.photo.id)) return;
+  if (item.photo && isFollowingStoredSolve(item.photo.id)) {
+    // The start-up check is asking astrometry.net about it: it takes a few seconds.
+    showToast({ message: t('batch.fetchAlreadyAsked'), type: 'info', duration: 4000 });
+    return;
+  }
   item.solver = 'astrometry';
   item.status = 'solving';
   startTimer(item);
   item.solveAbort = new AbortController();
   try {
-    const { jobId } = await resumePlateSolve(item.rawFile ?? item.file, submissionId, {
-      fits: item.online!.fits,
-    });
+    // The size of the picture sent, as stored in its file (a FITS file has its PNG's), read from its header: nothing
+    // is sent again.
+    const size = await pictureSize(item.file);
+    const { jobId } = await resumePlateSolve(size, submissionId, { fits: item.online!.fits });
     item.online!.jobId = jobId;
     const result = await pollUntilDone(item, jobId, item.solveAbort.signal);
     if (cancelled) return;

@@ -1061,10 +1061,15 @@ describe('online solving routes (astrometry.net)', () => {
     expect((await post('/api/astrometry/reuse', null, { lang: 'fr' })).body.error).toBe(
       'ASTROMETRY_API_KEY non configurée',
     );
-    const resume = await post('/api/solve-plate/resume', { name: 'a.png', bytes: png });
+    const resume = await call('POST', '/api/solve-plate/resume', {
+      width: 8,
+      height: 6,
+      submissionId: 1,
+    });
     expect(resume.status).toBe(400);
     expect(resume.body.code).toBe('ASTROMETRY_NOT_CONFIGURED');
-    expect((await post('/api/solve-plate/resume', null)).body.code).toBe(
+    // The key comes first.
+    expect((await call('POST', '/api/solve-plate/resume', {})).body.code).toBe(
       'ASTROMETRY_NOT_CONFIGURED',
     );
     expect(recorded).toHaveLength(0);
@@ -1135,31 +1140,38 @@ describe('online solving routes (astrometry.net)', () => {
       expect(recorded).toHaveLength(0);
     });
 
-    it('resumes a submission under a new job without a request, and refuses a bad id or no file', async () => {
-      expect((await post('/api/solve-plate/resume', null)).body).toEqual({
-        error: 'No file provided',
-        code: 'NO_FILE',
-      });
-      const bad = await post(
-        '/api/solve-plate/resume',
-        { name: 'a.png', bytes: png },
-        { submissionId: '12abc', lang: 'fr' },
-      );
+    it('resumes a submission from its size alone, sending nothing, and refuses a bad id or size', async () => {
+      const resume = (body: Record<string, unknown>) =>
+        call('POST', '/api/solve-plate/resume', body);
+      const bad = await resume({ width: 8, height: 6, submissionId: '12abc', lang: 'fr' });
       expect(bad.status).toBe(400);
       expect(bad.body).toEqual({
         error: 'Identifiant de soumission invalide',
         code: 'INVALID_SUBMISSION_ID',
       });
+      const noSize = await resume({ submissionId: 77 });
+      expect(noSize.status).toBe(400);
+      expect(noSize.body).toEqual({
+        error: 'Cannot determine image dimensions',
+        code: 'CANNOT_DETERMINE_DIMENSIONS',
+      });
 
-      const r = await post(
-        '/api/solve-plate/resume',
-        { name: 'a.png', bytes: png },
-        { submissionId: '77' },
-      );
+      // astrometry.net has not given the submission a job yet.
+      upstream = (url) =>
+        url === `${API}/submissions/77` ? json({ jobs: [null] }) : { status: 404, body: '' };
+      const r = await resume({ width: 8, height: 6, submissionId: 77 });
       expect(r.status).toBe(200);
       expect(recorded).toHaveLength(0);
       const status = await call('GET', `/api/solve-plate/${r.body.jobId}`);
       expect(status.body).toEqual({ jobId: r.body.jobId, status: 'solving', submissionId: 77 });
+
+      // Asked once: the job ends at once, astrometry.net not having finished.
+      const quick = await resume({ width: 8, height: 6, submissionId: 77, budgetMs: 0 });
+      await vi.waitFor(async () =>
+        expect((await call('GET', `/api/solve-plate/${quick.body.jobId}`)).body.status).toBe(
+          'timeout',
+        ),
+      );
     });
 
     it('answers 500 with the message when the login is refused', async () => {

@@ -14,6 +14,7 @@ import type {
 } from '@myastrosky/core/types';
 import { t } from '@myastrosky/core/i18n/index';
 import { getBackend } from './backend';
+import { readImageHeader } from '@myastrosky/core/image-header';
 import type { HorizonProfile } from '@myastrosky/core/horizon-io';
 import type { SkybotCandidate } from '@myastrosky/core/asteroid-identify';
 import type { TnsCandidate } from '@myastrosky/core/supernova-identify';
@@ -408,16 +409,40 @@ export async function submitPlateSolve(
   return { jobId };
 }
 
-/** Follows again a submission sent earlier, under a new job id (the jobs are lost when the app restarts). */
+/**
+ * Follows again a submission sent earlier, under a new job id (the jobs are lost when the app restarts). `size` is the
+ * picture's: nothing is sent again. `options.budgetMs` 0 asks once where it stands (see `NovaSolveService.resume`).
+ */
 export async function resumePlateSolve(
-  file: File,
+  size: { width: number; height: number },
   submissionId: number,
-  options?: { fits?: boolean },
+  options?: { fits?: boolean; budgetMs?: number },
 ): Promise<{ jobId: string }> {
   const jobId = await guard('errors.pollFailed', () =>
-    getBackend().novaSolve.resume(fileSource(file), submissionId, options),
+    getBackend().novaSolve.resume(size, submissionId, options),
   );
   return { jobId };
+}
+
+/** How much of a picture is read for its size: its header comes before the pixels. */
+const PICTURE_HEAD_BYTES = 256 * 1024;
+
+/**
+ * The size of a JPEG, PNG or WebP picture as its file stores it (before any EXIF rotation: the size a solver reads),
+ * from its header, without decoding it: the start of the file, or the whole file when the header is longer. 0 × 0
+ * when it is none of these.
+ */
+export async function pictureSize(file: Blob): Promise<{ width: number; height: number }> {
+  const parts = file.size > PICTURE_HEAD_BYTES ? [file.slice(0, PICTURE_HEAD_BYTES), file] : [file];
+  for (const part of parts) {
+    try {
+      const header = readImageHeader(new Uint8Array(await part.arrayBuffer()));
+      return { width: header.width, height: header.height };
+    } catch {
+      // A header longer than the start read, or not a picture.
+    }
+  }
+  return { width: 0, height: 0 };
 }
 
 export async function pollPlateSolve(jobId: string): Promise<AstrometrySolveStatus> {

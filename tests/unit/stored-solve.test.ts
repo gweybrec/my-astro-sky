@@ -7,7 +7,6 @@ const api = {
   resumePlateSolve: vi.fn(),
   setPhotoOnlineSolve: vi.fn(),
   setPhotoPlacement: vi.fn(),
-  storedPhotoFile: vi.fn(),
   updatePhotoMetadata: vi.fn(),
 };
 vi.mock('@myastrosky/app-state/api', () => api);
@@ -57,7 +56,6 @@ const options = {
 
 beforeEach(() => {
   for (const fn of Object.values(api)) fn.mockReset();
-  api.storedPhotoFile.mockResolvedValue(new File(['x'], 'p1.png'));
   api.resumePlateSolve.mockResolvedValue({ jobId: 'job-1' });
   api.setPhotoOnlineSolve.mockResolvedValue(undefined);
   api.updatePhotoMetadata.mockResolvedValue({});
@@ -73,7 +71,7 @@ describe('followStoredSolve', () => {
     }
   });
 
-  it('resumes the submission without a new upload, with the FITS flag, and places the solved photo', async () => {
+  it('resumes the submission from the size of the photo, sending nothing, with the FITS flag, and places the solved photo', async () => {
     api.pollPlateSolve
       .mockResolvedValueOnce({ jobId: 'job-1', status: 'solving' })
       .mockResolvedValueOnce({ jobId: 'job-1', status: 'solved', correspondences: CORR });
@@ -89,7 +87,10 @@ describe('followStoredSolve', () => {
       ...options,
       onChange: (p) => changes.push(p),
     });
-    expect(api.resumePlateSolve).toHaveBeenCalledWith(expect.any(File), 42, { fits: true });
+    // The stored photo's size: no picture is read or sent, and the whole follow (no `quick`).
+    expect(api.resumePlateSolve).toHaveBeenCalledWith({ width: 100, height: 80 }, 42, {
+      fits: true,
+    });
     expect(api.setPhotoPlacement).toHaveBeenCalledWith('p1', { correspondences: CORR });
     expect(result.correspondences).toEqual(CORR);
     expect(result.onlineSolve).toBeUndefined();
@@ -126,12 +127,46 @@ describe('followStoredSolve', () => {
     expect(result.onlineSolve).toMatchObject({ state: 'failed', error: 'no stars' });
   });
 
-  it('follows each waiting photo in turn, and leaves the others alone', async () => {
+  it('asks once about each waiting photo, and leaves the others alone', async () => {
     api.pollPlateSolve.mockResolvedValue({ jobId: 'job-1', status: 'timeout' });
     await followStoredSolves(
       [photo(), photo({ state: 'failed' }), { ...photo(), id: 'p2' }],
       options,
     );
     expect(api.resumePlateSolve).toHaveBeenCalledTimes(2);
+    for (const call of api.resumePlateSolve.mock.calls)
+      expect(call[2]).toEqual({ fits: false, budgetMs: 0 });
+  });
+
+  it('asks about three photos at a time, so a slow one holds no other back', async () => {
+    const photos = ['a', 'b', 'c', 'd', 'e'].map((id) => ({ ...photo(), id }));
+    const answers = new Map<string, () => void>();
+    let open = 0;
+    let most = 0;
+    api.resumePlateSolve.mockImplementation(async () => {
+      open++;
+      most = Math.max(most, open);
+      return { jobId: `job-${api.resumePlateSolve.mock.calls.length}` };
+    });
+    // Each job answers when the test lets it.
+    api.pollPlateSolve.mockImplementation(
+      (jobId: string) =>
+        new Promise((resolve) =>
+          answers.set(jobId, () => {
+            open--;
+            resolve({ jobId, status: 'timeout' });
+          }),
+        ),
+    );
+    const all = followStoredSolves(photos, options);
+    await vi.waitFor(() => expect(answers.size).toBe(3));
+    // The first never answers for now; the others go on past it.
+    answers.get('job-2')!();
+    answers.get('job-3')!();
+    await vi.waitFor(() => expect(answers.size).toBe(5));
+    for (const id of ['job-4', 'job-5', 'job-1']) answers.get(id)!();
+    await all;
+    expect(most).toBe(3);
+    expect(api.resumePlateSolve).toHaveBeenCalledTimes(5);
   });
 });
