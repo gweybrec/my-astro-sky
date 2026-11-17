@@ -17,7 +17,7 @@ import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categori
 import { catalogsReady } from '../catalogs';
 import { targetCard } from '../target-card';
 import { reloadTargetsPrefs, targetsPrefs } from '../composables/useTargets';
-import { isPlaced } from '../sky-map-setup';
+import { isPlacedPhoto } from '@myastrosky/core/photo-placement';
 import { photoTags } from '../photo-tags';
 import { selectSearchResult, skyPhotoFocus, skySelection } from '../composables/useSkySelection';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
@@ -75,7 +75,7 @@ const poiCategories = usePoiCategoriesStore();
 async function readPhotos() {
   try {
     const [photos] = await Promise.all([getPhotos(), poiCategories.ensureLoaded()]);
-    placed.value = photos.filter(isPlaced);
+    placed.value = photos.filter((p) => isPlacedPhoto(p));
   } catch (error) {
     reportError('SkySearchPage.photos', error);
   }

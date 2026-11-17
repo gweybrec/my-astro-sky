@@ -1,5 +1,6 @@
 import type { Photo, Point } from './types';
 import { buildPhotoQueryMatches } from './photo-search';
+import { isPlacedPhoto } from './photo-placement';
 
 export interface PhotoCanvasQuad {
   id: string;
@@ -91,6 +92,8 @@ export function findOverlappingPhotoIds(
   return overlappingIds;
 }
 
+/** The photos the draw-order list shows: placed ones only (one "À résoudre" is not on the map), matching the query and,
+ * with `overlapOnly`, overlapping the current photo. */
 export function filterDrawOrderPhotos(
   orderedPhotos: Photo[],
   query: string,
@@ -104,6 +107,7 @@ export function filterDrawOrderPhotos(
   const overlappingIds = overlapOnly ? findOverlappingPhotoIds(currentPhotoId, quads) : null;
 
   return orderedPhotos.filter((photo) => {
+    if (!isPlacedPhoto(photo)) return false;
     if (matchIds && !matchIds.has(photo.id)) return false;
     if (overlappingIds && !overlappingIds.has(photo.id)) return false;
     return true;

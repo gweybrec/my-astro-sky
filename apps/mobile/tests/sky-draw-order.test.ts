@@ -28,7 +28,16 @@ import { skyDrawOrder } from '../src/sky-draw-order';
 /** "Ciel, ordre d'affichage": the placed photos, the top one first, reordered by dragging. */
 
 const photo = (id: string, over: Partial<Photo> = {}): Photo =>
-  ({ id, originalName: `${id}.jpg`, dsoIds: [], labels: [], notes: '', ...over }) as Photo;
+  ({
+    id,
+    originalName: `${id}.jpg`,
+    dsoIds: [],
+    labels: [],
+    notes: '',
+    correspondences: [],
+    manualPlacement: { centerRa: 0, centerDec: 60, rotationDeg: 0, projPerPx: 0.002 },
+    ...over,
+  }) as unknown as Photo;
 const square = (id: string, x: number): PhotoCanvasQuad => ({
   id,
   name: id,

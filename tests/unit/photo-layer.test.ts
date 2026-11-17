@@ -63,6 +63,17 @@ describe('PhotoLayer', () => {
     expect(second.getAttribute('src')).toBe('/files/2.jpg');
   });
 
+  it('loads no picture for a photo without a placement, and loads it once the photo is placed', () => {
+    const { container, layer } = make();
+    const unplaced = placedPhoto('1', { manualPlacement: undefined });
+    layer.loadPhotos([unplaced]);
+    const img = container.querySelector('img')!;
+    expect(img.hasAttribute('src')).toBe(false);
+    expect(layer.getPlacedPhotos().map((p) => p.photo.id)).toEqual(['1']);
+    layer.updatePhotoData(placedPhoto('1'));
+    expect(img.getAttribute('src')).toBe('/files/1.jpg');
+  });
+
   it('replaces a turned photo by its new picture, keeping its draw order, opacity and hiding', () => {
     const { container, layer } = make();
     layer.loadPhotos([placedPhoto('1'), placedPhoto('2'), placedPhoto('3')]);

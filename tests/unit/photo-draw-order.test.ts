@@ -19,6 +19,14 @@ function makePhoto(id: string, overrides: Partial<Photo> = {}): Photo {
     height: 900,
     createdAt: new Date().toISOString(),
     correspondences: [],
+    manualPlacement: {
+      centerRa: 0,
+      centerDec: 60,
+      rotationDeg: 0,
+      projPerPx: 0.002,
+      mirrorX: false,
+      mirrorY: false,
+    },
     dsoIds: [],
     labels: [],
     notes: '',
@@ -67,6 +75,14 @@ describe('photo draw order helpers', () => {
     const filtered = filterDrawOrderPhotos(photos, 'nebula', false, 'a', []);
 
     expect(filtered.map((photo) => photo.id)).toEqual(['c', 'a']);
+  });
+
+  it('leaves out a photo stored without a placement, which is not on the map', () => {
+    const photos = [makePhoto('placed'), makePhoto('unplaced', { manualPlacement: undefined })];
+
+    const filtered = filterDrawOrderPhotos(photos, '', false, 'placed', []);
+
+    expect(filtered.map((photo) => photo.id)).toEqual(['placed']);
   });
 
   it('combines query and overlap filters conjunctively', () => {

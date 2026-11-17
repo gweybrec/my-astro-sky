@@ -23,6 +23,7 @@ import {
 import { SkyMap } from '@myastrosky/render/sky-map';
 import { PhotoLayer } from '@myastrosky/render/photo-layer';
 import type { Photo } from '@myastrosky/core/types';
+import { isPlacedPhoto } from '@myastrosky/core/photo-placement';
 import { getPhotos, photoFileUrl } from '@myastrosky/app-state/api';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { THEME_CHANGED_EVENT } from '@myastrosky/core/theme';
@@ -55,10 +56,6 @@ export async function withSkyMap<T>(draw: (map: SkyMap) => Promise<T>): Promise<
 
 /** How long the photos stay hidden after the map stopped moving: large images are not painted on every frame. */
 export const PHOTOS_FROZEN_MS = 100;
-
-/** A photo with a placement: two star correspondences or a manual placement. The others are not drawn. */
-export const isPlaced = (photo: Photo) =>
-  Boolean(photo.manualPlacement) || photo.correspondences.length >= 2;
 
 /** What places a photo on the map: a change of one of these draws it again from its file. */
 const placementOf = (p: Photo) =>
@@ -307,7 +304,7 @@ export function createPhoneSkyMap(
   let reading = 0;
   async function reloadPhotos() {
     const run = ++reading;
-    const photos = (await getPhotos()).filter(isPlaced);
+    const photos = (await getPhotos()).filter((p) => isPlacedPhoto(p));
     if (run !== reading || !active) return;
     const changes = photoChanges(
       layer.getPlacedPhotos().map((p) => p.photo),

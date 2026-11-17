@@ -27,6 +27,7 @@ import {
   computePhotoCenter,
   isLabelAllowed as labelAllowed,
   computeManualMatrix,
+  isPlacedPhoto,
   photoSkyModelAtView,
   projectPhotoMesh,
   meshDivisions,
@@ -512,6 +513,7 @@ export class PhotoLayer {
       if (idx >= 0) {
         // Replace with a new object so Vue's shallowRef detects the change via reference equality
         this.placedPhotos[idx] = { ...this.placedPhotos[idx], photo };
+        this.loadPictureOncePlaced(this.placedPhotos[idx]);
         changed = true;
       }
     }
@@ -768,6 +770,18 @@ export class PhotoLayer {
     this.fireOnPhotosChanged();
   }
 
+  /** The first picture a photo shows: its thumbnail (see placePhotoImage). */
+  private firstPictureUrl(photo: Photo): string {
+    return this.hooks.photoUrl(photo.thumbFilename || photo.filename);
+  }
+
+  /** Starts the picture of a photo kept without one while it had no placement, now that it has one. */
+  private loadPictureOncePlaced(placed: PlacedPhoto): void {
+    const { imgEl, photo } = placed;
+    if (imgEl.hasAttribute('src') || imgEl.dataset.pausedSrc || !isPlacedPhoto(photo)) return;
+    imgEl.src = this.firstPictureUrl(photo);
+  }
+
   /** The picture of a photo on the map, before `before` in the draw order (last without it). */
   private placePhotoImage(
     photo: Photo,
@@ -778,7 +792,8 @@ export class PhotoLayer {
     // A photo starts with its thumbnail: the size switch in applyTransform loads a larger picture once the photo shows
     // large. Starting with the full picture downloaded and decoded every one at start, only to swap most of them for
     // their thumbnails (44 full pictures on the phone for 42 shown as thumbnails).
-    img.src = this.hooks.photoUrl(photo.thumbFilename || photo.filename);
+    // A photo stored without a placement is not drawn: its picture loads once it is placed (updatePhotosData).
+    if (isPlacedPhoto(photo)) img.src = this.firstPictureUrl(photo);
     img.className = 'photo-overlay-img';
     img.draggable = false;
     img.style.visibility = 'hidden'; // Hide until loaded

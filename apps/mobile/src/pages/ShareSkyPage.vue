@@ -12,7 +12,7 @@ import { getPhotos, getShareSenderName } from '@myastrosky/app-state/api';
 import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
 import { useErrorToast } from '../composables/useErrorToast';
 import { gallerySort } from '../gallery-display';
-import { isPlaced } from '../sky-map-setup';
+import { isPlacedPhoto } from '@myastrosky/core/photo-placement';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
@@ -41,7 +41,7 @@ const sharing = ref(false);
 onMounted(async () => {
   try {
     const [list, name] = await Promise.all([getPhotos(), getShareSenderName()]);
-    photos.value = list.filter(isPlaced);
+    photos.value = list.filter((p) => isPlacedPhoto(p));
     selected.value = new Set(photos.value.map((p) => p.id));
     if (!senderName.value) senderName.value = name;
   } catch (error) {
