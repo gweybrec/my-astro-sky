@@ -13,6 +13,11 @@ export const photosRouter = express.Router();
  * /api/photos:
  *   post:
  *     summary: Upload a photo with star correspondences
+ *     description: >
+ *       Stores the picture and its metadata. A photo sent without correspondences is stored without a placement
+ *       ("À résoudre"); its optional `onlineSolve` field (JSON, as `PUT /api/photos/{id}/online-solve` takes it)
+ *       is stored in the same request, so the photo is never stored without its astrometry.net solve. A placed
+ *       photo's `onlineSolve` is ignored, and so is one that is not valid.
  *     consumes:
  *       - multipart/form-data
  *     responses:

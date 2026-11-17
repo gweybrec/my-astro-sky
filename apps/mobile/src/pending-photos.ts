@@ -383,6 +383,8 @@ export async function storePendingPhoto(id: string): Promise<Photo> {
       photo = { ...placed, ...metadata, dsoIds, captureDetails };
     }
   } else {
+    // The online solve goes with the photo, in the same request: a photo is never stored without it.
+    const solve = placement ? null : onlineSolveOf(found);
     photo = await uploadPhoto(
       pictureOf(found),
       placement?.correspondences ?? [],
@@ -398,13 +400,9 @@ export async function storePendingPhoto(id: string): Promise<Photo> {
         observationDate: metadata.observationDate,
         captureDetails,
         gearSetupId: metadata.gearSetupId,
+        ...(solve ? { onlineSolve: solve } : {}),
       },
     );
-    const solve = placement ? null : onlineSolveOf(found);
-    if (solve) {
-      await setPhotoOnlineSolve(photo.id, solve);
-      photo = { ...photo, onlineSolve: solve };
-    }
   }
   if (capture?.fitsHeaders?.length && !found.stored?.hasFitsHeaders) {
     try {

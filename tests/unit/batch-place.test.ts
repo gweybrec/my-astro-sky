@@ -27,7 +27,13 @@ function stored(overrides: Partial<Photo> = {}): Photo {
 
 function fakeApi(): BatchSaveApi & { [k: string]: ReturnType<typeof vi.fn> } {
   return {
-    upload: vi.fn(async (_f, correspondences) => stored({ correspondences })),
+    // As the server: the photo comes back with the online solve sent with it.
+    upload: vi.fn(async (_f, correspondences, _m, _p, metadata) =>
+      stored({
+        correspondences,
+        ...(metadata?.onlineSolve ? { onlineSolve: metadata.onlineSolve } : {}),
+      }),
+    ),
     updateMetadata: vi.fn(async () => undefined),
     setPlacement: vi.fn(async (_id, p) => stored({ correspondences: p.correspondences ?? [] })),
     setOnlineSolve: vi.fn(async () => undefined),
@@ -85,11 +91,12 @@ describe('saveBatchItem', () => {
     await saveBatchItem(item, api);
     expect(api.upload.mock.calls[0][1]).toEqual([]);
     expect(api.upload.mock.calls[0][2]).toBeUndefined();
+    expect(api.upload.mock.calls[0][4]).not.toHaveProperty('onlineSolve');
     expect(api.setOnlineSolve).not.toHaveBeenCalled();
     expect(item.placementSaved).toBe(false);
   });
 
-  it('keeps the astrometry.net solve with a photo saved while astrometry.net has not finished', async () => {
+  it('stores the astrometry.net solve with a photo saved while astrometry.net has not finished, in the same request', async () => {
     const api = fakeApi();
     const item = makeItem({
       status: 'unfinished',
@@ -102,7 +109,10 @@ describe('saveBatchItem', () => {
       sentAt: '2026-11-15T21:42:00.000Z',
       fits: true,
     };
-    expect(api.setOnlineSolve).toHaveBeenCalledWith('photo-1', solve);
+    expect(api.upload).toHaveBeenCalledTimes(1);
+    expect(api.upload.mock.calls[0][4]).toMatchObject({ onlineSolve: solve });
+    // No second request: a photo is never stored without its solve.
+    expect(api.setOnlineSolve).not.toHaveBeenCalled();
     expect(photo.onlineSolve).toEqual(solve);
   });
 

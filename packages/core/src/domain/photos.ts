@@ -2,6 +2,7 @@
 import type {
   CaptureDetails,
   ManualPlacement,
+  OnlineSolve,
   Photo,
   PhotoIntegration,
   PointOfInterest,
@@ -42,6 +43,8 @@ export interface NewPhotoInput {
   pointsOfInterest?: readonly PointOfInterest[];
   captureDetails?: CaptureDetails | null;
   gearSetupId?: string | null;
+  /** The astrometry.net solve of a photo stored without a placement, saved with it. */
+  onlineSolve?: OnlineSolve | null;
 }
 
 /** The text fields of the multipart form of `POST /api/photos` (the image itself travels separately). */
@@ -58,6 +61,11 @@ export interface UploadFields {
   captureDetails?: string;
   gearSetupId?: string;
   displayName?: string;
+  /**
+   * JSON `OnlineSolve` of a photo stored without a placement: saved in the same request as the photo, so a photo is
+   * never stored without the astrometry.net solve that goes on for it. Ignored for a placed photo.
+   */
+  onlineSolve?: string;
 }
 
 /** The metadata of an upload after parsing and sanitising. */
@@ -74,6 +82,8 @@ export interface UploadMetadata {
   gearSetupId: string | null;
   /** The name the user gave, or the name of the file. */
   displayName: string;
+  /** The online solve sent with the photo, cleaned; null when there is none or it is not valid. */
+  onlineSolve: OnlineSolve | null;
 }
 
 /** What `PATCH /api/photos/:id/metadata` may change; every field is checked and cleaned when it is written. */

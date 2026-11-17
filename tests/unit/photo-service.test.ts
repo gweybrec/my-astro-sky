@@ -543,7 +543,23 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
         captureDetails: {},
         gearSetupId: null,
         displayName: 'orig.png',
+        onlineSolve: null,
       });
+    });
+
+    it('reads the online solve sent with the photo, and leaves out one that is not valid', () => {
+      const solve = { state: 'unfinished', submissionId: 42, sentAt: '2026-11-15T21:42:00.000Z' };
+      expect(
+        svc.readUploadMetadata('orig.png', { onlineSolve: JSON.stringify(solve) }).onlineSolve,
+      ).toEqual(solve);
+      expect(
+        svc.readUploadMetadata('orig.png', { onlineSolve: '{not json' }).onlineSolve,
+      ).toBeNull();
+      expect(
+        svc.readUploadMetadata('orig.png', {
+          onlineSolve: JSON.stringify({ state: 'done', sentAt: 'x' }),
+        }).onlineSolve,
+      ).toBeNull();
     });
 
     it('parses and cleans each field', () => {

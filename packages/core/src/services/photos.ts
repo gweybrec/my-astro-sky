@@ -280,8 +280,8 @@ export interface CorrespondenceRow {
   star_dec: number | null;
 }
 
-const INSERT_PHOTO = `INSERT INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, medium_filename)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?)`;
+const INSERT_PHOTO = `INSERT INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, medium_filename, online_solve)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?, ?)`;
 const INSERT_PHOTO_WITH_ID = `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, quarter_turns, fits_headers)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?, ?)`;
 const INSERT_CORRESPONDENCE =
@@ -443,6 +443,12 @@ export function sanitizeOnlineSolve(val: unknown): OnlineSolve | null {
     ...(v.fits === true ? { fits: true } : {}),
     ...(error ? { error } : {}),
   };
+}
+
+/** An online solve as its column stores it: cleaned JSON, or null for none (or one that is not valid). */
+function onlineSolveJson(solve: unknown): string | null {
+  const clean = solve ? sanitizeOnlineSolve(solve) : null;
+  return clean ? JSON.stringify(clean) : null;
 }
 
 /** The `onlineSolve` field of a photo read from its row: absent when there is none. */
@@ -712,6 +718,8 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
           pointsOfInterest: meta.pointsOfInterest,
           captureDetails: meta.captureDetails,
           gearSetupId: meta.gearSetupId,
+          // A placed photo has no online solve to follow.
+          onlineSolve: correspondences.length || meta.manualPlacement ? null : meta.onlineSolve,
         });
       } catch (error) {
         // Nothing refers to the files of this upload any more: do not leave them behind.
@@ -790,6 +798,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
             JSON.stringify(sanitizeCaptureDetails(input.captureDetails ?? {})),
             cleanSetupId(input.gearSetupId),
             input.mediumFilename ?? null,
+            onlineSolveJson(input.onlineSolve),
           ],
         },
         ...correspondenceStatements(input.id, input.correspondences),
@@ -896,6 +905,12 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
         typeof f.displayName === 'string' && f.displayName.trim()
           ? f.displayName.trim().slice(0, 255)
           : fileName;
+      let onlineSolve: OnlineSolve | null = null;
+      try {
+        onlineSolve = f.onlineSolve ? sanitizeOnlineSolve(JSON.parse(f.onlineSolve)) : null;
+      } catch {
+        onlineSolve = null;
+      }
 
       return {
         manualPlacement,
@@ -908,6 +923,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
         captureDetails,
         gearSetupId,
         displayName,
+        onlineSolve,
       };
     },
 

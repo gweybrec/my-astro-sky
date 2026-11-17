@@ -340,7 +340,7 @@ describe('the photo import', () => {
     expect(uploadPhoto).not.toHaveBeenCalled();
   });
 
-  it('stores a photo astrometry.net has not finished with, keeping its solve for later', async () => {
+  it('stores a photo astrometry.net has not finished with, its solve in the same request', async () => {
     addImportFiles([new File(['x'], 'M45.jpg', { type: 'image/jpeg' })]);
     await settle();
     const id = pendingPhotos.value[0].id;
@@ -350,10 +350,9 @@ describe('the photo import', () => {
     });
     uploadPhoto.mockResolvedValue({ id: 'p3' });
     await importAll();
-    expect(setPhotoOnlineSolve).toHaveBeenCalledWith('p3', {
-      state: 'unfinished',
-      submissionId: 42,
-      sentAt: '2026-11-15T21:42:00.000Z',
+    expect(uploadPhoto.mock.calls[0][4]).toMatchObject({
+      onlineSolve: { state: 'unfinished', submissionId: 42, sentAt: '2026-11-15T21:42:00.000Z' },
     });
+    expect(setPhotoOnlineSolve).not.toHaveBeenCalled();
   });
 });

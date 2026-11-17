@@ -655,6 +655,31 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
     );
     await b.photos.remove(waiting.id);
 
+    // The solve sent with the photo is stored in the same request: no photo is ever stored without it.
+    const sentWith = await b.photos.upload(fixtures.jpeg(), { onlineSolve: JSON.stringify(solve) });
+    expectEqual(sentWith.onlineSolve, solve, 'the online solve sent with the photo, answered');
+    expectEqual(
+      (await b.photos.listWithSizes()).find((p) => p.id === sentWith.id)?.onlineSolve,
+      solve,
+      'the online solve sent with the photo, stored',
+    );
+    await b.photos.remove(sentWith.id);
+    // A placed photo has no solve to follow; a solve that is not one is left out.
+    const placedWith = await b.photos.upload(fixtures.jpeg(), {
+      correspondences: JSON.stringify(CORRESPONDENCES),
+      onlineSolve: JSON.stringify(solve),
+    });
+    const notSolve = await b.photos.upload(fixtures.jpeg(), {
+      onlineSolve: JSON.stringify({ state: 'done', sentAt: 'x' }),
+    });
+    expectEqual(
+      [placedWith.onlineSolve ?? null, notSolve.onlineSolve ?? null],
+      [null, null],
+      'no online solve stored with a placed photo, nor one that is not valid',
+    );
+    await b.photos.remove(placedWith.id);
+    await b.photos.remove(notSolve.id);
+
     await b.photos.setOrder([second.id, first.id]);
     expectEqual(
       (await b.photos.listWithSizes()).map((p) => p.id),

@@ -51,8 +51,20 @@ describe('the photos being worked on before they are saved', () => {
   beforeEach(() => {
     resetPendingPhotos();
     for (const fn of Object.values(api)) fn.mockReset();
-    api.uploadPhoto.mockImplementation(async (_f: File, correspondences: unknown) =>
-      stored({ id: 'new-1', correspondences: correspondences as never }),
+    // As the photo store: the photo comes back with the online solve sent with it.
+    api.uploadPhoto.mockImplementation(
+      async (
+        _f: File,
+        correspondences: unknown,
+        _m: unknown,
+        _p: unknown,
+        metadata?: { onlineSolve?: unknown },
+      ) =>
+        stored({
+          id: 'new-1',
+          correspondences: correspondences as never,
+          ...(metadata?.onlineSolve ? { onlineSolve: metadata.onlineSolve as never } : {}),
+        }),
     );
     api.storedPhotoFile.mockResolvedValue(new File(['png'], 'stored-1.png', { type: 'image/png' }));
     api.setPhotoPlacement.mockImplementation(async (id: string, p: { correspondences: unknown }) =>
@@ -109,7 +121,7 @@ describe('the photos being worked on before they are saved', () => {
     expect(pendingPhotos.value).toEqual([]);
   });
 
-  it('stores a photo not placed "À résoudre", with its astrometry.net solve when astrometry.net has not finished', async () => {
+  it('stores a photo not placed "À résoudre" with its astrometry.net solve, in the same request', async () => {
     const added = await addPendingPhoto(new Blob(['x'], { type: 'image/jpeg' }), 'M45.jpg');
     await setPendingState(added.id, 'unfinished', {
       submissionId: 42,
@@ -124,7 +136,10 @@ describe('the photos being worked on before they are saved', () => {
       sentAt: '2026-11-15T21:42:00.000Z',
       fits: true,
     };
-    expect(api.setPhotoOnlineSolve).toHaveBeenCalledWith('new-1', solve);
+    expect(api.uploadPhoto).toHaveBeenCalledTimes(1);
+    expect(api.uploadPhoto.mock.calls[0][4]).toMatchObject({ onlineSolve: solve });
+    // No second request: a photo is never stored without its solve.
+    expect(api.setPhotoOnlineSolve).not.toHaveBeenCalled();
     expect(photo.onlineSolve).toEqual(solve);
   });
 

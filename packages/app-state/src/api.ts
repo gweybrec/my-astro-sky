@@ -234,6 +234,8 @@ export function uploadPhoto(
     observationDate?: string | null;
     captureDetails?: CaptureDetails | null;
     gearSetupId?: string | null;
+    /** The astrometry.net solve of a photo not placed: stored with it, in the same request. */
+    onlineSolve?: OnlineSolve | null;
   },
 ): Promise<Photo> {
   const fields: UploadFields = { correspondences: JSON.stringify(correspondences) };
@@ -249,6 +251,7 @@ export function uploadPhoto(
   if (metadata?.captureDetails && Object.keys(metadata.captureDetails).length > 0)
     fields.captureDetails = JSON.stringify(metadata.captureDetails);
   if (metadata?.gearSetupId) fields.gearSetupId = metadata.gearSetupId;
+  if (metadata?.onlineSolve) fields.onlineSolve = JSON.stringify(metadata.onlineSolve);
   return guard('errors.uploadFailed', () =>
     getBackend().photos.upload(fileSource(file), fields, { onProgress }),
   );

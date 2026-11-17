@@ -36,7 +36,7 @@ export interface BatchSaveApi {
     correspondences: PhotoCorrespondence[],
     manualPlacement?: ManualPlacement,
     onProgress?: undefined,
-    metadata?: PhotoMetadata & { displayName?: string },
+    metadata?: PhotoMetadata & { displayName?: string; onlineSolve?: OnlineSolve | null },
   ): Promise<Photo>;
   updateMetadata(
     photoId: string,
@@ -96,18 +96,15 @@ export async function saveBatchItem(item: BatchItem, api: BatchSaveApi): Promise
   try {
     let photo: Photo;
     if (!item.photo) {
+      // The online solve goes with the photo, in the same request: a photo is never stored without it.
+      const solve = onlineSolveOf(item);
       photo = await api.upload(
         item.file,
         placed ? (item.solveCorrespondences ?? []) : [],
         placed ? (item.manualPlacement ?? undefined) : undefined,
         undefined,
-        { ...metadata, displayName: item.customName },
+        { ...metadata, displayName: item.customName, ...(solve ? { onlineSolve: solve } : {}) },
       );
-      const solve = onlineSolveOf(item);
-      if (solve) {
-        await api.setOnlineSolve(photo.id, solve);
-        photo = { ...photo, onlineSolve: solve };
-      }
       if (item.fitsHeaders?.length && api.saveFitsHeaders) {
         try {
           await api.saveFitsHeaders(photo.id, item.fitsHeaders);

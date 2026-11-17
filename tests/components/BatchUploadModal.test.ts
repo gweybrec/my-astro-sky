@@ -239,6 +239,36 @@ describe('BatchUploadModal — solving', () => {
     );
   });
 
+  it('saves the submission of a photo already stored as soon as astrometry.net gives it, then "En cours"', async () => {
+    state.pendingFiles = [jpeg('a.jpg')];
+    const w = mountModal();
+    await flushPromises();
+    const item = vm(w).items[0];
+    item.photo = storedPhoto({ id: 'p1' });
+    item.solver = 'astrometry';
+    submitPlateSolve.mockResolvedValue({ jobId: 'online-job' });
+    pollPlateSolve
+      .mockResolvedValueOnce({ jobId: 'online-job', status: 'running', submissionId: 42 })
+      .mockResolvedValue({ jobId: 'online-job', status: 'timeout', submissionId: 42 });
+
+    await button(w, 'solve-all').trigger('click');
+    await vi.advanceTimersByTimeAsync(2100);
+    await flushPromises();
+    // Saved while the solve still runs: the app can be closed now and the solve is followed again later.
+    expect(setPhotoOnlineSolve).toHaveBeenCalledWith(
+      'p1',
+      expect.objectContaining({ state: 'solving', submissionId: 42 }),
+    );
+
+    await vi.advanceTimersByTimeAsync(2100);
+    await flushPromises();
+    expect(item.status).toBe('unfinished');
+    expect(setPhotoOnlineSolve).toHaveBeenLastCalledWith(
+      'p1',
+      expect.objectContaining({ state: 'unfinished', submissionId: 42 }),
+    );
+  });
+
   it('sends the hint to astrometry.net: the target object and the field width typed', async () => {
     state.pendingFiles = [jpeg('a.jpg')];
     const w = mountModal();
