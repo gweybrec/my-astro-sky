@@ -6,6 +6,7 @@ const {
   mockFspWriteFile,
   mockFspReadFile,
   mockFspRm,
+  mockFspRename,
   mockExistsSync,
   mockParseFITSHeader,
   mockWcsToCorrespondences,
@@ -20,6 +21,7 @@ const {
   mockFspWriteFile: vi.fn(),
   mockFspReadFile: vi.fn(),
   mockFspRm: vi.fn(),
+  mockFspRename: vi.fn(),
   mockExistsSync: vi.fn(),
   mockParseFITSHeader: vi.fn(),
   mockWcsToCorrespondences: vi.fn(),
@@ -43,6 +45,7 @@ vi.mock('fs', () => ({
     writeFile: mockFspWriteFile,
     readFile: mockFspReadFile,
     rm: mockFspRm,
+    rename: mockFspRename,
   },
   existsSync: mockExistsSync,
   default: {
@@ -51,6 +54,7 @@ vi.mock('fs', () => ({
       writeFile: mockFspWriteFile,
       readFile: mockFspReadFile,
       rm: mockFspRm,
+      rename: mockFspRename,
     },
     existsSync: mockExistsSync,
   },
@@ -91,9 +95,14 @@ function rgbTiff(bitsPerSample: 8 | 16 | 32, values: number[]): Buffer {
   });
 }
 
+/** The FITS file the pieces make, or null. */
+function fitsOf(pieces: Iterable<Buffer> | null): Buffer | null {
+  return pieces && Buffer.concat([...pieces]);
+}
+
 describe('tiffToSolveFieldFits()', () => {
   it('turns a 32-bit float TIFF into a float FITS, grey, top row first', () => {
-    const fits = tiffToSolveFieldFits(rgbTiff(32, [0.1, 0.2, 0.3, 0.4]));
+    const fits = fitsOf(tiffToSolveFieldFits(rgbTiff(32, [0.1, 0.2, 0.3, 0.4])));
     expect(fits).not.toBeNull();
     const header = fits!.subarray(0, 2880).toString('ascii');
     expect(header).toMatch(/^SIMPLE {2}= +T/);
@@ -108,6 +117,27 @@ describe('tiffToSolveFieldFits()', () => {
   it('leaves 8- and 16-bit TIFFs as they are (solve-field reads them)', () => {
     expect(tiffToSolveFieldFits(rgbTiff(8, [0, 50, 100, 255]))).toBeNull();
     expect(tiffToSolveFieldFits(rgbTiff(16, [0, 1000, 30000, 65535]))).toBeNull();
+  });
+
+  it('writes the body in strips of rows, the last one padded to a whole block', () => {
+    // 3 × 300 mono: a strip of 256 rows, then one of 44; 3600 bytes of samples padded to 5760.
+    const width = 3;
+    const height = 300;
+    const tiff = buildTiff({
+      width,
+      height,
+      bitsPerSample: 32,
+      sampleFormat: 3,
+      samplesPerPixel: 1,
+      photometric: 1,
+      pixels: Array.from({ length: width * height }, (_, i) => i),
+    });
+    const pieces = [...tiffToSolveFieldFits(tiff)!];
+    expect(pieces.map((p) => p.length)).toEqual([2880, 256 * width * 4, 44 * width * 4 + 2160]);
+    const fits = Buffer.concat(pieces);
+    expect(fits.length).toBe(2880 + 5760);
+    for (const i of [0, 767, 768, 899]) expect(fits.readFloatBE(2880 + i * 4)).toBe(i);
+    expect(fits.subarray(2880 + 3600).every((b) => b === 0)).toBe(true);
   });
 });
 
@@ -128,6 +158,7 @@ describe('solveWithSolveField()', () => {
 
     mockFspMkdtemp.mockResolvedValue('/tmp/solve-field-test');
     mockFspWriteFile.mockResolvedValue(undefined);
+    mockFspRename.mockResolvedValue(undefined);
     mockFspReadFile.mockResolvedValue(
       [
         'CRPIX1  =                 960.0',
@@ -166,7 +197,7 @@ describe('solveWithSolveField()', () => {
 
   it('returns success with correspondences and parsed DSO IDs', async () => {
     const result = await solveWithSolveField(
-      Buffer.from('img'),
+      '/incoming/upload.part',
       '.jpg',
       1920,
       1080,
@@ -181,7 +212,7 @@ describe('solveWithSolveField()', () => {
 
   it('builds scale and position arguments from hints and adds downsample for large images', async () => {
     await solveWithSolveField(
-      Buffer.from('img'),
+      '/incoming/upload.part',
       '.jpg',
       4096,
       3000,
@@ -215,7 +246,7 @@ describe('solveWithSolveField()', () => {
     });
 
     const result = await solveWithSolveField(
-      Buffer.from('img'),
+      '/incoming/upload.part',
       '.jpg',
       1920,
       1080,
@@ -236,7 +267,7 @@ describe('solveWithSolveField()', () => {
     });
 
     const result = await solveWithSolveField(
-      Buffer.from('img'),
+      '/incoming/upload.part',
       '.jpg',
       1920,
       1080,
@@ -258,7 +289,7 @@ describe('solveWithSolveField()', () => {
     });
 
     const result = await solveWithSolveField(
-      Buffer.from('img'),
+      '/incoming/upload.part',
       '.jpg',
       1920,
       1080,
@@ -278,7 +309,7 @@ describe('solveWithSolveField()', () => {
       return null;
     });
 
-    await solveWithSolveField(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    await solveWithSolveField('/incoming/upload.part', '.jpg', 1920, 1080, undefined, 'en');
     const args = mockWrapExecForWSL.mock.calls[0][1] as string[];
     expect(args).toContain('--config');
     expect(args).toContain('/etc/astrometry.cfg');
@@ -288,7 +319,7 @@ describe('solveWithSolveField()', () => {
     mockExistsSync.mockReturnValue(false);
 
     const result = await solveWithSolveField(
-      Buffer.from('img'),
+      '/incoming/upload.part',
       '.jpg',
       1920,
       1080,
@@ -308,7 +339,7 @@ describe('solveWithSolveField()', () => {
     });
 
     const result = await solveWithSolveField(
-      Buffer.from('img'),
+      '/incoming/upload.part',
       '.jpg',
       1920,
       1080,
@@ -342,7 +373,7 @@ describe('solveWithSolveField()', () => {
     });
 
     const result = await solveWithSolveField(
-      Buffer.from('img'),
+      '/incoming/upload.part',
       '.jpg',
       1920,
       1080,
@@ -356,7 +387,7 @@ describe('solveWithSolveField()', () => {
   });
 
   it('always passes --uniformize 0 to skip the pyfits/astropy dependency', async () => {
-    await solveWithSolveField(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    await solveWithSolveField('/incoming/upload.part', '.jpg', 1920, 1080, undefined, 'en');
     const args = mockWrapExecForWSL.mock.calls[0][1] as string[];
     const idx = args.indexOf('--uniformize');
     expect(idx).toBeGreaterThanOrEqual(0);
@@ -372,7 +403,7 @@ describe('solveWithSolveField()', () => {
     });
 
     const result = await solveWithSolveField(
-      Buffer.from('img'),
+      '/incoming/upload.part',
       '.jpg',
       1920,
       1080,
@@ -397,7 +428,7 @@ describe('solveWithSolveField()', () => {
     });
 
     const result = await solveWithSolveField(
-      Buffer.from('img'),
+      '/incoming/upload.part',
       '.jpg',
       1920,
       1080,
@@ -420,7 +451,7 @@ describe('solveWithSolveField()', () => {
     });
 
     const result = await solveWithSolveField(
-      Buffer.from('img'),
+      '/incoming/upload.part',
       '.jpg',
       1920,
       1080,
@@ -442,7 +473,7 @@ describe('solveWithSolveField()', () => {
     });
 
     const result = await solveWithSolveField(
-      Buffer.from('img'),
+      '/incoming/upload.part',
       '.jpg',
       1920,
       1080,
@@ -455,19 +486,34 @@ describe('solveWithSolveField()', () => {
   });
 
   it('hands a 32-bit TIFF to solve-field as input.fits, keeping the picture Y convention', async () => {
-    await solveWithSolveField(rgbTiff(32, [0.1, 0.2, 0.3, 0.4]), '.tiff', 2, 2, undefined, 'en');
-    const [writtenPath, written] = mockFspWriteFile.mock.calls[0] as [string, Buffer];
+    mockFspReadFile.mockResolvedValueOnce(rgbTiff(32, [0.1, 0.2, 0.3, 0.4]));
+    await solveWithSolveField('/incoming/upload.part', '.tiff', 2, 2, undefined, 'en');
+    expect(mockFspReadFile).toHaveBeenNthCalledWith(1, '/incoming/upload.part');
+    const [writtenPath, written] = mockFspWriteFile.mock.calls[0] as [string, Iterable<Buffer>];
     expect(writtenPath).toMatch(/input\.fits$/);
-    expect(written.subarray(0, 6).toString('ascii')).toBe('SIMPLE');
+    expect(fitsOf(written)!.subarray(0, 6).toString('ascii')).toBe('SIMPLE');
+    expect(mockFspRename).not.toHaveBeenCalled();
     expect((mockWrapExecForWSL.mock.calls[0][1] as string[])[0]).toMatch(/input\.fits$/);
     expect(mockWcsToCorrespondences).toHaveBeenCalledWith(expect.anything(), 2, 2, false);
   });
 
-  it('hands an 8-bit TIFF to solve-field unchanged', async () => {
-    const tiff = rgbTiff(8, [0, 50, 100, 255]);
-    await solveWithSolveField(tiff, '.tif', 2, 2, undefined, 'en');
-    const [writtenPath, written] = mockFspWriteFile.mock.calls[0] as [string, Buffer];
-    expect(writtenPath).toMatch(/input\.tif$/);
-    expect(written).toBe(tiff);
+  it('hands an 8-bit TIFF to solve-field unchanged, moving the upload into place', async () => {
+    mockFspReadFile.mockResolvedValueOnce(rgbTiff(8, [0, 50, 100, 255]));
+    await solveWithSolveField('/incoming/upload.part', '.tif', 2, 2, undefined, 'en');
+    expect(mockFspRename).toHaveBeenCalledWith(
+      '/incoming/upload.part',
+      expect.stringMatching(/input\.tif$/),
+    );
+    expect(mockFspWriteFile).not.toHaveBeenCalled();
+  });
+
+  it('moves any other upload into place without reading it', async () => {
+    await solveWithSolveField('/incoming/upload.part', '.fits', 1920, 1080, undefined, 'en');
+    expect(mockFspRename).toHaveBeenCalledWith(
+      '/incoming/upload.part',
+      expect.stringMatching(/input\.fits$/),
+    );
+    expect(mockFspReadFile).not.toHaveBeenCalledWith('/incoming/upload.part');
+    expect(mockFspWriteFile).not.toHaveBeenCalled();
   });
 });

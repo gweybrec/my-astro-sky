@@ -4,6 +4,7 @@ import { promises as fsp, existsSync } from 'fs';
 import os from 'os';
 import path from 'path';
 import { parseFITSHeader, wcsToCorrespondences } from './wcs-reader.js';
+import { placeSolverInput } from './solver-input.js';
 import type { WCSData } from './wcs-reader.js';
 import { settings } from './services.js';
 import { shouldUseWSL, wrapExecForWSL, wslPath } from './wsl-utils.js';
@@ -91,8 +92,9 @@ async function useWSLForASTAP(): Promise<boolean> {
   return shouldUseWSL(await settings.get('USE_WSL_FOR_ASTAP'));
 }
 
+/** Solves the picture at `inputPath` (an upload on disk, moved into ASTAP's temporary folder; `ext` is its real extension). */
 export async function solveWithASTAP(
-  buffer: Buffer,
+  inputPath: string,
   ext: string,
   width: number,
   height: number,
@@ -110,7 +112,7 @@ export async function solveWithASTAP(
   const wcsPath = path.join(tmpDir, 'input.wcs');
 
   try {
-    await fsp.writeFile(imgPath, buffer);
+    await placeSolverInput(inputPath, imgPath);
 
     // Build ASTAP command with optional hints
     const imgArg = wslPath(imgPath, useWSL);

@@ -6,6 +6,7 @@ const {
   mockFspWriteFile,
   mockFspReadFile,
   mockFspRm,
+  mockFspRename,
   mockExistsSync,
   mockParseFITSHeader,
   mockWcsToCorrespondences,
@@ -19,6 +20,7 @@ const {
   mockFspWriteFile: vi.fn(),
   mockFspReadFile: vi.fn(),
   mockFspRm: vi.fn(),
+  mockFspRename: vi.fn(),
   mockExistsSync: vi.fn(),
   mockParseFITSHeader: vi.fn(),
   mockWcsToCorrespondences: vi.fn(),
@@ -41,6 +43,7 @@ vi.mock('fs', () => ({
     writeFile: mockFspWriteFile,
     readFile: mockFspReadFile,
     rm: mockFspRm,
+    rename: mockFspRename,
   },
   existsSync: mockExistsSync,
   default: {
@@ -49,6 +52,7 @@ vi.mock('fs', () => ({
       writeFile: mockFspWriteFile,
       readFile: mockFspReadFile,
       rm: mockFspRm,
+      rename: mockFspRename,
     },
     existsSync: mockExistsSync,
   },
@@ -108,6 +112,7 @@ describe('solveWithASTAP()', () => {
 
     mockFspMkdtemp.mockResolvedValue('/tmp/astap-test');
     mockFspWriteFile.mockResolvedValue(undefined);
+    mockFspRename.mockResolvedValue(undefined);
     mockFspReadFile.mockResolvedValue(
       [
         'CRPIX1  =                 960.0',
@@ -145,10 +150,27 @@ describe('solveWithASTAP()', () => {
   });
 
   it('returns success with correspondences from the ASTAP WCS', async () => {
-    const result = await solveWithASTAP(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    const result = await solveWithASTAP(
+      '/incoming/upload.part',
+      '.jpg',
+      1920,
+      1080,
+      undefined,
+      'en',
+    );
 
     expect(result.success).toBe(true);
     expect(result.correspondences).toHaveLength(3);
+  });
+
+  it('moves the upload into its temporary folder, never reading it into memory', async () => {
+    await solveWithASTAP('/incoming/upload.part', '.fits', 1920, 1080, undefined, 'en');
+    expect(mockFspRename).toHaveBeenCalledWith(
+      '/incoming/upload.part',
+      expect.stringMatching(/input\.fits$/),
+    );
+    expect(mockFspWriteFile).not.toHaveBeenCalled();
+    expect((mockWrapExecForWSL.mock.calls[0][1] as string[])[1]).toMatch(/input\.fits$/);
   });
 
   // Regression guard for the FITS Y-axis convention bug: ASTAP emits FITS-convention
@@ -156,7 +178,7 @@ describe('solveWithASTAP()', () => {
   // fitsYConvention=true — otherwise placements come out vertically flipped/skewed.
   // solve-field and astrometry.net stay false (display convention) and are untouched.
   it('generates correspondences with fitsYConvention=true (FITS bottom-up)', async () => {
-    await solveWithASTAP(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    await solveWithASTAP('/incoming/upload.part', '.jpg', 1920, 1080, undefined, 'en');
 
     expect(mockWcsToCorrespondences).toHaveBeenCalled();
     const args = mockWcsToCorrespondences.mock.calls[0];
@@ -169,7 +191,7 @@ describe('solveWithASTAP()', () => {
   // thorough search made ASTAP accept scale-distorted false matches. It must NOT
   // be passed; the thorough-search flags (-speed slow, -s 800) are kept.
   it('does not pass the relaxed -t tolerance, but keeps the thorough-search flags', async () => {
-    await solveWithASTAP(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    await solveWithASTAP('/incoming/upload.part', '.jpg', 1920, 1080, undefined, 'en');
     const args = mockWrapExecForWSL.mock.calls.find(
       (c) => Array.isArray(c[1]) && (c[1] as string[]).includes('-wcs'),
     )?.[1] as string[];
@@ -192,7 +214,14 @@ describe('solveWithASTAP()', () => {
       ...SHEARED_CD,
     });
 
-    const result = await solveWithASTAP(Buffer.from('img'), '.jpg', 1920, 1080, undefined, 'en');
+    const result = await solveWithASTAP(
+      '/incoming/upload.part',
+      '.jpg',
+      1920,
+      1080,
+      undefined,
+      'en',
+    );
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/distorted|shear|déformée|cisaillement/i);
@@ -200,7 +229,14 @@ describe('solveWithASTAP()', () => {
   });
 
   it('converts RA/Dec hints to hours and SPD in the ASTAP command', async () => {
-    await solveWithASTAP(Buffer.from('img'), '.jpg', 1920, 1080, { ra: 83.6, dec: 22.0 }, 'en');
+    await solveWithASTAP(
+      '/incoming/upload.part',
+      '.jpg',
+      1920,
+      1080,
+      { ra: 83.6, dec: 22.0 },
+      'en',
+    );
 
     const args = mockWrapExecForWSL.mock.calls.find(
       (c) => Array.isArray(c[1]) && (c[1] as string[]).includes('-wcs'),

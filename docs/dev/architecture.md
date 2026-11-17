@@ -212,6 +212,14 @@ An uploaded archive is never held in memory: multer writes it to a file in `INCO
 `openZipRanges` (`@myastrosky/core/zip-ranges`, the reader the phone uses too), and the route removes
 the file once it has answered. The folder is emptied at start-up.
 
+The plate-solve routes (`/api/solve-astap`, `/api/solve-field`, `/api/solve-plate`, `/api/solve-plate/resume`)
+write their upload to `INCOMING_DIR` the same way (`uploadSolve`), since a stacked FITS or TIFF can weigh
+hundreds of megabytes. The size is read from the start of the file. ASTAP and solve-field get the file moved
+into their temporary folder (`server/solver-input.ts`), and a 32-bit TIFF is written as FITS strip by strip.
+astrometry.net gets it streamed from disk through `fs.openAsBlob`: `NovaSolveFile.bytes` and the HTTP form part
+take a `ByteSource`, read only as needed. The upload is removed when the solve ends, or when the route
+refuses it.
+
 `unzipper` is only used by the tests, to check the archives the server writes with a second reader.
 It is CommonJS-only, so they load it via `createRequire(import.meta.url)`.
 

@@ -1,3 +1,13 @@
+/**
+ * A file's content read only when needed (a `Blob` is one: the server's comes from `fs.openAsBlob`), so that a large
+ * file sent on is not held in memory whole.
+ */
+export interface ByteSource {
+  readonly size: number;
+  slice(start?: number, end?: number): ByteSource;
+  arrayBuffer(): Promise<ArrayBuffer>;
+}
+
 export interface HttpRequest {
   method: 'GET' | 'POST';
   url: string;
@@ -8,7 +18,7 @@ export interface HttpRequest {
     | {
         form: ReadonlyArray<
           | { name: string; value: string }
-          | { name: string; fileName: string; type: string; bytes: Uint8Array }
+          | { name: string; fileName: string; type: string; bytes: Uint8Array | ByteSource }
         >;
       };
   timeoutMs?: number;

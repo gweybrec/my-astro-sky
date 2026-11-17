@@ -241,6 +241,41 @@ describe('submit()', () => {
     expect(t.calls[1].headers).toEqual({ 'User-Agent': 'MyAstroSky' });
   });
 
+  it('sends a file read on demand as it is, reading only the start of a FITS for its size', async () => {
+    const fits = buildFits({
+      bitpix: -32,
+      naxis1: 400,
+      naxis2: 300,
+      pixels: Array.from({ length: 400 * 300 }, () => 0),
+    });
+    const reads: Array<[number | undefined, number | undefined]> = [];
+    // A Blob-like source over the file: it records what is read.
+    const source = (start = 0, end = fits.length) => ({
+      size: end - start,
+      slice: (s?: number, e?: number) => {
+        reads.push([s, e]);
+        return source(start + (s ?? 0), Math.min(end, start + (e ?? end - start)));
+      },
+      arrayBuffer: async () => {
+        reads.push([start, end]);
+        return new Uint8Array(fits.subarray(start, end)).buffer;
+      },
+    });
+    const bytes = source();
+    const t = setup({ route: (r) => loginOk(r.url) ?? json({ status: 'success', subid: 5 }) });
+    await t.service.submit({ fileName: 'm13.fits', bytes });
+    expect(t.probe).not.toHaveBeenCalled();
+    expect(reads).toEqual([
+      [0, 64 * 1024],
+      [0, 64 * 1024],
+    ]);
+    expect(((t.calls[1].body as { form: unknown[] }).form[1] as { bytes: unknown }).bytes).toBe(
+      bytes,
+    );
+    const status = await t.service.getJob('job-1');
+    expect(status.status).toBe('solving');
+  });
+
   it('names the app in every request: astrometry.net answers a browser User-Agent with a page for crawlers', async () => {
     const t = setup({
       route: (r) => loginOk(r.url) ?? json({ status: 'success', subid: 5 }),

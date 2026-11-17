@@ -996,6 +996,12 @@ describe('online solving routes (astrometry.net)', () => {
     return { status: res.status, body: (await res.json()) as any };
   }
 
+  /** The uploads still waiting on disk. */
+  const incomingFiles = () => {
+    const dir = path.join(uploadsDir, '.incoming');
+    return fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+  };
+
   const json = (data: unknown): UpstreamReply => ({
     status: 200,
     body: JSON.stringify(data),
@@ -1220,6 +1226,34 @@ describe('online solving routes (astrometry.net)', () => {
       const status = await call('GET', `/api/solve-plate/${r.body.jobId}`);
       expect(status.status).toBe(200);
       expect(status.body).toEqual({ jobId: r.body.jobId, status: 'solving', submissionId: 77 });
+    });
+
+    it('sends a FITS file whole from disk, and removes the upload once it is sent', async () => {
+      const { buildFits } = await import('../fixtures/fits-builders');
+      const fits = buildFits({
+        bitpix: 16,
+        naxis1: 64,
+        naxis2: 48,
+        pixels: Array.from({ length: 64 * 48 }, (_, i) => i % 1000),
+      });
+      upstream = (url) =>
+        url === `${API}/login`
+          ? json({ status: 'success', session: 'sess-1' })
+          : json({ status: 'success', subid: 79 });
+      const r = await post('/api/solve-plate', { name: 'stack.fits', bytes: fits });
+      expect(r.status).toBe(200);
+      const up = recorded.find((x) => x.url === `${API}/upload`)!;
+      expect(up.body).toContain('name="file"; filename="stack.fits"');
+      expect(up.body).toContain(fits.toString('latin1'));
+      // Removed right after the answer is sent.
+      await vi.waitFor(() => expect(incomingFiles()).toEqual([]));
+    });
+
+    it('removes the upload of a request it refuses', async () => {
+      const r = await post('/api/solve-astap', { name: 'stack.xisf', bytes: png });
+      expect(r.status).toBe(400);
+      // Removed right after the answer is sent.
+      await vi.waitFor(() => expect(incomingFiles()).toEqual([]));
     });
 
     it('reuses the session and asks for the default scale range of the web form when no hint is given', async () => {

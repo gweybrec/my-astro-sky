@@ -5,6 +5,7 @@ import os from 'os';
 import path from 'path';
 import { decodeTiffToFloat, tiffBitsPerSample } from '@myastrosky/core/raw-decode/tiff-decoder';
 import { parseFITSHeader, wcsToCorrespondences } from './wcs-reader.js';
+import { placeSolverInput } from './solver-input.js';
 import type { WCSData } from './wcs-reader.js';
 import { normalizeDSOAliases } from './dso-utils.js';
 import { settings } from './services.js';
@@ -62,17 +63,32 @@ interface SolveResult {
   dsoIds?: string[];
 }
 
+/** Rows of the FITS body built and written at a time. */
+const FITS_STRIP_ROWS = 256;
+
 /**
  * solve-field reads a TIFF through netpbm's `tifftopnm`, which takes 8 or 16 bits per sample but refuses 32
  * (the float TIFF stacking programs export). Such a TIFF is handed over as a 32-bit float FITS instead: its
  * colour channels averaged into one, rows in the TIFF's top-to-bottom order so the solution keeps the
  * picture convention. Any other TIFF is left as is (returns null). Decoded by our own TIFF decoder: sharp
  * collapses float samples (see raw-decode/index.ts).
+ *
+ * The FITS file comes as pieces to write one after the other (its header, then strips of rows, the last one
+ * padded to a whole 2880-byte block), so that it never sits in memory whole. The TIFF is decoded at once and
+ * not kept: only its decoded samples are, until the last strip is written.
  */
-export function tiffToSolveFieldFits(buffer: Buffer): Buffer | null {
+export function tiffToSolveFieldFits(buffer: Uint8Array): Iterable<Buffer> | null {
   if ((tiffBitsPerSample(buffer) ?? 0) <= 16) return null;
-  const { width, height, channels, data: px } = decodeTiffToFloat(buffer);
+  const { width, height, channels, data } = decodeTiffToFloat(buffer);
+  return floatFitsPieces(width, height, channels, data);
+}
 
+function* floatFitsPieces(
+  width: number,
+  height: number,
+  channels: number,
+  px: Float32Array,
+): Generator<Buffer> {
   const card = (key: string, value: string) => `${key.padEnd(8)}= ${value.padStart(20)}`.padEnd(80);
   const cards = [
     card('SIMPLE', 'T'),
@@ -82,15 +98,22 @@ export function tiffToSolveFieldFits(buffer: Buffer): Buffer | null {
     card('NAXIS2', String(height)),
     'END'.padEnd(80),
   ].join('');
-  const header = Buffer.from(cards.padEnd(Math.ceil(cards.length / 2880) * 2880), 'ascii');
+  yield Buffer.from(cards.padEnd(Math.ceil(cards.length / 2880) * 2880), 'ascii');
 
-  const body = Buffer.alloc(Math.ceil((width * height * 4) / 2880) * 2880);
-  for (let i = 0; i < width * height; i++) {
-    let sum = 0;
-    for (let c = 0; c < channels; c++) sum += px[i * channels + c];
-    body.writeFloatBE(sum / channels, i * 4);
+  const bodyBytes = width * height * 4;
+  const padding = Math.ceil(bodyBytes / 2880) * 2880 - bodyBytes;
+  for (let y0 = 0; y0 < height; y0 += FITS_STRIP_ROWS) {
+    const rows = Math.min(FITS_STRIP_ROWS, height - y0);
+    const isLast = y0 + rows === height;
+    const strip = Buffer.alloc(rows * width * 4 + (isLast ? padding : 0));
+    const first = y0 * width;
+    for (let i = 0; i < rows * width; i++) {
+      let sum = 0;
+      for (let c = 0; c < channels; c++) sum += px[(first + i) * channels + c];
+      strip.writeFloatBE(sum / channels, i * 4);
+    }
+    yield strip;
   }
-  return Buffer.concat([header, body]);
 }
 
 async function getSolveFieldBin(): Promise<string> {
@@ -105,8 +128,12 @@ async function useWSLForSolveField(): Promise<boolean> {
   return shouldUseWSL(await settings.get('USE_WSL_FOR_SOLVE_FIELD'));
 }
 
+/**
+ * Solves the picture at `inputPath` (an upload on disk, moved into solve-field's temporary folder; `ext` is its
+ * real extension).
+ */
 export async function solveWithSolveField(
-  buffer: Buffer,
+  inputPath: string,
   ext: string,
   width: number,
   height: number,
@@ -124,12 +151,15 @@ export async function solveWithSolveField(
   try {
     // A 32-bit TIFF goes as a float FITS (see tiffToSolveFieldFits); its rows stay top-down,
     // so `ext` (still .tif/.tiff) keeps choosing the picture Y convention below.
-    const tiffFits = ext === '.tif' || ext === '.tiff' ? tiffToSolveFieldFits(buffer) : null;
+    const tiffFits =
+      ext === '.tif' || ext === '.tiff'
+        ? tiffToSolveFieldFits(await fsp.readFile(inputPath))
+        : null;
     const imgPath = path.join(tmpDir, tiffFits ? 'input.fits' : `input${ext}`);
 
-    // Write the original buffer to temp file WITHOUT rotation
-    // solve-field will solve it in its original orientation
-    await fsp.writeFile(imgPath, tiffFits ?? buffer);
+    // The original file, WITHOUT rotation: solve-field solves it in its original orientation
+    if (tiffFits) await fsp.writeFile(imgPath, tiffFits);
+    else await placeSolverInput(inputPath, imgPath);
 
     logDebug('solve-field', `Image dimensions: ${width}×${height}`);
 

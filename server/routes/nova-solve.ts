@@ -1,10 +1,19 @@
 import express from 'express';
+import fs from 'fs';
 import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { NovaSolveHints } from '@myastrosky/core/domain/solve';
-import { upload, uploadSolve } from './shared.js';
+import { removeUpload, upload, uploadSolve } from './shared.js';
 import { novaSolve } from '../services.js';
 import { sendError } from './http-errors.js';
 import { logServerError } from '../logger.js';
+
+/**
+ * The upload on disk, read only as it is needed: astrometry.net gets it streamed from the file, and the service
+ * reads only the start of a FITS file for its size. A stack of several hundred megabytes never sits in memory.
+ */
+function uploadedFile(filePath: string): Promise<Blob> {
+  return fs.openAsBlob(filePath, { type: 'application/octet-stream' });
+}
 
 export const novaSolveRouter = express.Router();
 
@@ -68,7 +77,7 @@ novaSolveRouter.post('/api/solve-plate', uploadSolve.single('photo'), async (req
     let jobId: string;
     try {
       jobId = await novaSolve.submit(
-        { fileName: file.originalname, bytes: file.buffer },
+        { fileName: file.originalname, bytes: await uploadedFile(file.path) },
         Object.keys(hints).length > 0 ? hints : undefined,
       );
     } catch (err) {
@@ -88,6 +97,9 @@ novaSolveRouter.post('/api/solve-plate', uploadSolve.single('photo'), async (req
   } catch (err: any) {
     console.error('Plate solve submit error:', err);
     res.status(500).json({ error: err.message });
+  } finally {
+    // `submit` returns once the upload to astrometry.net is over: the file on disk is no longer needed.
+    await removeUpload(req.file);
   }
 });
 
@@ -153,7 +165,7 @@ novaSolveRouter.post('/api/solve-plate/resume', uploadSolve.single('photo'), asy
     try {
       const fits = req.body.fits === 'true' ? true : req.body.fits === 'false' ? false : undefined;
       jobId = await novaSolve.resume(
-        { fileName: file.originalname, bytes: file.buffer },
+        { fileName: file.originalname, bytes: await uploadedFile(file.path) },
         Number(req.body.submissionId),
         fits === undefined ? undefined : { fits },
       );
@@ -177,6 +189,8 @@ novaSolveRouter.post('/api/solve-plate/resume', uploadSolve.single('photo'), asy
   } catch (err) {
     console.error('Plate solve resume error:', err);
     res.status(500).json({ error: (err as Error).message });
+  } finally {
+    await removeUpload(req.file);
   }
 });
 

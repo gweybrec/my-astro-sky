@@ -56,10 +56,17 @@ export const upload = multer({
 /**
  * The plate-solve routes take a picture or a raw astro file (FITS, TIFF, XISF), which arrives as
  * `application/octet-stream`: the extension admits it, the solver then reads what it supports.
- * Anything else that is not an image (a text file, say) is refused.
+ * Anything else that is not an image (a text file, say) is refused. The file is written to INCOMING_DIR, not
+ * kept in memory: a stack of several hundred megabytes waits there for minutes while it is solved or sent to
+ * astrometry.net. The route removes it when it is done with it (`removeUpload`).
  */
 export const uploadSolve = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      fs.mkdir(INCOMING_DIR, { recursive: true }, (err) => cb(err, INCOMING_DIR));
+    },
+    filename: (_req, _file, cb) => cb(null, `${randomUUID()}.part`),
+  }),
   limits: { fileSize: 600 * 1024 * 1024 }, // 600 MB, like uploadRaw
   fileFilter: (_req, file, cb) => {
     if (ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype) || isRawAstroFile(file.originalname)) {
@@ -69,6 +76,14 @@ export const uploadSolve = multer({
     }
   },
 });
+
+/** Removes an upload written to disk; a file already gone (moved by a solver, say) is no error. */
+export async function removeUpload(file: { path: string } | undefined): Promise<void> {
+  if (!file) return;
+  await fs.promises.rm(file.path, { force: true }).catch((err) => {
+    console.warn('[upload] Failed to remove', file.path, err);
+  });
+}
 
 // Separate multer instance for WCS companion files (FITS/TIFF can be large)
 export const uploadWCS = multer({

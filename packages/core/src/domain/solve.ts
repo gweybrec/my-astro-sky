@@ -2,6 +2,7 @@
 
 import type { FileSource, TransferOptions } from '../backend';
 import type { PlateSolveResult } from '../types';
+import type { ByteSource } from '../ports/http-client';
 
 /**
  * Result of converting a raw astro image to PNG. `TFile` is the platform file type
@@ -65,10 +66,10 @@ export function onlineSolveHints(
   };
 }
 
-/** A picture handed to online solving. */
+/** A picture handed to online solving: its bytes, or a source the service reads only as it needs (the server's file on disk). */
 export interface NovaSolveFile {
   fileName: string;
-  bytes: Uint8Array;
+  bytes: Uint8Array | ByteSource;
 }
 
 /** One star correspondence of a solved job. */

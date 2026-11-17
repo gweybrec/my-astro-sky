@@ -1,5 +1,8 @@
 // @vitest-environment node
 /** The server's `HttpClient` over `fetch`, with `globalThis.fetch` stubbed (no network). */
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFetchHttpClient } from '../../server/http-client';
 
@@ -66,6 +69,31 @@ describe('createFetchHttpClient()', () => {
     expect(file.name).toBe('m31.jpg');
     expect(file.type).toBe('image/jpeg');
     expect(Array.from(new Uint8Array(await file.arrayBuffer()))).toEqual([1, 2, 3]);
+  });
+
+  it('sends a file read from disk as it is, streamed from the file', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'http-client-test-'));
+    try {
+      const filePath = path.join(dir, 'stack.fits');
+      fs.writeFileSync(filePath, Buffer.from([4, 5, 6]));
+      const blob = await fs.openAsBlob(filePath);
+      const fetchMock = vi.fn(async () => new Response(''));
+      vi.stubGlobal('fetch', fetchMock);
+      await createFetchHttpClient()({
+        method: 'POST',
+        url: 'https://example.test/',
+        body: {
+          form: [{ name: 'file', fileName: 'stack.fits', type: 'image/fits', bytes: blob }],
+        },
+      });
+      const form = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1]
+        .body as FormData;
+      const file = form.get('file') as File;
+      expect(file.name).toBe('stack.fits');
+      expect(Array.from(new Uint8Array(await file.arrayBuffer()))).toEqual([4, 5, 6]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('aborts the request when the timeout passes', async () => {

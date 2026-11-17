@@ -31,11 +31,12 @@ function toBody(body: HttpRequest['body']): string | FormData | undefined {
   const form = new FormData();
   for (const part of body.form) {
     if ('bytes' in part) {
-      form.append(
-        part.name,
-        new Blob([part.bytes as BlobPart], { type: part.type }),
-        part.fileName,
-      );
+      // The phone hands bytes; a source read on demand is a `Blob` already.
+      const blob =
+        part.bytes instanceof Uint8Array
+          ? new Blob([part.bytes as BlobPart], { type: part.type })
+          : (part.bytes as Blob);
+      form.append(part.name, blob, part.fileName);
     } else {
       form.append(part.name, part.value);
     }

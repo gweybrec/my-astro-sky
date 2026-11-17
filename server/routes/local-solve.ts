@@ -1,7 +1,8 @@
 import express from 'express';
 import sharp from 'sharp';
 import path from 'path';
-import { ALLOWED_PHOTO_EXTENSIONS, uploadSolve } from './shared.js';
+import { promises as fsp } from 'fs';
+import { ALLOWED_PHOTO_EXTENSIONS, removeUpload, uploadSolve } from './shared.js';
 import { solveWithASTAP } from '../astap.js';
 import { solveWithSolveField } from '../solve-field.js';
 import { createJob, getJob, updateJob, cancelJob } from '../solve-queue.js';
@@ -16,11 +17,25 @@ export const localSolveRouter = express.Router();
 const ASTAP_EXTENSIONS = new Set([...ALLOWED_PHOTO_EXTENSIONS, '.fit', '.fits']);
 const SOLVE_FIELD_EXTENSIONS = new Set([...ASTAP_EXTENSIONS, '.tif', '.tiff']);
 
-/** The size and EXIF orientation of the upload; a FITS file gives its size from its header (sharp cannot read it). */
-async function sizeOf(buffer: Buffer, ext: string) {
-  if (ext === '.fit' || ext === '.fits')
-    return { ...fitsImageSize(buffer), orientation: undefined };
-  const meta = await sharp(buffer).metadata();
+/** How much of a FITS file is read for its size: NAXIS1 and NAXIS2 are among the first cards of its header. */
+const FITS_HEAD_BYTES = 64 * 1024;
+
+/**
+ * The size and EXIF orientation of the upload on disk, read from its start only; a FITS file gives its size
+ * from its header (sharp cannot read it).
+ */
+async function sizeOf(filePath: string, ext: string) {
+  if (ext === '.fit' || ext === '.fits') {
+    const fh = await fsp.open(filePath, 'r');
+    try {
+      const head = Buffer.alloc(FITS_HEAD_BYTES);
+      const { bytesRead } = await fh.read(head, 0, FITS_HEAD_BYTES, 0);
+      return { ...fitsImageSize(head.subarray(0, bytesRead)), orientation: undefined };
+    } finally {
+      await fh.close();
+    }
+  }
+  const meta = await sharp(filePath).metadata();
   return { width: meta.width ?? 0, height: meta.height ?? 0, orientation: meta.orientation };
 }
 
@@ -92,6 +107,8 @@ localSolveRouter.post('/api/solve-astap', uploadSolve.single('photo'), async (re
     return;
   }
 
+  // The upload is on disk: the background solve removes it when it ends, this route when it answers first.
+  let handedOff = false;
   try {
     const ext = path.extname(req.file.originalname).toLowerCase() || '.jpg';
     if (!ASTAP_EXTENSIONS.has(ext)) {
@@ -103,7 +120,7 @@ localSolveRouter.post('/api/solve-astap', uploadSolve.single('photo'), async (re
       return;
     }
 
-    const meta = await sizeOf(req.file.buffer, ext);
+    const meta = await sizeOf(req.file.path, ext);
     const width = meta.width;
     const height = meta.height;
     if (!width || !height) {
@@ -121,17 +138,18 @@ localSolveRouter.post('/api/solve-astap', uploadSolve.single('photo'), async (re
     if (req.body.fov !== undefined) hints.fov = parseFloat(req.body.fov);
     if (req.body.radius !== undefined) hints.radius = parseFloat(req.body.radius);
 
-    const fileBuffer = req.file.buffer;
+    const upload = req.file;
     const originalName = req.file.originalname;
     const orientation = meta.orientation;
     const job = createJob();
     res.status(202).json({ jobId: job.id });
 
+    handedOff = true;
     void (async () => {
       updateJob(job.id, { status: 'running' });
       try {
         const result = await solveWithASTAP(
-          fileBuffer,
+          upload.path,
           ext,
           width,
           height,
@@ -162,11 +180,15 @@ localSolveRouter.post('/api/solve-astap', uploadSolve.single('photo'), async (re
           console.error('[SolveASTAP] Background solve error:', err);
           updateJob(job.id, { status: 'failed', error: err.message || 'Unknown ASTAP error' });
         }
+      } finally {
+        await removeUpload(upload);
       }
     })();
   } catch (err: any) {
     console.error('[SolveASTAP] Request handling error:', err);
     if (!res.writableEnded) res.status(500).json({ error: err.message || 'Server error' });
+  } finally {
+    if (!handedOff) await removeUpload(req.file);
   }
 });
 
@@ -332,6 +354,8 @@ localSolveRouter.post('/api/solve-field', uploadSolve.single('photo'), async (re
     return;
   }
 
+  // The upload is on disk: the background solve removes it when it ends, this route when it answers first.
+  let handedOff = false;
   try {
     const ext = path.extname(req.file.originalname).toLowerCase() || '.jpg';
     if (!SOLVE_FIELD_EXTENSIONS.has(ext)) {
@@ -343,7 +367,7 @@ localSolveRouter.post('/api/solve-field', uploadSolve.single('photo'), async (re
       return;
     }
 
-    const meta = await sizeOf(req.file.buffer, ext);
+    const meta = await sizeOf(req.file.path, ext);
     const width = meta.width;
     const height = meta.height;
     if (!width || !height) {
@@ -361,17 +385,18 @@ localSolveRouter.post('/api/solve-field', uploadSolve.single('photo'), async (re
     if (req.body.fov !== undefined) hints.fov = parseFloat(req.body.fov);
     if (req.body.radius !== undefined) hints.radius = parseFloat(req.body.radius);
 
-    const fileBuffer = req.file.buffer;
+    const upload = req.file;
     const originalName = req.file.originalname;
     const orientation = meta.orientation;
     const job = createJob();
     res.status(202).json({ jobId: job.id });
 
+    handedOff = true;
     void (async () => {
       updateJob(job.id, { status: 'running' });
       try {
         const result = await solveWithSolveField(
-          fileBuffer,
+          upload.path,
           ext,
           width,
           height,
@@ -405,11 +430,15 @@ localSolveRouter.post('/api/solve-field', uploadSolve.single('photo'), async (re
             error: err.message || 'Unknown solve-field error',
           });
         }
+      } finally {
+        await removeUpload(upload);
       }
     })();
   } catch (err: any) {
     console.error('[SolveField] Request handling error:', err);
     if (!res.writableEnded) res.status(500).json({ error: err.message || 'Server error' });
+  } finally {
+    if (!handedOff) await removeUpload(req.file);
   }
 });
 

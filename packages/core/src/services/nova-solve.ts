@@ -26,7 +26,7 @@ import type {
   NovaSolveFile,
   NovaSolveHints,
 } from '../domain/solve';
-import type { HttpClient, HttpResponse } from '../ports/http-client';
+import type { ByteSource, HttpClient, HttpResponse } from '../ports/http-client';
 import type { ImageCodec } from '../ports/image-codec';
 import { fitsImageSize, parseFITSHeader, wcsToCorrespondences } from '../wcs';
 import { isFitsFile } from '../photo-formats';
@@ -117,6 +117,21 @@ interface Job {
   dsoIds?: string[];
 }
 
+/** How much of a FITS file is read for its size: its header's first blocks. */
+const FITS_HEAD_BYTES = 64 * 1024;
+
+/** The whole content, read. */
+async function readAll(bytes: Uint8Array | ByteSource): Promise<Uint8Array> {
+  return bytes instanceof Uint8Array ? bytes : new Uint8Array(await bytes.arrayBuffer());
+}
+
+/** The first `length` bytes (fewer when the content is shorter), read. */
+async function readHead(bytes: Uint8Array | ByteSource, length: number): Promise<Uint8Array> {
+  return bytes instanceof Uint8Array
+    ? bytes.subarray(0, length)
+    : new Uint8Array(await bytes.slice(0, length).arrayBuffer());
+}
+
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const isOk = (res: HttpResponse) => res.status >= 200 && res.status <= 299;
 
@@ -193,9 +208,11 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
   /** The size of a picture: its own, else the one a FITS header reports. 0 when unknown. */
   async function dimensionsOf(file: NovaSolveFile): Promise<{ width: number; height: number }> {
     // A FITS file is not an image the codec reads: its header gives the size, plate solution or not.
-    if (isFitsFile(file.fileName)) return fitsImageSize(file.bytes);
+    // NAXIS1 and NAXIS2 are among the first cards of the first 2880-byte block: the start of the file is enough.
+    if (isFitsFile(file.fileName))
+      return fitsImageSize(await readHead(file.bytes, FITS_HEAD_BYTES));
     try {
-      const info = await images.probe(file.bytes);
+      const info = await images.probe(await readAll(file.bytes));
       return { width: info.width || 0, height: info.height || 0 };
     } catch {
       return { width: 0, height: 0 };
