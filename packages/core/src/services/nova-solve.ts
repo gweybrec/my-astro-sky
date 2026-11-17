@@ -269,16 +269,13 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
       requestData.center_dec = hints.dec;
       requestData.radius = hints.radius || 2.0; // Search within 2 degrees by default
     }
-    if (hints?.scale_lower !== undefined) requestData.scale_lower = hints.scale_lower;
-    if (hints?.scale_upper !== undefined) requestData.scale_upper = hints.scale_upper;
-    // The scale range astrometry.net's own web form defaults to: a field from 0.1 to 180 degrees wide.
-    // A narrow guess from the picture's size left out telephoto and very wide fields.
-    if (!requestData.scale_lower && !requestData.scale_upper) {
-      requestData.scale_units = 'degwidth';
-      requestData.scale_type = 'ul';
-      requestData.scale_lower = 0.1;
-      requestData.scale_upper = 180;
-    }
+    // The field width range, in degrees. Without one, the range astrometry.net's own web form defaults to:
+    // a field from 0.1 to 180 degrees wide (a narrow guess from the picture's size left out telephoto and
+    // very wide fields).
+    requestData.scale_units = 'degwidth';
+    requestData.scale_type = 'ul';
+    requestData.scale_lower = hints?.scale_lower ?? 0.1;
+    requestData.scale_upper = hints?.scale_upper ?? 180;
 
     try {
       const res = await http({

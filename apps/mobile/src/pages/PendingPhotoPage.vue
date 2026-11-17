@@ -56,8 +56,12 @@ import PhoneRow from '../components/PhoneRow.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhotoMetadataForm from './gallery/PhotoMetadataForm.vue';
+import SolveHint from './gallery/SolveHint.vue';
 import imageIcon from '@icons/image.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
+import targetIcon from '@icons/target.svg?raw';
+import cloudIcon from '@icons/cloud.svg?raw';
+import smartphoneIcon from '../icons/smartphone.svg?raw';
 
 // The boards "Photo à ajouter" and "…, placée": a photo not stored yet, from the import list or the gallery's waiting
 // photos. Its file and where it stands, the placement methods (as the desktop's cards of "Ajouter des photos"), and
@@ -334,6 +338,33 @@ async function deletePhoto() {
         </IonList>
 
         <PhoneSectionHeader>{{ t('mobile.gallery.chooseMethod') }}</PhoneSectionHeader>
+        <SolveHint :photo-id="id" :disabled="solving" />
+
+        <h2 class="pending-group m-secondary">
+          <AppIcon :svg="smartphoneIcon" />{{ t('mobile.gallery.groupPhone') }}
+        </h2>
+        <IonList class="mob-list" lines="none">
+          <PhoneRow
+            button
+            wrap
+            :disabled="solving"
+            :title="t('mobile.gallery.identifyStars')"
+            :subs="[t('mobile.gallery.identifyStarsSub')]"
+            @click="identify"
+          />
+          <PhoneRow
+            button
+            wrap
+            :disabled="solving"
+            :title="t('mobile.gallery.placeByHand')"
+            :subs="[t('mobile.gallery.placeByHandSub')]"
+            @click="placeByHand"
+          />
+        </IonList>
+
+        <h2 class="pending-group m-secondary">
+          <AppIcon :svg="cloudIcon" />{{ t('batch.groupOnline') }}
+        </h2>
         <IonList class="mob-list" lines="none">
           <PhoneRow
             v-if="unfinished"
@@ -352,33 +383,28 @@ async function deletePhoto() {
             :title="t('mobile.gallery.solveOnline')"
             :subs="[
               unavailableReason() ??
-                (unfinished ? t('batch.onlineRunning') : t('mobile.gallery.solveOnlineSub')),
+                (unfinished ? t('batch.onlineRunning') : t('batch.methodOnlineSub')),
             ]"
+            data-test="solve-online"
             @click="solveOnline"
-          />
+          >
+            <template #title-end>
+              <span
+                class="phone-hint-mark"
+                role="img"
+                :aria-label="t('batch.usesHint')"
+                data-test="hint-mark"
+                ><AppIcon :svg="targetIcon"
+              /></span>
+            </template>
+          </PhoneRow>
           <PhoneRow
             button
             wrap
             :disabled="!online || !keySet || solving"
-            :title="t('mobile.gallery.reuseSolution')"
+            :title="t('batch.methodReuse')"
             :subs="[unavailableReason() ?? t('mobile.gallery.reuseSolutionSub')]"
             @click="reuse"
-          />
-          <PhoneRow
-            button
-            wrap
-            :disabled="solving"
-            :title="t('mobile.gallery.identifyStars')"
-            :subs="[t('mobile.gallery.identifyStarsSub')]"
-            @click="identify"
-          />
-          <PhoneRow
-            button
-            wrap
-            :disabled="solving"
-            :title="t('mobile.gallery.placeByHand')"
-            :subs="[t('mobile.gallery.placeByHandSub')]"
-            @click="placeByHand"
           />
         </IonList>
 
@@ -402,3 +428,21 @@ async function deletePhoto() {
     </PhoneFooter>
   </IonPage>
 </template>
+
+<style scoped>
+/* The heading of a group of placement methods: where they run (the phone, online), with its icon. */
+.pending-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-6) var(--mobile-gutter-end) var(--space-2) var(--mobile-gutter);
+  color: var(--text-secondary);
+  font-weight: normal;
+}
+.pending-group :deep(svg) {
+  flex: none;
+  width: var(--space-8);
+  height: var(--space-8);
+}
+</style>

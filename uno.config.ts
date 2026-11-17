@@ -345,9 +345,34 @@ export default defineConfig({
       'bg-[var(--bg-input)] border border-[var(--border-white-xs)]',
       'flex items-center justify-center text-muted [&_svg]:w-4 [&_svg]:h-4',
     ].join(' '),
+    // The placement methods, in one box per place they run (this computer, online), each under a heading.
+    // (The app's reset sets no border style, so each border below names its style.)
+    'bw-method-group':
+      'flex flex-col border border-solid border-[var(--border-panel)] rounded-lg bg-card overflow-hidden',
+    'bw-method-group-head': [
+      'flex items-center gap-3 px-7 py-3 bg-[var(--bg-panel-hdr)]',
+      'text-base font-medium text-secondary [&_svg]:w-3.5 [&_svg]:h-3.5',
+    ].join(' '),
     // A placement method: title and short line at the left, its action at the right.
-    'bw-method': 'flex flex-col gap-4 px-7 py-5 border-t border-subtle first:border-t-0',
+    'bw-method': 'flex flex-col gap-3 px-7 py-3 border-t [border-top-style:solid] border-subtle',
     'bw-method--done': 'bw-method bg-[var(--status-success-bg)]',
+    // The buttons and solver list of a method row, and the hint's fields: one compact height.
+    'bw-method-control': '!h-[var(--space-10)] !py-0 !px-6 !text-base',
+    'bw-hint-input': 'input-base !h-[var(--space-10)] !py-0 !text-base',
+    // The solve hint, and the mark beside each solve that uses it: the same icon on the same tint.
+    'bw-hint': [
+      'flex items-center gap-5 px-7 py-3 rounded-lg',
+      'border border-solid border-[var(--accent-fill-lg)] bg-[var(--accent-fill-sm)]',
+    ].join(' '),
+    'bw-hint-mark': [
+      'shrink-0 inline-flex items-center justify-center box-border w-[18px] h-[18px] rounded-sm',
+      'bg-[var(--accent-fill-sm)] border border-solid border-[var(--accent-fill-lg)] text-[var(--accent-color)]',
+      '[&_svg]:w-3 [&_svg]:h-3',
+    ].join(' '),
+    'bw-hint-mark--lg':
+      'bw-hint-mark !w-[var(--space-10)] !h-[var(--space-10)] [&_svg]:!w-3.5 [&_svg]:!h-3.5',
+    // A dialog with three choices: its buttons on one line at the right, each as wide as its text.
+    'dialog-buttons--row': '!flex justify-end',
     'bw-section-title': 'm-0 text-sub font-medium text-secondary',
     'bw-field-label': 'text-base text-label',
   },

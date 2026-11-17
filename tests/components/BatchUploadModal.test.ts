@@ -238,6 +238,41 @@ describe('BatchUploadModal — solving', () => {
       expect.objectContaining({ message: 'batch.statusUnfinished' }),
     );
   });
+
+  it('sends the hint to astrometry.net: the target object and the field width typed', async () => {
+    state.pendingFiles = [jpeg('a.jpg')];
+    const w = mountModal();
+    await flushPromises();
+    const item = vm(w).items[0];
+    item.solver = 'astrometry';
+    item.hintCoords = { ra: 10.68, dec: 41.27 };
+    item.fovDeg = 2.5;
+    submitPlateSolve.mockResolvedValue({ jobId: 'online-job' });
+    pollPlateSolve.mockResolvedValue({ jobId: 'online-job', status: 'timeout', submissionId: 1 });
+
+    await button(w, 'solve-all').trigger('click');
+    await vi.advanceTimersByTimeAsync(2100);
+    await flushPromises();
+    const hints = submitPlateSolve.mock.calls[0][1];
+    expect(hints).toMatchObject({ ra: 10.68, dec: 41.27, radius: 2 });
+    expect(hints.scale_lower).toBeCloseTo(2);
+    expect(hints.scale_upper).toBeCloseTo(3);
+  });
+
+  it('sends no field width to astrometry.net when none is typed', async () => {
+    state.pendingFiles = [jpeg('a.jpg')];
+    const w = mountModal();
+    await flushPromises();
+    const item = vm(w).items[0];
+    item.solver = 'astrometry';
+    submitPlateSolve.mockResolvedValue({ jobId: 'online-job' });
+    pollPlateSolve.mockResolvedValue({ jobId: 'online-job', status: 'timeout', submissionId: 1 });
+
+    await button(w, 'solve-all').trigger('click');
+    await vi.advanceTimersByTimeAsync(2100);
+    await flushPromises();
+    expect(submitPlateSolve.mock.calls[0][1]).toEqual({});
+  });
 });
 
 describe('BatchUploadModal — saving and finishing', () => {

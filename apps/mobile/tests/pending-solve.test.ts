@@ -39,6 +39,7 @@ import {
   reusePendingSolution,
   solvePendingOnline,
   solvedPhotoCount,
+  hintFovDeg,
 } from '../src/pending-solve';
 
 const corr = [{ pointIndex: 0, photoX: 1, photoY: 2, starHip: 0, starName: '' }];
@@ -46,6 +47,17 @@ const nextPoll = () => vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
 /** An error as the API facade throws it: the message, and the code of a refused call. */
 const refused = (message: string, code?: string) => Object.assign(new Error(message), { code });
 const setOnline = (online: boolean) => vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(online);
+
+describe('the field width of the solve hint', () => {
+  it('reads a width typed with a comma or a point, and nothing outside 0.1 to 180 degrees', () => {
+    expect(hintFovDeg('2,5')).toBe(2.5);
+    expect(hintFovDeg(' 1.2 ')).toBe(1.2);
+    expect(hintFovDeg('')).toBeNull();
+    expect(hintFovDeg('abc')).toBeNull();
+    expect(hintFovDeg('0')).toBeNull();
+    expect(hintFovDeg('200')).toBeNull();
+  });
+});
 
 describe('solving a waiting photo online', () => {
   beforeEach(() => {

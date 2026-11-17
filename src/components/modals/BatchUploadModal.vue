@@ -222,6 +222,7 @@ import {
   solveInputFile,
 } from '@myastrosky/core/photo-formats';
 import { isPlacedPhoto } from '@myastrosky/core/photo-placement';
+import { onlineSolveHints } from '@myastrosky/core/domain/solve';
 import { isFollowingStoredSolve } from '@myastrosky/app-state/stored-solve';
 import { noSolutionMessage, suggestedSetupFor } from '../../wcs-load-flow';
 import { applyWcsResultToItem } from '../../batch-wcs';
@@ -852,7 +853,7 @@ async function solveItem(item: BatchItem) {
       const sent = solveInputFile('astrometry', item.rawFile ?? null, item.file);
       const { jobId } = await submitPlateSolve(
         sent,
-        hints?.ra !== undefined ? { ra: hints.ra, dec: hints.dec!, radius: 2.0 } : undefined,
+        onlineSolveHints(item.hintCoords, item.fovDeg),
       );
       item.online = {
         sentAt: new Date().toISOString(),

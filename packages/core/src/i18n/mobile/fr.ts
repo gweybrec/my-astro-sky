@@ -35,7 +35,9 @@ const fr = {
     solveOffline:
       'Pas de réseau : astrometry.net continue la résolution. Revenez dans la Galerie une fois en ligne pour récupérer le résultat.',
     solveOnline: 'Résoudre en ligne',
-    solveOnlineSub: 'astrometry.net, nécessite une connexion',
+    groupPhone: 'Sur le téléphone',
+    hintTargetPlaceholder: 'ex : M31',
+    hintFovDeg: 'FOV (°)',
     reuseSolution: 'Réutiliser une solution astrometry.net',
     reuseSolutionSub: 'Une photo déjà résolue sur votre compte astrometry.net',
     solveUnfinished: 'Résolution en cours',

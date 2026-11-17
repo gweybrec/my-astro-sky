@@ -216,7 +216,7 @@ export function confirmFinishBatch(count: number): Promise<'back' | 'discard' | 
         : t('batch.finishMessageMany', { n: String(count) });
 
     const buttons = document.createElement('div');
-    buttons.className = 'dialog-buttons';
+    buttons.className = 'dialog-buttons dialog-buttons--row';
     const button = (label: string, cls: string, choice: 'back' | 'discard' | 'save') => {
       const b = document.createElement('button');
       b.type = 'button';

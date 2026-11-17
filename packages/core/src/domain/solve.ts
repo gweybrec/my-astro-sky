@@ -35,9 +35,34 @@ export interface NovaSolveHints {
   dec?: number;
   /** Search radius in degrees (2 when absent). */
   radius?: number;
-  /** Arcseconds per pixel; when neither bound is given the scale is estimated from the picture. */
+  /** Field width range in degrees; when neither bound is given, 0.1 to 180 degrees is searched. */
   scale_lower?: number;
   scale_upper?: number;
+}
+
+/** How far the field width typed by the user may be off, either way. */
+const FOV_TOLERANCE = 0.2;
+
+/** The field width range sent to astrometry.net for a field width (FOV, degrees) typed by the user. */
+export function fovScaleHints(fovDeg: number): Pick<NovaSolveHints, 'scale_lower' | 'scale_upper'> {
+  return {
+    scale_lower: Math.max(0.1, fovDeg * (1 - FOV_TOLERANCE)),
+    scale_upper: Math.min(180, fovDeg * (1 + FOV_TOLERANCE)),
+  };
+}
+
+/** The radius searched around the target object typed by the user, degrees. */
+const TARGET_RADIUS_DEG = 2;
+
+/** The hint sent to astrometry.net: the target object's position and the field width typed by the user, if any. */
+export function onlineSolveHints(
+  target: { ra: number; dec: number } | null | undefined,
+  fovDeg: number | null | undefined,
+): NovaSolveHints {
+  return {
+    ...(target ? { ra: target.ra, dec: target.dec, radius: TARGET_RADIUS_DEG } : {}),
+    ...(fovDeg != null ? fovScaleHints(fovDeg) : {}),
+  };
 }
 
 /** A picture handed to online solving. */

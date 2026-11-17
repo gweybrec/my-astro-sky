@@ -12,6 +12,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { HttpRequest, HttpResponse } from '@myastrosky/core/ports/http-client';
 import { createNovaSolveService, POLL_BUDGET_MS } from '@myastrosky/core/services/nova-solve';
+import { fovScaleHints, onlineSolveHints } from '@myastrosky/core/domain/solve';
 import { buildFits } from '../fixtures/fits-builders';
 
 const FIXTURES = path.join(__dirname, '../fixtures/astrometry');
@@ -196,6 +197,31 @@ describe('submit()', () => {
       expect(request.scale_upper).toBe(180);
     },
   );
+
+  it('sends a field width range from the hint in degrees, and the full range without one', async () => {
+    const t = setup({
+      route: (r) => loginOk(r.url) ?? json({ status: 'success', subid: 1 }),
+    });
+    const sent = (i: number) =>
+      JSON.parse((t.calls[i].body as { form: Array<{ value?: string }> }).form[0].value!);
+    await t.service.submit(t.file, { ...fovScaleHints(2.5), ra: 10, dec: 41 });
+    expect(sent(1)).toMatchObject({ scale_units: 'degwidth', scale_type: 'ul', center_ra: 10 });
+    expect(sent(1).scale_lower).toBeCloseTo(2);
+    expect(sent(1).scale_upper).toBeCloseTo(3);
+    await t.service.submit(t.file, { ra: 10, dec: 41 });
+    expect(sent(2)).toMatchObject({ scale_units: 'degwidth', scale_lower: 0.1, scale_upper: 180 });
+  });
+
+  it('builds the hint from the target object and the field width typed, each only when given', () => {
+    expect(onlineSolveHints(null, null)).toEqual({});
+    expect(onlineSolveHints({ ra: 10, dec: 41 }, null)).toEqual({ ra: 10, dec: 41, radius: 2 });
+    expect(onlineSolveHints(null, 2.5)).toEqual(fovScaleHints(2.5));
+  });
+
+  it('keeps the field width range inside 0.1 to 180 degrees', () => {
+    expect(fovScaleHints(0.1).scale_lower).toBe(0.1);
+    expect(fovScaleHints(170).scale_upper).toBe(180);
+  });
 
   it('logs in once and sends the picture as a multipart form with the file part', async () => {
     const t = setup({

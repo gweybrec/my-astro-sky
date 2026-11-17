@@ -50,6 +50,10 @@ vi.mock('../src/composables/useErrorToast', () => ({
 }));
 vi.mock('../src/composables/useBackClose', () => ({ useBackClose: vi.fn() }));
 vi.mock('../src/catalogs', () => ({ catalogsReady: () => Promise.resolve() }));
+const searchUnified = vi.fn();
+vi.mock('@myastrosky/core/search', () => ({
+  searchUnified: (...a: unknown[]) => searchUnified(...a),
+}));
 
 import PendingPhotoPage from '../src/pages/PendingPhotoPage.vue';
 import PhoneBackButton from '../src/components/PhoneBackButton.vue';
@@ -61,7 +65,7 @@ import {
   pendingPhotos,
   setPendingState,
 } from '../src/pending-photos';
-import { shownPendingId } from '../src/pending-solve';
+import { shownPendingId, solveHints } from '../src/pending-solve';
 import { unsavedDrafts } from '../src/pending-display';
 import { skyPlacement } from '../src/sky-modes';
 
@@ -86,6 +90,7 @@ describe('the page "Photo à ajouter"', () => {
   beforeEach(() => {
     localStorage.setItem('lang', 'fr');
     resetPendingPhotos();
+    solveHints.clear();
     unsavedDrafts.clear();
     vi.clearAllMocks();
     getPhotos.mockResolvedValue([{ id: 'x', labels: ['Galaxies'] }]);
@@ -106,11 +111,26 @@ describe('the page "Photo à ajouter"', () => {
     expect(w.text()).toContain('Choisir une méthode de placement');
     for (const method of [
       'Résoudre en ligne',
-      'Réutiliser une solution astrometry.net',
+      'Réutiliser une solution',
       'Identifier 3 étoiles',
       'Placer à la main',
     ])
       expect(rowWith(w, method).exists()).toBe(true);
+    // The methods on the phone first, then those of astrometry.net; the online solve is marked as sending the hint.
+    const text = w.text();
+    expect(text.indexOf('Sur le téléphone')).toBeLessThan(text.indexOf('Identifier 3 étoiles'));
+    expect(text.indexOf('Placer à la main')).toBeLessThan(
+      text.indexOf('En ligne · astrometry.net'),
+    );
+    expect(text.indexOf('En ligne · astrometry.net')).toBeLessThan(
+      text.indexOf('Résoudre en ligne'),
+    );
+    expect(w.find('[data-test="solve-hint"]').exists()).toBe(true);
+    const marked = w.findAll('.mob-row').filter((r) => r.find('[data-test="hint-mark"]').exists());
+    expect(marked.map((r) => r.find('.mob-row-title').text())).toEqual(['Résoudre en ligne']);
+    expect(rowWith(w, 'Résoudre en ligne').text()).toContain(
+      'Envoie le fichier à astrometry.net, avec l’indice',
+    );
     expect((nameField(w).element as HTMLInputElement).value).toBe('M45_RGB');
     expect(w.find('button[aria-label="Supprimer cette photo"]').exists()).toBe(true);
     expect(shownPendingId.value).toBe(photo.id);
@@ -137,6 +157,34 @@ describe('the page "Photo à ajouter"', () => {
     expect(rowWith(w, 'Placer à la main').classes()).toContain('mob-row--disabled');
   });
 
+  it('sends the hint with the online solve: the object picked from the results and the field width', async () => {
+    searchUnified.mockResolvedValue([
+      { type: 'dso', label: 'M101 – Galaxie du Moulinet', score: 1, mag: 8, ra: 210.8, dec: 54.35 },
+    ]);
+    const photo = await addPendingPhoto(new Blob(['x']), 'M101.jpg');
+    const w = await mountPage(photo.id);
+    const fields = w.findAll('[data-test="solve-hint"] input');
+    await fields[0].setValue('M101');
+    await new Promise((r) => setTimeout(r, 300));
+    await flushPromises();
+    await rowWith(w, 'Galaxie du Moulinet').trigger('click');
+    await fields[1].setValue('2,5');
+    await rowWith(w, 'Résoudre en ligne').trigger('click');
+    await flushPromises();
+    const hints = submitPlateSolve.mock.calls[0][1];
+    expect(hints).toMatchObject({ ra: 210.8, dec: 54.35, radius: 2 });
+    expect(hints.scale_lower).toBeCloseTo(2);
+    expect(hints.scale_upper).toBeCloseTo(3);
+  });
+
+  it('sends no hint when none is typed', async () => {
+    const photo = await addPendingPhoto(new Blob(['x']), 'M101.jpg');
+    const w = await mountPage(photo.id);
+    await rowWith(w, 'Résoudre en ligne').trigger('click');
+    await flushPromises();
+    expect(submitPlateSolve.mock.calls[0][1]).toEqual({});
+  });
+
   it('greys out the online solve and the reuse without a connection or without the key', async () => {
     const photo = await addPendingPhoto(new Blob(['x']), 'NGC7000.tif');
     loadServerSettings.mockResolvedValue({ apiKeySet: false });
@@ -145,7 +193,7 @@ describe('the page "Photo à ajouter"', () => {
     expect(online.classes()).toContain('mob-row--disabled');
     expect(online.text()).toContain('Clé API non configurée');
     await online.trigger('click');
-    await rowWith(w, 'Réutiliser une solution astrometry.net').trigger('click');
+    await rowWith(w, 'Réutiliser une solution').trigger('click');
     expect(submitPlateSolve).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
   });
@@ -159,7 +207,7 @@ describe('the page "Photo à ajouter"', () => {
     expect(push).toHaveBeenLastCalledWith('/tabs/sky');
     await rowWith(w, 'Identifier 3 étoiles').trigger('click');
     expect(push).toHaveBeenLastCalledWith(`/gallery/identify/${photo.id}`);
-    await rowWith(w, 'Réutiliser une solution astrometry.net').trigger('click');
+    await rowWith(w, 'Réutiliser une solution').trigger('click');
     expect(push).toHaveBeenLastCalledWith(`/gallery/reuse/${photo.id}`);
     w.unmount();
     // Opened again after the method: the name typed is there, not saved yet.

@@ -5,7 +5,8 @@ import PhoneBusy from './PhoneBusy.vue';
 import chevronIcon from '../icons/chevron-right.svg?raw';
 
 // A list row (`.mob-row`) on Ionic's item: title, up to a few lines under it, a leading icon, a trailing value,
-// a chevron, or anything in the `trail` slot (a switch, a button); the `badges` slot goes between the title and the
+// a chevron, or anything in the `trail` slot (a switch, a button); the `title-end` slot follows the title on its line
+// (a mark that the row sends the solve hint); the `badges` slot goes between the title and the
 // lines (`.mob-row-badges`), the `actions` slot under the lines (`.mob-row-actions`: text buttons) and the `below` slot
 // under those. A row with no title starts with its badges (a warning row). A row with `button` is a tap target.
 withDefaults(
@@ -71,9 +72,19 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
       <span v-else-if="thumb" class="mob-row-thumb"><AppIcon :svg="thumb" /></span>
       <span v-else-if="number !== undefined" class="mob-row-lead m-body-strong">{{ number }}</span>
       <span class="mob-row-body">
-        <span v-if="title" class="mob-row-title m-body" :class="{ 'mob-row-title--wrap': wrap }">{{
-          title
-        }}</span>
+        <span
+          v-if="title && $slots['title-end']"
+          class="mob-row-title m-body phone-row-title-line"
+          :class="{ 'mob-row-title--wrap': wrap }"
+          ><span>{{ title }}</span
+          ><slot name="title-end"
+        /></span>
+        <span
+          v-else-if="title"
+          class="mob-row-title m-body"
+          :class="{ 'mob-row-title--wrap': wrap }"
+          >{{ title }}</span
+        >
         <span v-if="$slots.badges" class="mob-row-badges"><slot name="badges" /></span>
         <span
           v-for="line in subs"

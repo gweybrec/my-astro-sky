@@ -1208,6 +1208,8 @@ describe('online solving routes (astrometry.net)', () => {
         center_ra: 250.4,
         center_dec: 36.5,
         radius: 1.5,
+        scale_units: 'degwidth',
+        scale_type: 'ul',
         scale_lower: 1,
         scale_upper: 3,
       });

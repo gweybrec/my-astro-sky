@@ -1978,3 +1978,36 @@ ion-tab-bar.mob-tabbar-hidden {
   height: 100%;
   pointer-events: none;
 }
+
+/* ── Solve hint: the target icon on the accent tint, on the hint card and after the title of each solve that sends it. */
+.phone-hint-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: var(--space-9);
+  height: var(--space-9);
+  border: 1px solid var(--accent-fill-lg);
+  border-radius: var(--radius-md);
+  background: var(--accent-fill-sm);
+  color: var(--accent-color);
+}
+.phone-hint-mark svg {
+  width: var(--space-7);
+  height: var(--space-7);
+}
+.phone-hint-mark--lg {
+  width: var(--mobile-touch-min);
+  height: var(--mobile-touch-min);
+}
+.phone-hint-mark--lg svg {
+  width: var(--space-9);
+  height: var(--space-9);
+}
+/* A row title followed by something on its line (the hint mark). */
+.phone-row-title-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}

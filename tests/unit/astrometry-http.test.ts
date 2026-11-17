@@ -288,7 +288,7 @@ describe('submitJob — upload request payload', () => {
     expect(body).toContain('"radius":2');
   });
 
-  it('uses explicit scale hints without the default range', async () => {
+  it('uses explicit scale hints, in degrees of field width, without the default range', async () => {
     fetchMock.mockResolvedValueOnce(jsonResp({ status: 'success', subid: 1 }));
     await submitJob(bytesOf('img'), 'photo.jpg', 800, 600, {
       scale_lower: 0.5,
@@ -298,7 +298,7 @@ describe('submitJob — upload request payload', () => {
     const body = requestJsonOf(fetchMock.mock.calls[1][0]);
     expect(body).toContain('"scale_lower":0.5');
     expect(body).toContain('"scale_upper":1.5');
-    expect(body).not.toContain('"scale_units"');
+    expect(body).toContain('"scale_units":"degwidth"');
   });
 });
 

@@ -627,13 +627,14 @@ export const rules = [
     gap: 'var(--space-4)',
     minimum: true,
   },
-  // The first column's titles, headers and helper lines start on one line (not the second field of a pair); a row that
+  // The first column's titles, headers and helper lines start on one line (not the second field of a pair, nor the fields
+  // of the solve hint, which follow its icon); a row that
   // starts with a picture placeholder, or a switch row that starts with its icon, starts with it.
   {
     id: 'left-edge',
     type: 'leadingEdge',
     items:
-      '.mob-section-header, .mob-sheet-title, .mob-stepper-label, .mob-form-label:not(.mob-form-row--pair > :not(:first-child) *), .mob-helper, ion-item.mob-row:not(:has(.mob-row-lead, .mob-row-thumb)):not(.mob-entry .mob-row) .mob-row-title, ion-item.mob-row:not(.mob-entry .mob-row) .mob-row-thumb, ion-toggle.mob-row:not(:has(.mob-row-lead)) .mob-row-title, ion-toggle.mob-row .mob-row-lead, .mob-card-row-key',
+      '.mob-section-header, .pending-group > :first-child, .mob-sheet-title, .mob-stepper-label, .mob-form-label:not(.mob-form-row--pair > :not(:first-child) *):not(.solve-hint *), .mob-helper, ion-item.mob-row:not(:has(.mob-row-lead, .mob-row-thumb)):not(.mob-entry .mob-row) .mob-row-title, ion-item.mob-row:not(.mob-entry .mob-row) .mob-row-thumb, ion-toggle.mob-row:not(:has(.mob-row-lead)) .mob-row-title, ion-toggle.mob-row .mob-row-lead, .mob-card-row-key',
   },
   // The chevron, else the trailing value or state (a submission's "✓ Résolue"), else the switch of each row ends on one line.
   {
@@ -1075,6 +1076,24 @@ export const views = [
       { wait: 'ion-item.mob-row:has-text("M1-CCD.jpg")' },
       { click: 'ion-item.mob-row:has-text("M1-CCD.jpg")' },
       { wait: 'ion-item.mob-row:has-text("Placer à la main")' },
+      { pause: 600 },
+    ],
+  },
+  {
+    // The same page with an object typed in the solve hint: its results under the hint card.
+    name: 'photo-to-add-hint',
+    path: '/tabs/gallery',
+    ready: '.mob-photo',
+    open: [
+      { click: 'ion-fab-button' },
+      { wait: '.mob-sheet' },
+      { pause: 600 },
+      { chooseFiles: '.mob-sheet ion-item.mob-row', files: ['test-photos/M1-CCD.jpg'] },
+      { wait: 'ion-item.mob-row:has-text("M1-CCD.jpg")' },
+      { click: 'ion-item.mob-row:has-text("M1-CCD.jpg")' },
+      { wait: '.solve-hint' },
+      { fill: '.solve-hint > div:nth-child(2) input', text: 'M1' },
+      { wait: 'ion-item.mob-row:has-text("RA:")' },
       { pause: 600 },
     ],
   },

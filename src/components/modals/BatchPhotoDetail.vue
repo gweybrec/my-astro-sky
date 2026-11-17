@@ -85,34 +85,92 @@
     </section>
     <section v-else class="flex flex-col gap-4">
       <h3 class="bw-section-title">{{ t('mobile.gallery.chooseMethod') }}</h3>
-      <div class="flex flex-col border border-[var(--border-panel)] rounded-lg bg-card">
-        <!-- Fetch the result of a solve astrometry.net goes on with -->
-        <div v-if="canFetch" class="bw-method" data-test="method-fetch">
-          <div class="flex items-center gap-7">
-            <div class="flex-1 min-w-0 flex flex-col gap-1">
-              <span class="text-primary">{{ t('batch.methodFetch') }}</span>
-              <span class="text-base text-dim">{{ t('batch.methodFetchSub') }}</span>
-            </div>
-            <button type="button" class="btn-action" @click="emit('fetch')">
-              {{ t('batch.methodFetchButton') }}
-            </button>
-          </div>
+
+      <!-- The hint both solves use: the target icon marks it and each solve that sends it -->
+      <div class="bw-hint" :class="{ 'opacity-45': anyOff }" data-test="hint">
+        <span class="bw-hint-mark--lg" aria-hidden="true" v-html="targetSvg"></span>
+        <label class="bw-field-label shrink-0" :for="`hint-target-${item.id}`">{{
+          t('batch.hintTarget')
+        }}</label>
+        <span class="relative flex-1 min-w-0">
+          <input
+            :id="`hint-target-${item.id}`"
+            type="text"
+            class="bw-hint-input"
+            :placeholder="t('modal.hintsPlaceholder')"
+            v-model="hintQuery"
+            :disabled="anyOff"
+            @input="onHintInput"
+            @keydown.enter.prevent="selectFirstHintResult"
+          />
+          <span
+            v-if="showHintDropdown && hintResults.length"
+            class="search-results-dropdown left-0 right-0 top-full"
+          >
+            <span
+              v-for="r in hintResults"
+              :key="r.label"
+              class="result-item cursor-pointer block"
+              @click="selectHint(r)"
+            >
+              <span class="block">{{ r.label }}</span>
+              <span class="star-coords block"
+                >RA: {{ r.ra.toFixed(2) }}° Dec: {{ r.dec.toFixed(2) }}°</span
+              >
+            </span>
+          </span>
+        </span>
+        <label class="bw-field-label shrink-0" :for="`hint-fov-${item.id}`">{{
+          t('batch.hintFov')
+        }}</label>
+        <span class="shrink-0 flex items-center gap-3 text-dim">
+          <input
+            :id="`hint-fov-${item.id}`"
+            type="number"
+            min="0.1"
+            max="180"
+            step="0.1"
+            class="bw-hint-input !w-[80px]"
+            :placeholder="t('batch.hintFovPlaceholder')"
+            :value="item.fovDeg ?? ''"
+            :disabled="anyOff"
+            @change="onFovChange"
+          />°
+        </span>
+      </div>
+
+      <!-- Methods that run on this computer -->
+      <div class="bw-method-group" role="group" :aria-label="t('batch.groupLocal')">
+        <div class="bw-method-group-head">
+          <span class="inline-flex" aria-hidden="true" v-html="monitorSvg"></span
+          >{{ t('batch.groupLocal') }}
         </div>
 
         <!-- Solve on the computer -->
         <div :class="methodClass('local')" data-test="method-local">
           <div class="flex items-center gap-7">
             <div class="flex-1 min-w-0 flex flex-col gap-1" :class="{ 'opacity-45': localOff }">
-              <span :class="titleClass('local')"
-                >{{ doneMark('local') }}{{ t('batch.methodLocal') }}</span
-              >
-              <span class="text-base text-dim">{{
+              <span class="flex items-center gap-4" :class="titleClass('local')"
+                >{{ doneMark('local') }}{{ t('batch.methodLocal')
+                }}<span
+                  class="bw-hint-mark"
+                  role="img"
+                  :title="t('batch.usesHint')"
+                  :aria-label="t('batch.usesHint')"
+                  v-html="targetSvg"
+                ></span
+              ></span>
+              <span class="text-small text-dim">{{
                 hasLocalSolver ? t('batch.methodLocalSub') : t('modal.solverNoPath')
               }}</span>
             </div>
             <div class="shrink-0 flex items-center gap-4">
               <template v-if="isDone('local')">
-                <button type="button" class="btn-cancel !text-primary" @click="removePlacement">
+                <button
+                  type="button"
+                  class="btn-cancel bw-method-control !text-primary"
+                  @click="removePlacement"
+                >
                   {{ t('batch.removePlacement') }}
                 </button>
               </template>
@@ -120,7 +178,7 @@
                 <select
                   v-if="hasLocalSolver"
                   v-model="localSolver"
-                  class="input-base !w-auto"
+                  class="input-base bw-method-control !w-auto"
                   :aria-label="t('batch.solverLabel')"
                   :disabled="localOff"
                 >
@@ -131,7 +189,7 @@
                 </select>
                 <button
                   type="button"
-                  class="btn-action"
+                  class="btn-action bw-method-control"
                   :disabled="localOff"
                   data-test="solve-local"
                   @click="emit('solve', localSolver)"
@@ -140,102 +198,6 @@
                 </button>
               </template>
             </div>
-          </div>
-        </div>
-
-        <!-- Solve online -->
-        <div :class="methodClass('online')" data-test="method-online">
-          <div class="flex items-center gap-7">
-            <div class="flex-1 min-w-0 flex flex-col gap-1" :class="{ 'opacity-45': onlineOff }">
-              <span :class="titleClass('online')"
-                >{{ doneMark('online') }}{{ t('mobile.gallery.solveOnline') }}</span
-              >
-              <span class="text-base text-dim">{{ onlineSub }}</span>
-            </div>
-            <button
-              v-if="isDone('online')"
-              type="button"
-              class="btn-cancel !text-primary"
-              @click="removePlacement"
-            >
-              {{ t('batch.removePlacement') }}
-            </button>
-            <button
-              v-else
-              type="button"
-              class="btn-action"
-              :disabled="onlineOff"
-              data-test="solve-online"
-              @click="emit('solve', 'astrometry')"
-            >
-              {{ t('batch.methodSolve') }}
-            </button>
-          </div>
-        </div>
-
-        <!-- The hint both solvers use -->
-        <div class="flex flex-col gap-4 px-7 py-5 border-t border-subtle">
-          <button
-            type="button"
-            class="self-start inline-flex items-center gap-2 p-0 bg-transparent border-0 text-base text-secondary cursor-pointer disabled:opacity-45 disabled:cursor-default"
-            :aria-expanded="hintOpen"
-            :disabled="anyOff"
-            @click="hintOpen = !hintOpen"
-          >
-            <span
-              class="[&_svg]:w-3 [&_svg]:h-3"
-              v-html="hintOpen ? chevronDownSvg : chevronRightSvg"
-            ></span>
-            {{ hintOpen ? t('batch.hintTitle') : t('batch.hintTitleClosed') }}
-          </button>
-          <div v-if="hintOpen" class="grid grid-cols-[1fr_150px] gap-6">
-            <label class="flex flex-col gap-2">
-              <span class="bw-field-label">{{ t('batch.hintTarget') }}</span>
-              <span class="relative">
-                <input
-                  type="text"
-                  class="input-base"
-                  :placeholder="t('modal.hintsPlaceholder')"
-                  v-model="hintQuery"
-                  :disabled="anyOff"
-                  @input="onHintInput"
-                  @keydown.enter.prevent="selectFirstHintResult"
-                />
-                <span
-                  v-if="showHintDropdown && hintResults.length"
-                  class="search-results-dropdown left-0 right-0 top-full"
-                >
-                  <span
-                    v-for="r in hintResults"
-                    :key="r.label"
-                    class="result-item cursor-pointer block"
-                    @click="selectHint(r)"
-                  >
-                    <span class="block">{{ r.label }}</span>
-                    <span class="star-coords block"
-                      >RA: {{ r.ra.toFixed(2) }}° Dec: {{ r.dec.toFixed(2) }}°</span
-                    >
-                  </span>
-                </span>
-              </span>
-            </label>
-            <label class="flex flex-col gap-2">
-              <span class="bw-field-label">{{ t('batch.hintFov') }}</span>
-              <span class="flex items-center gap-3">
-                <input
-                  type="number"
-                  min="0.1"
-                  max="180"
-                  step="0.1"
-                  class="input-base !w-[90px]"
-                  :placeholder="t('batch.hintFovPlaceholder')"
-                  :value="item.fovDeg ?? ''"
-                  :disabled="anyOff"
-                  @change="onFovChange"
-                />
-                <span class="text-dim">°</span>
-              </span>
-            </label>
           </div>
         </div>
 
@@ -254,12 +216,12 @@
                     : t('gallery.loadFromWcs')
                 }}</span
               >
-              <span class="text-base text-dim">{{ t('batch.methodWcsSub') }}</span>
+              <span class="text-small text-dim">{{ t('batch.methodWcsSub') }}</span>
             </div>
             <button
               v-if="isDone('file')"
               type="button"
-              class="btn-cancel !text-primary"
+              class="btn-cancel bw-method-control !text-primary"
               @click="removePlacement"
             >
               {{ t('batch.removePlacement') }}
@@ -267,7 +229,7 @@
             <button
               v-else
               type="button"
-              class="btn-cancel !text-primary"
+              class="btn-cancel bw-method-control !text-primary"
               :disabled="offFor('file') || wcsLoading"
               @click="triggerWcsFile"
             >
@@ -283,39 +245,6 @@
           </div>
         </div>
 
-        <!-- Re-use a solution of the astrometry.net account -->
-        <div :class="methodClass('reuse')" data-test="method-reuse">
-          <div class="flex items-center gap-7">
-            <div class="flex-1 min-w-0 flex flex-col gap-1" :class="{ 'opacity-45': reuseOff }">
-              <span :class="titleClass('reuse')"
-                >{{ doneMark('reuse') }}{{ t('mobile.gallery.reuseSolution') }}</span
-              >
-              <span class="text-base text-dim">{{
-                solverAvailability.astrometry
-                  ? t('mobile.gallery.reuseSolutionSub')
-                  : t('modal.solverNoApiKey')
-              }}</span>
-            </div>
-            <button
-              v-if="isDone('reuse')"
-              type="button"
-              class="btn-cancel !text-primary"
-              @click="removePlacement"
-            >
-              {{ t('batch.removePlacement') }}
-            </button>
-            <button
-              v-else
-              type="button"
-              class="btn-cancel !text-primary"
-              :disabled="reuseOff || reuseLoading"
-              @click="handleReuse"
-            >
-              {{ reuseLoading ? '…' : t('batch.methodChoose') }}
-            </button>
-          </div>
-        </div>
-
         <!-- Identify 3 stars -->
         <div :class="methodClass('stars')" data-test="method-stars">
           <div class="flex items-center gap-7">
@@ -326,12 +255,12 @@
               <span :class="titleClass('stars')"
                 >{{ doneMark('stars') }}{{ t('mobile.gallery.identifyStars') }}</span
               >
-              <span class="text-base text-dim">{{ t('batch.methodStarsSub') }}</span>
+              <span class="text-small text-dim">{{ t('batch.methodStarsSub') }}</span>
             </div>
             <button
               v-if="isDone('stars')"
               type="button"
-              class="btn-cancel !text-primary"
+              class="btn-cancel bw-method-control !text-primary"
               @click="removePlacement"
             >
               {{ t('batch.removePlacement') }}
@@ -339,7 +268,7 @@
             <button
               v-else
               type="button"
-              class="btn-cancel !text-primary"
+              class="btn-cancel bw-method-control !text-primary"
               :disabled="offFor('stars') || manualBusy"
               @click="openStars"
             >
@@ -358,12 +287,12 @@
               <span :class="titleClass('hand')"
                 >{{ doneMark('hand') }}{{ t('mobile.gallery.placeByHand') }}</span
               >
-              <span class="text-base text-dim">{{ t('mobile.gallery.placeByHandSub') }}</span>
+              <span class="text-small text-dim">{{ t('mobile.gallery.placeByHandSub') }}</span>
             </div>
             <button
               v-if="isDone('hand')"
               type="button"
-              class="btn-cancel !text-primary"
+              class="btn-cancel bw-method-control !text-primary"
               @click="removePlacement"
             >
               {{ t('batch.removePlacement') }}
@@ -371,11 +300,102 @@
             <button
               v-else
               type="button"
-              class="btn-cancel !text-primary"
+              class="btn-cancel bw-method-control !text-primary"
               :disabled="offFor('hand') || manualBusy"
               @click="openHand"
             >
               {{ t('batch.methodOpen') }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Methods that go through astrometry.net -->
+      <div class="bw-method-group" role="group" :aria-label="t('batch.groupOnline')">
+        <div class="bw-method-group-head">
+          <span class="inline-flex" aria-hidden="true" v-html="cloudSvg"></span
+          >{{ t('batch.groupOnline') }}
+        </div>
+
+        <!-- Fetch the result of a solve astrometry.net goes on with -->
+        <div v-if="canFetch" class="bw-method" data-test="method-fetch">
+          <div class="flex items-center gap-7">
+            <div class="flex-1 min-w-0 flex flex-col gap-1">
+              <span class="text-base text-primary">{{ t('batch.methodFetch') }}</span>
+              <span class="text-small text-dim">{{ t('batch.methodFetchSub') }}</span>
+            </div>
+            <button type="button" class="btn-action bw-method-control" @click="emit('fetch')">
+              {{ t('batch.methodFetchButton') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Solve online -->
+        <div :class="methodClass('online')" data-test="method-online">
+          <div class="flex items-center gap-7">
+            <div class="flex-1 min-w-0 flex flex-col gap-1" :class="{ 'opacity-45': onlineOff }">
+              <span class="flex items-center gap-4" :class="titleClass('online')"
+                >{{ doneMark('online') }}{{ t('mobile.gallery.solveOnline')
+                }}<span
+                  class="bw-hint-mark"
+                  role="img"
+                  :title="t('batch.usesHint')"
+                  :aria-label="t('batch.usesHint')"
+                  v-html="targetSvg"
+                ></span
+              ></span>
+              <span class="text-small text-dim">{{ onlineSub }}</span>
+            </div>
+            <button
+              v-if="isDone('online')"
+              type="button"
+              class="btn-cancel bw-method-control !text-primary"
+              @click="removePlacement"
+            >
+              {{ t('batch.removePlacement') }}
+            </button>
+            <button
+              v-else
+              type="button"
+              class="btn-action bw-method-control"
+              :disabled="onlineOff"
+              data-test="solve-online"
+              @click="emit('solve', 'astrometry')"
+            >
+              {{ t('batch.methodSolve') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Re-use a solution of the astrometry.net account -->
+        <div :class="methodClass('reuse')" data-test="method-reuse">
+          <div class="flex items-center gap-7">
+            <div class="flex-1 min-w-0 flex flex-col gap-1" :class="{ 'opacity-45': reuseOff }">
+              <span :class="titleClass('reuse')"
+                >{{ doneMark('reuse') }}{{ t('batch.methodReuse') }}</span
+              >
+              <span class="text-small text-dim">{{
+                solverAvailability.astrometry
+                  ? t('mobile.gallery.reuseSolutionSub')
+                  : t('modal.solverNoApiKey')
+              }}</span>
+            </div>
+            <button
+              v-if="isDone('reuse')"
+              type="button"
+              class="btn-cancel bw-method-control !text-primary"
+              @click="removePlacement"
+            >
+              {{ t('batch.removePlacement') }}
+            </button>
+            <button
+              v-else
+              type="button"
+              class="btn-cancel bw-method-control !text-primary"
+              :disabled="reuseOff || reuseLoading"
+              @click="handleReuse"
+            >
+              {{ reuseLoading ? '…' : t('batch.methodChoose') }}
             </button>
           </div>
         </div>
@@ -433,11 +453,9 @@ import BatchSolveStatus from './BatchSolveStatus.vue';
 import MetadataEditorPanel from './MetadataEditorPanel.vue';
 import trashSvg from '../../icons/trash.svg?raw';
 import imageSvg from '../../icons/image.svg?raw';
-
-const chevronRightSvg =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg>';
-const chevronDownSvg =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>';
+import targetSvg from '../../icons/target.svg?raw';
+import monitorSvg from '../../icons/monitor.svg?raw';
+import cloudSvg from '../../icons/cloud.svg?raw';
 
 const props = defineProps<{
   item: BatchItem;
@@ -479,7 +497,7 @@ const isDone = (m: BatchPlacedBy) => placed.value && props.item.placedBy === m;
 const doneMark = (m: BatchPlacedBy) => (isDone(m) ? '✓ ' : '');
 const methodClass = (m: BatchPlacedBy) => (isDone(m) ? 'bw-method--done' : 'bw-method');
 const titleClass = (m: BatchPlacedBy) =>
-  isDone(m) ? 'text-[var(--status-success-text)]' : 'text-primary';
+  isDone(m) ? 'text-base text-[var(--status-success-text)]' : 'text-base text-primary';
 
 const hasLocalSolver = computed(
   () => props.solverAvailability.astap || props.solverAvailability.solveField,
@@ -494,7 +512,7 @@ const onlineSub = computed(() =>
     ? t('modal.solverNoApiKey')
     : unfinished.value
       ? t('batch.onlineRunning')
-      : t('mobile.gallery.solveOnlineSub'),
+      : t('batch.methodOnlineSub'),
 );
 const reuseOff = computed(() => anyOff.value || !props.solverAvailability.astrometry);
 const canFetch = computed(
@@ -704,7 +722,6 @@ async function openHand() {
 }
 
 // ─── The hint both solvers use ────────────────────────────────────────────────
-const hintOpen = ref(!!props.item.hintTargetName || props.item.fovDeg != null);
 const hintQuery = ref(props.item.hintTargetName);
 const hintResults = ref<{ label: string; ra: number; dec: number }[]>([]);
 const showHintDropdown = ref(false);

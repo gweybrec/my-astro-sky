@@ -37,7 +37,9 @@ const en: Translations['mobile'] = {
     solveOffline:
       'No network: astrometry.net keeps solving. Come back to the Gallery once online to get the result.',
     solveOnline: 'Solve online',
-    solveOnlineSub: 'astrometry.net, needs a connection',
+    groupPhone: 'On the phone',
+    hintTargetPlaceholder: 'e.g. M31',
+    hintFovDeg: 'FOV (°)',
     reuseSolution: 'Re-use an astrometry.net solution',
     reuseSolutionSub: 'A photo already solved on your astrometry.net account',
     solveUnfinished: 'Solve in progress',

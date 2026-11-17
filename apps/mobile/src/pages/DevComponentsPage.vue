@@ -52,6 +52,7 @@ import eyeIcon from '@icons/eye.svg?raw';
 import telescopeIcon from '@icons/telescope.svg?raw';
 import checkIcon from '@icons/check.svg?raw';
 import moonIcon from '@icons/moon.svg?raw';
+import targetIcon from '@icons/target.svg?raw';
 
 const search = ref('');
 const targetFacts = [
@@ -217,6 +218,28 @@ function raiseError() {
             ></template>
           </PhoneRow>
           <PhoneRow title="Désactivée" :subs="['La raison reste lisible']" disabled chevron />
+          <PhoneRow
+            title="Résoudre en ligne"
+            :subs="['Envoie le fichier à astrometry.net, avec l’indice']"
+            button
+            data-test="row-title-end"
+          >
+            <template #title-end
+              ><span class="phone-hint-mark" role="img" aria-label="Utilise l’indice"
+                ><AppIcon :svg="targetIcon" /></span
+            ></template>
+          </PhoneRow>
+          <PhoneRow
+            title="Résoudre en ligne, un titre assez long pour passer à la ligne"
+            :subs="['Déjà en cours sur astrometry.net']"
+            wrap
+            disabled
+          >
+            <template #title-end
+              ><span class="phone-hint-mark" role="img" aria-label="Utilise l’indice"
+                ><AppIcon :svg="targetIcon" /></span
+            ></template>
+          </PhoneRow>
           <PhoneRow
             title="NGC7000_HaOIII.tif"
             :thumb="imageIcon"

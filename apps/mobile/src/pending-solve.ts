@@ -10,6 +10,7 @@ import { t } from '@myastrosky/core/i18n/index';
 import { findDSOIdsFromCorrespondences } from '@myastrosky/core/catalog/dso-registry';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { isFitsFile } from '@myastrosky/core/photo-formats';
+import { onlineSolveHints } from '@myastrosky/core/domain/solve';
 import { useErrorToast } from './composables/useErrorToast';
 import type { AstrometrySolveStatus, PhotoCorrespondence } from '@myastrosky/core/types';
 import {
@@ -36,6 +37,23 @@ const TRANSIENT_CODES = new Set([undefined, 'NETWORK_ERROR', 'HTTP_ERROR']);
 
 /** Counts the photos stored after a solve: a screen that lists the photos reads them again when it changes. */
 export const solvedPhotoCount = ref(0);
+
+/** The hint typed for a photo ("Objet cible", FOV), sent with its online solve; kept while the app runs. */
+export interface SolveHint {
+  /** The text of the target field, and the position of the object picked from its results. */
+  targetText: string;
+  target: { ra: number; dec: number } | null;
+  fov: string;
+}
+export const solveHints = new Map<string, SolveHint>();
+
+/** The field width typed, in degrees, or null when it is empty or not a width (0.1 to 180). */
+export function hintFovDeg(text: string): number | null {
+  const value = Number(text.trim().replace(',', '.'));
+  return text.trim() !== '' && Number.isFinite(value) && value >= 0.1 && value <= 180
+    ? value
+    : null;
+}
 
 const following = new Set<string>();
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -161,7 +179,7 @@ async function follow(id: string, firstJobId: string, again = false): Promise<vo
 }
 
 /**
- * Sends a waiting photo to the online solver. The photo shows "Résolution" until the solve ends. A photo stopped for want
+ * Sends a waiting photo to the online solver, with the hint typed for it (`solveHints`). The photo shows "Résolution" until the solve ends. A photo stopped for want
  * of the network is not sent again: its solve is followed again.
  */
 export async function solvePendingOnline(id: string): Promise<void> {
@@ -172,7 +190,11 @@ export async function solvePendingOnline(id: string): Promise<void> {
   await setPendingState(id, 'solving');
   let jobId: string;
   try {
-    ({ jobId } = await submitPlateSolve(file));
+    const hint = solveHints.get(id);
+    ({ jobId } = await submitPlateSolve(
+      file,
+      onlineSolveHints(hint?.target, hint ? hintFovDeg(hint.fov) : null),
+    ));
   } catch (error) {
     await setPendingState(id, 'failed', { error: messageOf(error) });
     return;
