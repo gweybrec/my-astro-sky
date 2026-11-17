@@ -12,7 +12,7 @@ import type { ServerLang } from '../messages.js';
 
 export const localSolveRouter = express.Router();
 
-/** ASTAP reads FITS besides the usual pictures; solve-field reads TIFF too. */
+/** ASTAP reads FITS besides the usual pictures; solve-field takes TIFF too (a 32-bit one converted to FITS). */
 const ASTAP_EXTENSIONS = new Set([...ALLOWED_PHOTO_EXTENSIONS, '.fit', '.fits']);
 const SOLVE_FIELD_EXTENSIONS = new Set([...ASTAP_EXTENSIONS, '.tif', '.tiff']);
 

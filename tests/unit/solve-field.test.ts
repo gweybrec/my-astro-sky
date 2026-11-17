@@ -75,7 +75,41 @@ vi.mock('../../server/wsl-utils', () => ({
   wslPath: mockWslPath,
 }));
 
-import { solveWithSolveField } from '../../server/solve-field';
+import { solveWithSolveField, tiffToSolveFieldFits } from '../../server/solve-field';
+import { buildTiff } from '../fixtures/tiff-builders';
+
+/** A 2×2 RGB TIFF whose pixel (x, y) has red = green = blue = `values[y * 2 + x]` in the given format. */
+function rgbTiff(bitsPerSample: 8 | 16 | 32, values: number[]): Buffer {
+  return buildTiff({
+    width: 2,
+    height: 2,
+    bitsPerSample,
+    sampleFormat: bitsPerSample === 32 ? 3 : 1,
+    samplesPerPixel: 3,
+    photometric: 2,
+    pixels: values.flatMap((v) => [v, v, v]),
+  });
+}
+
+describe('tiffToSolveFieldFits()', () => {
+  it('turns a 32-bit float TIFF into a float FITS, grey, top row first', () => {
+    const fits = tiffToSolveFieldFits(rgbTiff(32, [0.1, 0.2, 0.3, 0.4]));
+    expect(fits).not.toBeNull();
+    const header = fits!.subarray(0, 2880).toString('ascii');
+    expect(header).toMatch(/^SIMPLE {2}= +T/);
+    expect(header).toMatch(/BITPIX {2}= +-32/);
+    expect(header).toMatch(/NAXIS1 {2}= +2 /);
+    expect(header).toMatch(/NAXIS2 {2}= +2 /);
+    expect(fits!.length).toBe(2 * 2880);
+    const pixels = [0, 1, 2, 3].map((i) => fits!.readFloatBE(2880 + i * 4));
+    pixels.forEach((v, i) => expect(v).toBeCloseTo([0.1, 0.2, 0.3, 0.4][i], 5));
+  });
+
+  it('leaves 8- and 16-bit TIFFs as they are (solve-field reads them)', () => {
+    expect(tiffToSolveFieldFits(rgbTiff(8, [0, 50, 100, 255]))).toBeNull();
+    expect(tiffToSolveFieldFits(rgbTiff(16, [0, 1000, 30000, 65535]))).toBeNull();
+  });
+});
 
 describe('solveWithSolveField()', () => {
   beforeEach(() => {
@@ -418,5 +452,22 @@ describe('solveWithSolveField()', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/pyfits|astropy/i);
+  });
+
+  it('hands a 32-bit TIFF to solve-field as input.fits, keeping the picture Y convention', async () => {
+    await solveWithSolveField(rgbTiff(32, [0.1, 0.2, 0.3, 0.4]), '.tiff', 2, 2, undefined, 'en');
+    const [writtenPath, written] = mockFspWriteFile.mock.calls[0] as [string, Buffer];
+    expect(writtenPath).toMatch(/input\.fits$/);
+    expect(written.subarray(0, 6).toString('ascii')).toBe('SIMPLE');
+    expect((mockWrapExecForWSL.mock.calls[0][1] as string[])[0]).toMatch(/input\.fits$/);
+    expect(mockWcsToCorrespondences).toHaveBeenCalledWith(expect.anything(), 2, 2, false);
+  });
+
+  it('hands an 8-bit TIFF to solve-field unchanged', async () => {
+    const tiff = rgbTiff(8, [0, 50, 100, 255]);
+    await solveWithSolveField(tiff, '.tif', 2, 2, undefined, 'en');
+    const [writtenPath, written] = mockFspWriteFile.mock.calls[0] as [string, Buffer];
+    expect(writtenPath).toMatch(/input\.tif$/);
+    expect(written).toBe(tiff);
   });
 });

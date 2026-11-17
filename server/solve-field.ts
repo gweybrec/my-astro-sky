@@ -3,7 +3,7 @@ import { promisify } from 'util';
 import { promises as fsp, existsSync } from 'fs';
 import os from 'os';
 import path from 'path';
-import sharp from 'sharp';
+import { decodeTiffToFloat, tiffBitsPerSample } from '@myastrosky/core/raw-decode/tiff-decoder';
 import { parseFITSHeader, wcsToCorrespondences } from './wcs-reader.js';
 import type { WCSData } from './wcs-reader.js';
 import { normalizeDSOAliases } from './dso-utils.js';
@@ -62,6 +62,37 @@ interface SolveResult {
   dsoIds?: string[];
 }
 
+/**
+ * solve-field reads a TIFF through netpbm's `tifftopnm`, which takes 8 or 16 bits per sample but refuses 32
+ * (the float TIFF stacking programs export). Such a TIFF is handed over as a 32-bit float FITS instead: its
+ * colour channels averaged into one, rows in the TIFF's top-to-bottom order so the solution keeps the
+ * picture convention. Any other TIFF is left as is (returns null). Decoded by our own TIFF decoder: sharp
+ * collapses float samples (see raw-decode/index.ts).
+ */
+export function tiffToSolveFieldFits(buffer: Buffer): Buffer | null {
+  if ((tiffBitsPerSample(buffer) ?? 0) <= 16) return null;
+  const { width, height, channels, data: px } = decodeTiffToFloat(buffer);
+
+  const card = (key: string, value: string) => `${key.padEnd(8)}= ${value.padStart(20)}`.padEnd(80);
+  const cards = [
+    card('SIMPLE', 'T'),
+    card('BITPIX', '-32'),
+    card('NAXIS', '2'),
+    card('NAXIS1', String(width)),
+    card('NAXIS2', String(height)),
+    'END'.padEnd(80),
+  ].join('');
+  const header = Buffer.from(cards.padEnd(Math.ceil(cards.length / 2880) * 2880), 'ascii');
+
+  const body = Buffer.alloc(Math.ceil((width * height * 4) / 2880) * 2880);
+  for (let i = 0; i < width * height; i++) {
+    let sum = 0;
+    for (let c = 0; c < channels; c++) sum += px[i * channels + c];
+    body.writeFloatBE(sum / channels, i * 4);
+  }
+  return Buffer.concat([header, body]);
+}
+
 async function getSolveFieldBin(): Promise<string> {
   return (await settings.get('SOLVE_FIELD_PATH')) || 'solve-field';
 }
@@ -88,14 +119,17 @@ export async function solveWithSolveField(
   const useWSL = await useWSLForSolveField();
   void logSolverVersion(bin, ['--version'], useWSL);
   const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'solve-field-'));
-  const imgName = `input${ext}`;
-  const imgPath = path.join(tmpDir, imgName);
   const wcsPath = path.join(tmpDir, 'input.wcs');
 
   try {
+    // A 32-bit TIFF goes as a float FITS (see tiffToSolveFieldFits); its rows stay top-down,
+    // so `ext` (still .tif/.tiff) keeps choosing the picture Y convention below.
+    const tiffFits = ext === '.tif' || ext === '.tiff' ? tiffToSolveFieldFits(buffer) : null;
+    const imgPath = path.join(tmpDir, tiffFits ? 'input.fits' : `input${ext}`);
+
     // Write the original buffer to temp file WITHOUT rotation
     // solve-field will solve it in its original orientation
-    await fsp.writeFile(imgPath, buffer);
+    await fsp.writeFile(imgPath, tiffFits ?? buffer);
 
     logDebug('solve-field', `Image dimensions: ${width}×${height}`);
 
@@ -336,8 +370,9 @@ ${fullOutput}`,
     );
 
     // Generate correspondences from catalog stars.
-    // A JPEG/PNG/TIFF is in screen/display convention (pixel (1,1) = upper-left, Y increases
-    // downward: fitsYConvention=false); a FITS file counts its rows from the bottom (true).
+    // A JPEG/PNG/TIFF (also a TIFF handed over as FITS, written top row first) is in screen/display
+    // convention (pixel (1,1) = upper-left, Y increases downward: fitsYConvention=false); a FITS file
+    // counts its rows from the bottom (true).
     const correspondences = wcsToCorrespondences(
       wcs,
       width,

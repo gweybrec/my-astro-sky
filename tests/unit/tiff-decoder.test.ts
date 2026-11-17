@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
-import { decodeTiffToBytes, UnsupportedTiffError } from '@myastrosky/core/raw-decode/tiff-decoder';
+import {
+  decodeTiffToBytes,
+  decodeTiffToFloat,
+  tiffBitsPerSample,
+  UnsupportedTiffError,
+} from '@myastrosky/core/raw-decode/tiff-decoder';
 import { buildTiff } from '../fixtures/tiff-builders';
 
 describe('decodeTiffToBytes — 8-bit unsigned mono, uncompressed', () => {
@@ -332,5 +337,56 @@ describe('decodeTiffToBytes — rejections', () => {
       pixels: Array(256).fill(0),
     });
     expect(() => decodeTiffToBytes(buf)).toThrow(UnsupportedTiffError);
+  });
+});
+
+describe('decodeTiffToFloat — full-depth samples', () => {
+  it('keeps 32-bit float samples as stored, above 1 and below 1/255 included', () => {
+    const buf = buildTiff({
+      width: 2,
+      height: 1,
+      bitsPerSample: 32,
+      sampleFormat: 3,
+      samplesPerPixel: 1,
+      photometric: 1,
+      pixels: [0.0003, 1.5],
+    });
+    const d = decodeTiffToFloat(buf);
+    expect([d.width, d.height, d.channels]).toEqual([2, 1, 1]);
+    expect(d.data[0]).toBeCloseTo(0.0003, 7);
+    expect(d.data[1]).toBeCloseTo(1.5, 6);
+  });
+
+  it('scales 16-bit samples to [0,1] without rounding them to 8 bits', () => {
+    const buf = buildTiff({
+      width: 1,
+      height: 1,
+      bitsPerSample: 16,
+      sampleFormat: 1,
+      samplesPerPixel: 3,
+      photometric: 2,
+      pixels: [1, 65535, 32768],
+    });
+    const d = decodeTiffToFloat(buf);
+    expect(d.channels).toBe(3);
+    expect(d.data[0]).toBeCloseTo(1 / 65535, 9);
+    expect(d.data[1]).toBe(1);
+    expect(d.data[2]).toBeCloseTo(32768 / 65535, 6);
+  });
+});
+
+describe('tiffBitsPerSample', () => {
+  it('reads the bits per sample of the first image', () => {
+    const tiff = (bitsPerSample: 8 | 16 | 32) =>
+      buildTiff({
+        width: 1,
+        height: 1,
+        bitsPerSample,
+        sampleFormat: bitsPerSample === 32 ? 3 : 1,
+        samplesPerPixel: 1,
+        photometric: 1,
+        pixels: [0],
+      });
+    expect([8, 16, 32].map((b) => tiffBitsPerSample(tiff(b as 8 | 16 | 32)))).toEqual([8, 16, 32]);
   });
 });

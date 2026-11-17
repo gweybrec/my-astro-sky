@@ -15,6 +15,17 @@ export interface DecodedTiff {
   data: Uint8Array;
 }
 
+export interface DecodedTiffFloat {
+  width: number;
+  height: number;
+  channels: 1 | 3;
+  /** Samples normalised to ~[0,1] (integers divided by their full scale, floats as stored), not clipped. */
+  data: Float32Array;
+}
+
+/** Receives sample `index` (row-major, interleaved per pixel) of the image it was made for. */
+type SampleSink = (index: number, value: number) => void;
+
 const COMPRESSION_NONE = 1;
 const COMPRESSION_LZW = 5;
 const COMPRESSION_DEFLATE_OLD = 32946;
@@ -86,14 +97,43 @@ function readSample(
   }
 }
 
+/** The bits per sample of a TIFF's first image (its first channel's), or undefined without an image. */
+export function tiffBitsPerSample(buf: Uint8Array): number | undefined {
+  const ifd = parseTiffHeader(buf).ifds[0];
+  return ifd ? (fieldValues(ifd, 258) ?? [1])[0] : undefined;
+}
+
+/** Decode a TIFF's pixel data into an 8-bit, faithfully-mapped RGB or mono buffer. */
+export function decodeTiffToBytes(buf: Uint8Array): DecodedTiff {
+  let data = new Uint8Array(0);
+  const { width, height, channels } = decodeTiff(buf, (w, h, ch) => {
+    data = new Uint8Array(w * h * ch);
+    return (i, v) => (data[i] = toByte(v));
+  });
+  return { width, height, channels, data };
+}
+
+/** Decode a TIFF's pixel data into its samples as floats, keeping the file's full depth. */
+export function decodeTiffToFloat(buf: Uint8Array): DecodedTiffFloat {
+  let data = new Float32Array(0);
+  const { width, height, channels } = decodeTiff(buf, (w, h, ch) => {
+    data = new Float32Array(w * h * ch);
+    return (i, v) => (data[i] = v);
+  });
+  return { width, height, channels, data };
+}
+
 /**
- * Decode a TIFF's pixel data into an 8-bit, faithfully-mapped RGB or mono buffer.
+ * Decode a TIFF's pixel data, handing every sample to the sink made for the image's size.
  * Supports uncompressed / LZW / PackBits / Deflate, chunky or planar strips (no tiles —
  * none of the source raw files in scope use tiled TIFF), Predictor 1/2, 8/16/32-bit
  * unsigned integer or 32-bit float samples. Rejects everything else with
  * `UnsupportedTiffError` rather than silently misinterpreting the data.
  */
-export function decodeTiffToBytes(buf: Uint8Array): DecodedTiff {
+function decodeTiff(
+  buf: Uint8Array,
+  makeSink: (width: number, height: number, channels: 1 | 3) => SampleSink,
+): { width: number; height: number; channels: 1 | 3 } {
   const header = parseTiffHeader(buf);
   const ifd: TiffIfd = header.ifds[0];
   if (!ifd) throw new UnsupportedTiffError('TIFF file has no image directory');
@@ -153,7 +193,7 @@ export function decodeTiffToBytes(buf: Uint8Array): DecodedTiff {
   }
 
   const bytesPerSample = bitsPerSample / 8;
-  const out = new Uint8Array(width * height * outChannels);
+  const write = makeSink(width, height, outChannels);
 
   const numStrips = stripOffsets.length;
 
@@ -180,13 +220,13 @@ export function decodeTiffToBytes(buf: Uint8Array): DecodedTiff {
           const byteOffset = (x * samplesPerPixel + c) * bytesPerSample;
           let v = readSample(view, byteOffset, bitsPerSample, isFloat, header.littleEndian);
           if (invert) v = 1 - v;
-          out[outBase + c] = toByte(v);
+          write(outBase + c, v);
         }
       } else {
         const byteOffset = x * bytesPerSample;
         let v = readSample(view, byteOffset, bitsPerSample, isFloat, header.littleEndian);
         if (invert) v = 1 - v;
-        out[outBase + planarChannel] = toByte(v);
+        write(outBase + planarChannel, v);
       }
     }
   };
@@ -234,5 +274,5 @@ export function decodeTiffToBytes(buf: Uint8Array): DecodedTiff {
     }
   }
 
-  return { width, height, channels: outChannels, data: out };
+  return { width, height, channels: outChannels };
 }
