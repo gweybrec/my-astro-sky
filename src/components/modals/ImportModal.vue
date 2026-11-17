@@ -321,6 +321,7 @@ import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
 import { importPreview, importData, exportData, getPhotos } from '../../api';
 import type { ImportPreviewResult, ImportPreviewSetup, SetupImportChoice } from '../../api';
 import { reloadUserOverrides } from '../../dso-catalog';
+import { followDesktopStoredSolves } from '../../follow-stored-solves';
 import { showToast } from '../../toast';
 import { formatBytes } from '@myastrosky/core/format-utils';
 import {
@@ -584,6 +585,8 @@ async function onImport() {
       }
       if (gallery) gallery.loadPhotos(photos);
       photosStore.syncFromOverlay();
+      // A restored photo whose astrometry.net solve was still going on: its result is fetched now, not at the next start.
+      if (overlay) void followDesktopStoredSolves(photos, overlay, skyMap, gallery);
     } catch {
       /* non-fatal — user can refresh manually */
     }

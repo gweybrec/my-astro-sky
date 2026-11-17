@@ -322,6 +322,45 @@ describe.each(SQL_ADAPTERS)('backup service on the %s adapter', (_name, wrap) =>
       expect(b.blobs.store.has('p2.jpg')).toBe(true);
     });
 
+    it("restores an unplaced photo's online solve, and drops one a placed photo's record carries", async () => {
+      const a = await makeSet();
+      const solve = { state: 'solving', sentAt: '2026-11-17T20:00:00.000Z', submissionId: 42 };
+      await a.photos.insert({
+        id: 'p3',
+        filename: 'p3.jpg',
+        originalName: 'NGC7000.jpg',
+        width: 100,
+        height: 50,
+        correspondences: [],
+        onlineSolve: solve,
+      } as never);
+      a.blobs.store.set('p3.jpg', text('image-3'));
+      const writer = await exportAll(a);
+      const manifest = parse(writer.files[0][1]);
+      expect(manifest.photos[0].onlineSolve).toEqual(solve);
+      // A record edited by hand: placed, yet with a solve to follow.
+      manifest.photos.push({
+        ...manifest.photos[0],
+        id: 'p4',
+        filename: 'p4.jpg',
+        originalName: 'M8.jpg',
+        correspondences: correspondences(3),
+      });
+      const files = writer.files.map(([n, d]): [string, Uint8Array] =>
+        n === 'manifest.json' ? [n, text(JSON.stringify(manifest))] : [n, d],
+      );
+      files.push(['images/p4.jpg', text('image-4')]);
+
+      const b = await makeSet();
+      await createBackupService({ ...b, newId: () => 'y' }).importFrom(
+        memoryReader(files),
+        everything,
+      );
+      const restored = await b.photos.list();
+      expect(restored.find((p) => p.id === 'p3')?.onlineSolve).toEqual(solve);
+      expect(restored.find((p) => p.id === 'p4')?.onlineSolve).toBeUndefined();
+    });
+
     it('imports again over the same data without duplicating it', async () => {
       const a = await seed();
       const reader = memoryReader((await exportAll(a)).files);

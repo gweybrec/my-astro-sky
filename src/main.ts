@@ -13,7 +13,7 @@ import {
   makeMissingPhotoMediums,
   makeMissingSharedSkyMediums,
 } from './api';
-import { followStoredSolves } from '@myastrosky/app-state/stored-solve';
+import { followDesktopStoredSolves } from './follow-stored-solves';
 import { isUpdateAvailable, DISMISSED_UPDATE_KEY } from '@myastrosky/core/version-check';
 import { buildFovFrameSpecs } from './fov-overlay';
 import { getHemisphere } from '@myastrosky/core/projection';
@@ -280,17 +280,7 @@ async function init() {
     // Ensure outlines are drawn on initial load (onViewChange hasn't fired yet)
     skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));
     skyMap.render();
-    // Photos saved while astrometry.net had not finished: their solve went on there; its result is fetched now,
-    // without a new upload, and a solved photo takes its place on the map.
-    void followStoredSolves(photos, {
-      onChange: (photo) => {
-        overlay.updatePhotoData(photo);
-        overlay.updateTransforms();
-        gallery.loadPhotos(overlay.getPlacedPhotos().map((p) => p.photo));
-        skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));
-        skyMap.render();
-      },
-    });
+    void followDesktopStoredSolves(photos, overlay, skyMap, gallery);
   } catch {
     showToast({ message: t('app.photosLoadError'), type: 'error' });
   }

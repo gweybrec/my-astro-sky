@@ -282,8 +282,8 @@ export interface CorrespondenceRow {
 
 const INSERT_PHOTO = `INSERT INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, medium_filename, online_solve)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?, ?)`;
-const INSERT_PHOTO_WITH_ID = `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, quarter_turns, fits_headers)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?, ?)`;
+const INSERT_PHOTO_WITH_ID = `INSERT OR IGNORE INTO photos (id, filename, original_name, width, height, created_at, manual_placement, dso_ids, labels, points_of_interest, notes, integrations, display_order, thumb_filename, observation_date, capture_details, gear_setup_id, quarter_turns, fits_headers, online_solve)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(display_order) + 1 FROM photos), 0), ?, ?, ?, ?, ?, ?, ?)`;
 const INSERT_CORRESPONDENCE =
   'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip, star_name, star_ra, star_dec) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
 const SELECT_PHOTOS = 'SELECT * FROM photos ORDER BY display_order ASC, created_at ASC, id ASC';
@@ -1175,6 +1175,13 @@ const isPixelCount = (v: unknown): v is number => Number.isInteger(v) && (v as n
 /** A date in the form the database wrote before schema version 16 (`YYYY-MM-DD HH:MM:SS`, UTC). */
 const SQLITE_DATETIME = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})$/;
 
+/** True when a backup manifest's photo is placed (reference points or a manual placement). */
+function hasPlacement(p: Record<string, any>): boolean {
+  return (
+    Boolean(p.manualPlacement) || (Array.isArray(p.correspondences) && p.correspondences.length > 0)
+  );
+}
+
 /** The parameters of `INSERT_PHOTO_WITH_ID` for a photo of a backup manifest. */
 function importParams(p: Record<string, any>, nowIso: string): SqlValue[] {
   const id: string = p.id;
@@ -1199,5 +1206,7 @@ function importParams(p: Record<string, any>, nowIso: string): SqlValue[] {
     cleanSetupId(p.gearSetupId),
     cleanQuarterTurns(p.quarterTurns),
     fitsHeadersJson(p.fitsHeaders),
+    // A placed photo has no online solve to follow.
+    hasPlacement(p) ? null : onlineSolveJson(p.onlineSolve),
   ];
 }
