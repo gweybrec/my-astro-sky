@@ -28,4 +28,6 @@ Use `@vue/test-utils` `mount` (not `@testing-library/vue`). Content rendered thr
 
 The raw source images those solves came from are in the gitignored `test-photos/` directory (local only) — see `test-photos/CLAUDE.md` if present.
 
+**No test may read `test-photos/` or any other gitignored file, and no photo files are committed as fixtures.** Build the input in the test (`fits-builders.ts`, `tiff-builders.ts`) with hard-coded values, or mock.
+
 CI runs the full suite on every push/PR via `.github/workflows/test.yml` (Node.js 24).
