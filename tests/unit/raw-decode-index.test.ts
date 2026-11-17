@@ -1,6 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import fs from 'fs';
-import path from 'path';
 import sharp from 'sharp';
 import {
   decodeRawAstroImage as decodeWith,
@@ -79,31 +77,74 @@ describe('decodeRawAstroImage — extension dispatch', () => {
   });
 });
 
-const TEST_PHOTOS_DIR = path.join(__dirname, '../../test-photos');
+// The photos users import are mostly Siril exports: float32 colour FITS cubes with long headers
+// (WCS, SIP and HISTORY cards) and float32 RGB TIFFs written one row per strip. These build
+// small files of the same shape, so the whole path down to a colour PNG is checked end to end.
+describe('decodeRawAstroImage — colour files shaped like Siril exports', () => {
+  async function pngPixels(png: Uint8Array): Promise<{ channels: number; data: number[] }> {
+    const { data, info } = await sharp(Buffer.from(png)).raw().toBuffer({ resolveWithObject: true });
+    return { channels: info.channels, data: Array.from(data) };
+  }
 
-describe.skipIf(!fs.existsSync(TEST_PHOTOS_DIR))(
-  'decodeRawAstroImage — real sample files (local only, test-photos/ is gitignored)',
-  () => {
-    // One test per file, so each large sample gets its own time limit (they take seconds each
-    // under coverage) and a failure names the file.
-    it.each<[string, string, number, number, 1 | 3]>([
-      ['M26.tiff', '.tiff', 3331, 1791, 3],
-      ['M97+M108.tiff', '.tiff', 3263, 1931, 3],
-      ['M1-CCD.fit', '.fit', 1049, 754, 1],
-      ['M2_1320s.fit', '.fit', 674, 507, 1],
-      ['M101.fit', '.fit', 3204, 2136, 3],
-      ['LDN1235.fit', '.fit', 5760, 3239, 3],
-    ])(
-      'decodes %s to plausible dimensions',
-      async (file, ext, width, height, channels) => {
-        const full = path.join(TEST_PHOTOS_DIR, file);
-        if (!fs.existsSync(full)) return;
-        const r = await decodeRawAstroImage(fs.readFileSync(full), ext);
-        expect(r.width).toBe(width);
-        expect(r.height).toBe(height);
-        expect(r.channels).toBe(channels);
-      },
-      30000,
-    );
-  },
-);
+  it('decodes a float32 FITS colour cube with a header longer than one block', async () => {
+    // 2 x 2 pixels, plane-major (R, G, B), first stored row drawn at the bottom.
+    const buf = buildFits({
+      bitpix: -32,
+      naxis1: 2,
+      naxis2: 2,
+      naxis3: 3,
+      roworder: 'BOTTOM-UP',
+      extraCards: [
+        "CTYPE1  = 'RA---TAN-SIP'",
+        "CTYPE2  = 'DEC--TAN-SIP'",
+        'CRVAL1  =     323.362931259272',
+        'CRVAL2  =   -0.822062165245548',
+        'PLTSOLVD=                    T',
+        ...Array.from({ length: 40 }, (_, i) => `HISTORY processing step ${i}`),
+      ],
+      pixels: [
+        ...[0, 0.25, 0.5, 1], // R
+        ...[1, 0.5, 0.25, 0], // G
+        ...[0.5, 0, 1, 0.25], // B
+      ],
+    });
+    expect(buf.length).toBeGreaterThan(2 * 2880); // the header really spans more than one block
+
+    const r = await decodeRawAstroImage(buf, '.fit');
+    expect([r.width, r.height, r.channels]).toEqual([2, 2, 3]);
+    const px = await pngPixels(r.png);
+    expect(px.channels).toBe(3);
+    // Top row = second stored row (pixels 2, 3), bottom row = first stored row (pixels 0, 1).
+    expect(px.data).toEqual([
+      ...[128, 64, 255],
+      ...[255, 0, 64],
+      ...[0, 255, 128],
+      ...[64, 128, 0],
+    ]);
+  });
+
+  it('decodes a float32 RGB TIFF written one row per strip', async () => {
+    const pixels = [
+      ...[0, 0.25, 0.5],
+      ...[1, 0, 0.25],
+      ...[0.5, 1, 0],
+      ...[0.25, 0.5, 1],
+    ];
+    const buf = buildTiff({
+      width: 2,
+      height: 2,
+      bitsPerSample: 32,
+      sampleFormat: 3,
+      samplesPerPixel: 3,
+      photometric: 2,
+      rowsPerStrip: 1,
+      pixels,
+    });
+
+    const r = await decodeRawAstroImage(buf, '.tiff');
+    expect([r.width, r.height, r.channels]).toEqual([2, 2, 3]);
+    const px = await pngPixels(r.png);
+    expect(px.channels).toBe(3);
+    expect(px.data).toEqual(pixels.map((v) => Math.round(v * 255)));
+  });
+});
