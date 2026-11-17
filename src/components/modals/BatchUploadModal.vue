@@ -213,6 +213,14 @@ import {
   type BatchFilter,
 } from '../../batch-utils';
 import { onlineSolveOf, saveBatchItem, type BatchSaveApi } from '../../batch-place';
+import {
+  forgetBatch,
+  isKeptItem,
+  keepBatch,
+  keptStateOf,
+  type KeptBatchItem,
+  type KeptEntry,
+} from '../../batch-keep';
 import { confirmFinishBatch } from '../../photo-delete-confirm';
 import { showToast } from '../../toast';
 import {
@@ -393,12 +401,22 @@ function itemFromPhoto(photo: Photo, file: File): BatchItem {
   return item;
 }
 
+/** A photo kept when the app was left, read back as it was (its solve or conversion is taken up again below). */
+function itemFromKept(kept: KeptBatchItem): BatchItem {
+  return Object.assign(baseItem(kept.file), kept.state, { id: kept.id, rawFile: kept.rawFile });
+}
+
 const pendingFiles = uiStore.pendingBatchFiles ?? [];
 uiStore.pendingBatchFiles = null;
 const pendingPhotos = uiStore.pendingBatchPhotos ?? [];
 uiStore.pendingBatchPhotos = null;
+const restored = uiStore.pendingBatchRestored ?? [];
+uiStore.pendingBatchRestored = null;
 
-const items = reactive<BatchItem[]>(pendingFiles.map(createBatchItem));
+const items = reactive<BatchItem[]>([
+  ...restored.map(itemFromKept),
+  ...pendingFiles.map(createBatchItem),
+]);
 
 // ─── Selection, filters, tick boxes ───────────────────────────────────────────
 const filter = ref<BatchFilter>('all');
@@ -608,6 +626,9 @@ function cleanupItem(item: BatchItem) {
 
 onBeforeUnmount(() => {
   cancelled = true;
+  // Closed: its photos are saved, or given up. Nothing is kept for the next start any more.
+  if (keepTimer !== null) clearTimeout(keepTimer);
+  void forgetBatch();
   rawConvertQueue.length = 0;
   for (const item of items) {
     item.solveAbort?.abort();
@@ -1003,6 +1024,39 @@ async function saveAll() {
     saving.value = false;
     photosStore.syncFromOverlay();
     canvasStore.gallery?.loadPhotos(storedPhotos());
+  }
+}
+
+// ─── Kept until saved ─────────────────────────────────────────────────────────
+// The photos not stored yet are kept in the browser's database as they change, so that closing or killing the app
+// loses neither them nor a solve astrometry.net goes on with; the window opens again with them at the next start.
+const keptEntries = computed<KeptEntry[]>(() =>
+  items.filter(isKeptItem).map((item) => ({
+    id: item.id,
+    file: item.file,
+    rawFile: item.rawFile ?? null,
+    state: keptStateOf(item),
+  })),
+);
+/** A short wait gathers the changes of one typing burst into one write. */
+const KEEP_DELAY_MS = 300;
+let keepTimer: ReturnType<typeof setTimeout> | null = null;
+watch(
+  keptEntries,
+  (entries) => {
+    if (keepTimer !== null) clearTimeout(keepTimer);
+    keepTimer = setTimeout(() => {
+      keepTimer = null;
+      void keepBatch(entries);
+    }, KEEP_DELAY_MS);
+  },
+  { immediate: true },
+);
+
+// A solve astrometry.net went on with while the app was closed is followed again; nothing is sent again.
+for (const item of items) {
+  if (item.status === 'unfinished' && item.online?.submissionId && !item.photo) {
+    void fetchOnline(item);
   }
 }
 

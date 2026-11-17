@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, shallowRef } from 'vue';
 import type { ViewMode, DSO, Star, Photo, PointOfInterest } from '@myastrosky/core/types';
 import { useCanvasStore } from './canvas';
+import type { KeptBatchItem } from '../batch-keep';
 
 // Screen offset (px) of the tooltip from the cursor anchor; the tooltip is drawn
 // down-right of the anchor. Kept in sync with SkyTooltip.vue's positioning.
@@ -72,6 +73,8 @@ export const useUiStore = defineStore('ui', () => {
   const pendingBatchFiles = ref<File[] | null>(null);
   /** Stored photos to open in "Ajouter des photos" (a gallery photo "À résoudre"), taken by the window at setup. */
   const pendingBatchPhotos = shallowRef<Photo[] | null>(null);
+  /** The photos of "Ajouter des photos" kept when the app was left, read back at start-up; taken by the window. */
+  const pendingBatchRestored = shallowRef<KeptBatchItem[] | null>(null);
 
   // Set before opening the asteroid identification modal — it always opens
   // pre-targeted at one already-solved photo now (see triggerAsteroidModal in
@@ -332,6 +335,7 @@ export const useUiStore = defineStore('ui', () => {
     switchView,
     pendingBatchFiles,
     pendingBatchPhotos,
+    pendingBatchRestored,
     pendingAsteroidPhoto,
     pendingAsteroidOnIdentified,
     pendingSupernovaPhoto,

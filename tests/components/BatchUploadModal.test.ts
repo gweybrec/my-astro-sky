@@ -3,11 +3,19 @@ import { mount, flushPromises } from '@vue/test-utils';
 import BatchUploadModal from '../../src/components/modals/BatchUploadModal.vue';
 import type { BatchItem } from '../../src/batch-types';
 import type { Photo } from '@myastrosky/core/types';
+import {
+  configureBatchKeep,
+  keptStateOf,
+  type BatchKeepStore,
+  type KeptBatchItem,
+} from '../../src/batch-keep';
+import { makeItem } from '../helpers/batch-item';
 
 // ─── Shared mutable state for the mocks ─────────────────────────────────────────
 const state = vi.hoisted(() => ({
   pendingFiles: [] as File[],
   pendingPhotos: null as unknown[] | null,
+  restored: null as unknown[] | null,
   maxParallel: '2',
   availability: { solveField: true, astap: true, astrometry: true },
   jobSeq: 0,
@@ -59,6 +67,7 @@ vi.mock('../../src/stores/ui', () => ({
   useUiStore: () => ({
     pendingBatchFiles: state.pendingFiles,
     pendingBatchPhotos: state.pendingPhotos,
+    pendingBatchRestored: state.restored,
   }),
 }));
 
@@ -137,6 +146,8 @@ beforeEach(() => {
   vi.useFakeTimers();
   state.pendingFiles = [jpeg('a.jpg'), jpeg('b.jpg'), jpeg('c.jpg')];
   state.pendingPhotos = null;
+  state.restored = null;
+  configureBatchKeep(null);
   state.maxParallel = '2';
   state.availability = { solveField: true, astap: true, astrometry: true };
   state.jobSeq = 0;
@@ -408,5 +419,89 @@ describe('BatchUploadModal — list and batch edit', () => {
     });
     // Nothing to save until something changes.
     expect(button(w, 'save-all').text()).toBe('batch.nothingToSave');
+  });
+});
+
+describe('BatchUploadModal — kept until saved', () => {
+  /** The browser's database, as a map: id → what was last written. */
+  function memoryStore() {
+    const kept = new Map<string, Partial<KeptBatchItem>>();
+    const store: BatchKeepStore = {
+      all: async () => [...kept.values()] as KeptBatchItem[],
+      putFiles: async (id, file, rawFile) =>
+        void kept.set(id, { ...kept.get(id), id, file, rawFile }),
+      putState: async (id, order, s) => void kept.set(id, { ...kept.get(id), id, order, state: s }),
+      delete: async (id) => void kept.delete(id),
+      clear: async () => kept.clear(),
+    };
+    return { kept, store };
+  }
+
+  it('keeps the photos not stored yet as they change, and forgets them once the window is closed', async () => {
+    const { kept, store } = memoryStore();
+    configureBatchKeep(store);
+    state.pendingFiles = [jpeg('a.jpg'), jpeg('b.jpg')];
+    const w = mountModal();
+    await vi.advanceTimersByTimeAsync(400);
+    expect([...kept.values()].map((k) => k.file?.name)).toEqual(['a.jpg', 'b.jpg']);
+
+    vm(w).items[0].labels.push('hiver');
+    await vi.advanceTimersByTimeAsync(400);
+    expect([...kept.values()][0].state?.labels).toEqual(['hiver']);
+
+    // Stored: no longer kept here, the photo store has it.
+    await button(w, 'save-all').trigger('click');
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(400);
+    expect(kept.size).toBe(0);
+
+    vm(w).items.push(vm(w).createBatchItem(jpeg('c.jpg')));
+    await vi.advanceTimersByTimeAsync(400);
+    expect(kept.size).toBe(1);
+    w.unmount();
+    await flushPromises();
+    expect(kept.size).toBe(0);
+  });
+
+  it('opens with the photos kept when the app was left, and follows their astrometry.net solve again', async () => {
+    state.pendingFiles = [];
+    const fits = new File(['fits'], 'M31.fit', { type: 'application/fits' });
+    state.restored = [
+      {
+        id: 'kept-1',
+        order: 0,
+        file: jpeg('M42.jpg'),
+        rawFile: null,
+        state: { ...keptStateOf(makeItem()), labels: ['hiver'], customName: 'Orion' },
+      },
+      {
+        id: 'kept-2',
+        order: 1,
+        file: new File(['png'], 'M31.png', { type: 'image/png' }),
+        rawFile: fits,
+        state: {
+          ...keptStateOf(makeItem()),
+          rawName: 'M31.fit',
+          customName: 'M31',
+          solver: 'astrometry',
+          status: 'unfinished',
+          online: { submissionId: 42, sentAt: 's', fits: true },
+        },
+      },
+    ] satisfies KeptBatchItem[];
+    resumePlateSolve.mockResolvedValue({ jobId: 'new-job' });
+    pollPlateSolve.mockResolvedValue({ jobId: 'new-job', status: 'running', submissionId: 42 });
+
+    const w = mountModal();
+    await flushPromises();
+    expect(vm(w).items.map((i) => [i.id, i.customName])).toEqual([
+      ['kept-1', 'Orion'],
+      ['kept-2', 'M31'],
+    ]);
+    expect(vm(w).items[0].labels).toEqual(['hiver']);
+    // Followed from its submission: the original FITS file is not sent again.
+    expect(resumePlateSolve).toHaveBeenCalledWith(fits, 42, { fits: true });
+    expect(submitPlateSolve).not.toHaveBeenCalled();
+    expect(vm(w).items[1].status).toBe('solving');
   });
 });

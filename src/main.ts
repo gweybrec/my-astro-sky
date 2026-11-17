@@ -36,6 +36,7 @@ import { reportRendererError, reportUnknownRendererError } from './error-reporte
 import { openDSOEditModal } from './dso-editor';
 import { loadTheme, applyTheme } from './theme';
 import { THEME_CHANGED_EVENT } from '@myastrosky/core/theme';
+import { configureBatchKeep, createIndexedDbBatchStore, restoreBatch } from './batch-keep';
 import 'virtual:uno.css';
 import './styles/tokens.css';
 import './style.css';
@@ -296,6 +297,19 @@ async function init() {
 }
 
 /**
+ * The photos of "Ajouter des photos" not saved when the app was left (kept in the browser's database): the window opens
+ * again with them, before any other window, so that one opened later (the update notice) comes back to it.
+ */
+async function reopenAddPhotos() {
+  if (typeof indexedDB === 'undefined') return;
+  configureBatchKeep(createIndexedDbBatchStore(indexedDB));
+  const kept = await restoreBatch();
+  if (kept.length === 0) return;
+  useUiStore(pinia).pendingBatchRestored = kept;
+  openVueModal('batchUpload');
+}
+
+/**
  * Compare the running build's version against the latest GitHub release and,
  * when a newer version exists and has not already been dismissed, open the
  * update-available modal. Fails silently — a version check must never disrupt
@@ -366,6 +380,7 @@ async function reloadPhotos() {
 }
 
 init()
+  .then(() => reopenAddPhotos())
   .then(() => checkForUpdate())
   .then(() => repairStoredPhotos())
   .catch((err) => {
