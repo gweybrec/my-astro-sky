@@ -4,9 +4,18 @@ import { fileURLToPath } from 'url';
 import net from 'net';
 import fs from 'fs';
 import crypto from 'crypto';
+import { execFile } from 'child_process';
 import { setupErrorLogging, logMainError, logCrash } from './error-logger.js';
 import { shouldReloadAfterCrash } from './crash-reload-guard.js';
 import { shouldOpenExternally } from './external-links.js';
+import {
+  createPathBatcher,
+  photoPathsFromArgv,
+  registerOpenWithCommands,
+  squirrelEvent,
+  squirrelStubExe,
+  unregisterOpenWithCommands,
+} from './open-with.js';
 import { installLogger } from '../server/logger.js';
 import { DEFAULT_SERVER_PORT, DESKTOP_APP_PORT, INSTANCE_HEADER } from '../server/ports.js';
 import { msg, type ServerLang } from '../server/messages.js';
@@ -263,6 +272,11 @@ async function main() {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
+  mainWindow = win;
+  // A reload (crash recovery) drops the page's listener; files opened meanwhile wait until it asks again.
+  win.webContents.on('did-start-loading', () => {
+    rendererTakesFiles = false;
+  });
 
   // Native renderer crashes (white screen) can't be caught by JS in the renderer — handle
   // them here: log to the crash stream and auto-reload to recover.
@@ -299,22 +313,119 @@ ipcMain.handle('get-location', async () => {
 
 app.on('window-all-closed', () => app.quit());
 
-main().catch(async (error: unknown) => {
-  console.error(error);
-  const err = error instanceof Error ? error : new Error(String(error));
-  try {
-    logMainError('main_startup_failure', err);
-  } catch {
-    // Intentionally ignore to avoid recursive crashes.
+// ── "Open with MyAstroSky" ──────────────────────────────────────────────────────────────────
+
+let mainWindow: BrowserWindow | null = null;
+/** Photo files opened before the page asked for them (at launch, or while it reloads). */
+let waitingPaths: string[] = [];
+/** The page has asked for the opened files once, so later ones are pushed to it. */
+let rendererTakesFiles = false;
+
+interface OpenedFile {
+  name: string;
+  data: Uint8Array;
+}
+
+async function readOpenedFiles(paths: readonly string[]): Promise<OpenedFile[]> {
+  const files: OpenedFile[] = [];
+  for (const p of paths) {
+    try {
+      files.push({ name: path.basename(p), data: await fs.promises.readFile(p) });
+    } catch (err) {
+      logMainError('open_with_read_failed', err instanceof Error ? err : new Error(String(err)));
+    }
   }
-  try {
-    // A failed launch otherwise shows no window and logs only to a console nobody
-    // sees — this is the one visible signal the user gets that something went wrong.
-    if (isDatabaseUpdateError(err)) await offerBackupAfterFailedUpdate(err);
-    else dialog.showErrorBox('MyAstroSky failed to start', err.message);
-  } catch {
-    // Best effort — if the dialog itself can't be shown (e.g. no display), there's
-    // nothing more we can surface; fall through to exit below.
+  return files;
+}
+
+const queueOpenedPaths = createPathBatcher((paths) => {
+  const win = mainWindow;
+  if (!win || win.isDestroyed() || !rendererTakesFiles) {
+    waitingPaths.push(...paths);
+    return;
   }
-  app.exit(1);
+  void readOpenedFiles(paths).then((files) => {
+    if (files.length > 0 && !win.isDestroyed()) win.webContents.send('opened-files', files);
+  });
 });
+
+ipcMain.handle('opened-files:take', async () => {
+  rendererTakesFiles = true;
+  const paths = waitingPaths;
+  waitingPaths = [];
+  return readOpenedFiles(paths);
+});
+
+function focusMainWindow(): void {
+  const win = mainWindow;
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.focus();
+}
+
+function runCommand(file: string, args: string[]): Promise<void> {
+  return new Promise((resolve) => {
+    execFile(file, args, { windowsHide: true }, () => resolve());
+  });
+}
+
+/**
+ * The Windows installer starts the app with `--squirrel-install`, `--squirrel-updated`, … and expects it to
+ * do its setup and quit: shortcuts, and here the "Open with" entries in Explorer.
+ */
+async function handleSquirrelEvent(event: string): Promise<void> {
+  const exeName = path.basename(process.execPath);
+  const updateExe = path.resolve(path.dirname(process.execPath), '..', 'Update.exe');
+  if (event === '--squirrel-install' || event === '--squirrel-updated') {
+    await runCommand(updateExe, [`--createShortcut=${exeName}`]);
+    for (const args of registerOpenWithCommands(squirrelStubExe(process.execPath))) {
+      await runCommand('reg.exe', args);
+    }
+  } else if (event === '--squirrel-uninstall') {
+    await runCommand(updateExe, [`--removeShortcut=${exeName}`]);
+    for (const args of unregisterOpenWithCommands()) await runCommand('reg.exe', args);
+  }
+  app.quit();
+}
+
+const installerEvent = process.platform === 'win32' ? squirrelEvent(process.argv) : null;
+if (installerEvent && installerEvent !== '--squirrel-firstrun') {
+  void handleSquirrelEvent(installerEvent);
+} else if (!app.requestSingleInstanceLock()) {
+  // Already running: the running app receives this launch's files through 'second-instance'.
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    queueOpenedPaths(photoPathsFromArgv(argv));
+    focusMainWindow();
+  });
+  // macOS sends opened files as events, also before the app is ready.
+  app.on('open-file', (event, filePath) => {
+    event.preventDefault();
+    queueOpenedPaths([filePath]);
+  });
+  queueOpenedPaths(photoPathsFromArgv(process.argv));
+  startApp();
+}
+
+function startApp(): void {
+  main().catch(async (error: unknown) => {
+    console.error(error);
+    const err = error instanceof Error ? error : new Error(String(error));
+    try {
+      logMainError('main_startup_failure', err);
+    } catch {
+      // Intentionally ignore to avoid recursive crashes.
+    }
+    try {
+      // A failed launch otherwise shows no window and logs only to a console nobody
+      // sees — this is the one visible signal the user gets that something went wrong.
+      if (isDatabaseUpdateError(err)) await offerBackupAfterFailedUpdate(err);
+      else dialog.showErrorBox('MyAstroSky failed to start', err.message);
+    } catch {
+      // Best effort — if the dialog itself can't be shown (e.g. no display), there's
+      // nothing more we can surface; fall through to exit below.
+    }
+    app.exit(1);
+  });
+}

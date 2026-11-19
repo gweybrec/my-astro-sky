@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonList } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
+import type { Photo } from '@myastrosky/core/types';
+import { findPhotoWithFileName } from '@myastrosky/core/photo-name-match';
+import { getPhotos } from '@myastrosky/app-state/api';
+import { reportError } from '@myastrosky/core/platform/error-hook';
 import { useBackClose } from '../composables/useBackClose';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
@@ -32,6 +36,22 @@ const { confirm } = useConfirm();
 const { showError } = useErrorToast();
 const importing = ref(false);
 let leaving = false;
+
+// A file named like one of the user's photos says so under its state (board "Importer, nom déjà utilisé"): it may
+// be another photo of the same object, so it is only a note. The list of photos is read again when files come in.
+const storedPhotos = ref<Photo[]>([]);
+watch(
+  () => importRows.value.length,
+  () =>
+    void getPhotos()
+      .then((photos) => (storedPhotos.value = photos))
+      .catch((error) => reportError('ImportPhotosPage.getPhotos', error)),
+  { immediate: true },
+);
+const noteOf = (row: ImportRow) =>
+  row.kind === 'pending' && findPhotoWithFileName(row.photo.name, storedPhotos.value)
+    ? t('batch.nameAlreadyUsed')
+    : undefined;
 
 const title = computed(() =>
   importRows.value.length === 1
@@ -134,6 +154,7 @@ async function run() {
             :title="row.kind === 'pending' ? row.photo.name : row.file.name"
             :subs="[subOf(row)]"
             :status="statusOf(row)"
+            :note="noteOf(row)"
             :warning="
               row.kind === 'pending' && row.photo.noSolution
                 ? t('mobile.gallery.noSolutionLoaded')

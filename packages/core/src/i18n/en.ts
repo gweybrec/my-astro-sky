@@ -1632,6 +1632,15 @@ const en: Translations = {
     finishBack: 'Go back',
     finishDiscard: 'Discard',
     finishSave: 'Save and finish',
+    openWithTitle: 'A photo already has this name',
+    openWithMessage:
+      'You already have a photo named “{name}”. Do you want to see it in the sky, or add this file as a new photo?',
+    openWithMessageGallery:
+      'You already have a photo named “{name}”, not placed yet. Do you want to see it in the gallery, or add this file as a new photo?',
+    openWithShowSky: 'Show in the sky',
+    openWithShowGallery: 'Show in the gallery',
+    openWithAddNew: 'Add as a new photo',
+    nameAlreadyUsed: 'Name already used',
     infoTitle: 'Add photos',
     infoIntro:
       'Load several photos, place them on the sky, then save them. The window stays open: “Finish” closes it.',

@@ -72,6 +72,7 @@
               :key="item.id"
               :item="item"
               :selected="!multiEdit && item.id === selectedId"
+              :already-added="isAlreadyAdded(item)"
               @select="select(item.id)"
               @tick="(on) => (item.ticked = on)"
             />
@@ -197,6 +198,7 @@ import {
   getSolverAvailability,
   getGearSetups,
   convertRawPhoto,
+  getPhotos,
 } from '../../api';
 import type { SolverAvailability, GearSetupData } from '../../api';
 import { reportUnknownRendererError } from '../../error-reporter';
@@ -231,6 +233,7 @@ import {
   solveInputFile,
 } from '@myastrosky/core/photo-formats';
 import { isPlacedPhoto } from '@myastrosky/core/photo-placement';
+import { findPhotoWithFileName } from '@myastrosky/core/photo-name-match';
 import { onlineSolveHints } from '@myastrosky/core/domain/solve';
 import { isFollowingStoredSolve } from '@myastrosky/app-state/stored-solve';
 import { noSolutionMessage, suggestedSetupFor } from '../../wcs-load-flow';
@@ -586,15 +589,43 @@ function addMorePhotos() {
     if (valid.length !== selected.length) {
       showToast({ message: t('errors.someFilesSkipped'), type: 'error', duration: 3500 });
     }
-    // Enqueue the reactive items read back from the array, not the plain objects pushed: conversion progress and
-    // status written to a plain object never reach the window.
-    const start = items.length;
-    items.push(...valid.map(createBatchItem));
-    if (!selectedId.value && items[start]) selectedId.value = items[start].id;
-    enqueueForConversion(items.slice(start));
+    addFiles(valid);
   };
   input.click();
 }
+
+// ─── Files named like a photo already added ("Déjà dans vos photos") ─────────
+const addedPhotos = ref<Photo[]>([]);
+function refreshStoredPhotos() {
+  getPhotos()
+    .then((photos) => (addedPhotos.value = photos))
+    .catch((err) => reportUnknownRendererError('batch_stored_photos_failure', err));
+}
+refreshStoredPhotos();
+/** A file not saved yet whose name (without its extension) is the name of a photo already added. */
+function isAlreadyAdded(item: BatchItem): boolean {
+  return !item.photo && !!findPhotoWithFileName(item.file.name, addedPhotos.value);
+}
+
+function addFiles(files: readonly File[]) {
+  refreshStoredPhotos();
+  // Enqueue the reactive items read back from the array, not the plain objects pushed: conversion progress and
+  // status written to a plain object never reach the window.
+  const start = items.length;
+  items.push(...files.map(createBatchItem));
+  if (!selectedId.value && items[start]) selectedId.value = items[start].id;
+  enqueueForConversion(items.slice(start));
+}
+
+// Files handed over while the window is open ("Open with MyAstroSky") join the list.
+watch(
+  () => uiStore.pendingBatchFiles,
+  (files) => {
+    if (!files) return;
+    uiStore.pendingBatchFiles = null;
+    addFiles(files);
+  },
+);
 
 // ─── Remove a photo not saved yet ─────────────────────────────────────────────
 function removeItem(item: BatchItem) {

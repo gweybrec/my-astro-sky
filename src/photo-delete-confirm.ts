@@ -276,3 +276,72 @@ export function confirmWcsDimensionMismatch(warning: {
     'btn-confirm',
   );
 }
+
+/**
+ * A file opened with "Open with MyAstroSky" has the name of a photo already added: show that photo (in the sky, or
+ * in the gallery when it is not placed), or add the file as a new photo. Escape and a click outside cancel.
+ */
+export function chooseExistingOrNew(
+  name: string,
+  placed: boolean,
+): Promise<'show' | 'add' | 'cancel'> {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'dialog-overlay';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'dialog';
+    dialog.setAttribute('role', 'dialog');
+    dialog.addEventListener('click', (e) => e.stopPropagation());
+
+    const titleEl = document.createElement('h3');
+    titleEl.textContent = t('batch.openWithTitle');
+
+    const messageEl = document.createElement('p');
+    messageEl.className = 'dialog-message';
+    messageEl.textContent = t(placed ? 'batch.openWithMessage' : 'batch.openWithMessageGallery', {
+      name,
+    });
+
+    const buttons = document.createElement('div');
+    buttons.className = 'dialog-buttons dialog-buttons--row';
+    const button = (label: string, cls: string, choice: 'show' | 'add' | 'cancel') => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = cls;
+      b.textContent = label;
+      b.addEventListener('click', () => closeWith(choice));
+      buttons.appendChild(b);
+      return b;
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeWith('cancel');
+      }
+    };
+    const closeWith = (choice: 'show' | 'add' | 'cancel') => {
+      document.removeEventListener('keydown', onKeyDown);
+      overlay.remove();
+      resolve(choice);
+    };
+
+    button(t('gallery.cancelEdit'), 'btn-cancel', 'cancel');
+    button(t('batch.openWithAddNew'), 'btn-confirm', 'add');
+    const show = button(
+      t(placed ? 'batch.openWithShowSky' : 'batch.openWithShowGallery'),
+      'btn-action',
+      'show',
+    );
+    overlay.addEventListener('click', () => closeWith('cancel'));
+
+    dialog.appendChild(titleEl);
+    dialog.appendChild(messageEl);
+    dialog.appendChild(buttons);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', onKeyDown);
+    requestAnimationFrame(() => show.focus());
+  });
+}

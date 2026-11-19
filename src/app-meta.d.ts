@@ -18,4 +18,11 @@ interface Window {
     getLogsPathHint: () => Promise<string>;
     openLogsDir: () => Promise<{ ok: boolean; message?: string }>;
   };
+  /** Present in the desktop app only (electron/preload.ts). */
+  electronAPI?: {
+    getLocation: () => Promise<{ latitude: number; longitude: number }>;
+    /** Photo files opened with "Open with MyAstroSky" before the page was ready. */
+    takeOpenedFiles?: () => Promise<{ name: string; data: Uint8Array }[]>;
+    onOpenedFiles?: (callback: (files: { name: string; data: Uint8Array }[]) => void) => void;
+  };
 }

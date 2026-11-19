@@ -22,6 +22,28 @@ const config: ForgeConfig = {
     name: 'MyAstroSky',
     executableName: 'MyAstroSky',
     icon: 'build/icons/icon',
+    // macOS "Open With": list the app for every photo format it accepts, never as the default app.
+    // (Windows writes its "Open with" entries at install time, see electron/open-with.ts.)
+    extendInfo: {
+      CFBundleDocumentTypes: [
+        {
+          CFBundleTypeName: 'Astrophoto',
+          CFBundleTypeRole: 'Viewer',
+          LSHandlerRank: 'Alternate',
+          CFBundleTypeExtensions: [
+            'jpg',
+            'jpeg',
+            'png',
+            'webp',
+            'tif',
+            'tiff',
+            'fit',
+            'fits',
+            'xisf',
+          ],
+        },
+      ],
+    },
     // Remove devDependencies before packaging to avoid copying large dev-only modules.
     prune: true,
     // Ensure packager uses npm (consistent with CI/dev environment)
@@ -113,6 +135,8 @@ const config: ForgeConfig = {
         bin: 'MyAstroSky',
         icon: 'build/icons/icon.png',
         categories: ['Education', 'Science'],
+        // Lists the app in the file manager's "Open with" for these formats.
+        mimeType: ['image/jpeg', 'image/png', 'image/webp', 'image/tiff', 'image/fits'],
         description:
           'Overlay astrophotos onto an interactive sky map with automatic plate solving.',
       },

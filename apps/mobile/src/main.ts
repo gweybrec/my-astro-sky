@@ -8,7 +8,13 @@ import App from './App.vue';
 import StartupError from './components/StartupError.vue';
 import router from './router';
 import { isDatabaseUpdateError } from '@myastrosky/core/db/schema';
-import { initPlatform, installBackButton, saveBackupWithoutUpdates } from './platform-init';
+import {
+  initPlatform,
+  installBackButton,
+  isNativePlatform,
+  saveBackupWithoutUpdates,
+} from './platform-init';
+import { startOpenWith } from './open-with';
 import { catalogsReady } from './catalogs';
 import { checkAstrometryKey } from './key-check';
 import { repairStoredPhotoSizes } from './photo-sizes';
@@ -28,10 +34,12 @@ async function start(): Promise<void> {
   }
   createApp(App).use(IonicVue).use(createPinia()).use(router).mount('#app');
   installBackButton(router);
-  // An import left unsaved when the app was closed opens again, then the astrometry.net key is checked.
+  // An import left unsaved when the app was closed opens again, then the files opened with MyAstroSky from another
+  // app join it, then the astrometry.net key is checked.
   void router
     .isReady()
     .then(() => resumeImport(() => router.push('/gallery/import')))
+    .then(() => (isNativePlatform() ? startOpenWith(router) : undefined))
     .then(() => checkAstrometryKey(() => router.push('/settings/astrometry-key')));
   // After the first screen is up: the gear lists and the star and deep-sky registries (screens wait on the same promise),
   // then, last, the sizes of the photos stored without one.

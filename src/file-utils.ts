@@ -1,7 +1,4 @@
-/** Remove the last file extension from a filename (e.g. "M1.fit" → "M1"). */
-export function stripExtension(filename: string): string {
-  return filename.replace(/\.[^.]+$/, '');
-}
+export { stripExtension } from '@myastrosky/core/photo-name-match';
 
 /** Trigger a browser download of a Blob with the given filename. */
 export function downloadBlob(blob: Blob, filename: string): void {

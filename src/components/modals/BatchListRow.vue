@@ -35,6 +35,9 @@
           </span>
           <span :class="CHIP_CLASS[save.tone]">{{ t(save.key) }}</span>
         </span>
+        <span v-if="alreadyAdded" class="bw-chip--saved self-start">{{
+          t('batch.nameAlreadyUsed')
+        }}</span>
       </span>
     </button>
   </div>
@@ -50,7 +53,7 @@ import { generateThumbnail } from '../../lazy-image';
 import { isRawAstroFile } from '@myastrosky/core/photo-formats';
 import imageSvg from '../../icons/image.svg?raw';
 
-const props = defineProps<{ item: BatchItem; selected: boolean }>();
+const props = defineProps<{ item: BatchItem; selected: boolean; alreadyAdded?: boolean }>();
 const emit = defineEmits<{ select: []; tick: [boolean] }>();
 
 const displayName = computed(() => props.item.customName || stripExtension(props.item.file.name));

@@ -23,6 +23,36 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- "Ouvrir avec" (src/open-with.ts): the photo formats the app adds. FITS and XISF files have no
+                 common type, so file managers give them a generic one; the app skips any other file by its name. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="image/jpeg" />
+                <data android:mimeType="image/png" />
+                <data android:mimeType="image/webp" />
+                <data android:mimeType="image/tiff" />
+                <data android:mimeType="image/fits" />
+                <data android:mimeType="application/fits" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+
+            <!-- "Partager" (a gallery app offers only this): one photo or several. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/jpeg" />
+                <data android:mimeType="image/png" />
+                <data android:mimeType="image/webp" />
+                <data android:mimeType="image/tiff" />
+                <data android:mimeType="image/fits" />
+                <data android:mimeType="application/fits" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+
         </activity>
 
         <provider

@@ -4,7 +4,9 @@ import { ionicStubs } from './helpers';
 
 const convertRawPhoto = vi.fn();
 const uploadPhoto = vi.fn();
+let storedPhotos: { id: string; originalName: string }[] = [];
 vi.mock('@myastrosky/app-state/api', () => ({
+  getPhotos: () => Promise.resolve(storedPhotos),
   convertRawPhoto: (...a: unknown[]) => convertRawPhoto(...a),
   uploadPhoto: (...a: unknown[]) => uploadPhoto(...a),
   setPhotoFitsHeaders: () => Promise.resolve(),
@@ -57,6 +59,21 @@ describe('the import page', () => {
     showError.mockReset();
     uploadPhoto.mockReset();
     convertRawPhoto.mockReset();
+    storedPhotos = [];
+  });
+
+  it('notes "Nom déjà utilisé" under a file named like one of the photos, whatever its state', async () => {
+    storedPhotos = [{ id: 'p1', originalName: 'M45' }];
+    addImportFiles([new File(['x'], 'M45.jpg'), new File(['y'], 'M42.jpg')]);
+    const wrapper = mountPage();
+    await settle();
+    const rows = fileRows(wrapper);
+    const subs = (i: number) => rows[i].findAll('.mob-row-sub').map((s) => s.text());
+    expect(subs(0)).toContain('Nom déjà utilisé');
+    expect(subs(1)).not.toContain('Nom déjà utilisé');
+    // The note keeps the secondary colour: never the status colour of the line above it.
+    const note = rows[0].findAll('.mob-row-sub').find((s) => s.text() === 'Nom déjà utilisé')!;
+    expect(note.classes()).not.toContain('mob-status--success');
   });
 
   it('lists each file with where it stands; every photo opens its page "Photo à ajouter"', async () => {

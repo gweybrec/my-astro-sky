@@ -779,6 +779,9 @@ ion-alert.mob-dialog-alert {
   --max-width: none;
   --width: calc(100% - 2 * var(--mobile-gutter));
   --height: auto;
+  /* As tall as the room between the system bars (Ionic's own cap leaves a three-button dialog's message scrolling in
+     landscape). */
+  --max-height: calc(100% - var(--safe-top) - var(--safe-bottom) - 2 * var(--space-4));
   --backdrop-opacity: 1;
   font-family: var(--font-sans);
 }
@@ -910,6 +913,15 @@ ion-alert.mob-dialog-alert .alert-button.mob-btn--confirm {
 }
 ion-alert.mob-dialog-alert .alert-button.mob-btn--confirm:active {
   background: var(--btn-confirm-bg-hover);
+}
+ion-alert.mob-dialog-alert .alert-button.mob-btn--action {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--text-bright);
+}
+ion-alert.mob-dialog-alert .alert-button.mob-btn--action:active {
+  background: var(--accent-bg-hover);
+  border-color: var(--border-focus);
 }
 ion-alert.mob-dialog-alert .alert-button .alert-button-inner {
   width: 100%;

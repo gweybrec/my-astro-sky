@@ -1657,6 +1657,15 @@ const fr = {
     finishBack: 'Revenir',
     finishDiscard: 'Abandonner',
     finishSave: 'Enregistrer et terminer',
+    openWithTitle: 'Une photo porte déjà ce nom',
+    openWithMessage:
+      'Vous avez déjà une photo nommée « {name} ». Voulez-vous la voir dans le ciel, ou ajouter ce fichier comme nouvelle photo ?',
+    openWithMessageGallery:
+      'Vous avez déjà une photo nommée « {name} », pas encore placée. Voulez-vous la voir dans la galerie, ou ajouter ce fichier comme nouvelle photo ?',
+    openWithShowSky: 'Voir dans le ciel',
+    openWithShowGallery: 'Voir dans la galerie',
+    openWithAddNew: 'Ajouter comme nouvelle photo',
+    nameAlreadyUsed: 'Nom déjà utilisé',
     infoTitle: 'Ajouter des photos',
     infoIntro:
       'Chargez plusieurs photos, placez-les sur le ciel, puis enregistrez-les. La fenêtre reste ouverte : « Terminer » la ferme.',

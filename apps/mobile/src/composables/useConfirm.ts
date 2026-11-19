@@ -53,6 +53,44 @@ export async function showInfo(title: string, message: string): Promise<void> {
   await alert.onDidDismiss();
 }
 
+/** An invisible character that forbids a line break beside it. */
+const WORD_JOINER = String.fromCharCode(0x2060);
+
+/**
+ * The board "Ouvrir avec, nom déjà utilisé": a file opened from another app has the name of one of the user's photos.
+ * Voir dans le ciel (or Voir dans la galerie for a photo not placed yet), Ajouter comme nouvelle photo, or Annuler.
+ */
+export async function chooseExistingOrNew(
+  name: string,
+  placed: boolean,
+): Promise<'show' | 'add' | 'cancel'> {
+  // A word joiner after each hyphen keeps the name on one line.
+  const shown = name.replace(/-/g, '-' + WORD_JOINER);
+  const alert = await alertController.create({
+    header: t('batch.openWithTitle'),
+    message: t(placed ? 'batch.openWithMessage' : 'batch.openWithMessageGallery', { name: shown }),
+    cssClass: 'mob-dialog-alert',
+    backdropDismiss: true,
+    // The group wraps in reverse: the last button is drawn on top.
+    buttons: [
+      { text: t('modal.cancel'), role: 'cancel', cssClass: 'mob-btn mob-btn--lg m-body' },
+      {
+        text: t('batch.openWithAddNew'),
+        role: 'add',
+        cssClass: 'mob-btn mob-btn--lg m-body-strong mob-btn--confirm',
+      },
+      {
+        text: t(placed ? 'batch.openWithShowSky' : 'batch.openWithShowGallery'),
+        role: 'show',
+        cssClass: 'mob-btn mob-btn--lg m-body-strong mob-btn--action',
+      },
+    ],
+  });
+  await alert.present();
+  const { role } = await alert.onDidDismiss();
+  return role === 'show' || role === 'add' ? role : 'cancel';
+}
+
 /** A bullet and a non-breaking space, before each reason of a list in a dialog. */
 const BULLET = String.fromCharCode(0x2022, 0xa0);
 

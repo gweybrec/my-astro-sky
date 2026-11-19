@@ -256,6 +256,15 @@ function raiseError() {
             chevron
             button
           />
+          <PhoneRow
+            title="M45_2024-11-02_RGB.jpg"
+            :thumb="imageIcon"
+            :subs="['✓ Placée à la main']"
+            status="success"
+            note="Nom déjà utilisé"
+            chevron
+            button
+          />
           <PhoneRow title="Cygne et Céphée" :subs="['10 oct. 2026 · 6 objets']" chevron button>
             <template #badges><PhoneBadge kind="warn">Date passée</PhoneBadge></template>
           </PhoneRow>

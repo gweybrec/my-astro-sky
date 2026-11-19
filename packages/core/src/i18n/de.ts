@@ -1657,6 +1657,15 @@ const de: Translations = {
     finishBack: 'Zurück',
     finishDiscard: 'Verwerfen',
     finishSave: 'Speichern und fertig',
+    openWithTitle: 'Ein Foto hat bereits diesen Namen',
+    openWithMessage:
+      'Du hast bereits ein Foto namens „{name}“. Möchtest du es am Himmel ansehen oder diese Datei als neues Foto hinzufügen?',
+    openWithMessageGallery:
+      'Du hast bereits ein Foto namens „{name}“, noch nicht platziert. Möchtest du es in der Galerie ansehen oder diese Datei als neues Foto hinzufügen?',
+    openWithShowSky: 'Am Himmel zeigen',
+    openWithShowGallery: 'In der Galerie zeigen',
+    openWithAddNew: 'Als neues Foto hinzufügen',
+    nameAlreadyUsed: 'Name schon vergeben',
     infoTitle: 'Fotos hinzufügen',
     infoIntro:
       'Lade mehrere Fotos, platziere sie am Himmel und speichere sie. Das Fenster bleibt offen: „Fertig“ schließt es.',

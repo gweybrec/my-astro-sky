@@ -189,6 +189,18 @@ Choose by your Mac: **Apple Silicon (M1/M2/M3+) → `arm64`**, **Intel → `x64`
 
 ### Implementation notes
 
+### Open with MyAstroSky
+
+The desktop app is listed in the system's "Open with" menu for every format the photo picker accepts (`ANY_PHOTO_EXT_RE`), never as the default app:
+
+- **Windows**: Squirrel starts the app with `--squirrel-install` / `--squirrel-updated` / `--squirrel-uninstall`; `electron/main.ts` then creates or removes the shortcuts (`Update.exe --createShortcut`) and the per-user registry entries built in `electron/open-with.ts` (ProgID `MyAstroSky.Photo` pointing at the Squirrel stub `MyAstroSky.exe "%1"`, plus an `OpenWithProgids` value per extension), and quits.
+- **macOS**: `CFBundleDocumentTypes` with `LSHandlerRank: Alternate` in `forge.config.ts`; files arrive through the `open-file` event.
+- **Linux (deb)**: the maker's `mimeType` list; file managers may pass `file://` addresses, turned back into paths.
+
+The app holds a single-instance lock: a second launch passes its files to the running app (`second-instance`) and quits before starting a server. Paths arriving within 300 ms form one batch, because Explorer may start one process per selected file. The main process reads the files and the page takes them through `electronAPI.takeOpenedFiles()` (those opened at launch) and `onOpenedFiles` (later ones); `src/open-with.ts` opens "Ajouter des photos" with them, after the "show the existing photo or add it as new" question for a single file named like a photo already added (`findPhotoWithFileName` in `@myastrosky/core/photo-name-match`).
+
+The phone app (Android) receives files the same way through `VIEW`, `SEND` and `SEND_MULTIPLE` intent filters in `AndroidManifest.xml`. `OpenedFilesPlugin.java` keeps the intent's addresses and copies the files into the app's cache when `apps/mobile/src/open-with.ts` takes them. FITS and XISF have no common MIME type, so the filters also accept `application/octet-stream`, and the page skips any file whose name is not a photo format.
+
 ### Node.js version constraint (Electron packaging)
 
 Node.js v24.16.0 introduced a regression in stream destruction propagation (`stream: propagate destruction in duplexPair`) that broke `fd-slicer` 1.1.0, an abandoned library (last release 2018) used by `yauzl`, which `extract-zip` depends on. The symptom was Electron packaging (`electron:make`) hanging indefinitely on the "Copying files" step — `openReadStream` would never emit `data`, `end`, or `error`.

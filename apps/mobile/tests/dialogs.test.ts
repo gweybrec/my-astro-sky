@@ -9,7 +9,12 @@ vi.mock('@ionic/vue', () => ({
   toastController: { create: (o: unknown) => toastCreate(o) },
 }));
 
-import { useConfirm, showInfo, confirmWcsWarnings } from '../src/composables/useConfirm';
+import {
+  useConfirm,
+  showInfo,
+  confirmWcsWarnings,
+  chooseExistingOrNew,
+} from '../src/composables/useConfirm';
 import { useErrorToast } from '../src/composables/useErrorToast';
 
 describe('the confirmation dialog', () => {
@@ -54,6 +59,39 @@ describe('the confirmation dialog', () => {
     const arg = alertCreate.mock.calls[0][0];
     expect(arg.buttons).toHaveLength(1);
     expect(arg.buttons[0].text).toBe('Fermer');
+  });
+});
+
+describe('the dialog of a file named like a photo', () => {
+  beforeEach(() => {
+    localStorage.setItem('lang', 'fr');
+    onDidDismiss.mockReset();
+    alertCreate.mockReset().mockResolvedValue({ present, onDidDismiss });
+  });
+
+  it('offers Annuler, Ajouter comme nouvelle photo (green) and Voir dans le ciel (accent), drawn on top', async () => {
+    onDidDismiss.mockResolvedValue({ role: 'show' });
+    expect(await chooseExistingOrNew('M45_2024-11-02_RGB', true)).toBe('show');
+    const arg = alertCreate.mock.calls[0][0];
+    expect(arg.header).toBe('Une photo porte déjà ce nom');
+    // The name stays on one line: a word joiner follows each hyphen.
+    const J = String.fromCharCode(0x2060);
+    expect(arg.message).toContain('M45_2024-' + J + '11-' + J + '02_RGB');
+    expect(arg.buttons.map((b: { text: string }) => b.text)).toEqual([
+      'Annuler',
+      'Ajouter comme nouvelle photo',
+      'Voir dans le ciel',
+    ]);
+    expect(arg.buttons[1].cssClass).toContain('mob-btn--confirm');
+    expect(arg.buttons[2].cssClass).toContain('mob-btn--action');
+  });
+
+  it('offers the gallery for a photo not placed, and answers add or cancel', async () => {
+    onDidDismiss.mockResolvedValue({ role: 'add' });
+    expect(await chooseExistingOrNew('M31', false)).toBe('add');
+    expect(alertCreate.mock.calls[0][0].buttons[2].text).toBe('Voir dans la galerie');
+    onDidDismiss.mockResolvedValue({ role: 'backdrop' });
+    expect(await chooseExistingOrNew('M31', false)).toBe('cancel');
   });
 });
 

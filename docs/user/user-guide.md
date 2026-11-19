@@ -44,6 +44,8 @@ A collapsible side panel on the right holds Photos, Search, DSO info, Display se
 3. Choose a plate-solving method (see below) or place the photo manually.
 4. Once solved or placed, the photo appears on the map at the correct position.
 
+In the desktop app you can also right-click a photo file in your file manager and choose **Open with → MyAstroSky** (one or several files). It opens the same **Add photos** window with those files, whether the app was closed or already open. When you open a single file named like a photo you already added (`M101.fit` and a photo named `M101`), the app first asks whether to **Show in the sky** that photo (**Show in the gallery** when it is not placed yet) or **Add as a new photo**. With several files, nothing is asked: each file named like an existing photo shows **Name already used** in the list. On Android, the phone app does the same from **Open with** and **Share** (see [Phone App](/user/mobile-app.md)).
+
 ---
 
 ## Plate solving methods

@@ -30,6 +30,8 @@ withDefaults(
     /** How the line under the title reads: a finished state (green), a running operation (spinner and accent), a state
      * to come back to (amber: a solve not finished yet), or a failure (red). */
     status?: 'success' | 'busy' | 'warn' | 'danger';
+    /** A line in the secondary colour under the status lines, whatever the status (a file named like a photo). */
+    note?: string;
     /** A last line in the warning colour, under the others (a file read without its plate solution). */
     warning?: string;
     /** The delete row: lead and title in the danger colour. */
@@ -102,6 +104,7 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
             >{{ line }}</span
           ><template v-else>{{ line }}</template></span
         >
+        <span v-if="note" class="mob-row-sub mob-row-sub--wrap m-secondary">{{ note }}</span>
         <span v-if="warning" class="mob-row-sub mob-row-sub--wrap m-secondary mob-status--warn">{{
           warning
         }}</span>

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import BatchUploadModal from '../../src/components/modals/BatchUploadModal.vue';
+import BatchListRow from '../../src/components/modals/BatchListRow.vue';
 import type { BatchItem } from '../../src/batch-types';
 import type { Photo } from '@myastrosky/core/types';
 import {
@@ -24,7 +25,10 @@ const state = vi.hoisted(() => ({
     result: undefined as unknown,
   }),
   finishChoice: 'back' as 'back' | 'discard' | 'save',
+  addedPhotos: [] as Photo[],
 }));
+/** The store the window read at mount: reactive, so a test can hand it files while it is open. */
+const ui = vi.hoisted(() => ({ store: null as null | { pendingBatchFiles: File[] | null } }));
 
 // ─── Module mocks ───────────────────────────────────────────────────────────────
 // A text shows its key, then its parameters: "batch.solveMany|3".
@@ -63,13 +67,17 @@ vi.mock('@myastrosky/app-state/stores/settings', () => ({
     load: vi.fn(),
   }),
 }));
-vi.mock('../../src/stores/ui', () => ({
-  useUiStore: () => ({
-    pendingBatchFiles: state.pendingFiles,
-    pendingBatchPhotos: state.pendingPhotos,
-    pendingBatchRestored: state.restored,
-  }),
-}));
+vi.mock('../../src/stores/ui', async () => {
+  const { reactive } = await import('vue');
+  return {
+    useUiStore: () =>
+      (ui.store = reactive({
+        pendingBatchFiles: state.pendingFiles as File[] | null,
+        pendingBatchPhotos: state.pendingPhotos,
+        pendingBatchRestored: state.restored,
+      })),
+  };
+});
 
 const submitLocalSolveJob = vi.fn(async () => ({ jobId: `job-${state.jobSeq++}` }));
 const pollLocalSolveJob = vi.fn(async (_endpoint: string, jobId: string) =>
@@ -102,6 +110,7 @@ vi.mock('../../src/api', () => ({
   storedPhotoFile: (p: Photo) => storedPhotoFile(p),
   convertRawPhoto: vi.fn(),
   getGearSetups: vi.fn().mockResolvedValue([]),
+  getPhotos: async () => state.addedPhotos,
 }));
 vi.mock('@myastrosky/app-state/api', () => ({
   solveWCS: vi.fn(),
@@ -158,6 +167,7 @@ beforeEach(() => {
   state.jobSeq = 0;
   state.pollResponder = () => ({ status: 'running', result: undefined });
   state.finishChoice = 'back';
+  state.addedPhotos = [];
   following.value = false;
   for (const fn of [
     submitLocalSolveJob,
@@ -526,5 +536,29 @@ describe('BatchUploadModal — kept until saved', () => {
       expect.objectContaining({ message: 'batch.fetchAlreadyAsked', type: 'info' }),
     );
     expect(resumePlateSolve).not.toHaveBeenCalled();
+  });
+});
+
+describe('files opened while the window is open', () => {
+  it('join the list', async () => {
+    state.pendingFiles = [jpeg('a.jpg')];
+    const w = mountModal();
+    ui.store!.pendingBatchFiles = [jpeg('d.jpg'), jpeg('e.jpg')];
+    await flushPromises();
+    expect(vm(w).items.map((i) => i.file.name)).toEqual(['a.jpg', 'd.jpg', 'e.jpg']);
+    expect(ui.store!.pendingBatchFiles).toBeNull();
+    w.unmount();
+  });
+});
+
+describe('"Déjà dans vos photos"', () => {
+  it('marks a file not saved yet that is named like a photo already added', async () => {
+    state.pendingFiles = [jpeg('NGC7000.jpg'), jpeg('M31.jpg')];
+    state.addedPhotos = [storedPhoto()];
+    const w = mountModal();
+    await flushPromises();
+    const rows = w.findAllComponents(BatchListRow);
+    expect(rows.map((r) => r.props('alreadyAdded'))).toEqual([true, false]);
+    w.unmount();
   });
 });

@@ -14,6 +14,7 @@ import {
   makeMissingSharedSkyMediums,
 } from './api';
 import { followDesktopStoredSolves } from './follow-stored-solves';
+import { startOpenWith } from './open-with';
 import { isUpdateAvailable, DISMISSED_UPDATE_KEY } from '@myastrosky/core/version-check';
 import { buildFovFrameSpecs } from './fov-overlay';
 import { getHemisphere } from '@myastrosky/core/projection';
@@ -371,6 +372,8 @@ async function reloadPhotos() {
 
 init()
   .then(() => reopenAddPhotos())
+  // After "Ajouter des photos" reopened: files opened with "Open with MyAstroSky" join it.
+  .then(() => startOpenWith(window.electronAPI))
   .then(() => checkForUpdate())
   .then(() => repairStoredPhotos())
   .catch((err) => {

@@ -1650,6 +1650,15 @@ const es: Translations = {
     finishBack: 'Volver',
     finishDiscard: 'Descartar',
     finishSave: 'Guardar y terminar',
+    openWithTitle: 'Ya hay una foto con este nombre',
+    openWithMessage:
+      'Ya tienes una foto llamada «{name}». ¿Quieres verla en el cielo o añadir este archivo como foto nueva?',
+    openWithMessageGallery:
+      'Ya tienes una foto llamada «{name}», aún sin colocar. ¿Quieres verla en la galería o añadir este archivo como foto nueva?',
+    openWithShowSky: 'Ver en el cielo',
+    openWithShowGallery: 'Ver en la galería',
+    openWithAddNew: 'Añadir como foto nueva',
+    nameAlreadyUsed: 'Nombre ya usado',
     infoTitle: 'Añadir fotos',
     infoIntro:
       'Carga varias fotos, colócalas en el cielo y guárdalas. La ventana sigue abierta: «Terminar» la cierra.',
