@@ -1848,6 +1848,13 @@ svg.mob-icon--sm,
   background: var(--status-warn-bg);
   border-color: var(--status-warn-border);
 }
+/* `.mob-badge--success`: a badge in the success colour ("Photographié": an object of a catalogue already photographed). */
+.mob-badge--success {
+  flex: none;
+  color: var(--status-success-text);
+  background: var(--status-success-bg);
+  border-color: var(--status-success-border);
+}
 .mob-row-badges {
   display: flex;
   flex-wrap: wrap;

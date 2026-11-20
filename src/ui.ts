@@ -121,6 +121,10 @@ let _selectDSOInSearch: (dsoId: string) => void = () => {};
 export function setSelectDSOInSearchHandler(fn: (dsoId: string) => void) {
   _selectDSOInSearch = fn;
 }
+/** Selects a DSO as a click on it does: the map goes to it and its information panel opens. */
+export function selectDSOInSearch(dsoId: string) {
+  _selectDSOInSearch(dsoId);
+}
 let _clearDSOSelection: () => void = () => {};
 export function setClearDSOSelectionHandler(fn: () => void) {
   _clearDSOSelection = fn;

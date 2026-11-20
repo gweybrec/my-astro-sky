@@ -29,6 +29,11 @@ import {
   getDSOCatalogBaseValues,
   getUserOverride,
   computeCatalogStats,
+  listCatalogEntries,
+  filterCatalogEntries,
+  sortCatalogEntries,
+  groupCatalogEntries,
+  DSO_CATALOGS_ALL,
 } from '../../src/dso-catalog';
 
 // Columnar fixture — mirrors the real dso.json schema.
@@ -372,6 +377,119 @@ describe('computeCatalogStats()', () => {
     expect(stats.M.photographed).toBe(0);
     expect(stats.IC.total).toBe(1);
     expect(stats.IC.photographed).toBe(1);
+  });
+});
+
+// ─── catalogue entries (statistics page, one catalogue) ─────────────────────────
+
+describe('listCatalogEntries()', () => {
+  it('lists every object with an alias in the catalogue, under its designation there', () => {
+    const ngc = listCatalogEntries('NGC', new Set(), null);
+    expect(ngc.map((e) => e.designation).sort()).toEqual(['NGC1952', 'NGC1976']);
+    expect(ngc.find((e) => e.designation === 'NGC1976')?.dso.id).toBe('M42');
+    // Abell35's SH2-313 alias puts it in SH2, as computeCatalogStats counts it
+    expect(listCatalogEntries('SH2', new Set(), null).map((e) => e.designation)).toEqual([
+      'SH2-106',
+      'SH2-313',
+    ]);
+  });
+
+  it('matches the counts of computeCatalogStats for every catalogue', () => {
+    const photographed = new Set(['M1', 'IC434', 'WeDe1']);
+    const stats = computeCatalogStats(photographed, null);
+    for (const cat of DSO_CATALOGS_ALL) {
+      const entries = listCatalogEntries(cat, photographed, null);
+      expect(entries.length).toBe(stats[cat].total);
+      expect(entries.filter((e) => e.photographed).length).toBe(stats[cat].photographed);
+    }
+  });
+
+  it('keeps the primary id of an object in no named catalogue', () => {
+    const other = listCatalogEntries('Other', new Set(['WeDe1']), null);
+    expect(other.map((e) => [e.designation, e.photographed])).toEqual([
+      ['WeDe1', true],
+      ['TESTOBJ', false],
+    ]);
+  });
+
+  it('restricts to the given constellations', () => {
+    const ngc = listCatalogEntries('NGC', new Set(), new Set(['Ori']));
+    expect(ngc.map((e) => e.designation)).toEqual(['NGC1976']);
+  });
+});
+
+describe('filterCatalogEntries()', () => {
+  const entries = () => listCatalogEntries('NGC', new Set(['M1']), null);
+
+  it('shows the missing, the photographed or all objects', () => {
+    expect(filterCatalogEntries(entries(), 'missing', '').map((e) => e.designation)).toEqual([
+      'NGC1976',
+    ]);
+    expect(filterCatalogEntries(entries(), 'photographed', '').map((e) => e.designation)).toEqual([
+      'NGC1952',
+    ]);
+    expect(filterCatalogEntries(entries(), 'all', '')).toHaveLength(2);
+  });
+
+  it('finds an object by a designation typed with a space, by another id, or by its name', () => {
+    expect(filterCatalogEntries(entries(), 'all', 'ngc 1976').map((e) => e.dso.id)).toEqual([
+      'M42',
+    ]);
+    expect(filterCatalogEntries(entries(), 'all', 'M42').map((e) => e.dso.id)).toEqual(['M42']);
+    const named = filterCatalogEntries(entries(), 'all', entries()[0].dso.displayName.slice(0, 5));
+    expect(named.map((e) => e.dso.id)).toContain(entries()[0].dso.id);
+  });
+});
+
+describe('sortCatalogEntries()', () => {
+  const all = () =>
+    listCatalogEntries('Other', new Set(), null).concat(listCatalogEntries('NGC', new Set(), null));
+
+  it('sorts by photographic interest, then brighter first', () => {
+    // M42 rating 5, M1 rating 4, TESTOBJ / WeDe1 rating 1 (mag 10 before mag 12)
+    expect(sortCatalogEntries(all(), 'interest').map((e) => e.dso.id)).toEqual([
+      'M42',
+      'M1',
+      'TESTOBJ',
+      'WeDe1',
+    ]);
+  });
+
+  it('sorts by magnitude, brightest first', () => {
+    expect(sortCatalogEntries(all(), 'magnitude').map((e) => e.dso.id)).toEqual([
+      'M42',
+      'M1',
+      'TESTOBJ',
+      'WeDe1',
+    ]);
+  });
+
+  it('sorts by number in the catalogue, numerically', () => {
+    const sorted = sortCatalogEntries(
+      [{ designation: 'NGC10' }, { designation: 'NGC2' }, { designation: 'NGC1' }].map((e) => ({
+        ...e,
+        dso: getDSOById('M1')!,
+        photographed: false,
+      })),
+      'number',
+    );
+    expect(sorted.map((e) => e.designation)).toEqual(['NGC1', 'NGC2', 'NGC10']);
+  });
+});
+
+describe('groupCatalogEntries()', () => {
+  it('groups the shown objects by constellation, counting the whole catalogue', () => {
+    const all = listCatalogEntries('LDN', new Set(), null)
+      .concat(listCatalogEntries('IC', new Set(['IC434']), null))
+      .concat(listCatalogEntries('SH2', new Set(), null));
+    const shown = filterCatalogEntries(all, 'missing', '');
+    const names: Record<string, string> = { Ori: 'Orion', Cyg: 'Cygne', Hya: 'Hydre' };
+    const groups = groupCatalogEntries(shown, all, (c) => names[c] ?? c, 'fr');
+    expect(groups.map((g) => g.constellation)).toEqual(['Cyg', 'Hya', 'Ori']);
+    const ori = groups.find((g) => g.constellation === 'Ori')!;
+    // IC434 is photographed: not shown, but counted
+    expect(ori.entries.map((e) => e.designation)).toEqual(['LDN1622']);
+    expect([ori.photographed, ori.total]).toEqual([1, 2]);
   });
 });
 

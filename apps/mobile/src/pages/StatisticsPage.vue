@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonList } from '@ionic/vue';
 import { t, getLang } from '@myastrosky/core/i18n/index';
 import {
@@ -16,10 +17,13 @@ import PhoneRow from '../components/PhoneRow.vue';
 import PhoneProgressRow from '../components/PhoneProgressRow.vue';
 import SkyCheckSheet from './sky/SkyCheckSheet.vue';
 import { catalogsReady } from '../catalogs';
+import { statisticsConstellations } from '../composables/useStatisticsFilter';
 
 // The board "Réglages, statistiques": the desktop's catalog-completion tracker (the 🏆 button), with the same
 // constellation filter. One row per DSO catalog family: the name and the "N / M" count of photographed objects,
-// then the bar.
+// then the bar; a row opens the catalogue's objects (board "Réglages, statistiques, un catalogue"), in the same
+// constellations.
+const router = useRouter();
 const photographedIds = ref<Set<string>>(new Set());
 const constellationOptions = ref<{ value: string; label: string }[]>([]);
 const constellationsOpen = ref(false);
@@ -38,7 +42,8 @@ function readConstellations() {
 onMounted(async () => {
   const [photos] = await Promise.all([getPhotos(), catalogsReady()]);
   constellationOptions.value = readConstellations();
-  selectedConstellations.value = constellationOptions.value.map((o) => o.value);
+  selectedConstellations.value =
+    statisticsConstellations.value ?? constellationOptions.value.map((o) => o.value);
   const ids = new Set<string>();
   for (const photo of photos) {
     for (const dsoId of photo.dsoIds) {
@@ -61,6 +66,12 @@ const catalogStats = computed(() =>
       : new Set(selectedConstellations.value),
   ),
 );
+
+// The catalogue's page reads the same choice (null: all of them).
+watch(selectedConstellations, (chosen) => {
+  statisticsConstellations.value =
+    chosen.length === constellationOptions.value.length ? null : [...chosen];
+});
 
 function pct(cat: DSOCatalog): number {
   const { photographed, total } = catalogStats.value[cat];
@@ -99,6 +110,9 @@ function pct(cat: DSOCatalog): number {
             :title="t(`dso.catalogLabels.${cat}`)"
             :value="`${catalogStats[cat].photographed} / ${catalogStats[cat].total}`"
             :percent="pct(cat)"
+            button
+            :label="t('stats.catalog.open', { catalog: t(`dso.catalogLabels.${cat}`) })"
+            @click="router.push(`/settings/statistics/${cat}`)"
           />
         </div>
       </div>

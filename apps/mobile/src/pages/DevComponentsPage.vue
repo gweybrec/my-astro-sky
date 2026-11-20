@@ -36,6 +36,7 @@ import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PhoneSheet from '../components/PhoneSheet.vue';
 import PhoneSliderRow from '../components/PhoneSliderRow.vue';
 import PhoneProgressRow from '../components/PhoneProgressRow.vue';
+import PhoneObjectRow from '../components/PhoneObjectRow.vue';
 import PhoneStepperRow from '../components/PhoneStepperRow.vue';
 import PhoneToggleRow from '../components/PhoneToggleRow.vue';
 import PhoneCheckLeadRow from '../components/PhoneCheckLeadRow.vue';
@@ -356,6 +357,29 @@ function raiseError() {
             title="Un libellé d'interrupteur très long qui passe sur deux lignes avec son explication"
             info="Le texte long d'explication."
           />
+          <PhoneRow title="Cygne" value="4 / 104" mono button chevron :expanded="false" />
+          <PhoneRow title="Andromède" value="3 / 26" mono button chevron :expanded="true" />
+          <PhoneObjectRow
+            designation="NGC 7000"
+            name="Nébuleuse de l'Amérique du Nord"
+            photographed
+            type-label="Nébuleuse en émission"
+            magnitude="Mag 4.0"
+            rating="★★★★★"
+          />
+          <PhoneObjectRow
+            designation="NGC 6914"
+            :photographed="false"
+            type-label="Nébuleuse par réflexion"
+            magnitude="Mag 11.0"
+            rating="★★★★☆"
+          />
+          <PhoneObjectRow
+            designation="Sh2-313"
+            name="Un nom d'objet très long qui ne tient pas sur la ligne"
+            photographed
+            type-label="Nébuleuse planétaire"
+          />
         </IonList>
         <PhoneSliderRow
           v-model="opacity"
@@ -394,6 +418,7 @@ function raiseError() {
         <div class="mob-progress-list">
           <PhoneProgressRow title="Messier" value="68 / 110" :percent="62" />
           <PhoneProgressRow title="Lynds (nébuleuses brillantes)" value="12 / 1125" :percent="1" />
+          <PhoneProgressRow title="NGC" value="412 / 7842" :percent="5" button label="Ouvrir NGC" />
         </div>
         <PhoneStepperRow
           v-model="steps"

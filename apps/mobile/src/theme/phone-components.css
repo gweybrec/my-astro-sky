@@ -237,6 +237,15 @@ ion-item.mob-row::part(native) {
 ion-item.mob-row.item-disabled {
   opacity: 1;
 }
+/* An open fold's head (a constellation of a catalogue, board "Réglages, statistiques, un catalogue"): lit as a pressed
+   row, so that the objects under it read as its own. */
+ion-item.mob-row.phone-row--expanded {
+  background: var(--bg-hover);
+}
+/* Its chevron turns to point down, in the same footprint. */
+ion-item.mob-row.phone-row--expanded .mob-row-chevron svg {
+  transform: rotate(90deg);
+}
 /* A cell in a row's trail (a named point's tick): as wide as a touch target, its icon in the middle. */
 .mob-row-trail > .mob-row-trail--cell {
   display: flex;
@@ -296,6 +305,40 @@ ion-item.mob-row.mob-row--roomy .mob-row-line {
 }
 .mob-target-head .mob-rating {
   flex: none;
+}
+/* A completion row that opens its catalogue: a plain button with the row's own box, lit while pressed; the chevron sits
+   after the count, on the centre line of the label. */
+button.phone-progress-button {
+  display: flex;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button.phone-progress-button:active {
+  background: var(--bg-hover);
+}
+button.phone-progress-button:focus-visible {
+  outline: 2px solid var(--text-bright);
+  outline-offset: -2px;
+}
+.phone-progress-chevron {
+  flex: none;
+  align-self: center;
+  color: var(--text-secondary);
+}
+/* An object of a catalogue: the designation keeps its own width with the "Photographié" badge right after it, and the
+   stars stay at the right end. */
+.phone-object-head .mob-row-title {
+  flex: 0 1 auto;
+}
+.phone-object-head .mob-rating {
+  margin-left: auto;
 }
 .mob-facts.mob-target-facts {
   padding: var(--space-3) 0 0;

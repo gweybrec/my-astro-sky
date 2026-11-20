@@ -45,8 +45,10 @@ withDefaults(
     inert?: boolean;
     /** A tap target (a button); without it the row is only text. */
     button?: boolean;
+    /** A fold's head (a constellation of a catalogue): its chevron points down and the row is lit while it is open. */
+    expanded?: boolean;
   }>(),
-  { subs: () => [] },
+  { subs: () => [], expanded: undefined },
 );
 const emit = defineEmits<{ click: [event: MouseEvent] }>();
 </script>
@@ -59,10 +61,12 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
       'mob-row--roomy': roomy,
       'mob-row--disabled': disabled,
       'mob-row--inert': inert,
+      'phone-row--expanded': expanded,
     }"
     lines="none"
     :button="button && !disabled && !inert"
     :aria-disabled="inert ? 'true' : undefined"
+    :aria-expanded="expanded === undefined ? undefined : String(expanded)"
     :detail="false"
     @click="emit('click', $event)"
   >

@@ -479,6 +479,145 @@ export function computeCatalogStats(
   return stats;
 }
 
+/** One object of a catalogue, as the statistics page lists it. */
+export interface CatalogEntry {
+  dso: DSO;
+  /**
+   * The object's id in this catalogue: its primary id when that is in this catalogue, else its first alias there (M42
+   * is NGC1976 in NGC). A DSO in no named catalogue (`Other`) keeps its primary id.
+   */
+  designation: string;
+  photographed: boolean;
+}
+
+/** Which objects of a catalogue are listed: the ones not photographed yet, the photographed ones, or all. */
+export type CatalogEntryShow = 'missing' | 'photographed' | 'all';
+/** The order of a catalogue's objects: photographic interest, number in the catalogue, or magnitude. */
+export type CatalogEntrySort = 'interest' | 'number' | 'magnitude';
+
+/**
+ * The objects of one catalogue family, counted as {@link computeCatalogStats} counts them (every object with an alias
+ * in it), each with its designation there and whether it is photographed.
+ *
+ * @param photographedIds - canonical DSO ids the user has photographed
+ * @param constellationIds - restrict to these 3-letter IAU codes, or null for all
+ */
+export function listCatalogEntries(
+  catalog: DSOCatalog,
+  photographedIds: Set<string>,
+  constellationIds: Set<string> | null,
+): CatalogEntry[] {
+  const entries: CatalogEntry[] = [];
+  for (const d of dsos) {
+    if (
+      constellationIds !== null &&
+      (d.constellation === null || !constellationIds.has(d.constellation))
+    )
+      continue;
+    let designation: string | null = null;
+    if (catalog === 'Other') {
+      if (!d.catalogs.some((alias) => getDSOCatalog(alias) !== null)) designation = d.id;
+    } else if (getDSOCatalog(d.id) === catalog) {
+      // Its own id first: the eastern Veil is NGC6992 even though NGC6960 is one of its aliases too.
+      designation = d.id;
+    } else {
+      designation = d.catalogs.find((alias) => getDSOCatalog(alias) === catalog) ?? null;
+    }
+    if (designation !== null)
+      entries.push({ dso: d, designation, photographed: photographedIds.has(d.id) });
+  }
+  return entries;
+}
+
+const compactQuery = (s: string) => s.toLowerCase().replace(/[\s-]+/g, '');
+
+/**
+ * The entries to show: by `show`, then by the search text, matched against the designation and the object's other
+ * ids (spaces and dashes ignored, so "ngc 7000" finds NGC7000) and against its name in the language.
+ */
+export function filterCatalogEntries(
+  entries: readonly CatalogEntry[],
+  show: CatalogEntryShow,
+  query: string,
+): CatalogEntry[] {
+  const q = query.trim().toLowerCase();
+  const qc = compactQuery(q);
+  return entries.filter((e) => {
+    if (show === 'missing' && e.photographed) return false;
+    if (show === 'photographed' && !e.photographed) return false;
+    if (!q) return true;
+    return (
+      e.dso.catalogs.some((id) => compactQuery(id).includes(qc)) ||
+      compactQuery(e.designation).includes(qc) ||
+      (e.dso.displayName ?? '').toLowerCase().includes(q)
+    );
+  });
+}
+
+const byNumber = (a: CatalogEntry, b: CatalogEntry) =>
+  a.designation.localeCompare(b.designation, 'en', { numeric: true });
+
+/**
+ * A sorted copy. `interest`: the photographic rating, highest first, then the brighter first ({@link dsoImportance});
+ * `magnitude`: the brightest first, objects without a magnitude last; `number`: the number in the catalogue (NGC 2
+ * before NGC 10). Ties keep the catalogue's order.
+ */
+export function sortCatalogEntries(
+  entries: readonly CatalogEntry[],
+  sort: CatalogEntrySort,
+): CatalogEntry[] {
+  const out = [...entries];
+  if (sort === 'interest') {
+    out.sort((a, b) => dsoImportance(b.dso) - dsoImportance(a.dso) || byNumber(a, b));
+  } else if (sort === 'magnitude') {
+    out.sort((a, b) => (a.dso.mag ?? Infinity) - (b.dso.mag ?? Infinity) || byNumber(a, b));
+  } else {
+    out.sort(byNumber);
+  }
+  return out;
+}
+
+/** The objects of one constellation in a catalogue: the ones shown, and the photographed / total counts of all. */
+export interface CatalogGroup {
+  /** The 3-letter IAU code, or null for the objects in no constellation. */
+  constellation: string | null;
+  entries: CatalogEntry[];
+  photographed: number;
+  total: number;
+}
+
+/**
+ * The shown entries grouped by constellation, in their given order inside each group. The counts come from `all` (the
+ * whole catalogue in the chosen constellations), so a group says "photographed / total" whatever is shown. A group with
+ * nothing shown is left out. Groups are ordered by `nameOf` (the constellation's name in the language), the objects in
+ * no constellation last.
+ */
+export function groupCatalogEntries(
+  shown: readonly CatalogEntry[],
+  all: readonly CatalogEntry[],
+  nameOf: (constellation: string) => string,
+  lang: string,
+): CatalogGroup[] {
+  const groups = new Map<string | null, CatalogGroup>();
+  for (const e of shown) {
+    const c = e.dso.constellation;
+    let g = groups.get(c);
+    if (!g) groups.set(c, (g = { constellation: c, entries: [], photographed: 0, total: 0 }));
+    g.entries.push(e);
+  }
+  for (const e of all) {
+    const g = groups.get(e.dso.constellation);
+    if (!g) continue;
+    g.total++;
+    if (e.photographed) g.photographed++;
+  }
+  return [...groups.values()].sort((a, b) => {
+    if (a.constellation === null) return b.constellation === null ? 0 : 1;
+    if (b.constellation === null) return -1;
+    return nameOf(a.constellation).localeCompare(nameOf(b.constellation), lang);
+  });
+}
+
 export function getDSOsNear(ra: number, dec: number, radiusDeg: number): DSO[] {
   // First pass: bounding box filter
   const decMin = dec - radiusDeg;

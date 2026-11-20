@@ -550,6 +550,17 @@ describe('the statistics page', () => {
     expect(rows[0].find('.mob-progress-value').text()).toBe('0 / 0');
   });
 
+  it("opens a catalogue's page from its row", async () => {
+    const { global, router } = app();
+    const w = mount(StatisticsPage, { global });
+    await flushPromises();
+    const ngc = w.findAll('button.mob-progress-row')[DSO_CATALOGS_ALL.indexOf('NGC')];
+    expect(ngc.attributes('aria-label')).toBe('Ouvrir NGC');
+    await ngc.trigger('click');
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/settings/statistics/NGC');
+  });
+
   it('reads the constellations only once the catalogues are loaded', async () => {
     let loaded!: () => void;
     catalogsReady.mockReturnValueOnce(new Promise<void>((resolve) => (loaded = resolve)));
