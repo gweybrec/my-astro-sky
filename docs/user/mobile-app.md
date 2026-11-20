@@ -35,7 +35,7 @@ A photo solved on the desktop keeps its placement when you move it to the phone.
 
 ### What the desktop has and the phone does not
 
-The local plate solvers, the automatic star detection, random target suggestions, statistics, exporting the map as an image, deleting several photos at once, and deleting all data in one step. To remove all the phone's data, uninstall the app.
+The local plate solvers, the automatic star detection, and exporting the map as an image.
 
 ---
 
