@@ -307,9 +307,10 @@ export default defineConfig({
       'w-full min-w-0 min-h-[22px] flex items-center gap-2 p-0 bg-transparent border-0 cursor-pointer text-left',
       'font-[inherit] text-small text-label hover:text-primary',
     ].join(' '),
-    // One fact: label | value | its pen (or ✓ ✕ while edited). Hovering the line brightens its pen.
+    // One fact: label | value | its pen (or ✓ ✕ while edited). Hovering the line brightens its pen:
+    // the element also needs the plain `group` class (a marker class does nothing inside a shortcut).
     'sheet-row': [
-      'group relative grid grid-cols-[104px_minmax(0,1fr)_auto] items-center gap-x-4',
+      'relative grid grid-cols-[104px_minmax(0,1fr)_auto] items-center gap-x-4',
       'min-h-[24px] -mx-2 px-2 rounded-sm hover:bg-[var(--bg-hover)]',
     ].join(' '),
     'sheet-label': 'min-w-0 text-base text-label truncate',

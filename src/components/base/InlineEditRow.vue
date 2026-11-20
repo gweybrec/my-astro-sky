@@ -1,5 +1,5 @@
 <template>
-  <div class="sheet-row" :class="{ 'items-start': open && multiline }" :data-test="testId">
+  <div class="sheet-row group" :class="{ 'items-start': open && multiline }" :data-test="testId">
     <!-- Label column (a wide row spans it with its value / editor instead). -->
     <span v-if="!wide && !(open && !popup && wideEditor)" class="sheet-label" :title="label">
       <slot name="label">{{ label }}</slot>
