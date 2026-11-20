@@ -82,7 +82,9 @@ describe('decodeRawAstroImage — extension dispatch', () => {
 // small files of the same shape, so the whole path down to a colour PNG is checked end to end.
 describe('decodeRawAstroImage — colour files shaped like Siril exports', () => {
   async function pngPixels(png: Uint8Array): Promise<{ channels: number; data: number[] }> {
-    const { data, info } = await sharp(Buffer.from(png)).raw().toBuffer({ resolveWithObject: true });
+    const { data, info } = await sharp(Buffer.from(png))
+      .raw()
+      .toBuffer({ resolveWithObject: true });
     return { channels: info.channels, data: Array.from(data) };
   }
 
@@ -124,12 +126,7 @@ describe('decodeRawAstroImage — colour files shaped like Siril exports', () =>
   });
 
   it('decodes a float32 RGB TIFF written one row per strip', async () => {
-    const pixels = [
-      ...[0, 0.25, 0.5],
-      ...[1, 0, 0.25],
-      ...[0.5, 1, 0],
-      ...[0.25, 0.5, 1],
-    ];
+    const pixels = [...[0, 0.25, 0.5], ...[1, 0, 0.25], ...[0.5, 1, 0], ...[0.25, 0.5, 1]];
     const buf = buildTiff({
       width: 2,
       height: 2,
