@@ -1,19 +1,23 @@
-import { getLang, t } from '@myastrosky/core/i18n/index';
-import { CAPTURE_FIELDS } from '@myastrosky/core/capture-fields';
-import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
-import { formatPlanDate } from '@myastrosky/core/targets/plan';
-import type { Photo } from '@myastrosky/core/types';
+import { getLang, t } from './i18n/index';
+import { CAPTURE_FIELDS } from './capture-fields';
+import { formatIntegrationTotal } from './format-utils';
+import { formatPlanDate } from './targets/plan';
+import type { Photo } from './types';
 
 /**
  * One read-only figure of a photo: a `mono` one is drawn in the mono face; a `line` one takes a line of its own, cut
- * with "…" when too long; a map sheet first stops under the line of the `stop` one (the equipment).
+ * with "…" when too long; a map sheet first stops under the line of the `stop` one (the equipment). The exposures
+ * also come one per row in `exposures` (length and filter apart), for a place that lists them a line each. A `wide`
+ * one (equipment, notes) is long text that a narrow place shows under its label rather than beside it.
  */
 export interface PhotoFact {
   label: string;
   value: string;
+  exposures?: { time: string; filter: string }[];
   mono?: boolean;
   line?: boolean;
   stop?: boolean;
+  wide?: boolean;
 }
 
 /** The capture details left out of the map's photo sheet (`brief`): the gallery's information shows them. */
@@ -26,11 +30,11 @@ const joined = (items: readonly string[]) => items.join(' · ');
  * What is known of a photo, as the edit page lists it, read only (the boards "Ciel, photo sélectionnée" and "Photo,
  * informations"): its file name (`fileName`), the observation date, the total exposure, the capture details, the
  * equipment, the integration rows, the labels, the points of interest and the notes (its objects are chips, in
- * `PhoneChipPager`). Only the facts the photo has are listed. `brief` (the map's photo sheet) leaves out the sensor temperatures and the binning.
+ * `PhoneChipPager`). Only the facts the photo has are listed. `brief` (the map's photo sheet) leaves out the sensor temperatures and the binning. `noChips` leaves out the labels and points of interest, for a place that shows them as chips.
  */
 export function photoFacts(
   photo: Photo,
-  options: { setupName?: string; fileName?: boolean; brief?: boolean } = {},
+  options: { setupName?: string; fileName?: boolean; brief?: boolean; noChips?: boolean } = {},
 ): PhotoFact[] {
   const out: PhotoFact[] = [];
   // A visited sky's photo: its author first, on a line of its own (boards "Photo d'un ciel visité" and "Ciel,
@@ -61,7 +65,12 @@ export function photoFacts(
     });
   }
   if (options.setupName) {
-    out.push({ label: t('modal.metadataGearSetup'), value: options.setupName, stop: true });
+    out.push({
+      label: t('modal.metadataGearSetup'),
+      value: options.setupName,
+      stop: true,
+      wide: true,
+    });
   }
   // A visited sky's photo carries its gear as the sender named it (board "Photo d'un ciel visité").
   const gear = photo.sharedGear;
@@ -75,37 +84,54 @@ export function photoFacts(
     let first = true;
     for (const [label, value] of gearFacts) {
       if (!value) continue;
-      out.push({ label: t(label), value, ...(first ? { stop: true } : {}) });
+      out.push({ label: t(label), value, wide: true, ...(first ? { stop: true } : {}) });
       first = false;
     }
   }
   if (rows.length) {
+    const exposures = rows.map((row) => ({
+      time: `${row.frames} × ${row.seconds} ${t('modal.metadataIntegrationsSecondsSuffix')}`,
+      filter: row.filter,
+    }));
     out.push({
       label: t('modal.metadataIntegrations'),
-      value: joined(
-        rows.map((row) =>
-          [
-            row.filter,
-            `${row.frames} × ${row.seconds} ${t('modal.metadataIntegrationsSecondsSuffix')}`,
-          ]
-            .filter(Boolean)
-            .join(' '),
-        ),
-      ),
+      value: joined(exposures.map((e) => [e.filter, e.time].filter(Boolean).join(' '))),
+      exposures,
       mono: true,
     });
   }
-  if (photo.labels?.length) {
+  if (!options.noChips && photo.labels?.length) {
     out.push({ label: t('modal.metadataLabels'), value: joined(photo.labels) });
   }
-  if (photo.pointsOfInterest?.length) {
+  if (!options.noChips && photo.pointsOfInterest?.length) {
     out.push({
       label: t('modal.metadataPoi'),
       value: joined([...new Set(photo.pointsOfInterest.map((poi) => poi.name))]),
     });
   }
   if (photo.notes?.trim()) {
-    out.push({ label: t('modal.metadataNotes'), value: photo.notes.trim() });
+    out.push({ label: t('modal.metadataNotes'), value: photo.notes.trim(), wide: true });
   }
   return out;
+}
+
+/**
+ * The parts of a photo's summary: its equipment, total exposure and observation date
+ * (["Seestar S50", "2h15", "12 oct. 2025"]), only the parts the photo has; empty when it has none.
+ */
+export function photoSummaryParts(photo: Photo, setupName?: string): string[] {
+  const rows = (photo.integrations ?? []).filter((row) => row.frames >= 1 && row.seconds >= 1);
+  const seconds = rows.reduce((sum, row) => sum + row.frames * row.seconds, 0);
+  return [
+    setupName ?? photo.sharedGear?.setup,
+    seconds > 0 ? formatIntegrationTotal(seconds) : undefined,
+    photo.observationDate
+      ? formatPlanDate(photo.observationDate.slice(0, 10), getLang())
+      : undefined,
+  ].filter((part): part is string => !!part);
+}
+
+/** The summary of a photo on one line: "Seestar S50 · 2h15 · 12 oct. 2025". */
+export function photoSummary(photo: Photo, setupName?: string): string {
+  return joined(photoSummaryParts(photo, setupName));
 }

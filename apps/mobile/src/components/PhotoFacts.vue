@@ -3,7 +3,7 @@ import { computed, inject, ref, watch } from 'vue';
 import type { Photo } from '@myastrosky/core/types';
 import { getGearSetups } from '@myastrosky/app-state/api';
 import { reportError } from '@myastrosky/core/platform/error-hook';
-import { photoFacts } from '../photo-facts';
+import { photoFacts } from '@myastrosky/core/photo-facts';
 import PhoneFacts from './PhoneFacts.vue';
 import { SHEET_HOLD } from './map-sheet';
 

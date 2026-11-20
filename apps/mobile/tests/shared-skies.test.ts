@@ -29,7 +29,7 @@ import SkyViewField from '../src/pages/sky/SkyViewField.vue';
 import SkyCheckSheet from '../src/pages/sky/SkyCheckSheet.vue';
 import { MY_SKY } from '@myastrosky/core/shared-sky-view';
 import { sharedSkyPreviewLines } from '../src/composables/useSharedSkyOpen';
-import { photoFacts } from '../src/photo-facts';
+import { photoFacts } from '@myastrosky/core/photo-facts';
 
 const sky = (id: string, senderName: string, photoCount: number): SharedSky =>
   ({

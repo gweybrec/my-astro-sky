@@ -12,6 +12,8 @@ const en: Translations = {
     viewModeGallery: 'Gallery',
   },
   photos: {
+    showDetails: 'Show details',
+    hideDetails: 'Hide details',
     section: 'Photos',
     add: '+ Add photos',
     empty: 'No photos added',

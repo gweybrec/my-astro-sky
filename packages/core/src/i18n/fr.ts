@@ -10,6 +10,8 @@ const fr = {
     viewModeGallery: 'Galerie',
   },
   photos: {
+    showDetails: 'Afficher les détails',
+    hideDetails: 'Masquer les détails',
     section: 'Photos',
     add: '+ Ajouter des photos',
     empty: 'Aucune photo ajoutée',

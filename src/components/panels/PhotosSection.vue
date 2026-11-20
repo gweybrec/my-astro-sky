@@ -67,6 +67,7 @@
         @dso-chip="onDSOChip"
         @label-chip="photosStore.zoomToPhoto(selectedPlaced!.photo.id)"
       />
+      <PhotoFactsFold :photo="selectedPlaced.photo" />
     </div>
   </CollapsibleSection>
 
@@ -92,6 +93,7 @@ import { ref, computed } from 'vue';
 import { t } from '../../i18n';
 import CollapsibleSection from '../base/CollapsibleSection.vue';
 import PhotoItem from './PhotoItem.vue';
+import PhotoFactsFold from './PhotoFactsFold.vue';
 import GearPopup from './GearPopup.vue';
 import DrawOrderModal from '../modals/DrawOrderModal.vue';
 import { useCanvasStore } from '../../stores/canvas';
