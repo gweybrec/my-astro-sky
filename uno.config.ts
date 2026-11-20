@@ -297,6 +297,60 @@ export default defineConfig({
     'tag-chip-sm':
       'inline-flex items-center gap-1 px-3 py-px rounded-xl text-micro border border-[var(--accent-fill-lg)] bg-transparent text-label',
 
+    // ── Gallery photo information panel (MetadataSheet / InlineEditRow) ───────
+    // A section: its title line (title + small "+"), then label | value rows.
+    'sheet-section': 'flex flex-col gap-1',
+    'sheet-section-head': 'flex items-center gap-3 min-h-[22px]',
+    'sheet-section-title': 'flex-none text-small font-medium uppercase tracking-[0.06em]',
+    // The title line folds and unfolds its section (chevron + title + what it holds while folded).
+    'sheet-section-toggle': [
+      'w-full min-w-0 min-h-[22px] flex items-center gap-2 p-0 bg-transparent border-0 cursor-pointer text-left',
+      'font-[inherit] text-small text-label hover:text-primary',
+    ].join(' '),
+    // One fact: label | value | its pen (or ✓ ✕ while edited). Hovering the line brightens its pen.
+    'sheet-row': [
+      'group relative grid grid-cols-[104px_minmax(0,1fr)_auto] items-center gap-x-4',
+      'min-h-[24px] -mx-2 px-2 rounded-sm hover:bg-[var(--bg-hover)]',
+    ].join(' '),
+    'sheet-label': 'min-w-0 text-base text-label truncate',
+    'sheet-value': 'min-w-0 text-body text-primary truncate',
+    'sheet-value--dim': 'text-dim',
+    // Small icon buttons of the rows and section titles (pen, calendar, "+", bin).
+    'sheet-icon-btn': [
+      'inline-flex items-center justify-center flex-none w-[22px] h-[22px] p-0',
+      'bg-transparent border border-transparent rounded-md text-muted cursor-pointer',
+      'group-hover:text-primary hover:!text-bright hover:bg-[var(--bg-warm-btn)]',
+      'disabled:opacity-40 disabled:cursor-default',
+      '[&>svg]:w-[12px] [&>svg]:h-[12px]',
+    ].join(' '),
+    'sheet-icon-btn--on':
+      'sheet-icon-btn !bg-[var(--accent-fill-sm)] !border-[var(--accent-fill-lg)] !text-bright',
+    // ✓ and ✕ of a row being edited.
+    'sheet-ok': 'sheet-icon-btn !border-[var(--border-input)] !text-[var(--status-success-text)]',
+    'sheet-cancel': 'sheet-icon-btn !border-[var(--border-input)] !text-dim',
+    'sheet-trash': 'sheet-icon-btn !text-[var(--btn-trash-text)]',
+    // A small input inside a row.
+    'sheet-input': [
+      'box-border h-[26px] w-full min-w-0 px-4 rounded-md text-body text-primary font-[inherit]',
+      'bg-[var(--bg-input)] border border-[var(--border-input)] outline-none focus:border-[var(--accent-border)]',
+    ].join(' '),
+    // The pop-ups of the panel (capture fields, more actions, date picker, suggestions).
+    'sheet-pop': [
+      'absolute z-[5] box-border flex flex-col p-1 rounded-lg',
+      'bg-[var(--bg-modal)] border border-[var(--border-input)] shadow-[0_12px_40px_var(--shadow-lg)]',
+    ].join(' '),
+    'sheet-pop-item': [
+      'flex items-center gap-4 h-[28px] px-5 rounded-md text-left whitespace-nowrap text-body font-[inherit]',
+      'bg-transparent border-none text-primary cursor-pointer hover:bg-[var(--bg-hover)]',
+      'disabled:opacity-40 disabled:cursor-default [&>svg]:w-[12px] [&>svg]:h-[12px]',
+    ].join(' '),
+    // "Afficher les N objets" / "Réduire" under a folded chip list.
+    'sheet-fold': [
+      'self-start inline-flex items-center gap-2 h-[22px] mt-1 px-4 rounded-md cursor-pointer font-[inherit]',
+      'bg-[var(--bg-warm-btn)] border border-[var(--border-input)] text-secondary text-base',
+      'hover:text-primary [&>svg]:w-[12px] [&>svg]:h-[12px]',
+    ].join(' '),
+
     // ── Status banners ────────────────────────────────────────────────────────
     'status-success':
       'bg-[var(--status-success-bg)] border border-[var(--status-success-border)] text-[var(--status-success-text)]',

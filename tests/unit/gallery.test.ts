@@ -593,9 +593,13 @@ describe('Gallery', () => {
 
     (document.querySelector('.gallery-item') as HTMLElement).click();
 
+    // Delete waits in the "⋯" menu, behind one more click.
     const button = Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent === 'photos.deleteThisPhoto',
+      (b) => b.textContent?.trim() === 'photos.deleteThisPhoto',
     ) as HTMLButtonElement;
+    expect(button.closest('[role=menu]')!.classList.contains('hidden')).toBe(true);
+    (document.querySelector('[data-test=more-actions]') as HTMLButtonElement).click();
+    expect(button.closest('[role=menu]')!.classList.contains('hidden')).toBe(false);
     button.click();
 
     const confirmBtn = Array.from(document.querySelectorAll('button')).find(
@@ -626,6 +630,76 @@ describe('Gallery', () => {
     expect(metaSpy).toHaveBeenCalledOnce();
     const updated = metaSpy.mock.calls[0][0] as Photo;
     expect(updated.notes).toBe('updated via metadata');
+  });
+
+  it('opens the information panel as a sheet saved field by field', () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([makePhoto({ id: 'a', filename: 'a.jpg' })]);
+    (document.querySelector('.gallery-item') as HTMLElement).click();
+    const options = mockBuildMetadataEditorPanel.mock.calls[0][7];
+    expect(options).toEqual({ sheet: true });
+    (document.querySelector('.gallery-detail-close') as HTMLButtonElement).click();
+  });
+
+  it('renames the photo from the pen beside its name, and keeps the name when the save fails', async () => {
+    const saveFields = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    mockBuildMetadataEditorPanel.mockImplementationOnce(() => ({
+      teardown: vi.fn(),
+      isDirty: () => false,
+      saveFields,
+    }));
+    const gallery = new Gallery();
+    gallery.loadPhotos([makePhoto({ id: 'a', originalName: 'M42', filename: 'a.jpg' })]);
+    (document.querySelector('.gallery-item') as HTMLElement).click();
+
+    const name = document.querySelector('.gallery-detail-name') as HTMLElement;
+    (document.querySelector('[data-test=rename-photo]') as HTMLButtonElement).click();
+    expect(name.classList.contains('hidden')).toBe(true);
+    const input = document.querySelector('.gallery-detail-name-row input') as HTMLInputElement;
+    expect(input.value).toBe('M42');
+    input.value = 'Orion';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(saveFields).toHaveBeenLastCalledWith({ displayName: 'Orion' });
+    expect(name.textContent).toBe('M42');
+    expect(name.classList.contains('hidden')).toBe(true);
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(name.textContent).toBe('Orion');
+    expect(name.classList.contains('hidden')).toBe(false);
+
+    // Esc in the field closes the field only, not the photo view.
+    (document.querySelector('[data-test=rename-photo]') as HTMLButtonElement).click();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.querySelector('.gallery-cinematic-overlay')).not.toBeNull();
+    expect(name.classList.contains('hidden')).toBe(false);
+    (document.querySelector('.gallery-detail-close') as HTMLButtonElement).click();
+  });
+
+  it('has no rename pen and no action row for a visited sky photo', () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([makePhoto({ id: 'a', filename: 'a.jpg', sharedSkyId: 's1' })]);
+    (document.querySelector('.gallery-item') as HTMLElement).click();
+    expect(document.querySelector('[data-test=rename-photo]')).toBeNull();
+    expect(document.querySelector('[data-test=more-actions]')).toBeNull();
+    (document.querySelector('.gallery-detail-close') as HTMLButtonElement).click();
+  });
+
+  it('closes the "⋯" menu on Escape without closing the photo view', () => {
+    const gallery = new Gallery();
+    gallery.loadPhotos([makePhoto({ id: 'a', filename: 'a.jpg' })]);
+    (document.querySelector('.gallery-item') as HTMLElement).click();
+    const more = document.querySelector('[data-test=more-actions]') as HTMLButtonElement;
+    more.click();
+    const menu = more.parentElement!.querySelector('[role=menu]')!;
+    expect(menu.classList.contains('hidden')).toBe(false);
+    more.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(menu.classList.contains('hidden')).toBe(true);
+    expect(document.querySelector('.gallery-cinematic-overlay')).not.toBeNull();
+    (document.querySelector('.gallery-detail-close') as HTMLButtonElement).click();
   });
 
   it('setLabelFilter is opt-in: null/empty shows all, non-empty narrows to matching photos', () => {

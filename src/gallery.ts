@@ -43,6 +43,8 @@ import mapPinSvg from './icons/map-pin.svg?raw';
 import rotateRightSvg from './icons/rotate-right-90.svg?raw';
 import dsoGalaxySvg from './icons/dso-galaxy.svg?raw';
 import poiCometSvg from './icons/poi-comet.svg?raw';
+import trashSvg from './icons/trash.svg?raw';
+import { attachRenameControl, buildMoreMenu } from './gallery-detail-parts';
 
 /** Icon-only button for the photo detail header (tooltip + accessible name). Same
  * look as the former "Show DSOs" text button — `btn-action` + the ghost-outline
@@ -640,6 +642,8 @@ export class Gallery {
     let zoom: ReturnType<typeof createImageZoomPan> | null = null;
     let metaPanelTeardown: (() => void) | null = null;
     let metaPanelIsDirty: (() => boolean) | null = null;
+    let metaPanelSave: ((patch: { displayName: string }) => Promise<boolean>) | null = null;
+    let moreMenuTeardown: (() => void) | null = null;
     let dsoFilterApp: App | null = null;
 
     const rawClose = () => {
@@ -647,6 +651,7 @@ export class Gallery {
       window.removeEventListener('resize', redrawDsoOverlay);
       zoom?.destroy();
       metaPanelTeardown?.();
+      moreMenuTeardown?.();
       dsoFilterApp?.unmount();
       overlay.remove();
       if (this.closeActiveDetail === close) this.closeActiveDetail = null;
@@ -749,8 +754,10 @@ export class Gallery {
     nameRow.className = 'gallery-detail-name-row';
 
     const photoName = document.createElement('div');
-    photoName.className = 'gallery-detail-name';
+    // A name without spaces ("M58+M84+M86+…") ends in "…" instead of being cut; the whole name on hover.
+    photoName.className = 'gallery-detail-name !whitespace-nowrap overflow-hidden text-ellipsis';
     photoName.textContent = photo.originalName;
+    photoName.title = photo.originalName;
 
     const metaCloseBtn = document.createElement('button');
     metaCloseBtn.className = 'gallery-detail-close';
@@ -759,6 +766,12 @@ export class Gallery {
 
     nameRow.appendChild(photoName);
     nameRow.appendChild(metaCloseBtn);
+    // A visited photo is someone else's: its name is not changed either.
+    if (!photo.sharedSkyId) {
+      attachRenameControl(photoName, (name) =>
+        metaPanelSave ? metaPanelSave({ displayName: name }) : Promise.resolve(false),
+      );
+    }
 
     const showOnMapBtn = iconButton(mapPinSvg, t('gallery.showOnMap'));
     showOnMapBtn.addEventListener('click', async () => {
@@ -991,50 +1004,45 @@ export class Gallery {
                 .filter(Boolean),
             ),
           ],
-          // Pins follow the editor's unsaved POI list, so a POI added from an
+          // Pins follow the editor's POI list, so a POI added from an
           // identification modal (or a POI removed) shows on the photo immediately.
           onPoisChanged,
+          // Read as text, each fact changed in place and saved at once.
+          { sheet: true },
         );
     if (metaPanel) {
       metaPanelTeardown = metaPanel.teardown;
       metaPanelIsDirty = metaPanel.isDirty;
+      metaPanelSave = metaPanel.saveFields;
       meta.appendChild(formContainer);
     }
 
-    // Action row: save + delete
+    // Action row, by importance: the headers, loading a WCS file, then "⋯" (delete, behind a click more).
     const actionRow = document.createElement('div');
-    actionRow.className = 'gallery-detail-actions';
+    actionRow.className = 'gallery-detail-actions items-center';
 
-    const builtBtnRow = formContainer.querySelector<HTMLElement>('.meta-editor-btns');
-    const saveBtn = formContainer.querySelector<HTMLButtonElement>('.btn-confirm[type="button"]');
-    const cancelBtn = formContainer.querySelector<HTMLButtonElement>('.btn-cancel[type="button"]');
-    cancelBtn?.remove();
-    if (saveBtn) {
-      saveBtn.classList.add('gallery-detail-save');
-      actionRow.appendChild(saveBtn);
-    }
-    builtBtnRow?.remove();
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'btn-danger';
-    deleteBtn.textContent = t('photos.deleteThisPhoto');
-    deleteBtn.addEventListener('click', async () => {
-      const confirmed = await confirmPhotoDelete(photo.originalName);
-      if (!confirmed) return;
-      rawClose();
-      this.onDeletePhoto?.(photo);
-    });
-    actionRow.appendChild(deleteBtn);
-
-    // Move the "Load a WCS file" row out of the scrolling form into the fixed action
-    // area as a full-width line above the save/delete buttons (so it spans their width).
     const wcsLoadRow = formContainer.querySelector<HTMLElement>('.wcs-load-row');
     if (wcsLoadRow) {
       wcsLoadRow.classList.remove('my-2');
-      wcsLoadRow.classList.add('basis-full', 'w-full');
-      actionRow.classList.add('flex-wrap');
-      actionRow.insertBefore(wcsLoadRow, actionRow.firstChild);
+      wcsLoadRow.classList.add('flex-1', 'min-w-0', 'items-center');
+      actionRow.appendChild(wcsLoadRow);
     }
+
+    const more = buildMoreMenu([
+      {
+        label: t('photos.deleteThisPhoto'),
+        icon: trashSvg,
+        danger: true,
+        onSelect: async () => {
+          const confirmed = await confirmPhotoDelete(photo.originalName);
+          if (!confirmed) return;
+          rawClose();
+          this.onDeletePhoto?.(photo);
+        },
+      },
+    ]);
+    moreMenuTeardown = more.teardown;
+    actionRow.appendChild(more.wrap);
 
     if (!visited) meta.appendChild(actionRow);
 

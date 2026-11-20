@@ -26,6 +26,11 @@ vi.mock('../../src/wcs-conflicts', () => ({ showWcsConflicts }));
 vi.mock('../../src/components/modals/MetadataEditorPanel.vue', () => ({
   default: { render: () => null },
 }));
+vi.mock('../../src/components/modals/MetadataSheet.vue', () => ({
+  default: { render: () => null },
+}));
+const reportError = vi.hoisted(() => vi.fn());
+vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: reportError }));
 
 import { buildMetadataEditorPanel, showMetadataEditor } from '../../src/metadata-editor';
 import { t } from '../../src/i18n';
@@ -218,5 +223,121 @@ describe('buildMetadataEditorPanel, loading a WCS file', () => {
     const modal = document.querySelector('.meta-editor-overlay')!;
     expect(modal.querySelector('[data-test=fits-headers-btn]')).toBeNull();
     modal.remove();
+  });
+});
+
+describe('buildMetadataEditorPanel, as the gallery sheet', () => {
+  let container: HTMLElement;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.updatePhotoMetadata.mockResolvedValue(undefined);
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  const build = (p = photo(), onSaved = vi.fn(), onPois = vi.fn()) =>
+    buildMetadataEditorPanel(container, p, onSaved, vi.fn(), [], [], onPois, { sheet: true });
+
+  it('has no Save button, and puts the headers before the WCS file', () => {
+    build();
+    expect(container.querySelector('.meta-editor-btns')).toBeNull();
+    const row = container.querySelector('.wcs-load-row')!;
+    const buttons = Array.from(row.querySelectorAll('button'));
+    expect(buttons[0].dataset.test).toBe('fits-headers-btn');
+    expect(buttons[1].textContent?.trim()).toBe(t('gallery.sheet.loadWcs'));
+    expect(buttons[1].title).toBe(t('gallery.loadFromWcs'));
+  });
+
+  it('saves a change at once, with the other fields as they stand, and reports the saved photo', async () => {
+    const onSaved = vi.fn();
+    const onPois = vi.fn();
+    const panel = build(photo({ notes: 'old', labels: ['a'] }), onSaved, onPois);
+    expect(await panel.saveFields({ notes: 'new' })).toBe(true);
+    const meta = api.updatePhotoMetadata.mock.calls[0][1];
+    expect(meta).toMatchObject({ notes: 'new', labels: ['a'], captureDetails: { gain: 100 } });
+    expect(onSaved.mock.calls[0][0]).toMatchObject({ id: 'p1', notes: 'new' });
+    expect(onPois).not.toHaveBeenCalled();
+
+    // The next save starts from the saved draft.
+    await panel.saveFields({ labels: ['a', 'b'] });
+    expect(api.updatePhotoMetadata.mock.calls[1][1]).toMatchObject({
+      notes: 'new',
+      labels: ['a', 'b'],
+    });
+  });
+
+  it('renames the photo through its name', async () => {
+    const onSaved = vi.fn();
+    const panel = build(photo(), onSaved);
+    await panel.saveFields({ displayName: 'Andromède' });
+    expect(api.updatePhotoMetadata.mock.calls[0][1].originalName).toBe('Andromède');
+    expect(onSaved.mock.calls[0][0].originalName).toBe('Andromède');
+  });
+
+  it('tells the photo view about changed points of interest', async () => {
+    const onPois = vi.fn();
+    const panel = build(photo(), vi.fn(), onPois);
+    const pois = [{ name: 'C/2025 A1', categoryId: 'comet' }];
+    await panel.saveFields({ pointsOfInterest: pois as never });
+    expect(onPois).toHaveBeenCalledWith(pois);
+  });
+
+  it('keeps the draft and says why when the save fails', async () => {
+    api.updatePhotoMetadata.mockRejectedValueOnce(new Error('Disque plein'));
+    const onSaved = vi.fn();
+    const panel = build(photo({ notes: 'old' }), onSaved);
+    expect(await panel.saveFields({ notes: 'new' })).toBe(false);
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(showToast.mock.calls[0][0]).toMatchObject({ message: 'Disque plein', type: 'error' });
+    expect(reportError).toHaveBeenCalled();
+    // Not taken: the next save still has the old notes.
+    await panel.saveFields({ labels: ['x'] });
+    expect(api.updatePhotoMetadata.mock.calls[1][1].notes).toBe('old');
+  });
+
+  it('saves one change after the other, in order', async () => {
+    let release!: () => void;
+    api.updatePhotoMetadata.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (release = resolve)),
+    );
+    const panel = build();
+    const first = panel.saveFields({ notes: 'one' });
+    const second = panel.saveFields({ labels: ['two'] });
+    await flushPromises();
+    expect(api.updatePhotoMetadata).toHaveBeenCalledTimes(1);
+    release();
+    expect(await first).toBe(true);
+    expect(await second).toBe(true);
+    expect(api.updatePhotoMetadata.mock.calls[1][1]).toMatchObject({
+      notes: 'one',
+      labels: ['two'],
+    });
+  });
+
+  it('is never "dirty" by itself: nothing waits for a Save', () => {
+    const panel = build();
+    expect(panel.isDirty()).toBe(false);
+  });
+
+  it('saves a loaded WCS file at once, its values and its header cards', async () => {
+    const cards = [{ key: 'EXPTIME', value: '30.' }];
+    api.solveWCS.mockResolvedValue({
+      success: false,
+      code: 'NO_WCS_DATA',
+      expTime: 30,
+      stackCnt: 44,
+      captureDetails: { ccdTemp: 9.9 },
+      fitsHeaders: cards,
+    });
+    const onSaved = vi.fn();
+    build(photo(), onSaved);
+    await loadFile(container, 'M2.fit');
+    const meta = api.updatePhotoMetadata.mock.calls[0][1];
+    expect(meta.integrations).toEqual([{ frames: 44, seconds: 30, filter: '' }]);
+    expect(meta.captureDetails).toEqual({ gain: 100, ccdTemp: 9.9 });
+    expect(api.setPhotoFitsHeaders).toHaveBeenCalledWith('p1', cards);
+    expect(onSaved.mock.calls.at(-1)![0].hasFitsHeaders).toBe(true);
+    const headersBtn = container.querySelector<HTMLButtonElement>('[data-test=fits-headers-btn]')!;
+    expect(headersBtn.hasAttribute('aria-disabled')).toBe(false);
   });
 });
