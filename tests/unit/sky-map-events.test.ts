@@ -80,6 +80,7 @@ function makeHost(over: Partial<SkyEventHost> = {}) {
     emitPhotoClick: vi.fn(),
     emitDSOClick: vi.fn(),
     emitClearSelection: vi.fn(),
+    emitClearPhotoSelection: vi.fn(),
   };
 
   const state = {
@@ -102,6 +103,7 @@ function makeHost(over: Partial<SkyEventHost> = {}) {
       return state.hoveredDSO;
     },
     hasSelection: () => state.selection,
+    selectedPhotoName: () => null,
     hasStarPickedHandler: () => false,
     hasPhotoClickHandler: () => true,
     regionDrawActive: () => state.regionActive,
@@ -393,12 +395,21 @@ describe('attachSkyMapEvents', () => {
       expect(h.calls.emitPhotoClick).not.toHaveBeenCalled();
     });
 
-    it('a DSO click fires alongside the photo click', () => {
+    it('a click on a DSO inside a photo selects the photo only', () => {
       const h = setup({ photoOutlines: [PHOTO] });
       h.state.hoveredDSO = { id: 'M31' };
       press(h);
       window.dispatchEvent(mouse('mouseup', 500, 400));
-      expect(h.calls.emitPhotoClick).toHaveBeenCalled();
+      expect(h.calls.emitPhotoClick).toHaveBeenCalledWith('andromeda.jpg');
+      expect(h.calls.emitDSOClick).not.toHaveBeenCalled();
+    });
+
+    it('a click on a DSO outside any photo selects the DSO', () => {
+      const h = setup({ photoOutlines: [PHOTO] });
+      h.state.hoveredDSO = { id: 'M42' };
+      press(h, 200, 200);
+      window.dispatchEvent(mouse('mouseup', 200, 200));
+      expect(h.calls.emitPhotoClick).not.toHaveBeenCalled();
       expect(h.calls.emitDSOClick).toHaveBeenCalled();
     });
 
@@ -472,6 +483,55 @@ describe('attachSkyMapEvents', () => {
       const e = mouse('contextmenu', 500, 400);
       canvas.dispatchEvent(e);
       expect(calls.emitClearSelection).not.toHaveBeenCalled();
+      expect(e.defaultPrevented).toBe(false);
+    });
+
+    it('outside the selected photo, clears the photo and the object', () => {
+      const { canvas, calls, state } = setup({
+        photoOutlines: [PHOTO],
+        selectedPhotoName: () => 'andromeda.jpg',
+      });
+      state.selection = true;
+      const e = mouse('contextmenu', 200, 200);
+      canvas.dispatchEvent(e);
+      expect(calls.emitClearSelection).toHaveBeenCalled();
+      expect(calls.emitClearPhotoSelection).toHaveBeenCalled();
+      expect(e.defaultPrevented).toBe(true);
+    });
+
+    it('outside the selected photo, clears it even with no object selected', () => {
+      const { canvas, calls } = setup({
+        photoOutlines: [PHOTO],
+        selectedPhotoName: () => 'andromeda.jpg',
+      });
+      const e = mouse('contextmenu', 200, 200);
+      canvas.dispatchEvent(e);
+      expect(calls.emitClearSelection).not.toHaveBeenCalled();
+      expect(calls.emitClearPhotoSelection).toHaveBeenCalled();
+      expect(e.defaultPrevented).toBe(true);
+    });
+
+    it('inside the selected photo, clears only the object and keeps the photo', () => {
+      const { canvas, calls, state } = setup({
+        photoOutlines: [PHOTO],
+        selectedPhotoName: () => 'andromeda.jpg',
+      });
+      state.selection = true;
+      const e = mouse('contextmenu', 500, 400);
+      canvas.dispatchEvent(e);
+      expect(calls.emitClearSelection).toHaveBeenCalled();
+      expect(calls.emitClearPhotoSelection).not.toHaveBeenCalled();
+      expect(e.defaultPrevented).toBe(true);
+    });
+
+    it('inside the selected photo with no object selected, leaves the browser menu alone', () => {
+      const { canvas, calls } = setup({
+        photoOutlines: [PHOTO],
+        selectedPhotoName: () => 'andromeda.jpg',
+      });
+      const e = mouse('contextmenu', 500, 400);
+      canvas.dispatchEvent(e);
+      expect(calls.emitClearPhotoSelection).not.toHaveBeenCalled();
       expect(e.defaultPrevented).toBe(false);
     });
   });

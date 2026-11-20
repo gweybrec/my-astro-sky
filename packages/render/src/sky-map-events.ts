@@ -12,7 +12,7 @@
  * - **mousedown** — region drawing → frame interaction → pan.
  * - **mousemove** — region drawing → frame drag → pan → hover.
  * - **mouseup**   — region drawing → frame drag → pan (which then decides whether
- *   the gesture was a click, and routes it to star-pick / photo / DSO).
+ *   the gesture was a click, and routes it to star-pick / photo, else DSO).
  * - **Escape**    — region drawing → picking mode → deselect the active frame.
  *
  * The pan state lives here because only these handlers touch it.
@@ -22,7 +22,7 @@ import type { PhotoOutline } from '@myastrosky/core/photo-outline';
 import type { AltAzPoint } from '@myastrosky/core/sky-map-types';
 import { fromCanvas, isInsideBorderCircle } from '@myastrosky/core/projection';
 import { zoomAboutPoint } from '@myastrosky/core/sky-view-math';
-import { findTopPhotoOutlineAtPoint } from '@myastrosky/core/photo-outline';
+import { findTopPhotoOutlineAtPoint, pointInConvexPolygon } from '@myastrosky/core/photo-outline';
 
 /** One registered listener, so the caller can remove them all on destroy. */
 export interface EventBinding {
@@ -84,6 +84,9 @@ export interface SkyEventHost {
   emitPhotoClick(photoName: string): void;
   emitDSOClick(): void;
   emitClearSelection(): void;
+  /** The name of the photo selected in the app (its outline's name), or null. */
+  selectedPhotoName(): string | null;
+  emitClearPhotoSelection(): void;
 }
 
 /** A click (rather than a drag) is a release within this many px of the press. */
@@ -184,12 +187,21 @@ export function attachSkyMapEvents(host: SkyEventHost): EventBinding[] {
     }
   }) as EventListener);
 
-  // Right-click clears the active DSO/star selection (and suppresses the
-  // browser context menu when there was something to clear).
+  // Right-click clears the active DSO/star selection, and the selected photo when it lands outside that photo
+  // (inside it, the photo stays selected). Suppresses the browser context menu when there was something to clear.
   add(host.canvas, 'contextmenu', ((e: MouseEvent) => {
-    if (!host.hasSelection()) return;
+    const photoName = host.selectedPhotoName();
+    let clearPhoto = false;
+    if (photoName !== null) {
+      const { mx, my } = local(e);
+      const outline = host.photoOutlines.find((o) => o.name === photoName);
+      clearPhoto = !outline || !pointInConvexPolygon(mx, my, outline.corners);
+    }
+    const clearObject = host.hasSelection();
+    if (!clearObject && !clearPhoto) return;
     e.preventDefault();
-    host.emitClearSelection();
+    if (clearObject) host.emitClearSelection();
+    if (clearPhoto) host.emitClearPhotoSelection();
   }) as EventListener);
 
   // ── Move: region draw → frame drag → pan → hover ──────────────────────────
@@ -278,13 +290,15 @@ export function attachSkyMapEvents(host: SkyEventHost): EventBinding[] {
       return; // picking mode swallows the photo/DSO click paths
     }
 
-    // Photo click: test if click lands inside a photo outline
+    // A click on a photo selects the photo only, never an object on it: the photo's card lists its objects.
     if (host.hasPhotoClickHandler()) {
       const photoName = findTopPhotoOutlineAtPoint(mx, my, host.photoOutlines);
-      if (photoName) host.emitPhotoClick(photoName);
+      if (photoName) {
+        host.emitPhotoClick(photoName);
+        return;
+      }
     }
 
-    // DSO click: fires alongside the photo click if a DSO is under the cursor.
     if (host.hoveredDSO) host.emitDSOClick();
   }) as EventListener);
 

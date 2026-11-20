@@ -171,6 +171,15 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
   skyMap.setOnClearSelection(() => {
     _clearDSOSelection();
   });
+  // ...and lets go of the selected photo when it lands outside that photo.
+  skyMap.setPhotoSelection({
+    selectedName: () => {
+      const id = usePhotosStore(pinia).selectedPhotoId;
+      if (!id) return null;
+      return overlay.getPlacedPhotos().find((p) => p.photo.id === id)?.photo.originalName ?? null;
+    },
+    clear: () => usePhotosStore(pinia).selectPhoto(null),
+  });
 
   // Navigate to map when clicking a gallery photo
   gallery.onNavigateToMap = (photo) => {

@@ -344,6 +344,8 @@ export class SkyMap {
   private onDSOClick: ((dso: DSO) => void) | null = null;
   // Clear-selection callback: fired on right-click to dismiss the active DSO/star selection.
   private onClearSelection: (() => void) | null = null;
+  // The app's selected photo, which a right-click outside it lets go of.
+  private photoSelection: { selectedName: () => string | null; clear: () => void } | null = null;
   private onStarTap: ((star: Star) => void) | null = null;
   private onLongPress: ((press: { dso: DSO | null; mx: number; my: number }) => void) | null = null;
   // One-shot DSO picker: armed by a caller that wants the next DSO click (used
@@ -770,6 +772,10 @@ export class SkyMap {
   }
   setOnClearSelection(cb: () => void) {
     this.onClearSelection = cb;
+  }
+  /** Mouse only: the app's selected photo (by outline name) and how to clear it, for a right-click outside it. */
+  setPhotoSelection(source: { selectedName: () => string | null; clear: () => void }) {
+    this.photoSelection = source;
   }
   /** Touch only: a finger held still on the map. `dso` is the object under it, if any. */
   setOnLongPress(cb: (press: { dso: DSO | null; mx: number; my: number }) => void) {
@@ -1325,6 +1331,8 @@ export class SkyMap {
         }
       },
       emitClearSelection: () => this.onClearSelection?.(),
+      selectedPhotoName: () => this.photoSelection?.selectedName() ?? null,
+      emitClearPhotoSelection: () => this.photoSelection?.clear(),
     };
   }
 
