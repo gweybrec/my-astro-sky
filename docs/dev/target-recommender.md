@@ -169,6 +169,20 @@ Page size: `prefs.pageSize` (default 15, options 5–50).
 
 ---
 
+### Stage 7 — Objects outside the criteria
+
+With `includeOutside` (both Targets tabs ask for it), objects that miss **only** the altitude range, the frame size or "Already photographed" are kept and returned apart in `result.outside`. Each carries its reasons in `outside` (`too-low`, `too-high`, `too-big`, `photographed`). The recommender's `keepOutside` option does this:
+
+- `too-low` only for an object whose peak is still above 0°. An object that never rises stays out.
+- `too-big` only when `includeOversized` is off, and `photographed` only when `excludePhotographed` is on.
+- `finish` ranks only the objects inside the criteria. The direction and sky-region filters apply to both lists.
+
+The other criteria still leave objects out as before: type, catalogue, rating, difficulty, constellation, magnitude limit and terrain horizon.
+
+Both apps list these objects after the targets, under "Outside your criteria (N)", in the same sort. Their card or row is dimmed and has one warning chip per reason (`outsideLabels` in `targets/outside.ts`). They open like any target. The result count is the targets only. Keeping them costs about a quarter more search time on the full catalogue.
+
+---
+
 ## Altitude filter preferences
 
 Two inputs control which objects are included by altitude:

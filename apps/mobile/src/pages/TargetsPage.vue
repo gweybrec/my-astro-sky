@@ -8,6 +8,7 @@ import { ALL_DSO_TYPES } from '@myastrosky/core/targets/filters';
 import { todayISO } from '@myastrosky/core/targets/format';
 import { planSearchPrefs } from '@myastrosky/core/targets/night';
 import { matchesTargetQuery } from '@myastrosky/core/targets/query';
+import { outsideLabels } from '@myastrosky/core/targets/outside';
 import type { GearLists } from '@myastrosky/core/targets/plan-setup';
 import {
   runTargetRecommendationSliced,
@@ -33,6 +34,7 @@ import PhoneIconButton from '../components/PhoneIconButton.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import PhoneEmptyState from '../components/PhoneEmptyState.vue';
 import PhoneTargetRow from '../components/PhoneTargetRow.vue';
+import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PhoneBusy from '../components/PhoneBusy.vue';
 import PhoneRadioSheet from '../components/PhoneRadioSheet.vue';
 import TypesSheet from './targets/TypesSheet.vue';
@@ -53,6 +55,9 @@ import mapPinIcon from '@icons/map-pin.svg?raw';
 // opens its page for that plan. The Cibles settings are not changed by it.
 // The shuffle button (boards "Cibles, au hasard") is the desktop's "Cibles aléatoires": each tap mixes what the search
 // found again, and the chosen sort still orders it, so only the targets that tie change places.
+// After the targets, the board "Cibles, hors de vos critères": the objects that miss only the altitude range, the frame
+// size or "exclude photographed", under their own title, dimmed with a warning badge per criterion missed, in the same
+// sort. The shuffle leaves them as they are.
 const route = useRoute();
 const router = useRouter();
 const plans = usePlansStore();
@@ -72,6 +77,11 @@ let found: TargetSuggestion[] = [];
 let pool: TargetSuggestion[] = [];
 let shuffled = false;
 const sorted = shallowRef<TargetSuggestion[]>([]);
+/** The objects outside the criteria, sorted as the list. */
+let foundOutside: TargetSuggestion[] = [];
+const sortedOutside = shallowRef<TargetSuggestion[]>([]);
+/** The altitude range searched, which the "too low / too high" warnings print. */
+let altRange = { minAltDeg: 0, maxAltDeg: 90 };
 const scroller = ref<HTMLElement | null>(null);
 /** Why the list is empty: the search found nothing, or it could not run (each reason has its own board). */
 const emptyKind = ref<RecommendationEmptyReason | 'no-match'>('no-match');
@@ -115,32 +125,35 @@ const chosenSetupId = computed<string | undefined>({
   },
 });
 
-const shown = computed(() => {
+const matching = (list: TargetSuggestion[]) => {
   const query = search.value.trim();
-  const all = query ? sorted.value.filter((s) => matchesTargetQuery(s.dso, query)) : sorted.value;
-  return all;
-});
-// The list is drawn a part at a time: thousands of rows at once froze the page.
+  return query ? list.filter((s) => matchesTargetQuery(s.dso, query)) : list;
+};
+const shown = computed(() => matching(sorted.value));
+const shownOutside = computed(() => matching(sortedOutside.value));
+// The list is drawn a part at a time: thousands of rows at once froze the page. The objects outside the criteria come
+// once the targets are all drawn.
 const {
   shown: visibleTargets,
   onScroll,
   reset: resetVisible,
-} = useGrowingList(() => shown.value, CHUNK);
-const rows = computed(() =>
-  visibleTargets.value.map((s) => ({
-    id: s.dso.id,
-    ...targetCard(
-      s.dso,
-      {
-        bestTimeUtc: s.bestTimeUtc,
-        maxAltDeg: s.maxAltDeg,
-        scorePct: Math.round(s.score * 100),
-        fovFitPct: Math.round(s.fovFitScore * 100),
-      },
-      search.value,
-    ),
-  })),
-);
+} = useGrowingList(() => [...shown.value, ...shownOutside.value], CHUNK);
+const toRow = (s: TargetSuggestion) => ({
+  id: s.dso.id,
+  warnings: s.outside ? outsideLabels(s, altRange) : undefined,
+  ...targetCard(
+    s.dso,
+    {
+      bestTimeUtc: s.bestTimeUtc,
+      maxAltDeg: s.maxAltDeg,
+      scorePct: Math.round(s.score * 100),
+      fovFitPct: Math.round(s.fovFitScore * 100),
+    },
+    search.value,
+  ),
+});
+const rows = computed(() => visibleTargets.value.slice(0, shown.value.length).map(toRow));
+const outsideRows = computed(() => visibleTargets.value.slice(shown.value.length).map(toRow));
 
 /** Lets the browser paint the spinner before the long computation blocks the page. */
 const nextPaint = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -217,6 +230,7 @@ async function runSearch() {
         photographedIds,
         horizonProfile: horizonStore.profile,
         regions: regionsStore.regions,
+        includeOutside: true,
       },
       nextPaint,
     );
@@ -229,21 +243,23 @@ async function runSearch() {
       found = result.suggestions;
       pool = keepShuffle ? inOrderOf(found, pool) : found;
       shuffled = keepShuffle;
-      sorted.value = sortSuggestions(pool, targetsPrefs.sortBy ?? 'rating');
+      foundOutside = result.outside;
+      altRange = result.altRange;
+      sort();
       emptyKind.value = 'no-match';
     } else {
-      found = pool = [];
+      found = pool = foundOutside = [];
       shuffled = false;
-      sorted.value = [];
+      sorted.value = sortedOutside.value = [];
       emptyKind.value = result.reason;
     }
     resetVisible();
   } catch (error) {
     if (run !== searchRun) return;
     lastKey = lastSettingsKey = '';
-    found = pool = [];
+    found = pool = foundOutside = [];
     shuffled = false;
-    sorted.value = [];
+    sorted.value = sortedOutside.value = [];
     emptyKind.value = 'no-match';
     void showError(error);
   } finally {
@@ -253,6 +269,7 @@ async function runSearch() {
 
 function sort() {
   sorted.value = sortSuggestions(pool, targetsPrefs.sortBy ?? 'rating');
+  sortedOutside.value = sortSuggestions(foundOutside, targetsPrefs.sortBy ?? 'rating');
   loading.value = false;
 }
 
@@ -365,22 +382,45 @@ function openTarget(id: string) {
           :button-icon="slidersIcon"
           @action="settingsOpen = true"
         />
-        <div v-else-if="rows.length === 0" class="mob-empty">
-          <p class="mob-empty-text m-body">{{ t('targets.results.empty') }}</p>
-        </div>
-        <div v-else class="mob-cols2">
-          <PhoneTargetRow
-            v-for="row in rows"
-            :key="row.id"
-            :title="row.title"
-            :designation="row.designation"
-            :type-label="row.typeLabel"
-            :constellation="row.constellation"
-            :rating="row.rating"
-            :facts="row.facts"
-            @click="openTarget(row.id)"
-          />
-        </div>
+        <template v-else>
+          <!-- The "no target" message fills the list's height: drawn only when nothing at all matches, else it would push
+               the objects outside the criteria below the screen. -->
+          <div v-if="shown.length === 0 && shownOutside.length === 0" class="mob-empty">
+            <p class="mob-empty-text m-body">{{ t('targets.results.empty') }}</p>
+          </div>
+          <div v-else-if="shown.length > 0" class="mob-cols2">
+            <PhoneTargetRow
+              v-for="row in rows"
+              :key="row.id"
+              :title="row.title"
+              :designation="row.designation"
+              :type-label="row.typeLabel"
+              :constellation="row.constellation"
+              :rating="row.rating"
+              :facts="row.facts"
+              @click="openTarget(row.id)"
+            />
+          </div>
+          <template v-if="outsideRows.length">
+            <PhoneSectionHeader>{{
+              t('targets.outside.title', { n: shownOutside.length })
+            }}</PhoneSectionHeader>
+            <div class="mob-cols2">
+              <PhoneTargetRow
+                v-for="row in outsideRows"
+                :key="row.id"
+                :title="row.title"
+                :designation="row.designation"
+                :type-label="row.typeLabel"
+                :constellation="row.constellation"
+                :rating="row.rating"
+                :facts="row.facts"
+                :warnings="row.warnings"
+                @click="openTarget(row.id)"
+              />
+            </div>
+          </template>
+        </template>
       </div>
     </IonContent>
     <TypesSheet v-model:open="typesOpen" @update:open="closed" />

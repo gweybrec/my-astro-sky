@@ -339,6 +339,25 @@ function raiseError() {
             rating="★★★★★"
             :facts="targetFactsNoNight"
           />
+          <!-- Outside the search's criteria: dimmed, one warning badge, then two that wrap with a long designation. -->
+          <PhoneTargetRow
+            title="Nébuleuse de la Lagune"
+            designation="M8"
+            type-label="Nébuleuse en émission"
+            constellation="SGR"
+            rating="★★★★★"
+            :facts="targetFacts"
+            :warnings="['Trop basse · 19° < 20°']"
+          />
+          <PhoneTargetRow
+            title="Nébuleuse de la Rosette"
+            designation="NGC2237 · NGC2238 · NGC2239 · NGC2246"
+            type-label="Nébuleuse en émission"
+            constellation="MON"
+            rating="★★★★★"
+            :facts="targetFacts"
+            :warnings="['Trop grande pour le champ', 'Déjà photographiée']"
+          />
           <PhoneTargetRow
             title="Véga"
             designation="α LYR"

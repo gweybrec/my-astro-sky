@@ -175,6 +175,8 @@ Results show for each object:
 - Overall score and FOV-fit percentage
 - Suggested imaging recipe (total integration time and filter breakdown)
 
+After the results, an **Outside your criteria** section lists the objects that miss only the altitude range, the frame size (when oversized objects are not included) or "Exclude photographed". Their cards are greyed out, with a warning saying which criterion each one misses ("Too high · 81° > 80°", "Too big for the frame", "Already photographed"). This way you can see why an object you expected is missing. You can still open, plan or show these objects like any other result. The phone app shows the same section at the end of its Cibles list.
+
 Use the **sort** dropdown to reorder results by score, altitude, time at highest, magnitude, size, FOV fit, name, rating, or difficulty. Use the **per-page** selector and pagination controls to browse through the full result set.
 
 Click **Open on map** on any card to jump to that object's position on the sky map.

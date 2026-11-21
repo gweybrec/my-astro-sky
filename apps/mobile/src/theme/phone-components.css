@@ -343,6 +343,16 @@ button.phone-progress-button:focus-visible {
 .mob-facts.mob-target-facts {
   padding: var(--space-3) 0 0;
 }
+/* A target outside the search's criteria: its name, designation line and figures are dimmed, less than a disabled row
+   (it stays a tap target); the warning badges under the designation keep full contrast. */
+ion-item.mob-target--outside .mob-target-head,
+ion-item.mob-target--outside .mob-meta,
+ion-item.mob-target--outside .mob-target-facts {
+  opacity: 0.55;
+}
+.mob-row-badges.mob-target-warnings {
+  padding-top: var(--space-3);
+}
 ion-item.mob-row--disabled .mob-row-title,
 ion-item.mob-row--disabled .mob-row-lead {
   opacity: 0.4;

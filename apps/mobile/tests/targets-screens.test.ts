@@ -152,7 +152,7 @@ const dso = (over: Partial<DSO>): DSO =>
     ...over,
   }) as DSO;
 
-const suggestion = (d: DSO, maxAltDeg: number, hour: number) => ({
+const suggestion = (d: DSO, maxAltDeg: number, hour: number, outside?: string[]) => ({
   dso: d,
   maxAltDeg,
   bestTimeUtc: new Date(2026, 5, 12, hour, 38),
@@ -160,11 +160,50 @@ const suggestion = (d: DSO, maxAltDeg: number, hour: number) => ({
   fovFitScore: 1,
   altScore: 1,
   brightnessScore: 1,
+  ...(outside ? { outside } : {}),
 });
 
-function ok(suggestions: ReturnType<typeof suggestion>[]) {
-  return { kind: 'ok', suggestions, preset: {}, location: {}, dateNight: new Date(), dateStr: '' };
+function ok(
+  suggestions: ReturnType<typeof suggestion>[],
+  outside: ReturnType<typeof suggestion>[] = [],
+) {
+  return {
+    kind: 'ok',
+    suggestions,
+    outside,
+    altRange: { minAltDeg: 20, maxAltDeg: 80 },
+    preset: {},
+    location: {},
+    dateNight: new Date(),
+    dateStr: '',
+  };
 }
+
+// Two objects outside the criteria: M8 too low, IC1805 too big and already photographed.
+const outsideTargets = () => [
+  suggestion(
+    dso({
+      id: 'M8',
+      displayName: 'Nébuleuse de la Lagune',
+      catalogs: ['M8'],
+      constellation: 'SGR',
+    }),
+    19.2,
+    21,
+    ['too-low'],
+  ),
+  suggestion(
+    dso({
+      id: 'IC1805',
+      displayName: 'Nébuleuse du Cœur',
+      catalogs: ['IC1805'],
+      constellation: 'CAS',
+    }),
+    74,
+    1,
+    ['too-big', 'photographed'],
+  ),
+];
 
 function app() {
   const router = createRouter({
@@ -429,6 +468,75 @@ describe('the Cibles page', () => {
     expect(designation()).toBe('M31');
     await w.find('input[type="search"]').setValue('ngc 224');
     expect(designation()).toBe('M31 · NGC224');
+  });
+
+  it('asks the search for the objects outside the criteria', async () => {
+    show(TargetsPage, { global: app().global });
+    await settle();
+    expect(search.mock.calls[0][0]).toMatchObject({ includeOutside: true });
+  });
+
+  it('lists the objects outside the criteria after the targets, under their title, dimmed with their warnings', async () => {
+    search.mockResolvedValue(ok([suggestion(dso({}), 86, 21)], outsideTargets()));
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    const lists = w.findAll('.mob-cols2');
+    expect(lists).toHaveLength(2);
+    expect(lists[0].findAll('.mob-row--roomy')).toHaveLength(1);
+    expect(lists[0].find('.mob-target--outside').exists()).toBe(false);
+    expect(lists[0].find('.mob-badge--warn').exists()).toBe(false);
+    expect(w.find('.mob-page-fill .mob-section-header').text()).toBe('Hors de vos critères (2)');
+    const outside = lists[1].findAll('.mob-row--roomy');
+    expect(outside.map((r) => r.classes('mob-target--outside'))).toEqual([true, true]);
+    expect(outside[0].findAll('.mob-badge--warn').map((b) => b.text())).toEqual([
+      'Trop basse · 19° < 20°',
+    ]);
+    expect(outside[1].findAll('.mob-badge--warn').map((b) => b.text())).toEqual([
+      'Trop grande pour le champ',
+      'Déjà photographiée',
+    ]);
+  });
+
+  it('has no title for the objects outside the criteria when there are none', async () => {
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    expect(w.find('.mob-page-fill .mob-section-header').exists()).toBe(false);
+    expect(w.findAll('.mob-cols2')).toHaveLength(1);
+  });
+
+  it('lists the objects outside the criteria without the no-target message when only they match', async () => {
+    search.mockResolvedValue(ok([suggestion(dso({}), 86, 21)], outsideTargets()));
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    // Typing an object that is only outside the criteria: the full-height message would push it below the screen.
+    await w.find('input[type="search"]').setValue('IC1805');
+    expect(w.find('.mob-page-fill .mob-empty').exists()).toBe(false);
+    expect(w.findAll('.mob-page-fill .mob-cols2')).toHaveLength(1);
+    expect(w.find('.mob-page-fill .mob-section-header').text()).toBe('Hors de vos critères (1)');
+    expect(w.findAll('.mob-target--outside')).toHaveLength(1);
+  });
+
+  it('says no target matches when neither list has a match', async () => {
+    search.mockResolvedValue(ok([suggestion(dso({}), 86, 21)], outsideTargets()));
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    await w.find('input[type="search"]').setValue('zzz');
+    expect(w.find('.mob-page-fill .mob-empty').text()).toContain('Aucune cible trouvée');
+    expect(w.find('.mob-page-fill .mob-section-header').exists()).toBe(false);
+  });
+
+  it('filters the objects outside the criteria by the typed text too, and opens one on a tap', async () => {
+    search.mockResolvedValue(ok([suggestion(dso({}), 86, 21)], outsideTargets()));
+    const { global, router } = app();
+    const w = show(TargetsPage, { global });
+    await settle();
+    await w.find('input[type="search"]').setValue('lagune');
+    expect(w.find('.mob-page-fill .mob-section-header').text()).toBe('Hors de vos critères (1)');
+    const rows = w.findAll('.mob-target--outside');
+    expect(rows).toHaveLength(1);
+    await rows[0].trigger('click');
+    await settle();
+    expect(router.currentRoute.value.path).toBe('/targets/M8');
   });
 
   it("opens a target's page on a tap", async () => {

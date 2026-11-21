@@ -32,6 +32,11 @@ export interface RecommendationInput {
   regions?: readonly { id: string; points: { azDeg: number; altDeg: number }[] }[];
   /** The objects to choose among; the catalogue by default. */
   dsos?: DSO[];
+  /**
+   * Also return the objects that miss only the altitude range, the frame size or the "exclude photographed" criteria
+   * (`outside` of the result), so that the Targets tab can show them apart.
+   */
+  includeOutside?: boolean;
 }
 
 export type RecommendationEmptyReason = 'no-location' | 'no-setup' | 'no-window-overlap';
@@ -42,6 +47,13 @@ export type RecommendationResult =
       kind: 'ok';
       /** In the recommender's order (best score first); may be empty when nothing matches the filters. */
       suggestions: TargetSuggestion[];
+      /**
+       * The objects that miss only the altitude, size or photographed criteria, each with its reasons in `outside`,
+       * best score first; empty unless `includeOutside` was asked for.
+       */
+      outside: TargetSuggestion[];
+      /** The altitude range searched, defaults applied (what the "too low / too high" warnings compare with). */
+      altRange: { minAltDeg: number; maxAltDeg: number };
       preset: GearPreset;
       location: ObserverLocation;
       dateNight: Date;
@@ -86,12 +98,15 @@ function prepare(
       ? new Set(prefs.enabledConstellations)
       : null;
 
+  const keepOutside = input.includeOutside ?? false;
+  const photographedIds = prefs.excludePhotographed ? (input.photographedIds ?? null) : null;
   const filterOptions = {
     enabledTypes,
     enabledRatings,
     enabledDifficulties,
     enabledCatalogs,
-    photographedIds: prefs.excludePhotographed ? (input.photographedIds ?? null) : null,
+    // The photographed objects stay in the pool when they are shown outside the criteria; tagged in `finish`.
+    photographedIds: keepOutside ? null : photographedIds,
     enabledConstellations,
   };
   const filteredDSOs = filterTargetDSOs(dsos, filterOptions);
@@ -119,48 +134,51 @@ function prepare(
     if (!darkOverlaps && !twilightOverlaps) return { kind: 'empty', reason: 'no-window-overlap' };
   }
 
+  const altRange = { minAltDeg: prefs.minAltDeg ?? 20, maxAltDeg: prefs.maxAltDeg ?? 80 };
   const recommender = createRecommender(preset, location, dateNight, {
     ignoreFovFit: prefs.includeOversized ?? false,
-    minAltDeg: prefs.minAltDeg ?? 20,
-    maxAltDeg: prefs.maxAltDeg ?? 80,
+    ...altRange,
     timeWindow: timeWindow ?? undefined,
     horizonProfile: prefs.respectHorizon ? (input.horizonProfile ?? null) : null,
+    keepOutside,
   });
+
+  const midnightUTC = dateNight.getTime() + (12 - lon / 15) * 3600 * 1000;
+  // Sky region filter: composes as AND with the N/S/E/W chips — a precise
+  // "what I can actually see from my garden" cut on top of the coarse quadrant one.
+  const activeRegion = prefs.skyRegionId
+    ? input.regions?.find((r) => r.id === prefs.skyRegionId)
+    : null;
+  /** The sky-direction and sky-region filters, applied to both lists. */
+  const inSkyArea = (s: TargetSuggestion): boolean => {
+    if (dirFilterActive) {
+      const isNorth = s.dso.dec > lat;
+      if (!enabledDirs.has('N') && isNorth) return false;
+      if (!enabledDirs.has('S') && !isNorth) return false;
+      const isEast = s.bestTimeUtc.getTime() > midnightUTC;
+      if (!enabledDirs.has('E') && isEast) return false;
+      if (!enabledDirs.has('W') && !isEast) return false;
+    }
+    if (activeRegion) {
+      const lstH = lstHours(dateToJD(s.bestTimeUtc), lon);
+      const { altDeg, azDeg } = altAzFromRaDec(s.dso.ra, s.dso.dec, lstH, lat);
+      if (!isAltAzInRegion(azDeg, altDeg, activeRegion)) return false;
+    }
+    return true;
+  };
 
   /** Ranks the scored objects, then applies the sky-direction and sky-region filters. */
   const finish = (scored: TargetSuggestion[]): RecommendationResult => {
-    const rawSuggestions = recommender.finish(scored, 5000);
-
-    let suggestions: TargetSuggestion[];
-    if (!dirFilterActive) {
-      suggestions = rawSuggestions;
-    } else {
-      const midnightUTC = dateNight.getTime() + (12 - lon / 15) * 3600 * 1000;
-      suggestions = rawSuggestions.filter((s) => {
-        const isNorth = s.dso.dec > lat;
-        if (!enabledDirs.has('N') && isNorth) return false;
-        if (!enabledDirs.has('S') && !isNorth) return false;
-        const isEast = s.bestTimeUtc.getTime() > midnightUTC;
-        if (!enabledDirs.has('E') && isEast) return false;
-        if (!enabledDirs.has('W') && !isEast) return false;
-        return true;
-      });
+    if (photographedIds && keepOutside) {
+      for (const s of scored) {
+        if (photographedIds.has(s.dso.id)) s.outside = [...(s.outside ?? []), 'photographed'];
+      }
     }
-
-    // Sky region filter: composes as AND with the N/S/E/W chips above — a precise
-    // "what I can actually see from my garden" cut on top of the coarse quadrant one.
-    const activeRegion = prefs.skyRegionId
-      ? input.regions?.find((r) => r.id === prefs.skyRegionId)
-      : null;
-    if (activeRegion) {
-      suggestions = suggestions.filter((s) => {
-        const lstH = lstHours(dateToJD(s.bestTimeUtc), lon);
-        const { altDeg, azDeg } = altAzFromRaDec(s.dso.ra, s.dso.dec, lstH, lat);
-        return isAltAzInRegion(azDeg, altDeg, activeRegion);
-      });
-    }
-
-    return { kind: 'ok', suggestions, preset, location, dateNight, dateStr };
+    const suggestions = recommender.finish(scored, 5000).filter(inSkyArea);
+    const outside = scored
+      .filter((s) => s.outside && inSkyArea(s))
+      .sort((a, b) => b.score - a.score);
+    return { kind: 'ok', suggestions, outside, altRange, preset, location, dateNight, dateStr };
   };
 
   return { kind: 'ready', pool, recommender, finish };

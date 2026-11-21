@@ -5,7 +5,9 @@ import PhoneFacts from './PhoneFacts.vue';
 
 // A result of the Cibles list or of the map's search (`.mob-row--roomy`) on Ionic's item: the name with the rating's
 // stars at its right end, then the designation with the type and constellation badges, then the figures as compact
-// facts (a deep-sky object) or the magnitude line (a star). A row is a tap target.
+// facts (a deep-sky object) or the magnitude line (a star). A row is a tap target. A target outside the search's criteria
+// (`warnings`, board "Cibles, hors de vos critères") is dimmed, with one warning badge per criterion it misses under the
+// designation line; it stays a tap target like the others.
 defineProps<{
   title: string;
   /** The main catalogue designation when it is not the name itself, and the one searched when it differs (M31 · NGC224). */
@@ -20,6 +22,8 @@ defineProps<{
   magnitude?: string;
   /** A deep-sky object's figures, label over value. */
   facts?: { label: string; value: string }[];
+  /** Why the target is outside the search's criteria ("Trop basse · 19° < 20°"); the row is dimmed when set. */
+  warnings?: string[];
 }>();
 const emit = defineEmits<{ click: [event: MouseEvent] }>();
 </script>
@@ -27,6 +31,7 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
 <template>
   <IonItem
     class="mob-row mob-row--roomy"
+    :class="{ 'mob-target--outside': warnings?.length }"
     lines="none"
     button
     :detail="false"
@@ -42,6 +47,9 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
           <span v-if="designation">{{ designation }}</span>
           <PhoneBadge v-if="typeLabel" kind="type">{{ typeLabel }}</PhoneBadge>
           <PhoneBadge v-if="constellation" kind="const">{{ constellation }}</PhoneBadge>
+        </span>
+        <span v-if="warnings?.length" class="mob-row-badges mob-target-warnings">
+          <PhoneBadge v-for="w in warnings" :key="w" kind="warn">{{ w }}</PhoneBadge>
         </span>
         <span v-if="magnitude" class="mob-row-sub m-secondary">{{ magnitude }}</span>
         <PhoneFacts v-if="facts?.length" class="mob-target-facts" :facts="facts" />

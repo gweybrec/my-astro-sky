@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { recommendTargets, scoreDso, fitsInFrame } from '@myastrosky/core/target-recommender';
+import {
+  createRecommender,
+  recommendTargets,
+  scoreDso,
+  fitsInFrame,
+} from '@myastrosky/core/target-recommender';
 import { mightBeVisible, maxAltDuringWindow } from '@myastrosky/core/sky-geometry';
 import { twilightWindow } from '@myastrosky/core/astro-time';
 import { densifyPoints } from '@myastrosky/core/horizon-io';
@@ -749,5 +754,48 @@ describe('recommendTargets — objects larger than the frame', () => {
     expect(fitsInFrame(120, 100, 1.5, 2)).toBe(false); // 1.67° wide > short side
     expect(fitsInFrame(100, null, 1.5, 2)).toBe(false); // round 1.67° > short side
     expect(fitsInFrame(90, null, 1.5, 2)).toBe(true);
+  });
+});
+
+describe('objects outside the criteria (keepOutside)', () => {
+  // Near Orion on a winter night in Paris: dec -1.2° culminates at about 40°.
+  const orion = makeDSO({ id: 'ORI', majAxis: 20, minAxis: 15 });
+  const collect = (dsos: DSO[], opts: Parameters<typeof createRecommender>[3]) => {
+    const r = createRecommender(testPreset, testLocation, winterNight, opts);
+    const collected = r.collect(dsos);
+    return { collected, ranked: r.finish(collected, 10) };
+  };
+
+  it('leaves out an object above the maximum altitude, or tags it too-high when asked', () => {
+    expect(collect([orion], { maxAltDeg: 30 }).collected).toHaveLength(0);
+    const { collected, ranked } = collect([orion], { maxAltDeg: 30, keepOutside: true });
+    expect(collected.map((c) => c.outside)).toEqual([['too-high']]);
+    expect(ranked).toHaveLength(0);
+  });
+
+  it('tags an object below the minimum altitude too-low', () => {
+    const { collected } = collect([orion], { minAltDeg: 50, keepOutside: true });
+    expect(collected.map((c) => c.outside)).toEqual([['too-low']]);
+  });
+
+  it('still leaves out an object that never rises above the horizon', () => {
+    const south = makeDSO({ id: 'SOUTH', dec: -60, majAxis: 20, minAxis: 15 });
+    expect(collect([south], { minAltDeg: 20, keepOutside: true }).collected).toHaveLength(0);
+  });
+
+  it('tags an object larger than the frame too-big, with the altitude reasons too', () => {
+    const big = makeDSO({ id: 'BIG', majAxis: 600, minAxis: 600 });
+    expect(collect([big], {}).collected).toHaveLength(0);
+    const { collected } = collect([big], { maxAltDeg: 30, keepOutside: true });
+    expect(collected.map((c) => c.outside)).toEqual([['too-big', 'too-high']]);
+    expect(collected[0].fovFitScore).toBeGreaterThanOrEqual(0);
+  });
+
+  it('ranks only the objects inside the criteria, and leaves them untagged', () => {
+    const big = makeDSO({ id: 'BIG', majAxis: 600, minAxis: 600 });
+    const { collected, ranked } = collect([orion, big], { keepOutside: true });
+    expect(ranked.map((c) => c.dso.id)).toEqual(['ORI']);
+    expect(ranked[0].outside).toBeUndefined();
+    expect(collected).toHaveLength(2);
   });
 });

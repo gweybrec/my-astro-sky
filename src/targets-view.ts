@@ -158,6 +158,7 @@ import {
   type GearLists,
 } from '@myastrosky/core/targets/plan-setup';
 import { runTargetRecommendation } from '@myastrosky/core/targets/recommend';
+import { outsideLabels } from '@myastrosky/core/targets/outside';
 
 /**
  * Tiny SVG of the Moon for one of the 8 standard phases (index 0 = new …
@@ -930,6 +931,10 @@ export class TargetsView {
   public onEditDSO: ((dso: DSO) => void) | null = null;
   private prefs: TargetsPrefs;
   private lastPool: TargetSuggestion[] = [];
+  /** The objects outside the criteria (altitude, size, photographed), listed after the targets, dimmed. */
+  private lastOutside: TargetSuggestion[] = [];
+  /** The altitude range of the last search, which the "too low / too high" warnings print. */
+  private lastAltRange = { minAltDeg: 20, maxAltDeg: 80 };
   private lastSuggestions: TargetSuggestion[] = [];
   private lastPreset: ReturnType<typeof buildGearPreset> | null = null;
   private lastMode: 'best' | 'random' = 'best';
@@ -2029,6 +2034,7 @@ export class TargetsView {
         photographedIds,
         horizonProfile: useHorizonStore(pinia).profile,
         regions: this.skyRegionsStore.regions,
+        includeOutside: true,
       });
 
       if (result.kind === 'empty') {
@@ -2046,6 +2052,8 @@ export class TargetsView {
         return;
       }
       const { suggestions, preset, location, dateNight } = result;
+      this.lastOutside = result.outside;
+      this.lastAltRange = result.altRange;
 
       allGenBtns.forEach((b) => {
         b.disabled = false;
@@ -2074,16 +2082,19 @@ export class TargetsView {
 
   private renderResults(el: HTMLElement): void {
     el.innerHTML = '';
-    if (this.lastPool.length === 0 || !this.lastPreset) {
+    if ((this.lastPool.length === 0 && this.lastOutside.length === 0) || !this.lastPreset) {
       el.innerHTML = `<div class="targets-empty">${t('targets.results.empty')}</div>`;
       return;
     }
 
     const sortKey = this.prefs.sortBy ?? 'rating';
     const pageSize = this.prefs.pageSize ?? 15;
-    const sorted = sortSuggestions(this.lastPool, sortKey);
-    const total = sorted.length;
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    // The targets, then the objects outside the criteria under their own title, in the same sort and the same pages.
+    const sortedTargets = sortSuggestions(this.lastPool, sortKey);
+    const sortedOutside = sortSuggestions(this.lastOutside, sortKey);
+    const sorted = [...sortedTargets, ...sortedOutside];
+    const total = sortedTargets.length;
+    const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
     this.currentPage = Math.max(0, Math.min(this.currentPage, totalPages - 1));
     const pageSlice = sorted.slice(this.currentPage * pageSize, (this.currentPage + 1) * pageSize);
 
@@ -2188,6 +2199,12 @@ export class TargetsView {
 
     pageSlice.forEach((s, i) => {
       const absoluteIndex = this.currentPage * pageSize + i;
+      if (absoluteIndex === sortedTargets.length) {
+        const title = document.createElement('h3');
+        title.className = 'targets-outside-title';
+        title.textContent = t('targets.outside.title', { n: sortedOutside.length });
+        el.appendChild(title);
+      }
       el.appendChild(
         this.buildTargetCard(s, this.lastPreset!, sorted, absoluteIndex, pageSize, navigate),
       );
@@ -2275,6 +2292,23 @@ export class TargetsView {
       chipsRow.appendChild(constEl);
     }
     header.appendChild(chipsRow);
+    // Outside the search's criteria: the card is dimmed, with one warning chip per criterion missed under the chips.
+    const outside = s.outside ? outsideLabels(s, this.lastAltRange) : [];
+    if (outside.length) {
+      titleRow.classList.add('targets-card-dim');
+      chipsRow.classList.add('targets-card-dim');
+      const warnRow = document.createElement('div');
+      warnRow.className = 'target-card-chips';
+      for (const label of outside) {
+        warnRow.appendChild(
+          Object.assign(document.createElement('div'), {
+            className: 'targets-card-warn',
+            textContent: label,
+          }),
+        );
+      }
+      header.appendChild(warnRow);
+    }
     block.appendChild(header);
 
     const meta = document.createElement('div');
@@ -2304,6 +2338,7 @@ export class TargetsView {
         ),
       );
     block.appendChild(meta);
+    if (outside.length) meta.classList.add('targets-card-dim');
 
     const meta2 = document.createElement('div');
     meta2.className = 'target-card-meta';
@@ -2334,6 +2369,7 @@ export class TargetsView {
         ),
       );
     block.appendChild(meta2);
+    if (outside.length) meta2.classList.add('targets-card-dim');
 
     // Imaging recipe (total integration + per-filter breakdown) — omitted for visual
     // doubles, which have no recipe (`recipe` is null for multiple-star cards).

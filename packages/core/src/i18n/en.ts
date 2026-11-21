@@ -1488,6 +1488,14 @@ const en: Translations = {
       prevResult: 'Previous result',
       nextResult: 'Next result',
     },
+    /** Targets that miss only the altitude, size or photographed criteria, shown apart after the others. */
+    outside: {
+      title: 'Outside your criteria ({n})',
+      tooLow: 'Too low · {alt}° < {min}°',
+      tooHigh: 'Too high · {alt}° > {max}°',
+      tooBig: 'Too big for the frame',
+      photographed: 'Already photographed',
+    },
     tooltips: {
       maxAlt: 'Maximum altitude above the horizon during the observation window',
       bestTime:

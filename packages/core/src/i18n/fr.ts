@@ -1507,6 +1507,14 @@ const fr = {
       prevResult: 'Résultat précédent',
       nextResult: 'Résultat suivant',
     },
+    /** Targets that miss only the altitude, size or photographed criteria, shown apart after the others. */
+    outside: {
+      title: 'Hors de vos critères ({n})',
+      tooLow: 'Trop basse · {alt}° < {min}°',
+      tooHigh: 'Trop haute · {alt}° > {max}°',
+      tooBig: 'Trop grande pour le champ',
+      photographed: 'Déjà photographiée',
+    },
     tooltips: {
       maxAlt: "Altitude maximale au-dessus de l'horizon pendant la nuit d'observation",
       bestTime:

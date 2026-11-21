@@ -1508,6 +1508,14 @@ const de: Translations = {
       prevResult: 'Vorheriges Ergebnis',
       nextResult: 'Nächstes Ergebnis',
     },
+    /** Targets that miss only the altitude, size or photographed criteria, shown apart after the others. */
+    outside: {
+      title: 'Außerhalb Ihrer Kriterien ({n})',
+      tooLow: 'Zu niedrig · {alt}° < {min}°',
+      tooHigh: 'Zu hoch · {alt}° > {max}°',
+      tooBig: 'Zu groß für das Bildfeld',
+      photographed: 'Bereits fotografiert',
+    },
     tooltips: {
       maxAlt: 'Maximale Höhe über dem Horizont während des Beobachtungsfensters',
       bestTime:

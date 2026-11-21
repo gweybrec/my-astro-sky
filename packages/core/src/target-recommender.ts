@@ -20,6 +20,12 @@ export interface ObserverLocation {
   lonDeg: number;
 }
 
+/**
+ * Why a target is shown outside the user's criteria: its highest point that night is below the minimum or above the
+ * maximum altitude, it is larger than the frame, or it is already photographed.
+ */
+export type OutsideReason = 'too-low' | 'too-high' | 'too-big' | 'photographed';
+
 export interface TargetSuggestion {
   dso: DSO;
   maxAltDeg: number;
@@ -28,6 +34,8 @@ export interface TargetSuggestion {
   fovFitScore: number;
   altScore: number;
   brightnessScore: number;
+  /** Set only on a target that misses the altitude, size or photographed criteria (see `RecommendOptions.keepOutside`). */
+  outside?: OutsideReason[];
 }
 
 const MAX_RESULTS = 8;
@@ -41,6 +49,11 @@ export interface RecommendOptions {
   /** Terrain skyline: reject targets whose peak sits below the horizon in that
    *  direction ("how low not to go" made azimuth-dependent). */
   horizonProfile?: HorizonProfile | null;
+  /**
+   * Keep the objects that miss only the altitude range (while rising above the horizon) or the frame size, tagged
+   * with `outside`, instead of leaving them out. `finish` ranks only the others.
+   */
+  keepOutside?: boolean;
 }
 
 /**
@@ -112,18 +125,21 @@ export function createRecommender(
 
       // Objects larger than the frame are left out unless the user asked for them ("Include objects larger than
       // FOV"): a low FOV-fit score alone would still list them, only further down.
+      const outside: OutsideReason[] = [];
       if (
         !isMultipleStar &&
         !options.ignoreFovFit &&
         !fitsInFrame(majAxisArcmin!, dso.minAxis, minFovDeg, maxFovDeg)
-      )
-        continue;
+      ) {
+        if (!options.keepOutside) continue;
+        outside.push('too-big');
+      }
 
       // Skip objects that are too faint
       if (dso.mag !== null && dso.mag > magLimit) continue;
 
       // Quick declination pre-filter (avoids expensive sampling)
-      if (!mightBeVisible(dso.dec, latDeg, minAlt)) continue;
+      if (!mightBeVisible(dso.dec, latDeg, options.keepOutside ? 0 : minAlt)) continue;
 
       // Compute max altitude during the observing window. Stars use the wider visual
       // window and ignore the upper altitude cap (overhead is ideal for splitting doubles;
@@ -139,7 +155,13 @@ export function createRecommender(
       );
 
       const effectiveMaxAlt = isMultipleStar ? 90 : maxAlt;
-      if (maxAltDeg < minAlt || maxAltDeg > effectiveMaxAlt) continue;
+      if (maxAltDeg < minAlt) {
+        if (!options.keepOutside || maxAltDeg <= 0) continue;
+        outside.push('too-low');
+      } else if (maxAltDeg > effectiveMaxAlt) {
+        if (!options.keepOutside) continue;
+        outside.push('too-high');
+      }
 
       // Terrain horizon gate: reject targets that never clear the real skyline in
       // their direction. The peak-time azimuth is used as an MVP approximation — an
@@ -174,13 +196,15 @@ export function createRecommender(
         fovFitScore,
         altScore,
         brightnessScore,
+        ...(outside.length ? { outside } : {}),
       });
     }
     return candidates;
   };
 
-  const finish = (candidates: TargetSuggestion[], limit: number): TargetSuggestion[] => {
-    // Sort by score descending
+  const finish = (collected: TargetSuggestion[], limit: number): TargetSuggestion[] => {
+    // Only the targets inside the criteria are ranked; sort by score descending
+    const candidates = collected.filter((c) => !c.outside);
     candidates.sort((a, b) => b.score - a.score);
 
     // Diversity cap: max 2 of each DSO type in top results

@@ -361,6 +361,13 @@ export default defineConfig({
       'bg-[var(--status-info-bg)] border border-[var(--status-info-border)] text-[var(--status-info-text)]',
     'status-warn':
       'bg-[var(--status-warn-bg)] border border-[var(--status-warn-border)] text-[var(--status-warn-text)]',
+    // ── Targets outside the search's criteria: their title across the grid, a dimmed card part, a warning chip.
+    // (Not `target-…`: UnoCSS reads that prefix as the `:target` variant and generates nothing.)
+    'targets-outside-title':
+      'col-span-full mt-4 mb-0 text-small font-medium uppercase tracking-[0.06em] text-label',
+    'targets-card-dim': 'opacity-55',
+    'targets-card-warn':
+      'shrink-0 text-small leading-[normal] rounded-[var(--radius-sm)] px-[var(--space-3h)] py-[var(--space-1)] status-warn border-solid',
 
     // ── Import modal: name-collision warning marker ───────────────────────────
     'import-warn-icon': 'shrink-0 cursor-help text-[var(--status-warn-text)]',
