@@ -6,6 +6,7 @@ defineProps<{
   /** The accessible name of the group (what the choice is about). */
   label: string;
 }>();
+// A press does not take the focus (`mousedown.prevent`), so a search field above keeps it and its keyboard stays up.
 const model = defineModel<V | undefined>();
 </script>
 
@@ -19,6 +20,7 @@ const model = defineModel<V | undefined>();
         class="mob-seg-btn m-body"
         role="radio"
         :aria-checked="model === o.value"
+        @mousedown.prevent
         @click="model = o.value"
       >
         {{ o.label }}
