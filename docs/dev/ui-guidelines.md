@@ -55,7 +55,8 @@ The most-reused named component classes. Prefer one of these before inventing an
 | `btn-danger`       | Destructive action button                      |
 | `btn-icon`         | Square icon button (eye, gear, ×)              |
 | `btn-icon--danger` | Icon button with danger colour                 |
-| `input-base`       | All text inputs and selects                    |
+| `input-base`       | Text inputs and form-row selects (sort: §2.9)  |
+| `progress-track`   | Outlined completion bar; `progress-fill` in it |
 | `tag-chip`         | Inline DSO/label chip with border              |
 | `tag-chip-sm`      | Small pill chip (targets form badges)          |
 | `status-success`   | Green status message                           |

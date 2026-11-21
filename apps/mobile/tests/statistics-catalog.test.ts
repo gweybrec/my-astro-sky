@@ -7,8 +7,8 @@ import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/s
 import { setDsoCatalog } from '@myastrosky/core/catalog/dso-registry';
 import { ionicStubs } from './helpers';
 
-// The board "Réglages, statistiques, un catalogue": the missing / photographed / all objects of one catalogue, by
-// constellation in folds, the "Photographié" badge, the sort sheet, the search, and the map button.
+// The board "Réglages, statistiques, un catalogue": all / the missing / the photographed objects of one catalogue, by
+// constellation in folds, the "Photographié" badge, the constellations and sort sheets, the search, and the map button.
 const { catalogsReady, getPhotos, showTarget } = vi.hoisted(() => ({
   catalogsReady: vi.fn(() => Promise.resolve()),
   getPhotos: vi.fn(),
@@ -40,6 +40,8 @@ import StatisticsCatalogPage from '../src/pages/StatisticsCatalogPage.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import PhoneObjectRow from '../src/components/PhoneObjectRow.vue';
 import PhoneSearch from '../src/components/PhoneSearch.vue';
+import PhoneRow from '../src/components/PhoneRow.vue';
+import SkyCheckSheet from '../src/pages/sky/SkyCheckSheet.vue';
 import { statisticsConstellations } from '../src/composables/useStatisticsFilter';
 
 const FIELDS = ['id', 'ra', 'dec', 'type', 'mag', 'nameFr', 'catalogs', 'constellation', 'rating'];
@@ -88,17 +90,21 @@ const designations = (w: Awaited<ReturnType<typeof open>>) =>
   w.findAllComponents(PhoneObjectRow).map((r) => r.props('designation'));
 
 describe('the page of a catalogue', () => {
-  it('names the catalogue with its photographed / total count, on the missing objects by constellation', async () => {
+  it('names the catalogue with its photographed / total count, on all the objects by constellation', async () => {
     const w = await open();
     expect(w.find('h1').text()).toBe('NGC');
     expect(w.find('.stats-catalog-count').text()).toBe('2 / 4');
-    expect(folds(w).map((f) => f.text().replace(/\s+/g, ' '))).toEqual(['Cygne1 / 3']);
+    expect(folds(w).map((f) => f.text().replace(/\s+/g, ' '))).toEqual([
+      'Cygne1 / 3',
+      'Orion1 / 1',
+    ]);
     expect(folds(w)[0].attributes('aria-expanded')).toBe('false');
     expect(designations(w)).toEqual([]);
   });
 
-  it('opens a fold, sorted by photographic interest then brightness', async () => {
+  it('opens a fold of the missing objects, sorted by photographic interest then brightness', async () => {
     const w = await open();
+    await w.findAll('.mob-seg-btn')[0].trigger('click');
     await folds(w)[0].trigger('click');
     expect(folds(w)[0].attributes('aria-expanded')).toBe('true');
     expect(designations(w)).toEqual(['NGC 6960', 'NGC 6914']);
@@ -113,7 +119,6 @@ describe('the page of a catalogue', () => {
 
   it('shows all objects, the photographed ones with the badge, an alias under its designation here', async () => {
     const w = await open();
-    await w.findAll('.mob-seg-btn')[2].trigger('click');
     for (const f of folds(w)) await f.trigger('click');
     expect(designations(w)).toEqual(['NGC 7000', 'NGC 6960', 'NGC 6914', 'NGC 1976']);
     expect(w.findAll('.mob-badge--success').map((b) => b.text())).toEqual([
@@ -124,6 +129,7 @@ describe('the page of a catalogue', () => {
 
   it('sorts by number in the catalogue from the sort sheet', async () => {
     const w = await open();
+    await w.findAll('.mob-seg-btn')[0].trigger('click');
     w.getComponent(PhoneRadioSheet as Component).vm.$emit('update:value', 'number');
     await flushPromises();
     await folds(w)[0].trigger('click');
@@ -132,7 +138,6 @@ describe('the page of a catalogue', () => {
 
   it('opens every fold while searching, and says when nothing matches', async () => {
     const w = await open();
-    await w.findAll('.mob-seg-btn')[2].trigger('click');
     w.findComponent(PhoneSearch).vm.$emit('update:modelValue', 'ngc 1976');
     await flushPromises();
     expect(designations(w)).toEqual(['NGC 1976']);
@@ -145,13 +150,39 @@ describe('the page of a catalogue', () => {
     statisticsConstellations.value = ['Ori'];
     const w = await open();
     expect(w.find('.stats-catalog-count').text()).toBe('1 / 1');
-    expect(folds(w)).toHaveLength(0);
-    await w.findAll('.mob-seg-btn')[1].trigger('click');
     expect(folds(w).map((f) => f.text().replace(/\s+/g, ' '))).toEqual(['Orion1 / 1']);
+  });
+
+  it('changes the constellations here, for the statistics page too', async () => {
+    const w = await open();
+    const row = w.findAllComponents(PhoneRow).find((r) => r.props('title') === 'Constellations');
+    expect(row?.props('value')).toBe('2 / 2');
+    await row!.trigger('click');
+    const sheet = w.getComponent(SkyCheckSheet);
+    expect(sheet.props('open')).toBe(true);
+    expect(sheet.props('options').map((o: { label: string }) => o.label)).toEqual([
+      'Cygne',
+      'Orion',
+    ]);
+    sheet.vm.$emit('update:selected', ['Ori']);
+    await flushPromises();
+    expect(statisticsConstellations.value).toEqual(['Ori']);
+    expect(row!.props('value')).toBe('1 / 2');
+    expect(w.find('.stats-catalog-count').text()).toBe('1 / 1');
+    expect(folds(w).map((f) => f.text().replace(/\s+/g, ' '))).toEqual(['Orion1 / 1']);
+    sheet.vm.$emit('update:selected', ['Cyg', 'Ori']);
+    await flushPromises();
+    expect(statisticsConstellations.value).toBeNull();
+  });
+
+  it('has no information button beside the sort', async () => {
+    const w = await open();
+    expect(w.findComponent({ name: 'PhoneInfoButton' }).exists()).toBe(false);
   });
 
   it("shows an object on the map, coming back to the catalogue's page", async () => {
     const w = await open();
+    await w.findAll('.mob-seg-btn')[0].trigger('click');
     await folds(w)[0].trigger('click');
     w.findAllComponents(PhoneObjectRow)[0].vm.$emit('map');
     await flushPromises();

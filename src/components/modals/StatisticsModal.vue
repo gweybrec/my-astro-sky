@@ -2,22 +2,25 @@
   <BaseModal
     :title="t('stats.modalTitle')"
     :size="openCatalog ? 'default' : 'wide'"
-    body-class="modal-form-body"
+    :body-class="openCatalog ? 'flex-col !overflow-hidden' : 'modal-form-body'"
+    :modal-class="openCatalog ? 'h-[85vh]' : undefined"
     @close="emit('close')"
   >
     <template v-if="openCatalog" #title>
       <div class="flex items-center gap-4 min-w-0">
         <button
           type="button"
-          class="btn-icon"
+          class="modal-close inline-flex items-center"
           :title="t('stats.catalog.back')"
           :aria-label="t('stats.catalog.back')"
           @click="openCatalog = null"
         >
-          ←
+          <span v-html="arrowLeftSvg" class="inline-flex w-[1em] h-[1em]" aria-hidden="true"></span>
         </button>
-        <h2>{{ t('stats.modalTitle') }} · {{ t(`dso.catalogLabels.${openCatalog}`) }}</h2>
-        <span class="text-body text-dim font-mono"
+        <h2 class="truncate">
+          {{ t('stats.modalTitle') }} · {{ t(`dso.catalogLabels.${openCatalog}`) }}
+        </h2>
+        <span class="shrink-0 text-body text-label"
           >{{ catalogStats[openCatalog].photographed }} /
           {{ catalogStats[openCatalog].total }}</span
         >
@@ -26,9 +29,9 @@
 
     <StatisticsCatalog
       v-if="openCatalog"
+      v-model:constellations="selectedConstellations"
       :catalog="openCatalog"
       :photographed-ids="photographedIds"
-      :constellations="selectedConstellations"
       @show-on-map="showOnMap"
     />
 
@@ -49,11 +52,8 @@
             :title="t(`dso.catalogLabels.${cat}`)"
             >{{ t(`dso.catalogLabels.${cat}`) }}</span
           >
-          <span class="flex-1 h-2 rounded-pill bg-[var(--bg-surface-lo)] overflow-hidden">
-            <span
-              class="block h-full rounded-pill bg-[var(--accent-fill-xl)]"
-              :style="{ width: `${pct(cat)}%` }"
-            ></span>
+          <span class="progress-track flex-1">
+            <span class="progress-fill" :style="{ width: `${pct(cat)}%` }"></span>
           </span>
           <span class="w-20 shrink-0 text-right text-body text-label">
             {{ catalogStats[cat].photographed }} / {{ catalogStats[cat].total }}
@@ -81,6 +81,7 @@ import { getPhotos } from '../../api';
 import { useUiStore } from '../../stores/ui';
 import { selectDSOInSearch } from '../../ui';
 import type { DSO } from '@myastrosky/core/types';
+import arrowLeftSvg from '../../icons/arrow-left.svg?raw';
 
 const emit = defineEmits<{ close: [] }>();
 

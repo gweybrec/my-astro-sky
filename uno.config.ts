@@ -391,6 +391,13 @@ export default defineConfig({
     ].join(' '),
     'bw-filter--on':
       'bw-filter !bg-[var(--accent-fill-md)] !border-[var(--accent-fill-xl)] !text-bright',
+    // A completion bar (Statistics): the fill in an outlined track, so the bar's end and
+    // 100 % always show, as on the phone's `.mob-progress-track`. Width comes from the row.
+    'progress-track': [
+      'block box-border h-[var(--space-5)] p-px rounded-pill overflow-hidden',
+      'bg-[var(--bg-deep)] border border-solid border-[var(--border-white-md)]',
+    ].join(' '),
+    'progress-fill': 'block h-full rounded-pill bg-[var(--accent-fill-xl)]',
     // A row of the photo list: tick box, then the button that shows the photo.
     'bw-row': 'flex items-center gap-5 w-full box-border p-4 border border-transparent rounded-lg',
     'bw-row--sel': 'bw-row bg-[var(--accent-fill-sm)] !border-[var(--accent-fill-lg)]',

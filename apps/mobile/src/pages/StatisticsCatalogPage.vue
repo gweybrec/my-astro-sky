@@ -25,17 +25,20 @@ import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneSearch from '../components/PhoneSearch.vue';
 import PhoneSegmented from '../components/PhoneSegmented.vue';
 import PhoneRow from '../components/PhoneRow.vue';
-import PhoneInfoButton from '../components/PhoneInfoButton.vue';
 import PhoneRadioSheet from '../components/PhoneRadioSheet.vue';
 import PhoneObjectRow from '../components/PhoneObjectRow.vue';
 import PhoneHelper from '../components/PhoneHelper.vue';
+import SkyCheckSheet from './sky/SkyCheckSheet.vue';
 import { catalogsReady } from '../catalogs';
-import { statisticsConstellations } from '../composables/useStatisticsFilter';
+import {
+  statisticsConstellations,
+  useStatisticsConstellations,
+} from '../composables/useStatisticsFilter';
 import { useShowTargetOnMap } from '../composables/useShowTargetOnMap';
 
 // The board "Réglages, statistiques, un catalogue": one catalogue's objects in the constellations chosen on the
-// statistics page, the missing, photographed or all of them, by constellation in folds, sorted by photographic interest,
-// number or magnitude. Each object's map button shows it on the sky map; the map's back button comes back here.
+// statistics page (changed here too), all, the missing or the photographed ones, by constellation in folds, sorted by
+// photographic interest, number or magnitude; the search and these choices stay at the top while the list scrolls. Each object's map button shows it on the sky map; the map's back button comes back here.
 const route = useRoute();
 const param = String(route.params.catalog);
 const catalog: DSOCatalog = (DSO_CATALOGS_ALL as string[]).includes(param)
@@ -50,6 +53,7 @@ const constellationNames = shallowRef(new Map<string, string>());
 onMounted(async () => {
   const [photos] = await Promise.all([getPhotos(), catalogsReady()]);
   constellationNames.value = new Map(getConstellationInfos().map((c) => [c.id, c.displayName]));
+  loadConstellations();
   const ids = new Set<string>();
   for (const photo of photos) {
     for (const dsoId of photo.dsoIds) {
@@ -62,9 +66,18 @@ onMounted(async () => {
 });
 
 const query = ref('');
-const show = ref<CatalogEntryShow>('missing');
+const show = ref<CatalogEntryShow>('all');
 const sort = ref<CatalogEntrySort>('interest');
 const sortOpen = ref(false);
+const constellationsOpen = ref(false);
+const {
+  options: constellationOptions,
+  selected: selectedConstellations,
+  load: loadConstellations,
+} = useStatisticsConstellations();
+const countOf = (n: number, total: number) => t('mobile.targets.countOf', { n, total });
+const countAria = (label: string, n: number, total: number) =>
+  t('mobile.targets.countAria', { label, n, total });
 /** The constellations folded open (all of them while searching). */
 const opened = ref<Set<string | null>>(new Set());
 
@@ -155,19 +168,28 @@ async function showOnMap(e: CatalogEntry) {
             />
           </div>
           <PhoneSegmented v-model="show" :options="showOptions" :label="t('stats.catalog.shown')" />
-          <div class="stats-catalog-sort">
-            <PhoneRow
-              :title="t('targets.sort.label')"
-              :value="sortLabel"
-              button
-              chevron
-              @click="sortOpen = true"
-            />
-            <PhoneInfoButton
-              :title="t('targets.sort.rating')"
-              :message="t('targets.tooltips.rating')"
-            />
-          </div>
+          <PhoneRow
+            :title="t('targets.constellationFilter')"
+            :value="countOf(selectedConstellations.length, constellationOptions.length)"
+            :aria-label="
+              countAria(
+                t('targets.constellationFilter'),
+                selectedConstellations.length,
+                constellationOptions.length,
+              )
+            "
+            button
+            chevron
+            @click="constellationsOpen = true"
+          />
+          <PhoneRow
+            class="stats-catalog-sort"
+            :title="t('targets.sort.label')"
+            :value="sortLabel"
+            button
+            chevron
+            @click="sortOpen = true"
+          />
         </div>
         <PhoneHelper v-if="ready && groups.length === 0">{{
           t('stats.catalog.empty')
@@ -207,6 +229,12 @@ async function showOnMap(e: CatalogEntry) {
         </template>
       </div>
     </IonContent>
+    <SkyCheckSheet
+      v-model:open="constellationsOpen"
+      v-model:selected="selectedConstellations"
+      :title="t('targets.constellationFilter')"
+      :options="constellationOptions"
+    />
     <PhoneRadioSheet
       v-model:open="sortOpen"
       v-model:value="sort"
@@ -231,17 +259,13 @@ async function showOnMap(e: CatalogEntry) {
   flex: 1;
   min-width: 0;
 }
-/* "Trier par" and the "i" that explains the photographic interest share one line; the row gives way to the button. */
-.stats-catalog-sort {
-  display: flex;
-  align-items: center;
-  padding-inline-end: var(--mobile-gutter-end);
+/* The search and the choices stay at the top while the list scrolls (sticky through .mob-search-tabs); a hairline
+   marks where the list starts. */
+.stats-catalog-tools {
+  border-bottom: 1px solid var(--border-panel);
 }
-.stats-catalog-sort > :first-child {
-  flex: 1;
-  min-width: 0;
-}
-/* In landscape the search and the choice of objects share a line, so that the list keeps some height. */
+/* In landscape the search and the choice of objects share a line, then "Constellations" and "Trier par", so that the
+   list keeps some height; the right-hand column starts where the choice of objects starts. */
 @media (orientation: landscape) {
   .stats-catalog-tools {
     display: grid;
@@ -252,7 +276,7 @@ async function showOnMap(e: CatalogEntry) {
     padding-inline-start: 0;
   }
   .stats-catalog-tools > .stats-catalog-sort {
-    grid-column: 1 / -1;
+    padding-inline-start: 0;
   }
 }
 </style>

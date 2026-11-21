@@ -1,62 +1,45 @@
 <template>
-  <div class="flex flex-col gap-5 min-w-0">
-    <!-- Search, which objects, sort -->
-    <div class="flex items-center gap-6 flex-wrap">
-      <input
-        v-model="query"
-        class="input-base w-64"
-        type="search"
-        :placeholder="t('stats.catalog.search', { catalog: catalogLabel })"
-        :aria-label="t('stats.catalog.search', { catalog: catalogLabel })"
-      />
-      <span class="flex gap-2" role="radiogroup" :aria-label="t('stats.catalog.shown')">
-        <button
-          v-for="s in SHOWS"
-          :key="s"
-          type="button"
-          role="radio"
-          :aria-checked="show === s"
-          :class="show === s ? 'bw-filter--on' : 'bw-filter'"
-          @click="show = s"
-        >
-          {{ t(SHOW_LABELS[s]) }} <b>{{ counts[s] }}</b>
-        </button>
-      </span>
-      <span class="ml-auto flex items-center gap-4">
-        <span class="text-base text-label">{{ t('targets.sort.label') }}</span>
-        <button
-          ref="sortBtnRef"
-          type="button"
-          class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
-          @click.stop="sortOpen = !sortOpen"
-        >
-          {{ t(SORT_LABELS[sort]) }}
-        </button>
-        <DropdownPanel v-model="sortOpen" :anchor-el="sortBtnRef" min-width="240px">
-          <label v-for="s in SORTS" :key="s" class="dso-toggle-label labels-select-all-row">
-            <input
-              type="radio"
-              name="stats-catalog-sort"
-              :checked="sort === s"
-              @change="chooseSort(s)"
-            />
-            <span class="ml-4">{{ t(SORT_LABELS[s]) }}</span>
-          </label>
-        </DropdownPanel>
-        <span
-          class="hints-info-icon"
-          role="img"
-          :title="t('targets.tooltips.rating')"
-          :aria-label="t('targets.tooltips.rating')"
-          >i</span
-        >
-      </span>
+  <div class="flex flex-col flex-1 min-w-0 min-h-0">
+    <!-- Constellations, search, which objects, sort: they stay at the top, only the list below scrolls -->
+    <div
+      class="shrink-0 flex flex-col gap-4 px-7 pt-7 pb-5 border-b border-b-solid border-[var(--border-subtle)]"
+    >
+      <ConstellationSelector v-model="constellations" />
+      <div class="flex items-center gap-6 flex-wrap">
+        <input
+          v-model="query"
+          class="input-base w-64"
+          type="search"
+          :placeholder="t('stats.catalog.search', { catalog: catalogLabel })"
+          :aria-label="t('stats.catalog.search', { catalog: catalogLabel })"
+        />
+        <span class="flex gap-2" role="radiogroup" :aria-label="t('stats.catalog.shown')">
+          <button
+            v-for="s in SHOWS"
+            :key="s"
+            type="button"
+            role="radio"
+            :aria-checked="show === s"
+            :class="show === s ? 'bw-filter--on' : 'bw-filter'"
+            @click="show = s"
+          >
+            {{ t(SHOW_LABELS[s]) }} <b>{{ counts[s] }}</b>
+          </button>
+        </span>
+        <span class="ml-auto flex items-center gap-4">
+          <label for="stats-catalog-sort" class="targets-sort-label">{{
+            t('targets.sort.label')
+          }}</label>
+          <select id="stats-catalog-sort" v-model="sort" class="targets-sort-select">
+            <option v-for="s in SORTS" :key="s" :value="s">{{ t(SORT_LABELS[s]) }}</option>
+          </select>
+        </span>
+      </div>
     </div>
 
-    <p v-if="groups.length === 0" class="text-body text-dim">{{ t('stats.catalog.empty') }}</p>
-
     <!-- One fold per constellation -->
-    <div class="flex flex-col">
+    <div class="flex-1 min-h-0 overflow-y-auto flex flex-col px-7 pt-4 pb-7">
+      <p v-if="groups.length === 0" class="text-body text-dim">{{ t('stats.catalog.empty') }}</p>
       <template v-for="g in groups" :key="g.constellation ?? ''">
         <button
           type="button"
@@ -66,11 +49,8 @@
         >
           <span class="w-4 text-secondary" aria-hidden="true">{{ isOpen(g) ? '▾' : '▸' }}</span>
           <span class="flex-1 min-w-0 truncate">{{ groupName(g) }}</span>
-          <span class="w-30 h-2 rounded-pill bg-[var(--bg-surface-lo)] overflow-hidden">
-            <span
-              class="block h-full rounded-pill bg-[var(--accent-fill-xl)]"
-              :style="{ width: `${groupPct(g)}%` }"
-            ></span>
+          <span class="progress-track w-30 shrink-0">
+            <span class="progress-fill" :style="{ width: `${groupPct(g)}%` }"></span>
           </span>
           <span class="w-20 text-right text-base text-secondary font-mono"
             >{{ g.photographed }} / {{ g.total }}</span
@@ -83,9 +63,7 @@
               <th class="font-normal py-2 px-4">{{ t('stats.catalog.name') }}</th>
               <th class="font-normal py-2 px-4">{{ t('stats.catalog.type') }}</th>
               <th class="font-normal py-2 px-4">{{ t('stats.catalog.mag') }}</th>
-              <th class="font-normal py-2 px-4" :title="t('targets.tooltips.rating')">
-                {{ t('targets.sort.rating') }}
-              </th>
+              <th class="font-normal py-2 px-4">{{ t('targets.sort.rating') }}</th>
               <th class="w-10"></th>
             </tr>
           </thead>
@@ -141,7 +119,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import DropdownPanel from '../base/DropdownPanel.vue';
+import ConstellationSelector from '../panels/ConstellationSelector.vue';
 import { useI18n } from '../../composables/useI18n';
 import {
   listCatalogEntries,
@@ -163,9 +141,10 @@ import mapPinSvg from '../../icons/map-pin.svg?raw';
 const props = defineProps<{
   catalog: DSOCatalog;
   photographedIds: Set<string>;
-  /** The constellations chosen on the statistics page, or null for all. */
-  constellations: string[] | null;
 }>();
+
+/** The constellations chosen (shared with the statistics page), or null for all. */
+const constellations = defineModel<string[] | null>('constellations', { required: true });
 
 const emit = defineEmits<{ showOnMap: [dso: DSO] }>();
 
@@ -185,10 +164,8 @@ const SORT_LABELS: Record<CatalogEntrySort, string> = {
 };
 
 const query = ref('');
-const show = ref<CatalogEntryShow>('missing');
+const show = ref<CatalogEntryShow>('all');
 const sort = ref<CatalogEntrySort>('interest');
-const sortOpen = ref(false);
-const sortBtnRef = ref<HTMLElement | null>(null);
 /** The constellations folded open (all of them while searching). */
 const opened = ref<Set<string | null>>(new Set());
 
@@ -200,7 +177,7 @@ const all = computed(() =>
   listCatalogEntries(
     props.catalog,
     props.photographedIds,
-    props.constellations ? new Set(props.constellations) : null,
+    constellations.value ? new Set(constellations.value) : null,
   ),
 );
 
@@ -241,11 +218,6 @@ function toggle(g: CatalogGroup) {
   if (next.has(g.constellation)) next.delete(g.constellation);
   else next.add(g.constellation);
   opened.value = next;
-}
-
-function chooseSort(s: CatalogEntrySort) {
-  sort.value = s;
-  sortOpen.value = false;
 }
 
 /** The object's name in the language, when it is not just its designation again. */
