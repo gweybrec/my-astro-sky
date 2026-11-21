@@ -1,6 +1,7 @@
 import { storage } from '../platform/storage';
 import { TARGETS_PREFS_KEY } from '../observer-location';
 import { renameLegacyCatalogs } from '../display-settings';
+import { todayISO } from './format';
 
 export type SortKey =
   | 'score'
@@ -84,4 +85,12 @@ export function loadTargetsPrefs(): TargetsPrefs {
 
 export function saveTargetsPrefs(p: TargetsPrefs): void {
   storage().set(TARGETS_PREFS_KEY, JSON.stringify(p));
+}
+
+/**
+ * Puts the night searched back to today, at app start: the filters are kept, but a stored date would silently point at
+ * a past night when the app is opened days later.
+ */
+export function resetTargetsNightToToday(): void {
+  saveTargetsPrefs({ ...loadTargetsPrefs(), lastDateISO: todayISO() });
 }

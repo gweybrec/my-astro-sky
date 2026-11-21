@@ -1112,6 +1112,7 @@ const es: Translations = {
       loadWcs: 'Cargar un WCS',
       rename: 'Renombrar la foto',
       hour: 'Hora',
+      today: 'Hoy',
       prevMonth: 'Mes anterior',
       nextMonth: 'Mes siguiente',
       emptyCapture: 'Introduzca un valor o elimine el campo',

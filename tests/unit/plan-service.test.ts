@@ -2,6 +2,7 @@
 /**
  * The plan service on a private in-memory database, on both SQL adapters.
  */
+import { todayISO } from '@myastrosky/core/targets/format';
 import Database from 'better-sqlite3';
 import { describe, it, expect, expectTypeOf, beforeEach, afterEach } from 'vitest';
 import { initSchema } from '@myastrosky/core/db/schema';
@@ -170,7 +171,7 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
         id: 'plan-id1',
         name: 'Night A',
         position: 0,
-        nightOf: null,
+        nightOf: todayISO(new Date(NOW)),
         setupId: null,
         lat: null,
         lon: null,

@@ -18,6 +18,7 @@ import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
 import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 import PhoneField from '../../components/PhoneField.vue';
 import PhoneNativePicker from '../../components/PhoneNativePicker.vue';
+import PhoneDateSheet from '../../components/PhoneDateSheet.vue';
 import AppIcon from '../../components/AppIcon.vue';
 import SkyCheckSheet from '../sky/SkyCheckSheet.vue';
 import { dsoCatalogOptions } from '../../catalog-options';
@@ -37,7 +38,7 @@ import {
 } from '../../composables/useTargets';
 
 // The board "Cibles, paramètres de recherche": everything the targets list is searched and ordered by. The sort, the
-// night (the phone's date picker) and the location (the "Lieu d'observation" page), then the sky (directions, region,
+// night (the calendar sheet, PhoneDateSheet) and the location (the "Lieu d'observation" page), then the sky (directions, region,
 // altitude), the observation window (the phone's time picker), the filters (interest, difficulty, and the catalogues
 // and constellations, each a list of tick boxes: "Cibles, catalogues" / "Cibles, constellations") and the three
 // switches. Each change is stored at once; "Réinitialiser" puts the sky, the window, the filters and the switches back
@@ -48,7 +49,7 @@ defineProps<{ planMode?: boolean }>();
 const open = defineModel<boolean>('open', { required: true });
 const router = useRouter();
 const regionsStore = useSkyRegionsStore();
-const nightPicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
+const nightOpen = ref(false);
 const fromPicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
 const toPicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
 const sortOpen = ref(false);
@@ -176,19 +177,13 @@ const aria = (name: string, value: string) => t('mobile.targets.fieldAria', { na
           block
           text-style="body"
           :aria-label="aria(t('mobile.targets.fieldNight'), nightLabel.toLowerCase())"
-          @click="nightPicker?.open()"
+          @click="nightOpen = true"
         >
           <span class="mob-btn-key">{{ t('mobile.targets.fieldNight') }}</span>
           <span class="mob-btn-value mob-btn-value--swatch">{{ nightLabel }}</span>
           <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
         </PhoneButton>
       </div>
-      <PhoneNativePicker
-        ref="nightPicker"
-        type="date"
-        :value="nightISO"
-        @pick="updateTargetsPrefs({ lastDateISO: $event })"
-      />
       <div class="mob-form-row" style="padding-bottom: var(--space-4)">
         <PhoneButton
           variant="field"
@@ -384,6 +379,12 @@ const aria = (name: string, value: string) => t('mobile.targets.fieldAria', { na
       }}</PhoneButton>
     </template>
   </PhoneSheet>
+  <PhoneDateSheet
+    v-model:open="nightOpen"
+    :value="nightISO"
+    :title="t('mobile.targets.fieldNight')"
+    @pick="updateTargetsPrefs({ lastDateISO: $event })"
+  />
   <PhoneRadioSheet
     v-model:open="sortOpen"
     v-model:value="sortKey"

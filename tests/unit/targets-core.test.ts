@@ -3,7 +3,11 @@ import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/s
 import type { AccessoryData, CameraData, TelescopeData } from '@myastrosky/core/gear-catalog';
 import type { DSO } from '@myastrosky/core/types';
 import type { TargetSuggestion } from '@myastrosky/core/target-recommender';
-import { loadTargetsPrefs, saveTargetsPrefs } from '@myastrosky/core/targets/prefs';
+import {
+  loadTargetsPrefs,
+  resetTargetsNightToToday,
+  saveTargetsPrefs,
+} from '@myastrosky/core/targets/prefs';
 import {
   formatArcmin,
   formatClock24,
@@ -69,6 +73,16 @@ describe('targets preferences', () => {
       enabledCatalogs: ['M', 'LPN', 'Other'],
     });
     expect(loadTargetsPrefs().enabledCatalogs).toEqual(['M', 'Other']);
+  });
+
+  it('puts the night back to today at start, keeping the filters', () => {
+    saveTargetsPrefs({ setupId: 's1', lat: 1, lon: 2, lastDateISO: '2020-01-01', minAltDeg: 30 });
+    resetTargetsNightToToday();
+    expect(loadTargetsPrefs()).toMatchObject({
+      setupId: 's1',
+      minAltDeg: 30,
+      lastDateISO: todayISO(),
+    });
   });
 
   it('falls back to defaults on a corrupt record', () => {

@@ -1101,6 +1101,7 @@ const en: Translations = {
       loadWcs: 'Load a WCS',
       rename: 'Rename the photo',
       hour: 'Time',
+      today: 'Today',
       prevMonth: 'Previous month',
       nextMonth: 'Next month',
       emptyCapture: 'Enter a value, or remove the field',

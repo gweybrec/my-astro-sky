@@ -8,6 +8,7 @@ import App from './App.vue';
 import StartupError from './components/StartupError.vue';
 import router from './router';
 import { isDatabaseUpdateError } from '@myastrosky/core/db/schema';
+import { resetTargetsNightToToday } from '@myastrosky/core/targets/prefs';
 import {
   initPlatform,
   installBackButton,
@@ -32,6 +33,8 @@ async function start(): Promise<void> {
     createApp(StartupError, { message, saveBackup }).mount('#app');
     return;
   }
+  // The Targets search keeps its filters across launches, but its night starts on today, as on the desktop.
+  resetTargetsNightToToday();
   createApp(App).use(IonicVue).use(createPinia()).use(router).mount('#app');
   installBackButton(router);
   // An import left unsaved when the app was closed opens again, then the files opened with MyAstroSky from another

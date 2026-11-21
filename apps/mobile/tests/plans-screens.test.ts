@@ -55,6 +55,7 @@ import PlanEntryPage from '../src/pages/PlanEntryPage.vue';
 import TargetDetailPage from '../src/pages/TargetDetailPage.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
+import PhoneDateSheet from '../src/components/PhoneDateSheet.vue';
 import ObsWindowSheet from '../src/pages/plans/ObsWindowSheet.vue';
 import { reloadTargetsPrefs } from '../src/composables/useTargets';
 import { skyFocus } from '../src/composables/useSkySelection';
@@ -714,12 +715,15 @@ describe('archived plans and plans whose night has passed', () => {
     expect(w.text()).not.toContain('Cette nuit est passée');
   });
 
-  it("shows the plan's night in a field and changes it with the phone's picker", async () => {
+  it("shows the plan's night in a field and changes it in the calendar sheet", async () => {
     const { w } = await show(PlanDetailPage, '/plans/p1');
     const field = w.findAll('button').find((b) => b.text().startsWith('Nuit'))!;
     expect(field.text()).toContain('Ce soir');
-    const picker = w.findAllComponents(PhoneNativePicker)[0];
-    picker.vm.$emit('pick', '2026-10-12');
+    const sheet = w.findComponent(PhoneDateSheet);
+    expect(sheet.props('open')).toBe(false);
+    await field.trigger('click');
+    expect(sheet.props('open')).toBe(true);
+    sheet.vm.$emit('pick', '2026-10-12');
     await settle();
     expect(backend.plans.update).toHaveBeenCalledWith(
       'p1',

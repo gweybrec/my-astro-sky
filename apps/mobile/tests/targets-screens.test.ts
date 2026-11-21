@@ -51,6 +51,7 @@ import RegionsPage from '../src/pages/RegionsPage.vue';
 import { skyRegionDraw, skyRegionView } from '../src/sky-modes';
 import { writeObserverLocation } from '@myastrosky/core/observer-location';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
+import PhoneDateSheet from '../src/components/PhoneDateSheet.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import SkyCheckSheet from '../src/pages/sky/SkyCheckSheet.vue';
 import { DSO_CATALOGS_ALL } from '@myastrosky/core/catalog/dso-registry';
@@ -931,11 +932,12 @@ describe('the search settings sheet', () => {
     );
   });
 
-  it("stores the night chosen in the phone's date picker and shows it", async () => {
+  it('stores the night chosen in the calendar sheet and shows it', async () => {
     const { w } = mountSheet();
     await settle();
-    const night = w.findAllComponents(PhoneNativePicker)[0];
-    expect(night.props('type')).toBe('date');
+    const night = w.findComponent(PhoneDateSheet);
+    await w.find('button[aria-label^="Nuit"]').trigger('click');
+    expect(night.props('open')).toBe(true);
     night.vm.$emit('pick', '2031-03-09');
     await settle();
     expect(prefsOf().lastDateISO).toBe('2031-03-09');
@@ -963,7 +965,7 @@ describe('the search settings sheet', () => {
   it("stores the two times of the observation window chosen in the phone's time picker", async () => {
     const { w } = mountSheet();
     await settle();
-    const [, from, to] = w.findAllComponents(PhoneNativePicker);
+    const [from, to] = w.findAllComponents(PhoneNativePicker);
     expect([from.props('type'), to.props('type')]).toEqual(['time', 'time']);
     from.vm.$emit('pick', '22:00');
     to.vm.$emit('pick', '02:00');

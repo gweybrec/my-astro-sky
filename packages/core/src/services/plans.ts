@@ -22,6 +22,7 @@ import {
   type PlanSortKey,
 } from '../domain/plans';
 import type { SqlDb, SqlStatement, SqlValue } from '../ports/sql-db';
+import { todayISO } from '../targets/format';
 
 export interface PlanServiceDeps {
   db: SqlDb;
@@ -36,7 +37,7 @@ export interface PlanService {
   list(): Promise<Plan[]>;
   /** The id and name of every plan, in position order (for the name checks of a backup import). */
   listNames(): Promise<{ id: string; name: string }[]>;
-  /** Creates a plan at the end of the list. Throws `invalid` (`PLAN_NAME_REQUIRED`). */
+  /** Creates a plan at the end of the list, dated today. Throws `invalid` (`PLAN_NAME_REQUIRED`). */
   create(input: PlanInput): Promise<{ id: string }>;
   /** Gives every listed plan the position of its index; unknown ids are ignored. Throws `invalid` (`PLAN_IDS_NOT_ARRAY`). */
   reorder(ids: readonly string[]): Promise<void>;
@@ -472,11 +473,13 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
       const { name } = input;
       if (isBlank(name)) throw nameRequired();
       const id = `plan-${newId()}`;
+      const created = new Date(now());
+      // A new plan is for today's night; its date can then be changed, never removed.
       await db.run(INSERT_PLAN_AT_END, [
         id,
         name.trim(),
-        new Date(now()).toISOString(),
-        null,
+        created.toISOString(),
+        todayISO(created),
         null,
         null,
         null,

@@ -10,6 +10,8 @@ import PhoneChip from '../src/components/PhoneChip.vue';
 import PhoneBadge from '../src/components/PhoneBadge.vue';
 import PhoneSheet from '../src/components/PhoneSheet.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
+import PhoneDateSheet from '../src/components/PhoneDateSheet.vue';
+import { todayISO } from '@myastrosky/core/targets/format';
 import PhoneMapSheet from '../src/components/PhoneMapSheet.vue';
 import PhoneMapSheetHost from '../src/components/PhoneMapSheetHost.vue';
 import PhoneSearch from '../src/components/PhoneSearch.vue';
@@ -252,6 +254,30 @@ describe('the shared phone components', () => {
     expect(w.find('.mob-sheet-footer #ok').exists()).toBe(true);
     await w.find('.mob-sheet-grab').trigger('click');
     expect(w.emitted('update:open')?.[0]).toEqual([false]);
+  });
+
+  it('PhoneDateSheet replaces the night by a picked day or today, never removes it, and Annuler keeps it', async () => {
+    const sheet = () =>
+      mount(PhoneDateSheet, { props: { open: true, value: '2020-01-01', title: 'Nuit' }, global });
+    const buttons = (w: ReturnType<typeof sheet>) =>
+      w.findAll('.mob-sheet-footer [data-test]').map((b) => b.attributes('data-test'));
+    // a day picked, then Valider
+    const picked = sheet();
+    expect(buttons(picked)).toEqual(['night-today', 'night-cancel', 'night-ok']);
+    await picked.find('[data-test=night-calendar]').setValue('2026-12-03T00:00:00');
+    await picked.find('[data-test=night-ok]').trigger('click');
+    expect(picked.emitted('pick')?.[0]).toEqual(['2026-12-03']);
+    expect(picked.emitted('update:open')?.[0]).toEqual([false]);
+    // Aujourd'hui
+    const today = sheet();
+    await today.find('[data-test=night-today]').trigger('click');
+    expect(today.emitted('pick')?.[0]).toEqual([todayISO()]);
+    // Annuler, after a day was picked: nothing changes
+    const cancel = sheet();
+    await cancel.find('[data-test=night-calendar]').setValue('2026-12-03');
+    await cancel.find('[data-test=night-cancel]').trigger('click');
+    expect(cancel.emitted('pick')).toBeUndefined();
+    expect(cancel.emitted('update:open')?.[0]).toEqual([false]);
   });
 
   it('PhoneRadioSheet applies a tapped choice and closes, as every list of one choice does', async () => {

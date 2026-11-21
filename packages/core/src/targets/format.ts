@@ -13,8 +13,8 @@ export function formatHours(h: number): string {
   return `${h.toFixed(1)} h`;
 }
 
-export function todayISO(): string {
-  const d = new Date();
+/** The local calendar date of `d` (now by default), as `YYYY-MM-DD`. */
+export function todayISO(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 

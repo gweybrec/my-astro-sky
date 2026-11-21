@@ -1118,6 +1118,7 @@ const de: Translations = {
       loadWcs: 'WCS laden',
       rename: 'Foto umbenennen',
       hour: 'Uhrzeit',
+      today: 'Heute',
       prevMonth: 'Vorheriger Monat',
       nextMonth: 'Nächster Monat',
       emptyCapture: 'Geben Sie einen Wert ein oder entfernen Sie das Feld',

@@ -14,6 +14,7 @@ import type { Server } from 'http';
 import express from 'express';
 import sharp from 'sharp';
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { todayISO } from '@myastrosky/core/targets/format';
 
 // ─── Route table helper ──────────────────────────────────────────────────────
 
@@ -389,7 +390,7 @@ describe('plans', () => {
         id: planId,
         name: 'Night 1',
         position: 0,
-        nightOf: null,
+        nightOf: todayISO(),
         setupId: null,
         lat: null,
         lon: null,

@@ -45,6 +45,21 @@ const checkbox = defineComponent({
   },
 });
 
+/** A calendar: the stub shows its value and reports a day typed in it as Ionic's `ionChange` does. */
+const datetime = defineComponent({
+  inheritAttrs: true,
+  props: { value: { type: String, default: '' } },
+  emits: ['ionChange'],
+  setup(props, { emit }) {
+    return () =>
+      h('input', {
+        value: props.value,
+        onInput: (e: Event) =>
+          emit('ionChange', { detail: { value: (e.target as HTMLInputElement).value } }),
+      });
+  },
+});
+
 /** A radio group: the stub reports the chosen value as Ionic's `ionChange` does. */
 const radioGroup = defineComponent({
   inheritAttrs: true,
@@ -84,6 +99,7 @@ export const ionicStubs = {
   IonRadioGroup: radioGroup,
   IonRadio: radio,
   IonCheckbox: checkbox,
+  IonDatetime: datetime,
   IonFab: plain('div'),
   IonFabButton: plain('button'),
   IonFooter: plain('footer'),

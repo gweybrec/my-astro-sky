@@ -34,6 +34,7 @@ import PhoneCardRow from '../components/PhoneCardRow.vue';
 import PhoneSearch from '../components/PhoneSearch.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
 import PhoneSheet from '../components/PhoneSheet.vue';
+import PhoneDateSheet from '../components/PhoneDateSheet.vue';
 import PhoneSliderRow from '../components/PhoneSliderRow.vue';
 import PhoneProgressRow from '../components/PhoneProgressRow.vue';
 import PhoneObjectRow from '../components/PhoneObjectRow.vue';
@@ -90,6 +91,8 @@ const tickOff = ref(false);
 const opacity = ref(0.6);
 const steps = ref(2);
 const sheet = ref(false);
+const dateSheet = ref(false);
+const dateValue = ref('2026-11-21');
 const order = ref(['a', 'b', 'c']);
 const pressed = ref(true);
 const answer = ref('');
@@ -600,6 +603,7 @@ function raiseError() {
         <PhoneSectionHeader>Fenêtres</PhoneSectionHeader>
         <div class="mob-form-row" style="display: flex; gap: var(--space-4); flex-wrap: wrap">
           <PhoneButton @click="sheet = true">Feuille</PhoneButton>
+          <PhoneButton @click="dateSheet = true">Calendrier</PhoneButton>
           <PhoneButton variant="danger" @click="askDelete">Confirmer</PhoneButton>
           <PhoneButton variant="danger" @click="raiseError">Erreur</PhoneButton>
         </div>
@@ -711,5 +715,11 @@ function raiseError() {
         }}</PhoneButton>
       </template>
     </PhoneSheet>
+    <PhoneDateSheet
+      v-model:open="dateSheet"
+      :value="dateValue"
+      title="Nuit"
+      @pick="dateValue = $event"
+    />
   </IonPage>
 </template>

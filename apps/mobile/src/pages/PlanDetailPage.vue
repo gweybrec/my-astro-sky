@@ -48,7 +48,7 @@ import PhoneFacts from '../components/PhoneFacts.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 import PhoneBadge from '../components/PhoneBadge.vue';
 import PhoneButton from '../components/PhoneButton.vue';
-import PhoneNativePicker from '../components/PhoneNativePicker.vue';
+import PhoneDateSheet from '../components/PhoneDateSheet.vue';
 import PhoneFab from '../components/PhoneFab.vue';
 import PhoneRadioSheet from '../components/PhoneRadioSheet.vue';
 import PlanActionsSheet from './plans/PlanActionsSheet.vue';
@@ -66,7 +66,7 @@ import caretIcon from '../icons/chevron-down.svg?raw';
 // desktop's "Trouver des cibles" of a plan; the targets added there show when this page is entered again. A mosaic is
 // an item of the plan like a target (its name · Mosaïque, its number of tiles): sorted with them, a tap
 // shows the plan on the map zoomed to fit it, as the desktop's "Afficher sur la carte" of a mosaic.
-// The night is a field above the equipment (the phone's date picker, as the Targets' night). When it has passed and
+// The night is a field above the equipment (the calendar sheet, as the Targets' night). When it has passed and
 // the plan is still current (board "Plan, détail, date passée"), a warning row offers to archive the plan or to move
 // it to tonight. An archived plan takes no new target and is not shown on the map, as on the desktop.
 const route = useRoute();
@@ -82,7 +82,7 @@ const actionsOpen = ref(false);
 const renameOpen = ref(false);
 const sortOpen = ref(false);
 
-const nightPicker = ref<InstanceType<typeof PhoneNativePicker> | null>(null);
+const nightOpen = ref(false);
 /** The plan's own night, else the Targets' one (the night the plan is shown for). */
 const nightISO = computed(() => plan.value?.nightOf ?? targetsPrefs.lastDateISO ?? todayISO());
 const nightLabel = computed(() =>
@@ -92,7 +92,7 @@ const nightLabel = computed(() =>
 );
 const overdue = computed(() => !!plan.value && isPlanOverdue(plan.value));
 
-function setNight(dateISO: string | null) {
+function setNight(dateISO: string) {
   const p = plan.value;
   if (!p) return;
   void store.updatePlanSettings(p.id, dateISO, p.setupId, p.lat, p.lon);
@@ -369,20 +369,13 @@ async function remove() {
                 value: nightLabel.toLowerCase(),
               })
             "
-            @click="nightPicker?.open()"
+            @click="nightOpen = true"
           >
             <span class="mob-btn-key">{{ t('mobile.targets.fieldNight') }}</span>
             <span class="mob-btn-value mob-btn-value--swatch">{{ nightLabel }}</span>
             <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
           </PhoneButton>
         </div>
-        <PhoneNativePicker
-          ref="nightPicker"
-          type="date"
-          :value="nightISO"
-          @pick="setNight"
-          @clear="setNight(null)"
-        />
         <IonList v-if="overdue" class="mob-list" lines="none" style="margin-bottom: var(--space-4)">
           <PhoneRow :subs="[t('targets.plan.datePassedHint')]">
             <template #badges>
@@ -434,6 +427,12 @@ async function remove() {
       @delete="remove"
     />
     <PlanRenameSheet v-if="plan" v-model:open="renameOpen" :name="plan.name" @rename="rename" />
+    <PhoneDateSheet
+      v-model:open="nightOpen"
+      :value="nightISO"
+      :title="t('mobile.targets.fieldNight')"
+      @pick="setNight"
+    />
     <PhoneRadioSheet
       v-model:open="sortOpen"
       v-model:value="sortKey"

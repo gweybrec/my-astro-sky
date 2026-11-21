@@ -1,7 +1,8 @@
 <template>
   <div
     ref="root"
-    class="sheet-pop right-0 top-full mt-1 w-[260px] gap-4 p-5"
+    class="sheet-pop top-full mt-1 w-[260px] gap-4 p-5"
+    :class="align === 'left' ? 'left-0' : 'right-0'"
     role="dialog"
     :aria-label="t('gallery.sheet.chooseDate')"
     data-test="date-picker"
@@ -57,7 +58,10 @@
       </template>
     </div>
 
-    <div class="flex items-center gap-3 pt-4 border-t border-[var(--border-subtle)]">
+    <div
+      v-if="!dateOnly"
+      class="flex items-center gap-3 pt-4 border-t border-[var(--border-subtle)]"
+    >
       <span class="flex-1 text-base text-label">{{ t('gallery.sheet.hour') }}</span>
       <select
         v-model.number="hour"
@@ -77,7 +81,19 @@
       </select>
     </div>
 
-    <div class="flex justify-end gap-3">
+    <div
+      class="flex justify-end gap-3"
+      :class="{ 'pt-4 border-t border-[var(--border-subtle)]': dateOnly }"
+    >
+      <button
+        v-if="showToday"
+        type="button"
+        class="btn-cancel !py-2 !px-5 mr-auto"
+        data-test="date-today"
+        @click="pickToday"
+      >
+        {{ t('gallery.sheet.today') }}
+      </button>
       <button
         type="button"
         class="btn-cancel !py-2 !px-5"
@@ -110,21 +126,27 @@ const chevronRightSvg =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
 
 const props = defineProps<{
-  /** The date as a local `YYYY-MM-DDTHH:mm` string, or '' when there is none yet. */
+  /** The date as a local `YYYY-MM-DDTHH:mm` string (`YYYY-MM-DD` with `dateOnly`), or '' when there is none yet. */
   value: string;
   busy?: boolean;
+  /** A day only: no hour row, and the choice is emitted as `YYYY-MM-DD`. */
+  dateOnly?: boolean;
+  /** Adds "Aujourd'hui", which chooses today and closes at once. */
+  showToday?: boolean;
+  /** The side of its line the popup lines up with (right by default). */
+  align?: 'left' | 'right';
 }>();
 const emit = defineEmits<{ confirm: [value: string]; cancel: [] }>();
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-const initial = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(props.value);
+const initial = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(props.value);
 const now = new Date();
 const selected = ref<{ year: number; month: number; day: number } | null>(
   initial ? { year: +initial[1], month: +initial[2] - 1, day: +initial[3] } : null,
 );
-const hour = ref(initial ? +initial[4] : 0);
-const minute = ref(initial ? +initial[5] : 0);
+const hour = ref(initial?.[4] ? +initial[4] : 0);
+const minute = ref(initial?.[5] ? +initial[5] : 0);
 const shown = ref({
   year: selected.value?.year ?? now.getFullYear(),
   month: selected.value?.month ?? now.getMonth(),
@@ -162,16 +184,21 @@ function pick(cell: CalendarDay) {
 function confirm() {
   const s = selected.value;
   if (!s) return;
-  emit(
-    'confirm',
-    `${s.year}-${pad(s.month + 1)}-${pad(s.day)}T${pad(hour.value)}:${pad(minute.value)}`,
-  );
+  const day = `${s.year}-${pad(s.month + 1)}-${pad(s.day)}`;
+  emit('confirm', props.dateOnly ? day : `${day}T${pad(hour.value)}:${pad(minute.value)}`);
 }
 
-// A click outside its line closes it, as Annuler does (its own calendar button toggles it already).
+function pickToday() {
+  const d = new Date();
+  selected.value = { year: d.getFullYear(), month: d.getMonth(), day: d.getDate() };
+  confirm();
+}
+
+// A click outside its line closes it, as Annuler does (its own calendar button toggles it already). The line is the
+// photo sheet's row, else the element the popup is shown in.
 const root = ref<HTMLElement>();
 function onDocMouseDown(e: MouseEvent) {
-  const row = root.value?.closest('.sheet-row');
+  const row = root.value?.closest('.sheet-row') ?? root.value?.parentElement;
   if (row && !row.contains(e.target as Node)) emit('cancel');
 }
 onMounted(() => document.addEventListener('mousedown', onDocMouseDown));

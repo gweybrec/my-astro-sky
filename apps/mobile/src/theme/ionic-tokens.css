@@ -24,6 +24,8 @@
   --ion-color-primary-contrast-rgb: 232, 240, 255;
   --ion-color-primary-shade: var(--accent-color);
   --ion-color-primary-tint: var(--accent-color);
+  /* A sheet's background (--bg-deep) as a triplet, for the fade of Ionic's wheels; one per theme below. */
+  --bg-deep-rgb: 15, 20, 25;
 
   --ion-toolbar-background: var(--bg-panel);
   --ion-toolbar-color: var(--text-bright);
@@ -256,4 +258,15 @@ ion-app > ion-router-outlet > .ion-page:not(.mob-tabs-page):not(:has(ion-footer)
     flex: 1 1 0;
     min-width: 0;
   }
+}
+
+/* --bg-deep as a triplet in the other themes (design-system/tokens.css). */
+[data-theme='cold-blue'] {
+  --bg-deep-rgb: 10, 10, 46;
+}
+[data-theme='warm'] {
+  --bg-deep-rgb: 17, 17, 17;
+}
+[data-theme='night-red'] {
+  --bg-deep-rgb: 22, 0, 0;
 }

@@ -14,6 +14,7 @@ import type { Backend, CancelSignal, FileSource } from '../backend';
 import { ERROR_CODES } from '../domain/error-codes';
 import type { ObservationWindow } from '../domain/plans';
 import type { Photo } from '../types';
+import { todayISO } from '../targets/format';
 
 /** The sites a backend reaches out to. */
 export type ContractNetworkSite = 'skybot' | 'tns' | 'comets' | 'version';
@@ -187,7 +188,7 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
       id,
       name,
       position,
-      nightOf: null,
+      nightOf: todayISO(),
       setupId: null,
       lat: null,
       lon: null,

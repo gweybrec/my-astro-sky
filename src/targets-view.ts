@@ -3,7 +3,7 @@
  * A full-screen panel with gear/location/date inputs and a ranked result grid.
  */
 
-import { t } from './i18n';
+import { t, getLang } from './i18n';
 import { DSO_CATALOGS_ALL } from './dso-catalog';
 import { getConstellationInfos, customLocationLabel, formatMultiplicity } from './star-catalog';
 import {
@@ -92,6 +92,9 @@ import mapPinSvg from './icons/map-pin.svg?raw';
 import listPlusSvg from './icons/list-plus.svg?raw';
 import targetSvg from './icons/target.svg?raw';
 import trajectorySvg from './icons/trajectory.svg?raw';
+import calendarSvg from './icons/calendar.svg?raw';
+import { createApp, h, type App } from 'vue';
+import DateTimePicker from './components/base/DateTimePicker.vue';
 import { buildSetupControls, buildFovFrameSpecs } from './fov-overlay';
 import { pinia } from './pinia-instance';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
@@ -142,6 +145,7 @@ import {
   buildMoonOverlay,
   computePlanTargets,
   defaultPlanName,
+  formatPlanDate,
   isPlanOverdue,
   moonPhaseForWindow,
   moonSeparationRating,
@@ -168,6 +172,83 @@ import { outsideLabels } from '@myastrosky/core/targets/outside';
  * right). The dark portion is left as the disk outline so it reads as the
  * unlit limb against the chart background.
  */
+/**
+ * The night field of the search and of each plan: a button showing the night, which opens the app's calendar (the
+ * photo sheet's, a day only). The night is replaced by a picked day or "Aujourd'hui", or kept by "Annuler", a click
+ * outside or Escape; it can never be removed.
+ */
+export function buildNightDateField(value: string, onPick: (dateISO: string) => void): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'relative inline-flex';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className =
+    'targets-coord-input !min-w-0 !max-w-none !flex-none w-auto inline-flex items-center gap-3 cursor-pointer';
+  btn.title = t('gallery.sheet.chooseDate');
+  btn.setAttribute('aria-haspopup', 'dialog');
+  btn.dataset.test = 'night-field';
+  const text = document.createElement('span');
+  const icon = document.createElement('span');
+  icon.className = 'inline-flex w-[14px] h-[14px] text-dim [&>svg]:w-full [&>svg]:h-full';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.innerHTML = calendarSvg;
+  btn.append(text, icon);
+  wrap.appendChild(btn);
+
+  let current = value;
+  const show = () => {
+    text.textContent = formatPlanDate(current, getLang());
+    btn.setAttribute('aria-label', `${t('targets.date.label')} ${text.textContent}`);
+  };
+  show();
+
+  let popup: { app: App; el: HTMLElement } | null = null;
+  const close = () => {
+    if (!popup) return;
+    popup.app.unmount();
+    popup.el.remove();
+    popup = null;
+    btn.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('keydown', onKey, true);
+  };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    close();
+    btn.focus();
+  };
+  btn.addEventListener('click', () => {
+    if (popup) return close();
+    const el = document.createElement('div');
+    el.className = 'contents';
+    wrap.appendChild(el);
+    const app = createApp({
+      render: () =>
+        h(DateTimePicker, {
+          value: current,
+          dateOnly: true,
+          showToday: true,
+          align: 'left',
+          onConfirm: (dateISO: string) => {
+            close();
+            if (dateISO === current) return;
+            current = dateISO;
+            show();
+            onPick(dateISO);
+          },
+          onCancel: close,
+        }),
+    });
+    app.mount(el);
+    popup = { app, el };
+    // On a short window the panel scrolls so the whole calendar, its buttons included, is in view.
+    el.querySelector('[data-test=date-picker]')?.scrollIntoView?.({ block: 'nearest' });
+    btn.setAttribute('aria-expanded', 'true');
+    document.addEventListener('keydown', onKey, true);
+  });
+  return wrap;
+}
+
 function moonPhaseIconSvg(phaseIndex: number): string {
   const r = 5,
     c = 6,
@@ -943,7 +1024,6 @@ export class TargetsView {
   private lastDateNight: Date | null = null;
   private generateBtn: HTMLButtonElement | null = null;
   private randomBtn: HTMLButtonElement | null = null;
-  private dateInput: HTMLInputElement | null = null;
 
   /** Recommend surface (gear/location/date/filters + results), built once and
    * reparented into the "Find targets" overlay on first mount. Persists across
@@ -1317,16 +1397,11 @@ export class TargetsView {
     filterColL.appendChild(formRow(t('targets.location.label'), locControl));
 
     // ── Date ──
-    this.dateInput = document.createElement('input');
-    const dateInput = this.dateInput;
-    dateInput.type = 'date';
-    dateInput.className = 'targets-coord-input !min-w-0 !max-w-none !flex-none w-auto';
-    dateInput.value = this.prefs.lastDateISO ?? todayISO();
-    dateInput.addEventListener('change', () => {
-      this.prefs.lastDateISO = dateInput.value;
+    const dateField = buildNightDateField(this.prefs.lastDateISO ?? todayISO(), (dateISO) => {
+      this.prefs.lastDateISO = dateISO;
       savePrefs(this.prefs);
     });
-    filterColL.appendChild(formRow(t('targets.date.label'), dateInput));
+    filterColL.appendChild(formRow(t('targets.date.label'), dateField));
 
     // ── Observation time window ──────────────────────────────────────────────
     const timeWindowRow = document.createElement('div');
@@ -1820,13 +1895,13 @@ export class TargetsView {
     this.generateBtn.className = 'targets-generate-btn';
     this.generateBtn.textContent = t('targets.generateBest');
     this.generateBtn.addEventListener('click', () => {
-      this.runRecommendation(this.generateBtn!, this.dateInput!, 'best');
+      this.runRecommendation(this.generateBtn!, 'best');
     });
     this.randomBtn = document.createElement('button');
     this.randomBtn.className = 'targets-generate-btn targets-generate-btn--random';
     this.randomBtn.textContent = t('targets.generateRandom');
     this.randomBtn.addEventListener('click', () => {
-      this.runRecommendation(this.randomBtn!, this.dateInput!, 'random');
+      this.runRecommendation(this.randomBtn!, 'random');
     });
     btnRow.appendChild(this.generateBtn);
     btnRow.appendChild(this.randomBtn);
@@ -1996,11 +2071,7 @@ export class TargetsView {
 
   // ─── Run recommendation ────────────────────────────────────────────────────
 
-  private async runRecommendation(
-    btn: HTMLButtonElement,
-    dateInput: HTMLInputElement,
-    mode: 'best' | 'random',
-  ): Promise<void> {
+  private async runRecommendation(btn: HTMLButtonElement, mode: 'best' | 'random'): Promise<void> {
     const resultsEl = document.getElementById('targets-results')!;
 
     const lat = this.prefs.lat ?? NaN;
@@ -2023,7 +2094,7 @@ export class TargetsView {
     await new Promise((r) => setTimeout(r, 10));
 
     try {
-      const dateStr = dateInput.value || todayISO();
+      const dateStr = this.prefs.lastDateISO ?? todayISO();
       const photographedIds = this.prefs.excludePhotographed
         ? new Set((await getPhotos()).flatMap((p) => p.dsoIds))
         : null;
@@ -3335,12 +3406,22 @@ export class TargetsView {
     const dateLabel = document.createElement('label');
     dateLabel.className = 'text-base text-dim shrink-0';
     dateLabel.textContent = t('targets.date.label');
-    const dateInput = document.createElement('input');
-    dateInput.type = 'date';
-    dateInput.className = 'targets-coord-input !min-w-0 !max-w-none !flex-none w-auto';
-    dateInput.value = plan.nightOf ?? this.prefs.lastDateISO ?? todayISO();
+    const dateField = buildNightDateField(
+      plan.nightOf ?? this.prefs.lastDateISO ?? todayISO(),
+      (dateISO) => {
+        plan.nightOf = dateISO;
+        this.plansStore.updatePlanSettings(plan.id, dateISO, plan.setupId, plan.lat, plan.lon);
+        // The "date passed" chip and line follow the new date.
+        if (overdue !== isPlanOverdue(plan)) {
+          this.uiStore.pendingPlanFocusId = plan.id;
+          this.render();
+          return;
+        }
+        renderTrajectories();
+      },
+    );
     dateRow.appendChild(dateLabel);
-    dateRow.appendChild(dateInput);
+    dateRow.appendChild(dateField);
     controls.appendChild(dateRow);
 
     const setupRow = document.createElement('div');
@@ -3549,18 +3630,6 @@ export class TargetsView {
     };
 
     renderTrajectories();
-
-    dateInput.addEventListener('change', () => {
-      plan.nightOf = dateInput.value || null;
-      this.plansStore.updatePlanSettings(plan.id, plan.nightOf, plan.setupId, plan.lat, plan.lon);
-      // The "date passed" chip and line follow the new date.
-      if (overdue !== isPlanOverdue(plan)) {
-        this.uiStore.pendingPlanFocusId = plan.id;
-        this.render();
-        return;
-      }
-      renderTrajectories();
-    });
 
     getGearSetups()
       .then((setups) => {

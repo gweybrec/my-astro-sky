@@ -1115,6 +1115,7 @@ const fr = {
       loadWcs: 'Charger un WCS',
       rename: 'Renommer la photo',
       hour: 'Heure',
+      today: "Aujourd'hui",
       prevMonth: 'Mois précédent',
       nextMonth: 'Mois suivant',
       emptyCapture: 'Saisissez une valeur, ou supprimez le champ',

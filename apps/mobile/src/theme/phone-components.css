@@ -2076,3 +2076,13 @@ ion-tab-bar.mob-tabbar-hidden {
   align-items: center;
   gap: var(--space-4);
 }
+
+/* The night's calendar (PhoneDateSheet): Ionic's date picker on the sheet's own background, across the sheet's width
+   (Ionic holds it to its own fixed width otherwise). */
+ion-datetime.mob-date-calendar {
+  --background: var(--bg-deep);
+  --title-color: var(--text-secondary);
+  --wheel-fade-background-rgb: var(--bg-deep-rgb);
+  width: 100%;
+  max-width: none;
+}
