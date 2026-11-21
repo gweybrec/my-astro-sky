@@ -181,6 +181,15 @@ const de: Translations['mobile'] = {
     autoRotateHelp:
       'Wenn das Telefon hochkant gehalten wird, wird ein Querformatfoto um eine Vierteldrehung gedreht, damit es den ganzen Bildschirm füllt, außer Sie haben es selbst gedreht. Das Foto selbst wird nicht verändert.',
   },
+  stats: {
+    constellationsValue: '{n} Sternbilder',
+    constellationsValueOne: '1 Sternbild',
+    sortShort: {
+      interest: 'Interesse',
+      number: 'Nummer',
+      magnitude: 'Helligkeit',
+    },
+  },
   nav: { back: 'Zurück' },
   photo: {
     info: 'Informationen zum Foto',

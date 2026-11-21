@@ -179,6 +179,15 @@ const es: Translations['mobile'] = {
     autoRotateHelp:
       'Con el teléfono en vertical, una foto horizontal se gira un cuarto de vuelta para ocupar toda la pantalla, salvo si la ha girado usted. La foto en sí no se modifica.',
   },
+  stats: {
+    constellationsValue: '{n} constelaciones',
+    constellationsValueOne: '1 constelación',
+    sortShort: {
+      interest: 'Interés',
+      number: 'Número',
+      magnitude: 'Magnitud',
+    },
+  },
   nav: { back: 'Atrás' },
   photo: {
     info: 'Información de la foto',

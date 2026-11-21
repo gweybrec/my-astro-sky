@@ -179,6 +179,15 @@ const en: Translations['mobile'] = {
     autoRotateHelp:
       'When the phone is held upright, a landscape photo is turned a quarter to fill the screen, unless you rotated it yourself. The photo itself is not changed.',
   },
+  stats: {
+    constellationsValue: '{n} constellations',
+    constellationsValueOne: '1 constellation',
+    sortShort: {
+      interest: 'DSO interest',
+      number: 'Number',
+      magnitude: 'Magnitude',
+    },
+  },
   nav: { back: 'Back' },
   photo: {
     info: 'Photo information',

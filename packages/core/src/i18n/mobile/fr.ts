@@ -178,6 +178,15 @@ const fr = {
     autoRotateHelp:
       "Quand le téléphone est tenu en portrait, une photo en paysage est tournée d'un quart de tour pour occuper tout l'écran, sauf si vous l'avez pivotée vous-même. La photo elle-même n'est pas modifiée.",
   },
+  stats: {
+    constellationsValue: '{n} constellations',
+    constellationsValueOne: '1 constellation',
+    sortShort: {
+      interest: 'Intérêt photo',
+      number: 'Numéro',
+      magnitude: 'Magnitude',
+    },
+  },
   nav: { back: 'Retour' },
   photo: {
     info: 'Informations sur la photo',

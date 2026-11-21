@@ -40,7 +40,6 @@ import StatisticsCatalogPage from '../src/pages/StatisticsCatalogPage.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import PhoneObjectRow from '../src/components/PhoneObjectRow.vue';
 import PhoneSearch from '../src/components/PhoneSearch.vue';
-import PhoneRow from '../src/components/PhoneRow.vue';
 import SkyCheckSheet from '../src/pages/sky/SkyCheckSheet.vue';
 import { statisticsConstellations } from '../src/composables/useStatisticsFilter';
 
@@ -155,9 +154,9 @@ describe('the page of a catalogue', () => {
 
   it('changes the constellations here, for the statistics page too', async () => {
     const w = await open();
-    const row = w.findAllComponents(PhoneRow).find((r) => r.props('title') === 'Constellations');
-    expect(row?.props('value')).toBe('2 / 2');
-    await row!.trigger('click');
+    const button = () => w.findAll('.stats-catalog-filters > *')[0];
+    expect(button().text()).toBe('2 constellations');
+    await button().trigger('click');
     const sheet = w.getComponent(SkyCheckSheet);
     expect(sheet.props('open')).toBe(true);
     expect(sheet.props('options').map((o: { label: string }) => o.label)).toEqual([
@@ -167,7 +166,7 @@ describe('the page of a catalogue', () => {
     sheet.vm.$emit('update:selected', ['Ori']);
     await flushPromises();
     expect(statisticsConstellations.value).toEqual(['Ori']);
-    expect(row!.props('value')).toBe('1 / 2');
+    expect(button().text()).toBe('1 constellation');
     expect(w.find('.stats-catalog-count').text()).toBe('1 / 1');
     expect(folds(w).map((f) => f.text().replace(/\s+/g, ' '))).toEqual(['Orion1 / 1']);
     sheet.vm.$emit('update:selected', ['Cyg', 'Ori']);
@@ -175,8 +174,18 @@ describe('the page of a catalogue', () => {
     expect(statisticsConstellations.value).toBeNull();
   });
 
-  it('has no information button beside the sort', async () => {
+  it('shows the order on its button in its short name, after the sort icon, and no information button', async () => {
     const w = await open();
+    const sortButton = () => w.findAll('.stats-catalog-filters > *')[1];
+    expect(sortButton().text()).toBe('Intérêt photo');
+    expect(sortButton().attributes('aria-label')).toContain('Intérêt photo');
+    await sortButton().trigger('click');
+    expect((w.getComponent(PhoneRadioSheet as Component).props() as { open: boolean }).open).toBe(
+      true,
+    );
+    w.getComponent(PhoneRadioSheet as Component).vm.$emit('update:value', 'number');
+    await flushPromises();
+    expect(sortButton().text()).toBe('Numéro');
     expect(w.findComponent({ name: 'PhoneInfoButton' }).exists()).toBe(false);
   });
 
