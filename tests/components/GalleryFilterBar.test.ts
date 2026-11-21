@@ -46,11 +46,8 @@ async function mountInGallery() {
   return wrapper;
 }
 
-const sortButton = (wrapper: Awaited<ReturnType<typeof mountInGallery>>) =>
-  wrapper.findAll('button').find((b) => b.text().includes('A–Z'))!;
-const sortRadios = () => [
-  ...document.body.querySelectorAll<HTMLInputElement>('input[name="gallery-sort"]'),
-];
+const sortSelect = (wrapper: Awaited<ReturnType<typeof mountInGallery>>) =>
+  wrapper.find('select#gallery-sort');
 
 beforeEach(() => {
   configureStorage(createMemoryStore());
@@ -70,21 +67,19 @@ describe('GalleryFilterBar sort', () => {
     expect(gallery.setSort).toHaveBeenLastCalledWith('date-desc');
   });
 
-  it('lists the four orders, the current one checked', async () => {
+  it('lists the four orders in a native dropdown, the current one chosen', async () => {
     const wrapper = await mountInGallery();
-    await sortButton(wrapper).trigger('click');
-    const radios = sortRadios();
-    expect(radios).toHaveLength(4);
-    expect(radios.map((r) => r.checked)).toEqual([true, false, false, false]);
+    const select = sortSelect(wrapper);
+    expect(select.findAll('option')).toHaveLength(4);
+    expect((select.element as HTMLSelectElement).value).toBe('name-asc');
+    expect(document.body.querySelector('input[type="radio"]')).toBeNull();
   });
 
-  it('a choice reorders the gallery, closes the dropdown and is stored', async () => {
+  it('a choice reorders the gallery and is stored', async () => {
     const wrapper = await mountInGallery();
-    await sortButton(wrapper).trigger('click');
-    sortRadios()[2].dispatchEvent(new Event('change'));
+    await sortSelect(wrapper).setValue('date-desc');
     await flushPromises();
     expect(gallery.setSort).toHaveBeenLastCalledWith('date-desc');
     expect(storage().get('gallery-sort')).toBe('date-desc');
-    expect(sortRadios()).toHaveLength(0);
   });
 });

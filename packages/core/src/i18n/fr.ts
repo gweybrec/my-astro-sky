@@ -1135,7 +1135,6 @@ const fr = {
     dateFrom: 'Du',
     dateTo: 'Au',
     sort: 'Tri',
-    sortValue: 'Tri : {value}',
     sortNameAsc: 'Nom (A–Z)',
     sortNameDesc: 'Nom (Z–A)',
     sortDateNewest: "Date d'observation (récentes d'abord)",

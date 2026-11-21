@@ -1132,7 +1132,6 @@ const es: Translations = {
     dateFrom: 'Desde',
     dateTo: 'Hasta',
     sort: 'Ordenar',
-    sortValue: 'Orden: {value}',
     sortNameAsc: 'Nombre (A–Z)',
     sortNameDesc: 'Nombre (Z–A)',
     sortDateNewest: 'Fecha de observación (recientes primero)',

@@ -1138,7 +1138,6 @@ const de: Translations = {
     dateFrom: 'Von',
     dateTo: 'Bis',
     sort: 'Sortierung',
-    sortValue: 'Sortierung: {value}',
     sortNameAsc: 'Name (A–Z)',
     sortNameDesc: 'Name (Z–A)',
     sortDateNewest: 'Beobachtungsdatum (neueste zuerst)',

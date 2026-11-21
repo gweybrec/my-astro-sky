@@ -269,31 +269,19 @@
     </div>
 
     <!-- Sort order (kept between sessions, unlike the filters) -->
-    <div class="display-controls-mag-row">
-      <button
-        ref="sortBtnRef"
-        type="button"
-        class="display-controls-btn display-dropdown-btn labels-dropdown-btn"
-        @click.stop="sortOpen = !sortOpen"
+    <span class="flex items-center gap-4">
+      <label for="gallery-sort" class="targets-sort-label">{{ t('targets.sort.label') }}</label>
+      <select
+        id="gallery-sort"
+        class="targets-sort-select"
+        :value="sort"
+        @change="chooseSort(($event.target as HTMLSelectElement).value as GallerySort)"
       >
-        {{ t('gallery.sortValue', { value: t(`gallery.sortShort.${sort}`) }) }}
-      </button>
-      <DropdownPanel v-model="sortOpen" :anchor-el="sortBtnRef" min-width="240px">
-        <label
-          v-for="option in GALLERY_SORTS"
-          :key="option"
-          class="dso-toggle-label labels-select-all-row"
-        >
-          <input
-            type="radio"
-            name="gallery-sort"
-            :checked="sort === option"
-            @change="chooseSort(option)"
-          />
-          <span class="ml-4">{{ t(GALLERY_SORT_LABEL_KEYS[option]) }}</span>
-        </label>
-      </DropdownPanel>
-    </div>
+        <option v-for="option in GALLERY_SORTS" :key="option" :value="option">
+          {{ t(`gallery.sortShort.${option}`) }}
+        </option>
+      </select>
+    </span>
 
     <!-- Export -->
     <button
@@ -342,7 +330,6 @@ import { reportUnknownRendererError } from '../../error-reporter';
 import exportSvg from '../../icons/export.svg?raw';
 import {
   GALLERY_SORTS,
-  GALLERY_SORT_LABEL_KEYS,
   loadGallerySort,
   saveGallerySort,
   type GallerySort,
@@ -542,13 +529,10 @@ function clearDateRange() {
 }
 
 // ── Sort order ────────────────────────────────────────────────────────────────
-const sortBtnRef = ref<HTMLButtonElement>();
-const sortOpen = ref(false);
 const sort = ref<GallerySort>(loadGallerySort());
 
 function chooseSort(next: GallerySort) {
   sort.value = next;
-  sortOpen.value = false;
   saveGallerySort(next);
   canvasStore.gallery?.setSort(next);
 }
@@ -589,7 +573,6 @@ watch(viewMode, (mode) => {
   typeOpen.value = false;
   catalogOpen.value = false;
   dateOpen.value = false;
-  sortOpen.value = false;
   batchEditMode.value = null;
   canvasStore.gallery?.setSearchQuery('');
   canvasStore.gallery?.setSetupFilter(null);
