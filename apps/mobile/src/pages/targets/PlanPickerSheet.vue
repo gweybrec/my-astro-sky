@@ -30,11 +30,8 @@ watch(open, (isOpen) => {
 async function toggle(planId: string) {
   const plan = plans.plans.find((p) => p.id === planId);
   if (!plan) return;
-  const wasIn = plans.isInPlan(props.target.id, planId);
+  // No toast: the checkbox already shows the result, and a toast would cover the other checkboxes.
   await plans.toggleEntry(planId, props.target.id);
-  void showNotice(
-    t(wasIn ? 'targets.plan.removedFromPlan' : 'targets.plan.addedToPlan', { name: plan.name }),
-  );
 }
 // The plan does not hold the star as such: added only, never ticked.
 async function addStar(planId: string) {

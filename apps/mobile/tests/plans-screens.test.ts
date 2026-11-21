@@ -1194,13 +1194,13 @@ describe('the target page ("Cibles, détail d\'une cible")', () => {
     await settle();
     const planId = PLANS.find((p) => p.name === out.props('title'))!.id;
     expect(backend.plans.addEntry).toHaveBeenCalledWith(planId, { dsoId: 'M31' });
-    expect(showNotice).toHaveBeenCalledWith(`Ajouté à « ${out.props('title')} »`);
+    expect(showNotice).not.toHaveBeenCalled();
 
     const inside = ticks.find((c) => c.props('modelValue') === true)!;
     inside.vm.$emit('update:modelValue', false);
     await settle();
     expect(backend.plans.removeEntry).toHaveBeenCalled();
-    expect(showNotice).toHaveBeenLastCalledWith(`Retiré de « ${inside.props('title')} »`);
+    expect(showNotice).not.toHaveBeenCalled();
   });
 
   it('leaves the archived plans out of the plans offered', async () => {
