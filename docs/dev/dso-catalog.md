@@ -65,7 +65,7 @@ node scripts/add-constellations.mjs
 3. **SH2 objects**: treat all OpenNGC SH2 coordinates as suspect until verified against SIMBAD — the systematic drift pattern is real.
 4. **Abell planetary nebulae**: use PN G identifiers (in the `catalogs` array) to unambiguously verify coordinates. Do not use "Abell N" queries in SIMBAD (hits galaxy clusters).
 5. **After any coordinate edit**: run `node scripts/add-constellations.mjs` to recompute the `constellation` field.
-6. **Protoplanetary nebulae** (Step 11b of `generate-dso.mjs`, type `PPN`): the 16 objects of the fr.wikipedia list, in the `Other` family under IRAS-style ids. Their names are each language's Wikipedia name (English where that Wikipedia has none). Coordinates, V magnitude and size come from the en.wikipedia infoboxes and should be checked against SIMBAD at the next regeneration. Alias `M 1-92` keeps its space so it never reads as a Messier number.
+6. **Protoplanetary nebulae** (Step 11b of `generate-dso.mjs`, type `PPN`): the 16 objects of the fr.wikipedia list, in the `Other` family under IRAS-style ids. Their names are each language's Wikipedia name (English where that Wikipedia has none). Coordinates come from SIMBAD; V magnitude and size from SIMBAD, else the en.wikipedia infobox. Alias `M 1-92` keeps its space so it never reads as a Messier number.
 
 ---
 
