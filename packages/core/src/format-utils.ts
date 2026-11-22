@@ -7,21 +7,24 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+// Both round to the shown precision first, then split, so a value never reads "60" seconds (44.3° is 44° 18' 00", not
+// 44° 17' 60").
 export function formatRA(raDeg: number): string {
-  const raH = raDeg / 15;
-  const h = Math.floor(raH);
-  const m = Math.floor((raH - h) * 60);
-  const s = ((raH - h) * 60 - m) * 60;
+  // Tenths of a second of time, within one day.
+  const tenths = Math.round((raDeg / 15) * 36000) % (24 * 36000);
+  const h = Math.floor(tenths / 36000);
+  const m = Math.floor((tenths % 36000) / 600);
+  const s = (tenths % 600) / 10;
   return `${h}h ${m.toString().padStart(2, '0')}m ${s.toFixed(1).padStart(4, '0')}s`;
 }
 
 export function formatDec(decDeg: number): string {
   const sign = decDeg >= 0 ? '+' : '−';
-  const abs = Math.abs(decDeg);
-  const d = Math.floor(abs);
-  const m = Math.floor((abs - d) * 60);
-  const s = ((abs - d) * 60 - m) * 60;
-  return `${sign}${d}° ${m.toString().padStart(2, '0')}' ${s.toFixed(0).padStart(2, '0')}"`;
+  const seconds = Math.round(Math.abs(decDeg) * 3600);
+  const d = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${sign}${d}° ${m.toString().padStart(2, '0')}' ${s.toString().padStart(2, '0')}"`;
 }
 
 export function formatSize(majAxis: number | null, minAxis: number | null): string {
