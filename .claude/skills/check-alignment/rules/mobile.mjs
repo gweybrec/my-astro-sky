@@ -255,9 +255,10 @@ export async function seed({ ports }) {
     observationWindows: windows(['w3']),
   });
 
-  // A mosaic in the summer plan: what "Changer d’équipement" asks about when the plan's setup changes.
-  // No object: a mosaic on one of the plan's objects would replace that object's frame (the views below use it).
-  await api(base, 'POST', `/api/plans/${summer.id}/mosaics`, {
+  // A mosaic in the summer plan: what "Changer d’équipement" asks about when the plan's setup changes, and the
+  // mosaic's own page (with a window of its own). No object: a mosaic on one of the plan's objects would replace that
+  // object's frame (the views below use it).
+  const mosaic = await api(base, 'POST', `/api/plans/${summer.id}/mosaics`, {
     dsoId: null,
     name: 'Amérique du Nord',
     centerRa: 314.7,
@@ -270,6 +271,9 @@ export async function seed({ ports }) {
       { ra: 314.4, dec: 44.3, paDeg: 0 },
       { ra: 315.0, dec: 44.3, paDeg: 0 },
     ],
+  });
+  await api(base, 'PUT', `/api/plans/${summer.id}/mosaics/${mosaic.id}/windows`, {
+    observationWindows: windows(['w4']),
   });
 
   const firstPhoto = await uploadPhoto(base);
@@ -358,6 +362,7 @@ export async function seed({ ports }) {
       passedPlan: passed.id,
       entry: summer.entries.NGC7000,
       longEntry: summer.entries['SH2-308'],
+      mosaic: mosaic.id,
     },
     storage: {
       'targets-prefs-v3': JSON.stringify(prefs),
@@ -999,7 +1004,7 @@ export const views = [
     open: [
       { click: '.mob-search-tabs .mob-seg-btn:nth-child(2)' },
       { fill: '.mob-search-wrap input', text: 'Cygnus' },
-      { wait: '.mob-row-thumb' },
+      { wait: 'ion-item.mob-row:has-text("Cygnus")' },
       { pause: 400 },
     ],
   },
@@ -1292,6 +1297,23 @@ export const views = [
     name: 'plan-target-long-name',
     path: (ids) => `/plans/${ids.plan}/${ids.longEntry}`,
     ready: '.mob-meta',
+  },
+  // A mosaic of the plan (board "Plan, détail d'une mosaïque"), and its tiles' sheet.
+  {
+    name: 'plan-mosaic',
+    path: (ids) => `/plans/${ids.plan}/mosaics/${ids.mosaic}`,
+    ready: '.mob-meta',
+  },
+  {
+    name: 'plan-mosaic-panels',
+    path: (ids) => `/plans/${ids.plan}/mosaics/${ids.mosaic}`,
+    ready: '.mob-meta',
+    open: [
+      { click: 'ion-item.mob-row:has-text("Détails panneau par panneau")' },
+      { wait: '.mob-sheet' },
+      { pause: 600 },
+    ],
+    ...SHEET,
   },
   {
     name: 'observation-window',
