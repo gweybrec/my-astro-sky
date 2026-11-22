@@ -114,6 +114,9 @@ const en: Translations['mobile'] = {
     phase6: 'Last quarter',
     phase7: 'Waning crescent',
     windowsHeader: 'Observation windows',
+    /** The coordinates of a mosaic's centre and of its tiles, labelled as on the desktop. */
+    ra: 'RA',
+    dec: 'Dec',
     actions: 'Plan actions',
     addTarget: 'Add a target',
     drag: 'Move {name}',

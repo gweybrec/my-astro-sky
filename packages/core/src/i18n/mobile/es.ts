@@ -114,6 +114,9 @@ const es: Translations['mobile'] = {
     phase6: 'Cuarto menguante',
     phase7: 'Menguante',
     windowsHeader: 'Ventanas de observación',
+    /** The coordinates of a mosaic's centre and of its tiles, labelled as on the desktop. */
+    ra: 'RA',
+    dec: 'Dec',
     actions: 'Acciones del plan',
     addTarget: 'Añadir un objetivo',
     drag: 'Mover {name}',

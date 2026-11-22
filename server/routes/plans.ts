@@ -2,6 +2,7 @@ import express from 'express';
 import { isDomainError } from '@myastrosky/core/domain/errors';
 import type {
   MosaicParams,
+  ObservationWindow,
   PlanChanges,
   PlanEntryChanges,
   PlanEntryInput,
@@ -672,6 +673,61 @@ plansRouter.delete('/api/plans/:id/mosaics/:mosaicId', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     if (!isDomainError(err)) console.error('[Plans] Failed to delete mosaic', err);
+    sendError(res, err);
+  }
+});
+
+/**
+ * @swagger
+ * /api/plans/{id}/mosaics/{mosaicId}/windows:
+ *   put:
+ *     summary: Replace a mosaic's observation windows
+ *     description: One set of windows for the whole mosaic, drawn on the trajectory of its centre. The tiles are left as they are.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Plan ID
+ *       - in: path
+ *         name: mosaicId
+ *         required: true
+ *         schema: { type: string }
+ *         description: Mosaic ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [observationWindows]
+ *             properties:
+ *               observationWindows:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: string }
+ *                     startFrac: { type: number, description: Start as a fraction of the night (0 to 1) }
+ *                     endFrac: { type: number, description: End as a fraction of the night (0 to 1) }
+ *                     filter: { type: string, nullable: true }
+ *                     color: { type: string, nullable: true }
+ *                     frameSeconds: { type: number, nullable: true }
+ *                     snap: { type: boolean }
+ *     responses:
+ *       200: { description: Windows saved }
+ *       400: { description: observationWindows is not an array }
+ *       404: { description: Mosaic not found }
+ *       500: { description: Server error }
+ */
+plansRouter.put('/api/plans/:id/mosaics/:mosaicId/windows', async (req, res) => {
+  try {
+    const { id, mosaicId } = req.params;
+    const body = (req.body ?? {}) as { observationWindows?: unknown };
+    await plans.updateMosaicWindows(id, mosaicId, body.observationWindows as ObservationWindow[]);
+    res.json({ ok: true });
+  } catch (err) {
+    if (!isDomainError(err)) console.error('[Plans] Failed to save mosaic windows', err);
     sendError(res, err);
   }
 });

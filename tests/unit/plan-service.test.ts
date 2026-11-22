@@ -673,6 +673,40 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
     const tileIds = async () =>
       (await plan(planId)).entries.filter((e) => e.mosaicId).map((e) => e.id);
 
+    it('stores a mosaic’s own windows, cleaned, and refuses a mosaic of another plan', async () => {
+      const id = (await svc.createMosaic(planId, mosaic())).id;
+      await svc.updateMosaicWindows(planId, id, [
+        {
+          id: 'w1',
+          startFrac: 0.4,
+          endFrac: 0.1,
+          filter: null,
+          color: null,
+          frameSeconds: 120,
+          snap: true,
+        },
+      ]);
+      expect((await plan(planId)).mosaics[0].observationWindows).toEqual([
+        {
+          id: 'w1',
+          startFrac: 0.1,
+          endFrac: 0.4,
+          filter: null,
+          color: null,
+          frameSeconds: 120,
+          snap: true,
+        },
+      ]);
+      const other = (await svc.create({ name: 'B' })).id;
+      await expect(svc.updateMosaicWindows(other, id, [])).rejects.toMatchObject({
+        kind: 'notFound',
+        code: 'MOSAIC_NOT_FOUND',
+      });
+      await expect(svc.updateMosaicWindows(planId, id, 'x' as unknown as [])).rejects.toMatchObject(
+        { kind: 'invalid', code: 'ENTRY_FIELD_INVALID' },
+      );
+    });
+
     it('creates a mosaic with an mo- id and its tiles as tile-<mosaicId>-<position> entries', async () => {
       await svc.addEntry(planId, { dsoId: 'X' });
       expect(await svc.createMosaic(planId, mosaic())).toEqual({ id: 'mo-id3' });
@@ -689,6 +723,7 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
           cols: 2,
           rows: 1,
           position: 0,
+          observationWindows: [],
         },
       ]);
       expect(p.entries.filter((e) => e.mosaicId)).toMatchObject([
@@ -927,6 +962,7 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
           cols: 2,
           rows: 3,
           position: 7,
+          observationWindows: [{ id: 'w-m', startFrac: 0.5, endFrac: 0.7, filter: 'OIII' }],
         },
       ],
     };
@@ -974,6 +1010,17 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
           cols: 2,
           rows: 3,
           position: 7,
+          observationWindows: [
+            {
+              id: 'w-m',
+              startFrac: 0.5,
+              endFrac: 0.7,
+              filter: 'OIII',
+              color: null,
+              frameSeconds: null,
+              snap: false,
+            },
+          ],
         },
       ]);
     });
@@ -1053,6 +1100,7 @@ describe.each(SQL_ADAPTERS)('PlanService (%s)', (_adapter, wrap) => {
           cols: 1,
           rows: 1,
           position: 2,
+          observationWindows: [],
         },
       ]);
     });

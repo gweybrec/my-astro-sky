@@ -61,6 +61,8 @@ export interface PlanMosaic {
   cols: number;
   rows: number;
   position: number;
+  /** User-drawn observation windows on the trajectory of the mosaic's centre, one set for the whole mosaic. */
+  observationWindows: ObservationWindow[];
 }
 
 /** Per-tile sky centre sent to the server when creating/updating a mosaic. */

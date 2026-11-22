@@ -60,8 +60,9 @@ export function sortPlanTargets<T extends PlanSortItem>(
 }
 
 /**
- * Build the `entryId → earliest observation-window startFrac` map that
- * `sortPlanTargets('window', …)` consumes. Entries without any window are simply
+ * Build the `item id → earliest observation-window startFrac` map that
+ * `sortPlanTargets('window', …)` consumes. The items are a plan's entries and its
+ * mosaics (a mosaic's item id is its own id). Items without any window are simply
  * omitted (treated as `Infinity` = sorted last).
  */
 export function firstWindowFracByEntry(

@@ -350,6 +350,39 @@ describe('the Ciel page', () => {
       expect(fov.selection).toEqual({ kind: 'free' });
     });
 
+    it("opens a mosaic's page again above its plan's page when the map was opened from it", async () => {
+      const w = mountPage();
+      await flushPromises();
+      showPlan();
+      skyPlanView.value = {
+        ...skyPlanView.value!,
+        under: ['/plans/p1'],
+        returnTo: '/plans/p1/mosaics/m1',
+      };
+      await flushPromises();
+      replace.mockClear();
+      navigate.mockClear();
+      await w.find('button[aria-label="Retour"]').trigger('click');
+      await flushPromises();
+      expect(replace.mock.calls.map((c) => c[0])).toEqual(['/tabs/plans']);
+      expect(navigate.mock.calls).toEqual([
+        ['/plans/p1', 'none', 'push'],
+        ['/plans/p1/mosaics/m1', 'none', 'push'],
+      ]);
+    });
+
+    it("has no frames' list or its button when a mosaic's page shows its mosaic", async () => {
+      const w = mountPage();
+      await flushPromises();
+      showPlan();
+      framesSheetOpen.value = false;
+      skyPlanView.value = { ...skyPlanView.value!, mosaicId: 'm1' };
+      await flushPromises();
+      expect(w.find('.mob-topbar-title').text()).toBe('Nuit du 2026-10-03');
+      expect(w.find('.mob-topbar button[aria-label="Contours de champ"]').exists()).toBe(false);
+      expect(w.findComponent({ name: 'SkyFramesSheet' }).props('open')).toBe(false);
+    });
+
     it("reopens the frames' sheet from the bar's frames button once it was dragged away", async () => {
       const w = mountPage();
       await flushPromises();

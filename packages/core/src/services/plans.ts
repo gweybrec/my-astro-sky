@@ -63,6 +63,15 @@ export interface PlanService {
   /** Deletes a mosaic and its tiles. Throws `notFound` (`MOSAIC_NOT_FOUND`). */
   removeMosaic(planId: string, mosaicId: string): Promise<void>;
   /**
+   * Replaces a mosaic's observation windows (one set for the whole mosaic; its tiles are untouched).
+   * Throws `invalid` (`ENTRY_FIELD_INVALID`), `notFound` (`MOSAIC_NOT_FOUND`).
+   */
+  updateMosaicWindows(
+    planId: string,
+    mosaicId: string,
+    windows: ObservationWindow[],
+  ): Promise<void>;
+  /**
    * Writes one plan of a backup file in one atomic batch: the plans in `options.replaceIds` and the plan with
    * the same id are deleted (with their entries and mosaics), then the plan, its valid entries and its valid
    * mosaics are inserted. Returns false, writing nothing, when the plan has no string id or name.
@@ -111,6 +120,7 @@ interface PlanMosaicRow {
   cols: number;
   rows: number;
   position: number;
+  observation_windows: string | null;
 }
 
 const SELECT_PLANS = 'SELECT * FROM plans ORDER BY position ASC, rowid ASC';
@@ -150,7 +160,7 @@ const DELETE_MOSAIC_TILES = 'DELETE FROM plan_entries WHERE mosaic_id = ?';
 const SELECT_MOSAICS = 'SELECT * FROM plan_mosaics ORDER BY position ASC, rowid ASC';
 const SELECT_MOSAIC = 'SELECT * FROM plan_mosaics WHERE id = ?';
 const INSERT_MOSAIC =
-  'INSERT INTO plan_mosaics (id, plan_id, dso_id, name, center_ra, center_dec, pa_deg, overlap_pct, cols, rows, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+  'INSERT INTO plan_mosaics (id, plan_id, dso_id, name, center_ra, center_dec, pa_deg, overlap_pct, cols, rows, position, observation_windows) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 const INSERT_MOSAIC_AT_END =
   'INSERT INTO plan_mosaics (id, plan_id, dso_id, name, center_ra, center_dec, pa_deg, overlap_pct, cols, rows, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position) + 1, 0) FROM plan_mosaics WHERE plan_id = ?))';
 const UPDATE_MOSAIC =
@@ -159,6 +169,8 @@ const UPDATE_MOSAIC =
 // background tile drags and transforms never clobber it.
 const UPDATE_MOSAIC_WITH_NAME =
   'UPDATE plan_mosaics SET dso_id = ?, name = ?, center_ra = ?, center_dec = ?, pa_deg = ?, overlap_pct = ?, cols = ?, rows = ? WHERE id = ?';
+const UPDATE_MOSAIC_WINDOWS =
+  'UPDATE plan_mosaics SET observation_windows = ? WHERE id = ? AND plan_id = ?';
 const DELETE_MOSAIC = 'DELETE FROM plan_mosaics WHERE id = ?';
 const DELETE_PLAN_MOSAICS = 'DELETE FROM plan_mosaics WHERE plan_id = ?';
 
@@ -177,13 +189,18 @@ const nameRequired = (): DomainError => err('invalid', 'name is required', 'PLAN
 
 const isBlank = (v: unknown): boolean => !v || typeof v !== 'string' || v.trim().length === 0;
 
-function planEntryToApi(e: PlanEntryRow): PlanEntry {
-  let observationWindows: ObservationWindow[] = [];
+/** The stored windows of an entry or a mosaic; unreadable JSON gives none. */
+function parseWindows(json: string | null | undefined): ObservationWindow[] {
   try {
-    observationWindows = JSON.parse(e.observation_windows ?? '[]');
+    const parsed: unknown = JSON.parse(json ?? '[]');
+    return Array.isArray(parsed) ? (parsed as ObservationWindow[]) : [];
   } catch {
-    observationWindows = [];
+    return [];
   }
+}
+
+function planEntryToApi(e: PlanEntryRow): PlanEntry {
+  const observationWindows = parseWindows(e.observation_windows);
   return {
     id: e.id,
     dsoId: e.dso_id ?? null,
@@ -211,6 +228,7 @@ function planMosaicToApi(m: PlanMosaicRow): PlanMosaic {
     cols: m.cols,
     rows: m.rows,
     position: m.position,
+    observationWindows: parseWindows(m.observation_windows),
   };
 }
 
@@ -435,6 +453,7 @@ function planImportStatements(
           Number.isInteger(m.cols) ? m.cols : 1,
           Number.isInteger(m.rows) ? m.rows : 1,
           typeof m.position === 'number' ? m.position : mi,
+          sanitizeObservationWindows(m.observationWindows, deps.newId),
         ],
       });
     });
@@ -764,6 +783,18 @@ export function createPlanService(deps: PlanServiceDeps): PlanService {
           tileStatements(mosaicId, existing.plan_id, parsed.dsoId, parsed.tiles, next!.pos),
         );
       });
+    },
+
+    async updateMosaicWindows(planId, mosaicId, windows) {
+      if (!Array.isArray(windows)) {
+        throw err('invalid', 'observationWindows must be an array', 'ENTRY_FIELD_INVALID');
+      }
+      const { changes } = await db.run(UPDATE_MOSAIC_WINDOWS, [
+        sanitizeObservationWindows(windows, newId),
+        mosaicId,
+        planId,
+      ]);
+      if (changes === 0) throw mosaicNotFound();
     },
 
     async removeMosaic(planId, mosaicId) {

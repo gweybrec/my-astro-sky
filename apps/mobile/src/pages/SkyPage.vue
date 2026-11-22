@@ -327,8 +327,10 @@ useBackClose(() => targetShown.value !== null, endTargetView);
 // Showing a plan ("Afficher sur la carte" of its page, board "Ciel, contours de champ d'un plan"): the map with the
 // plan's frames and the frames' sheet on them, as the desktop opens its frame manager. Dragged down, the sheet closes
 // whole (a strip at the bottom of the screen would be under the system's gesture area); the frames button of the bar
-// opens it again. Its frames are the plan's own: a tap opens a frame's sheet with all its actions. The back arrow and
-// the back button open the plan's page again; leaving puts the frames back as they were.
+// opens it again. Its frames are the plan's own: a tap opens a frame's sheet with all its actions. Shown from a mosaic's
+// page, the mosaic is selected instead, its own sheet over the map without the frames' list or its button, and neither
+// moved into a plan nor deleted there, as a target shown from its page. The back arrow and the back button open the
+// page it came from again; leaving puts the frames back as they were.
 const planShown = computed(() => skyPlanView.value);
 watch(planShown, (shown) => {
   if (shown) clearSkySelection();
@@ -345,9 +347,11 @@ async function endPlanView() {
   if (JSON.stringify(fov.selection) !== JSON.stringify(shown.frames.selection))
     fov.setSelection(shown.frames.selection);
   fov.setFramesVisible(shown.frames.visible);
-  // The plan's page opens again above the Plans tab, where its back arrow leads; out of sight, without a slide.
+  // The plan's page (and a mosaic's page above it) opens again above the Plans tab, where its back arrow leads; out of
+  // sight, without a slide.
   await swapPagesUnseen(async () => {
     await router.replace('/tabs/plans');
+    for (const page of shown.under ?? []) await openStill(page);
     await openStill(shown.returnTo);
   });
 }
@@ -566,7 +570,7 @@ onBeforeUnmount(() => {
           <PhoneBackButton :action="modeBar.back" />
           <h1 class="mob-topbar-title mob-topbar-title--grow m-title">{{ modeBar.title }}</h1>
           <PhoneIconButton
-            v-if="planShown"
+            v-if="planShown && !planShown.mosaicId"
             :label="t('fovOverlay.popupTitle')"
             @click="framesSheetOpen = true"
             ><AppIcon :svg="telescopeIcon"
@@ -619,7 +623,7 @@ onBeforeUnmount(() => {
               :key="activeFrame.id"
               :frame="activeFrame"
               :map="skyMap"
-              :viewing="!!targetShown"
+              :viewing="!!targetShown || !!planShown?.mosaicId"
               @close="releaseFrame"
               @edit-mosaic="openMosaicEdit"
             />

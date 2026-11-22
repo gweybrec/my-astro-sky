@@ -16,7 +16,6 @@ import {
 } from '@myastrosky/core/targets/plan';
 import { buildPlanPdfTargets } from '@myastrosky/core/targets/plan-pdf';
 import { fovDeg } from '@myastrosky/core/gear-presets';
-import { outlineFromGrid } from '@myastrosky/core/mosaic';
 import { presetForSetupId, resolveSetupById } from '@myastrosky/core/targets/plan-setup';
 import {
   deletePlanAPI,
@@ -27,9 +26,6 @@ import {
 import type { DSO } from '@myastrosky/core/types';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
-import { skyPlanView } from '../sky-modes';
-import { framesSheetOpen } from '../sky-frames';
-import { openTab, swapPagesUnseen } from '../tab-navigation';
 import { catalogsReady } from '../catalogs';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
@@ -37,7 +33,7 @@ import { loadGearLists, planLookups } from '../composables/usePlans';
 import { withSkyMap } from '../sky-map-setup';
 import { saveFile } from '../platform-device';
 import { reloadTargetsPrefs, targetsPrefs } from '../composables/useTargets';
-import { skyFocus } from '../composables/useSkySelection';
+import { usePlanOnMap } from '../composables/usePlanOnMap';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
@@ -64,8 +60,8 @@ import caretIcon from '../icons/chevron-down.svg?raw';
 // is entered, after a target's windows were changed on its page. The actions rename the plan, export it as a PDF (the desktop's, through the share sheet) and delete it; "Afficher sur la carte" opens the map in a mode of its own on the plan's frames (the
 // desktop selects the plan's frames and opens its frame manager), its back arrow returning here. The plus opens the Cibles list for this plan (boards "Plan, ajouter une cible"), as the
 // desktop's "Trouver des cibles" of a plan; the targets added there show when this page is entered again. A mosaic is
-// an item of the plan like a target (its name · Mosaïque, its number of tiles): sorted with them, a tap
-// shows the plan on the map zoomed to fit it, as the desktop's "Afficher sur la carte" of a mosaic.
+// an item of the plan like a target (its name · Mosaïque, its first window, else its number of tiles): sorted with
+// them, a tap opens its page (board "Plan, détail d'une mosaïque").
 // The night is a field above the equipment (the calendar sheet, as the Targets' night). When it has passed and
 // the plan is still current (board "Plan, détail, date passée"), a warning row offers to archive the plan or to move
 // it to tonight. An archived plan takes no new target and is not shown on the map, as on the desktop.
@@ -75,6 +71,7 @@ const store = usePlansStore();
 const fov = useFovFramesStore();
 const { confirm } = useConfirm();
 const { showError, showNotice } = useErrorToast();
+const { showPlan } = usePlanOnMap();
 
 const planId = computed(() => String(route.params.id));
 const plan = computed<Plan | undefined>(() => store.plans.find((p) => p.id === planId.value));
@@ -155,32 +152,34 @@ const rows = computed(() => {
     }
   }
   const win = night.value?.win;
+  /** The first of the windows, as a range of the night's clock (empty without one). */
+  const firstRange = (windows: readonly { startFrac: number; endFrac: number }[]) => {
+    const first = [...windows].sort((a, b) => a.startFrac - b.startFrac)[0];
+    return first && win
+      ? `${fracToClock(first.startFrac, win)} – ${fracToClock(first.endFrac, win)}`
+      : '';
+  };
   return items.map(({ id, name, mosaic }) => {
     if (mosaic) {
       const tiles = p.entries.filter((e) => e.mosaicId === mosaic.id).length;
+      const range = firstRange(mosaic.observationWindows ?? []);
       return {
         id,
         title: `${name} · ${t('targets.plan.mosaicLabel')}`,
-        sub: `${tiles} ${t('fovOverlay.mosaicPanels')}`,
-        mono: false,
+        sub: range || `${tiles} ${t('fovOverlay.mosaicPanels')}`,
+        mono: !!range,
         mosaic,
       };
     }
     const entry = p.entries.find((e) => e.id === id);
-    const first = [...(entry?.observationWindows ?? [])].sort(
-      (a, b) => a.startFrac - b.startFrac,
-    )[0];
-    const range =
-      first && win
-        ? `${fracToClock(first.startFrac, win)} – ${fracToClock(first.endFrac, win)}`
-        : '';
+    const range = firstRange(entry?.observationWindows ?? []);
     return { id, title: name, sub: range, mono: true, mosaic: undefined };
   });
 });
 
 function openRow(id: string) {
   const mosaic = rows.value.find((r) => r.id === id)?.mosaic;
-  if (mosaic) void showMosaicOnMap(mosaic);
+  if (mosaic) void router.push(`/plans/${planId.value}/mosaics/${mosaic.id}`);
   else void router.push(`/plans/${planId.value}/${id}`);
 }
 
@@ -220,49 +219,12 @@ const sortKey = computed<PlanSortKey>({
   },
 });
 
-// The map's mode "voir un plan": the plan's frames shown, with the frames' sheet on them. The mode puts the frames back
-// as they were when it ends.
+// The map's mode "voir un plan": the plan's frames shown, with the frames' sheet on them.
 async function showOnMap() {
   const p = plan.value;
   if (!p) return;
   actionsOpen.value = false;
-  await openPlanOnMap(p);
-}
-
-// A mosaic of the plan: the plan on the map, zoomed so the whole mosaic fits (its outline as the field), as the
-// desktop's navigateToMosaic. A smart telescope's mosaic is one enlarged frame, of its own size.
-async function showMosaicOnMap(m: PlanMosaic) {
-  const p = plan.value;
-  if (!p) return;
-  const setupId = p.setupId ?? targetsPrefs.setupId ?? null;
-  if (setupId && !fov.specs.has(setupId)) await fov.loadSpecs();
-  const spec = setupId ? fov.specs.get(setupId) : undefined;
-  const tiles = p.entries.filter((e) => e.mosaicId === m.id);
-  const own = tiles.length === 1 ? tiles[0] : undefined;
-  const outline =
-    own?.mosaicWDeg && own.mosaicHDeg
-      ? { wDeg: own.mosaicWDeg, hDeg: own.mosaicHDeg }
-      : spec
-        ? outlineFromGrid(m.cols, m.rows, spec.wDeg, spec.hDeg, m.overlapPct)
-        : null;
-  skyFocus.value = outline
-    ? { ra: m.centerRa, dec: m.centerDec, scale: 0, fov: outline }
-    : { ra: m.centerRa, dec: m.centerDec, scale: 400 };
-  await openPlanOnMap(p);
-}
-
-async function openPlanOnMap(p: Plan) {
-  skyPlanView.value = {
-    planId: p.id,
-    name: p.name,
-    frames: { visible: fov.framesVisible, selection: { ...fov.selection } },
-    returnTo: `/plans/${p.id}`,
-  };
-  fov.setSelection({ kind: 'plan', planId: p.id });
-  fov.setFramesVisible(true);
-  // Its tab, then the map: out of sight, so that the tab is not glimpsed on the way. The sheet opens over the map.
-  await swapPagesUnseen(() => openTab(router, 'plans', 'sky'));
-  framesSheetOpen.value = true;
+  await showPlan(p);
 }
 
 // The desktop's PDF of a plan: its targets and mosaics in the plan's order, the sky views drawn with the Ciel map; the

@@ -322,6 +322,11 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
       async updateMosaic(planId, mosaicId, params) {
         await call('PUT', `/api/plans/${id(planId)}/mosaics/${id(mosaicId)}`, params);
       },
+      async updateMosaicWindows(planId, mosaicId, observationWindows) {
+        await call('PUT', `/api/plans/${id(planId)}/mosaics/${id(mosaicId)}/windows`, {
+          observationWindows,
+        });
+      },
       async removeMosaic(planId, mosaicId) {
         await call('DELETE', `/api/plans/${id(planId)}/mosaics/${id(mosaicId)}`);
       },

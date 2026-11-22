@@ -1,16 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from 'vue';
+import { computed, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { IonPage, IonContent, IonList, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { formatPaDeg } from '@myastrosky/core/frame-orientation';
-import {
-  fracToClock,
-  framesInWindow,
-  newObservationWindow,
-} from '@myastrosky/core/observation-windows';
 import { resolvePlanNight, scorePlanEntry } from '@myastrosky/core/targets/plan';
-import { filterLabel, getFilters } from '@myastrosky/core/gear-catalog';
 import {
   presetForSetupId,
   resolveSetupById,
@@ -22,6 +16,7 @@ import {
   type ObservationWindow,
   type Plan,
 } from '@myastrosky/app-state/api';
+import { usePlanWindows } from '../composables/usePlanWindows';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useShowTargetOnMap } from '../composables/useShowTargetOnMap';
 import { catalogsReady } from '../catalogs';
@@ -33,20 +28,16 @@ import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 import PhoneSectionHeader from '../components/PhoneSectionHeader.vue';
-import ObsWindowSheet, { type WindowChanges } from './plans/ObsWindowSheet.vue';
-import { takeGearAdded } from './gear/gear-added';
+import ObsWindowSheet from './plans/ObsWindowSheet.vue';
 import TargetSummary from './targets/TargetSummary.vue';
-import { filterColor } from '../filter-color';
 import mapPinIcon from '@icons/map-pin.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
 
 // The boards "Plan, détail d'une cible" and "Plan, fenêtre d'observation": the target's figures for the plan's night
 // and setup, its suggested filters (board "Plan, cible, filtres suggérés": the desktop's recipe, a sheet), its
-// observation windows (a tap opens one; the plus adds one), showing it on the map (as the desktop: a free frame of the
-// setup on the target, the map zoomed on that frame) and the removal of the target from the plan. A window's "Ajouter un
-// filtre" leaves for the filter's add page with the window as edited, and opens it again on the way back, the filter
-// saved there chosen.
+// observation windows (`usePlanWindows`), showing it on the map (as the desktop: a free frame of the setup on the
+// target, the map zoomed on that frame) and the removal of the target from the plan.
 const route = useRoute();
 const router = useRouter();
 const store = usePlansStore();
@@ -58,19 +49,6 @@ const entryId = computed(() => String(route.params.entryId));
 const plan = computed<Plan | undefined>(() => store.plans.find((p) => p.id === planId.value));
 const entry = computed(() => plan.value?.entries.find((e) => e.id === entryId.value));
 const gear = shallowRef<GearLists | null>(null);
-const editingId = ref<string | null>(null);
-const editorOpen = ref(false);
-/** The window shown instead of the stored one: a window being added, or one edited before leaving to add a filter. */
-const draft = ref<ObservationWindow | null>(null);
-/** The draft is a window being added: stored only when its sheet's "Enregistrer" is tapped. */
-const isNew = ref(false);
-/** The editor closed to add a filter: its draft waits for the way back. */
-const addingFilter = ref(false);
-watch(editorOpen, (isOpen) => {
-  if (isOpen || addingFilter.value) return;
-  draft.value = null;
-  isNew.value = false;
-});
 
 const night = computed(() =>
   plan.value ? resolvePlanNight(plan.value, targetsPrefs, planLookups) : null,
@@ -94,43 +72,28 @@ const scores = computed(() =>
     : null,
 );
 
-/** The window's colour dot: the one chosen, else its filter's. */
-const colorOf = (w: ObservationWindow) => w.color || filterColor(w.filter);
-
-const windows = computed(() =>
-  [...(entry.value?.observationWindows ?? [])]
-    .sort((a, b) => a.startFrac - b.startFrac)
-    .map((w) => {
-      const win = night.value?.win;
-      const span = win ? win.end.getTime() - win.start.getTime() : 0;
-      const frames = win ? framesInWindow(w, span) : null;
-      return {
-        w,
-        title: w.filter || t('targets.plan.obsWindowTitle'),
-        range: win ? `${fracToClock(w.startFrac, win)} – ${fracToClock(w.endFrac, win)}` : '',
-        frames: w.frameSeconds && frames !== null ? `${frames} × ${w.frameSeconds} s` : '',
-        color: colorOf(w),
-      };
-    }),
-);
-// The windows as bands of the altitude chart, in their colours.
-const chartWindows = computed(() =>
-  windows.value.map((row) => ({
-    startFrac: row.w.startFrac,
-    endFrac: row.w.endFrac,
-    color: row.color,
-  })),
-);
 const angle = computed(() => (entry.value?.paDeg != null ? formatPaDeg(entry.value.paDeg) : '—'));
-const editing = computed(() =>
-  draft.value && draft.value.id === editingId.value
-    ? draft.value
-    : (entry.value?.observationWindows.find((w) => w.id === editingId.value) ?? null),
-);
+const {
+  rows: windows,
+  chartWindows,
+  editing,
+  editorOpen,
+  isNew,
+  openWindow,
+  addWindow,
+  addFilter,
+  resume,
+  saveWindow,
+  deleteWindow,
+} = usePlanWindows({
+  stored: () => entry.value?.observationWindows ?? [],
+  night: () => night.value?.win ?? null,
+  save: saveWindows,
+});
 
 async function load() {
   try {
-    if (addingFilter.value) await resumeAfterFilter();
+    await resume();
     reloadTargetsPrefs();
     await catalogsReady();
     await store.load();
@@ -146,73 +109,6 @@ onIonViewWillEnter(load);
 async function saveWindows(next: ObservationWindow[]) {
   await updatePlanEntryPositionAPI(planId.value, entryId.value, { observationWindows: next });
   await store.load();
-}
-
-function openWindow(id: string) {
-  editingId.value = id;
-  editorOpen.value = true;
-}
-
-function addWindow() {
-  draft.value = newObservationWindow();
-  isNew.value = true;
-  openWindow(draft.value.id);
-}
-
-function addFilter(changes: WindowChanges) {
-  const shown = editing.value;
-  if (!shown) return;
-  draft.value = { ...shown, ...changes };
-  addingFilter.value = true;
-  editorOpen.value = false;
-  void router.push('/settings/gear/filter/new');
-}
-
-/** Back from the filter's add page: the window opens again as it was, with the filter saved there (if any). */
-async function resumeAfterFilter() {
-  addingFilter.value = false;
-  const id = takeGearAdded('filter');
-  if (id && draft.value) {
-    const added = (await getFilters()).find((f) => f.id === id);
-    if (added) draft.value = { ...draft.value, filter: filterLabel(added) };
-  }
-  if (draft.value) openWindow(draft.value.id);
-}
-
-async function saveWindow(changes: WindowChanges) {
-  const id = editingId.value;
-  const added = isNew.value ? draft.value : null;
-  editorOpen.value = false;
-  if (!id) return;
-  const stored = entry.value?.observationWindows ?? [];
-  try {
-    await saveWindows(
-      added
-        ? [...stored, { ...added, ...changes }]
-        : stored.map((w) => (w.id === id ? { ...w, ...changes } : w)),
-    );
-  } catch (error) {
-    void showError(error);
-  }
-}
-
-async function deleteWindow() {
-  const id = editingId.value;
-  if (!id) return;
-  // The editor stays open under the question: "Annuler" leaves it as it was.
-  const sure = await confirm({
-    title: t('targets.plan.obsWindowRemove'),
-    message: t('mobile.plans.deleteWindowMessage'),
-    confirmLabel: t('mobile.plans.delete'),
-    destructive: true,
-  });
-  if (!sure) return;
-  editorOpen.value = false;
-  try {
-    await saveWindows((entry.value?.observationWindows ?? []).filter((w) => w.id !== id));
-  } catch (error) {
-    void showError(error);
-  }
 }
 
 // The desktop's "Afficher sur la carte", with the plan's setup.

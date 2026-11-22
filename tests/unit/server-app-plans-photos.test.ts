@@ -825,6 +825,7 @@ describe('mosaics', () => {
         cols: 3,
         rows: 1,
         position: 0,
+        observationWindows: [],
       },
     ]);
   });
@@ -967,6 +968,38 @@ describe('mosaics', () => {
     expect((await readPlan(id)).entries).toHaveLength(3);
   });
 
+  it('saves a mosaic’s own observation windows, cleaned, and leaves its tiles alone', async () => {
+    const id = await mkPlan();
+    const mosaicId = await mkMosaic(id);
+    const tilesBefore = (await readPlan(id)).entries;
+    const url = `/api/plans/${id}/mosaics/${mosaicId}/windows`;
+    expect(
+      await call('PUT', url, {
+        observationWindows: [{ id: 'w1', startFrac: 0.6, endFrac: 0.2, filter: ' Ha ' }, 'junk'],
+      }),
+    ).toEqual(OK);
+    const plan = await readPlan(id);
+    expect(plan.mosaics[0].observationWindows).toEqual([
+      {
+        id: 'w1',
+        startFrac: 0.2,
+        endFrac: 0.6,
+        filter: 'Ha',
+        color: null,
+        frameSeconds: null,
+        snap: false,
+      },
+    ]);
+    expect(plan.entries).toEqual(tilesBefore);
+    expect(await call('PUT', url, { observationWindows: 'x' })).toEqual({
+      status: 400,
+      body: { error: 'observationWindows must be an array', code: 'ENTRY_FIELD_INVALID' },
+    });
+    expect(
+      await call('PUT', `/api/plans/${id}/mosaics/nope/windows`, { observationWindows: [] }),
+    ).toEqual({ status: 404, body: { error: 'Mosaic not found', code: 'MOSAIC_NOT_FOUND' } });
+  });
+
   it('replaces the tiles when it updates a mosaic, and keeps the name when none is given', async () => {
     const id = await mkPlan();
     const mosaicId = await mkMosaic(id, { dsoId: 'M42', name: 'Orion' });
@@ -1001,6 +1034,7 @@ describe('mosaics', () => {
         cols: 2,
         rows: 1,
         position: 0,
+        observationWindows: [],
       },
     ]);
     expect(plan.entries).toEqual([

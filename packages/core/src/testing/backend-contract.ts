@@ -317,10 +317,16 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
           cols: 2,
           rows: 1,
           position: 0,
+          observationWindows: [],
         },
       ],
       'a new mosaic',
     );
+
+    // A mosaic's own windows: stored on the mosaic, and kept when its tiles are replaced.
+    await b.plans.updateMosaicWindows(a, m, [WINDOW]);
+    current = await planWith();
+    expectEqual(current.mosaics[0].observationWindows, [WINDOW], 'the windows of a mosaic');
 
     await b.plans.updateMosaic(a, m, { ...mosaicParams(1, 3, 3), name: 'Mosaic 2' });
     current = await planWith();
@@ -337,6 +343,11 @@ export function backendContractCases(makeBackend: MakeBackend): BackendContractC
       current.mosaics.map((x) => [x.name, x.cols, x.rows]),
       [['Mosaic 2', 1, 3]],
       'a changed mosaic',
+    );
+    expectEqual(
+      current.mosaics[0].observationWindows,
+      [WINDOW],
+      'the windows of a mosaic whose tiles changed',
     );
 
     await b.plans.removeMosaic(a, m);

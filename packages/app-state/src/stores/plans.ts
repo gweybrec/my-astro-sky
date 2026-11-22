@@ -16,9 +16,11 @@ import {
   updatePlanEntryPositionAPI,
   createPlanMosaicAPI,
   updatePlanMosaicAPI,
+  updatePlanMosaicWindowsAPI,
   deletePlanMosaicAPI,
   type Plan,
   type PlanEntry,
+  type PlanMosaic,
   type MosaicParams,
   type ObservationWindow,
   type PlanSortKey,
@@ -42,6 +44,10 @@ interface PendingEdit<T> {
 
 function findEntry(list: Plan[], planId: string, entryId: string): PlanEntry | undefined {
   return list.find((p) => p.id === planId)?.entries.find((e) => e.id === entryId);
+}
+
+function findMosaic(list: Plan[], planId: string, mosaicId: string): PlanMosaic | undefined {
+  return list.find((p) => p.id === planId)?.mosaics.find((m) => m.id === mosaicId);
 }
 
 function applyFraming(entry: PlanEntry, fields: FramingFields): void {
@@ -81,6 +87,9 @@ export const usePlansStore = defineStore('plans', () => {
   // that settles only clears its own record, never a newer edit's.
   const pendingFraming = new Map<string, PendingEdit<FramingFields>>();
   const pendingWindows = new Map<string, PendingEdit<ObservationWindow[]>>();
+  // The same for a mosaic's windows (one set for the whole mosaic), keyed by the mosaic's id.
+  const mosaicWindowTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const pendingMosaicWindows = new Map<string, PendingEdit<ObservationWindow[]>>();
 
   const planCount = computed(() => plans.value.length);
   /** The plans the user has not archived: the ones every plan picker offers. */
@@ -111,6 +120,7 @@ export const usePlansStore = defineStore('plans', () => {
     // while the fetched list still carries the old values: lay it over too.
     const framingAtStart = [...pendingFraming];
     const windowsAtStart = [...pendingWindows];
+    const mosaicWindowsAtStart = [...pendingMosaicWindows];
     try {
       const fresh = await getPlans();
       if (seq !== loadSeq) return;
@@ -121,6 +131,10 @@ export const usePlansStore = defineStore('plans', () => {
       for (const [entryId, edit] of [...windowsAtStart, ...pendingWindows]) {
         const entry = findEntry(fresh, edit.planId, entryId);
         if (entry) entry.observationWindows = edit.value;
+      }
+      for (const [mosaicId, edit] of [...mosaicWindowsAtStart, ...pendingMosaicWindows]) {
+        const mosaic = findMosaic(fresh, edit.planId, mosaicId);
+        if (mosaic) mosaic.observationWindows = edit.value;
       }
       plans.value = fresh;
       loaded.value = true;
@@ -356,6 +370,38 @@ export const usePlansStore = defineStore('plans', () => {
   }
 
   /**
+   * Replace a mosaic's observation windows (one set for the whole mosaic). Mutates the local cache
+   * immediately and debounces the persist, as `setEntryObservationWindows` does for an entry.
+   */
+  function setMosaicObservationWindows(
+    planId: string,
+    mosaicId: string,
+    windows: ObservationWindow[],
+  ): void {
+    const mosaic = findMosaic(plans.value, planId, mosaicId);
+    if (mosaic) mosaic.observationWindows = windows;
+    const edit = { planId, value: windows };
+    pendingMosaicWindows.set(mosaicId, edit);
+    const prev = mosaicWindowTimers.get(mosaicId);
+    if (prev) clearTimeout(prev);
+    mosaicWindowTimers.set(
+      mosaicId,
+      setTimeout(() => {
+        mosaicWindowTimers.delete(mosaicId);
+        if (!findMosaic(plans.value, planId, mosaicId)) {
+          clearPending(pendingMosaicWindows, mosaicId, edit);
+          return;
+        }
+        updatePlanMosaicWindowsAPI(planId, mosaicId, edit.value)
+          .catch((err) => {
+            reportError('plan_set_mosaic_windows_failed', err, { planId, mosaicId });
+          })
+          .finally(() => clearPending(pendingMosaicWindows, mosaicId, edit));
+      }, 250),
+    );
+  }
+
+  /**
    * Create a mosaic in a plan from client-computed tiles. Returns the new mosaic
    * id, or null on failure. Refreshes the cache so the tiles appear.
    */
@@ -427,6 +473,7 @@ export const usePlansStore = defineStore('plans', () => {
     setEntryPA,
     setEntryPosition,
     setEntryObservationWindows,
+    setMosaicObservationWindows,
     setPlanSort,
     createMosaic,
     updateMosaic,

@@ -9,6 +9,7 @@ vi.mock('@myastrosky/app-state/api', () => ({
   updatePlanArchivedAPI: vi.fn().mockResolvedValue(undefined),
   renamePlanAPI: vi.fn().mockResolvedValue(undefined),
   updatePlanEntryPositionAPI: vi.fn().mockResolvedValue(undefined),
+  updatePlanMosaicWindowsAPI: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../src/error-reporter', () => ({ reportUnknownRendererError: vi.fn() }));
 
@@ -19,6 +20,7 @@ import {
   updatePlanArchivedAPI,
   renamePlanAPI,
   updatePlanEntryPositionAPI,
+  updatePlanMosaicWindowsAPI,
   type Plan,
   type PlanEntry,
 } from '../../src/api';
@@ -284,5 +286,45 @@ describe('plans store · pending entry edits survive a refresh', () => {
     expect(updatePlanEntryPositionAPI).toHaveBeenCalledWith('p', 'e', {
       observationWindows: windows,
     });
+  });
+
+  it('a mosaic’s windows show at once, survive a refresh and are saved once after a burst', async () => {
+    const store = usePlansStore();
+    const withMosaic = (): Plan => ({
+      ...makePlan('p', null),
+      mosaics: [
+        {
+          id: 'm',
+          dsoId: null,
+          name: null,
+          centerRa: 1,
+          centerDec: 2,
+          paDeg: 0,
+          overlapPct: 20,
+          cols: 2,
+          rows: 1,
+          position: 0,
+          observationWindows: [],
+        },
+      ],
+    });
+    store.plans = [withMosaic()];
+    vi.mocked(getPlans).mockResolvedValueOnce([withMosaic()]);
+    const first = [
+      { id: 'w', startFrac: 0.1, endFrac: 0.2 },
+    ] as Plan['mosaics'][number]['observationWindows'];
+    const last = [
+      { id: 'w', startFrac: 0.1, endFrac: 0.3 },
+    ] as Plan['mosaics'][number]['observationWindows'];
+
+    store.setMosaicObservationWindows('p', 'm', first);
+    store.setMosaicObservationWindows('p', 'm', last);
+    expect(store.plans[0].mosaics[0].observationWindows).toEqual(last);
+    await store.load();
+    expect(store.plans[0].mosaics[0].observationWindows).toEqual(last);
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(updatePlanMosaicWindowsAPI).toHaveBeenCalledTimes(1);
+    expect(updatePlanMosaicWindowsAPI).toHaveBeenCalledWith('p', 'm', last);
   });
 });

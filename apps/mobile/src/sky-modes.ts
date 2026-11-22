@@ -51,13 +51,15 @@ export const skyTargetView = shallowRef<{
 
 /**
  * A plan shown on the map by "Afficher sur la carte" of its page, or null: its frames shown, with the frames' sheet on
- * it. The mode ends by putting back the frames as they were (`frames`: shown or not, and which set) and opening the
- * Plans tab, then `returnTo` (the plan's page).
+ * it; from a mosaic's page (`mosaicId`), that mosaic selected instead, with its own sheet (as a target is shown). The mode ends by putting back the frames as they were (`frames`: shown or not, and which set) and opening the
+ * Plans tab, the pages `under` the page it was opened from (the plan's page under a mosaic's), then `returnTo`.
  */
 export const skyPlanView = shallowRef<{
   planId: string;
   name: string;
   frames: { visible: boolean; selection: FovSelection };
+  under?: string[];
+  mosaicId?: string;
   returnTo: string;
 } | null>(null);
 

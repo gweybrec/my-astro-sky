@@ -127,6 +127,8 @@ export interface PlanItemMosaic {
   name: string | null;
   centerRa: number;
   centerDec: number;
+  /** The mosaic's own observation windows (one set for the whole mosaic). */
+  observationWindows?: Array<{ startFrac: number }>;
 }
 
 /**
@@ -297,7 +299,7 @@ export function resolvePlanNight(
   const infos = sortPlanTargets(
     computePlanTargets(plan, observer.loc, win, moonEnabled, lookups),
     plan.sortBy ?? 'transit',
-    firstWindowFracByEntry(plan.entries),
+    firstWindowFracByEntry([...plan.entries, ...(plan.mosaics ?? [])]),
   );
   return {
     loc: observer.loc,

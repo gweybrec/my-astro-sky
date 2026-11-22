@@ -52,6 +52,7 @@ vi.mock('@myastrosky/core/catalog/dso-registry', async (importOriginal) => ({
 import PlansPage from '../src/pages/PlansPage.vue';
 import PlanDetailPage from '../src/pages/PlanDetailPage.vue';
 import PlanEntryPage from '../src/pages/PlanEntryPage.vue';
+import PlanMosaicPage from '../src/pages/PlanMosaicPage.vue';
 import TargetDetailPage from '../src/pages/TargetDetailPage.vue';
 import PhoneRadioSheet from '../src/components/PhoneRadioSheet.vue';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
@@ -173,6 +174,8 @@ const backend = {
     removeEntry: vi.fn(),
     updateEntry: vi.fn(),
     addEntry: vi.fn(),
+    updateMosaicWindows: vi.fn(),
+    removeMosaic: vi.fn(),
   },
 };
 
@@ -181,6 +184,7 @@ function app(path: string) {
     history: createMemoryHistory(),
     routes: [
       { path: '/plans/:id/targets/:dsoId', component: { template: '<div />' } },
+      { path: '/plans/:id/mosaics/:mosaicId', component: { template: '<div />' } },
       { path: '/plans/:id/:entryId', component: { template: '<div />' } },
       { path: '/plans/:id', component: { template: '<div />' } },
       { path: '/targets/:dsoId', component: { template: '<div />' } },
@@ -258,6 +262,8 @@ beforeEach(() => {
   backend.plans.removeEntry.mockResolvedValue(undefined);
   backend.plans.updateEntry.mockResolvedValue(undefined);
   backend.plans.addEntry.mockResolvedValue({ id: 'e9' });
+  backend.plans.updateMosaicWindows.mockResolvedValue(undefined);
+  backend.plans.removeMosaic.mockResolvedValue(undefined);
   confirm.mockResolvedValue(true);
   setBackend(backend as never);
 });
@@ -356,7 +362,7 @@ describe('the plan detail page', () => {
     expect(router.currentRoute.value.path).toMatch(/^\/plans\/p1\/e[12]$/);
   });
 
-  const withMosaic = () => {
+  const withMosaic = (observationWindows: (typeof window1)[] = []) => {
     const mosaic = {
       id: 'm1',
       dsoId: 'NGC7000',
@@ -368,8 +374,9 @@ describe('the plan detail page', () => {
       cols: 2,
       rows: 1,
       position: 0,
+      observationWindows,
     };
-    backend.plans.list.mockResolvedValue([
+    backend.plans.list.mockImplementation(async () => [
       plan(
         'p1',
         'Nuit du 2026-10-03',
@@ -387,23 +394,138 @@ describe('the plan detail page', () => {
       .findAll('.mob-list .mob-row')
       .find((r) => r.text().includes("Nébuleuse de l'Amérique du Nord · Mosaïque"))!;
 
-  it('lists a mosaic as an item like the targets, and shows a tapped one on the map zoomed to fit it', async () => {
+  it('lists a mosaic as an item like the targets, and opens its page on a tap', async () => {
     withMosaic();
     const { w, router } = await show(PlanDetailPage, '/plans/p1');
-    vi.spyOn(router, 'replace').mockResolvedValue(undefined);
     expect(w.text()).toContain('2 objets');
     expect(mosaicRow(w).text()).toContain('2 tuiles');
     // one item for the mosaic, none for its tiles
     expect(w.findAll('.mob-list .mob-row')).toHaveLength(2);
     await mosaicRow(w).trigger('click');
     await settle();
-    expect(skyPlanView.value?.planId).toBe('p1');
-    expect(skyFocus.value).toMatchObject({ ra: 314, dec: 44, scale: 0 });
-    const field = skyFocus.value!.fov!;
-    expect(field.wDeg).toBeGreaterThan(field.hDeg);
-    skyPlanView.value = null;
-    skyFocus.value = null;
-    framesSheetOpen.value = false;
+    expect(router.currentRoute.value.path).toBe('/plans/p1/mosaics/m1');
+    expect(skyPlanView.value).toBeNull();
+  });
+
+  it("gives a mosaic's row its first window, as a target's", async () => {
+    withMosaic([window1]);
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    expect(mosaicRow(w).text()).toMatch(/\d\d:\d\d – \d\d:\d\d/);
+    expect(mosaicRow(w).text()).not.toContain('tuiles');
+  });
+
+  describe("a mosaic's page", () => {
+    beforeEach(() => withMosaic([window1]));
+    afterEach(() => {
+      skyPlanView.value = null;
+      skyFocus.value = null;
+      framesSheetOpen.value = false;
+    });
+    const rowTitled = (w: ReturnType<typeof mount>, title: string) =>
+      w.findAll('.mob-row').find((r) => r.text().trim() === title)!;
+
+    it("shows the desktop's figures of the mosaic: its tiles and field, centre, angle, Moon and total time", async () => {
+      const { w } = await show(PlanMosaicPage, '/plans/p1/mosaics/m1');
+      expect(w.find('.mob-topbar-title').text()).toBe("Nébuleuse de l'Amérique du Nord · Mosaïque");
+      expect(w.find('.mob-meta').text()).toMatch(/^2 tuiles × .+ → .+$/);
+      expect(w.findAll('.mob-fact-label').map((l) => l.text())).toEqual([
+        'Alt. max',
+        'Au plus haut',
+        'Distance Lune',
+        'Angle',
+        'RA',
+        'Dec',
+        'Temps total indicatif',
+      ]);
+      // no catalogue figure: a mosaic is not one object
+      expect(w.text()).not.toContain('Magnitude');
+      expect(w.text()).toContain('20h 56m 00.0s');
+      expect(w.text()).toContain('+44° 00');
+      expect(w.findAll('.mob-alt-chart-window')).toHaveLength(1);
+    });
+
+    it("lists each tile's figures in a sheet", async () => {
+      const { w } = await show(PlanMosaicPage, '/plans/p1/mosaics/m1');
+      await rowTitled(w, 'Détails panneau par panneau').trigger('click');
+      await settle();
+      const sheet = w
+        .findAllComponents({ name: 'PhoneSheet' })
+        .find((c) => c.props('title') === 'Détails des panneaux')!;
+      expect(sheet.props('open')).toBe(true);
+      const tiles = sheet.findAll('.mob-row');
+      expect(tiles.map((r) => r.find('.mob-row-title').text())).toEqual(['Panneau 1', 'Panneau 2']);
+      expect(tiles[0].text()).toContain('RA 20h 52m 00.0s · Dec +44° 00');
+      expect(tiles[0].text()).toMatch(/Alt\. max \d+° · Angle 0°/);
+    });
+
+    it('adds a window to the mosaic itself, in one request that keeps the others', async () => {
+      const { w } = await show(PlanMosaicPage, '/plans/p1/mosaics/m1');
+      await rowTitled(w, "Fenêtre d'observation").trigger('click');
+      await settle();
+      expect(backend.plans.updateMosaicWindows).not.toHaveBeenCalled();
+      await w
+        .findAll('button')
+        .find((b) => b.text() === 'Enregistrer')!
+        .trigger('click');
+      await settle();
+      expect(backend.plans.updateMosaicWindows).toHaveBeenCalledTimes(1);
+      const [planId, mosaicId, windows] = backend.plans.updateMosaicWindows.mock.calls[0];
+      expect([planId, mosaicId]).toEqual(['p1', 'm1']);
+      expect(windows).toHaveLength(2);
+      expect(windows[0].id).toBe('w1');
+      expect(backend.plans.updateEntry).not.toHaveBeenCalled();
+    });
+
+    it('shows the error toast when the window cannot be saved', async () => {
+      backend.plans.updateMosaicWindows.mockRejectedValue(new Error('boom'));
+      const { w } = await show(PlanMosaicPage, '/plans/p1/mosaics/m1');
+      await w
+        .findAll('.mob-row')
+        .find((r) => r.text().includes('Ha'))!
+        .trigger('click');
+      await settle();
+      await w
+        .findAll('button')
+        .find((b) => b.text() === 'Enregistrer')!
+        .trigger('click');
+      await settle();
+      expect(showError).toHaveBeenCalled();
+    });
+
+    it('shows the mosaic selected on the map, zoomed to fit it, without the frames list, and comes back here', async () => {
+      const { w, router } = await show(PlanMosaicPage, '/plans/p1/mosaics/m1');
+      vi.spyOn(router, 'replace').mockResolvedValue(undefined);
+      await rowTitled(w, 'Afficher sur la carte').trigger('click');
+      await settle();
+      expect(skyPlanView.value).toMatchObject({
+        planId: 'p1',
+        mosaicId: 'm1',
+        under: ['/plans/p1'],
+        returnTo: '/plans/p1/mosaics/m1',
+      });
+      // the mosaic is the selected frame: its own sheet opens over the map, not the frames' list with its add buttons
+      const frames = useFovFramesStore();
+      expect(frames.selection).toEqual({ kind: 'plan', planId: 'p1' });
+      expect(frames.renderables.find((r) => r.active)?.id).toBe('mosaic:p1:m1');
+      expect(skyFocus.value).toMatchObject({ ra: 314, dec: 44, scale: 0 });
+      const field = skyFocus.value!.fov!;
+      expect(field.wDeg).toBeGreaterThan(field.hDeg);
+      expect(framesSheetOpen.value).toBe(false);
+    });
+
+    it('asks before deleting the mosaic, and deletes nothing when cancelled', async () => {
+      confirm.mockResolvedValueOnce(false);
+      const { w } = await show(PlanMosaicPage, '/plans/p1/mosaics/m1');
+      await rowTitled(w, 'Supprimer la mosaïque').trigger('click');
+      await settle();
+      expect(confirm).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Supprimer la mosaïque', destructive: true }),
+      );
+      expect(backend.plans.removeMosaic).not.toHaveBeenCalled();
+      await rowTitled(w, 'Supprimer la mosaïque').trigger('click');
+      await settle();
+      expect(backend.plans.removeMosaic).toHaveBeenCalledWith('p1', 'm1');
+    });
   });
 
   it('opens the Cibles list for the plan from its plus', async () => {

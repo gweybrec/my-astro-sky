@@ -113,6 +113,9 @@ const fr = {
     phase6: 'Dernier quartier',
     phase7: 'Dernier croissant',
     windowsHeader: "Fenêtres d'observation",
+    /** The coordinates of a mosaic's centre and of its tiles, labelled as on the desktop. */
+    ra: 'RA',
+    dec: 'Dec',
     actions: 'Actions du plan',
     addTarget: 'Ajouter une cible',
     drag: 'Déplacer {name}',

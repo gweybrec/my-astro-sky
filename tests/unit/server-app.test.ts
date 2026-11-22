@@ -88,6 +88,7 @@ const EXPECTED_API_ROUTES = [
   'PATCH /api/plans/:id/entries/:entryId',
   'POST /api/plans/:id/mosaics',
   'PUT /api/plans/:id/mosaics/:mosaicId',
+  'PUT /api/plans/:id/mosaics/:mosaicId/windows',
   'DELETE /api/plans/:id/mosaics/:mosaicId',
   'POST /api/export',
   'POST /api/import/preview',
@@ -214,10 +215,10 @@ describe('route table', () => {
     ]);
   });
 
-  it('registers exactly the 95 documented /api routes', () => {
+  it('registers exactly the 96 documented /api routes', () => {
     const all = listRoutes(app);
     const api = all.filter((r) => r.split(' ')[1].startsWith('/api/'));
-    expect(EXPECTED_API_ROUTES).toHaveLength(95);
+    expect(EXPECTED_API_ROUTES).toHaveLength(96);
     expect([...api].sort()).toEqual([...EXPECTED_API_ROUTES].sort());
   });
 
@@ -497,6 +498,7 @@ describe('plans', () => {
         cols: 2,
         rows: 1,
         position: 0,
+        observationWindows: [],
       },
     ]);
     const tileEntries = list.body[0].entries.filter((e: any) => e.mosaicId === mosaic.body.id);

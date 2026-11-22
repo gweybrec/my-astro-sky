@@ -10,6 +10,8 @@ const DROP_PLAN_ARCHIVED = 'ALTER TABLE plans DROP COLUMN archived';
 /** What migration 22 added, taken away the same way. */
 const DROP_FITS_HEADERS = 'ALTER TABLE photos DROP COLUMN fits_headers';
 const DROP_ONLINE_SOLVE = 'ALTER TABLE photos DROP COLUMN online_solve';
+/** What migration 24 added (a mosaic's observation windows), taken away the same way. */
+const DROP_MOSAIC_WINDOWS = 'ALTER TABLE plan_mosaics DROP COLUMN observation_windows';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -456,6 +458,7 @@ describe('applyMigrations — v9 supernova type + ISS recolor', () => {
     db.prepare('UPDATE schema_version SET version = 8').run();
     db.exec(DROP_VISIT_TABLES);
     db.exec(DROP_PLAN_ARCHIVED);
+    db.exec(DROP_MOSAIC_WINDOWS);
     // Migration 15 on is plain SQL, run once: what it added goes too.
     db.exec('ALTER TABLE photos DROP COLUMN quarter_turns');
     const ins = db.prepare(
@@ -889,6 +892,7 @@ describe('applyMigrations — v15 photo quarter turns', () => {
     db.prepare('UPDATE schema_version SET version = 14').run();
     db.exec(DROP_VISIT_TABLES);
     db.exec(DROP_PLAN_ARCHIVED);
+    db.exec(DROP_MOSAIC_WINDOWS);
     db.prepare(
       'INSERT INTO photos (id, filename, original_name, width, height) VALUES (?, ?, ?, ?, ?)',
     ).run('p1', 'p1.jpg', 'p1.jpg', 30, 20);
@@ -906,6 +910,7 @@ describe('applyMigrations — v16 photo dates in ISO form', () => {
     db.prepare('UPDATE schema_version SET version = 15').run();
     db.exec(DROP_VISIT_TABLES);
     db.exec(DROP_PLAN_ARCHIVED);
+    db.exec(DROP_MOSAIC_WINDOWS);
     const ins = db.prepare(
       'INSERT INTO photos (id, filename, original_name, width, height, created_at) VALUES (?, ?, ?, ?, ?, ?)',
     );
@@ -1001,6 +1006,7 @@ describe('applyMigrations — v20 author of a visited photo', () => {
     db.exec('ALTER TABLE shared_sky_photos DROP COLUMN author');
     db.prepare('UPDATE schema_version SET version = 19').run();
     db.exec(DROP_PLAN_ARCHIVED);
+    db.exec(DROP_MOSAIC_WINDOWS);
     db.exec(DROP_FITS_HEADERS);
     db.exec(DROP_ONLINE_SOLVE);
     db.prepare(

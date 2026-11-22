@@ -82,6 +82,7 @@ export interface Backend {
     | 'updateEntry'
     | 'createMosaic'
     | 'updateMosaic'
+    | 'updateMosaicWindows'
     | 'removeMosaic'
   >;
   photos: Pick<

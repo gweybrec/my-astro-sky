@@ -13,7 +13,7 @@
 import type { SqlDb } from '../ports/sql-db';
 
 /** Schema version produced by `BASELINE_SCHEMA` (the latest migration it includes). */
-export const SCHEMA_VERSION = 23;
+export const SCHEMA_VERSION = 24;
 
 /** The columns of the photos table at version 17, in their order (migration 17 copies them). */
 const PHOTO_COLUMNS_V17 =
@@ -146,7 +146,8 @@ export const BASELINE_SCHEMA: readonly string[] = [
     cols        INTEGER NOT NULL DEFAULT 1,
     rows        INTEGER NOT NULL DEFAULT 1,
     position    INTEGER NOT NULL DEFAULT 0,
-    name TEXT
+    name TEXT,
+    observation_windows TEXT NOT NULL DEFAULT '[]'
   )`,
   `CREATE TABLE plans (
     id         TEXT PRIMARY KEY,
@@ -271,6 +272,13 @@ export const MIGRATIONS: readonly DataMigration[] = [
   { version: 22, statements: ['ALTER TABLE photos ADD COLUMN fits_headers TEXT'] },
   // The astrometry.net solve of a photo stored without a placement (JSON), followed again until it ends.
   { version: 23, statements: ['ALTER TABLE photos ADD COLUMN online_solve TEXT'] },
+  // A mosaic's observation windows on its night trajectory (JSON list): one set for the whole mosaic.
+  {
+    version: 24,
+    statements: [
+      "ALTER TABLE plan_mosaics ADD COLUMN observation_windows TEXT NOT NULL DEFAULT '[]'",
+    ],
+  },
 ];
 
 /**

@@ -63,6 +63,11 @@ const routes: RouteRecordRaw[] = [
     path: '/plans/:id/targets/:dsoId',
     component: () => import('./pages/TargetDetailPage.vue'),
   },
+  // A mosaic of a plan (board "Plan, détail d'une mosaïque"), before the entries' path that would take "mosaics".
+  {
+    path: '/plans/:id/mosaics/:mosaicId',
+    component: () => import('./pages/PlanMosaicPage.vue'),
+  },
   { path: '/plans/:id/:entryId', component: () => import('./pages/PlanEntryPage.vue') },
   { path: '/settings/setups', component: () => import('./pages/SetupsPage.vue') },
   { path: '/settings/setups/:id', component: () => import('./pages/SetupEditPage.vue') },

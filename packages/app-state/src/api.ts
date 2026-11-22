@@ -865,6 +865,17 @@ export async function updatePlanMosaicAPI(
   );
 }
 
+/** Replace a mosaic's observation windows (one set for the whole mosaic). */
+export async function updatePlanMosaicWindowsAPI(
+  planId: string,
+  mosaicId: string,
+  windows: ObservationWindow[],
+): Promise<void> {
+  return guard('errors.updateMosaic', () =>
+    getBackend().plans.updateMosaicWindows(planId, mosaicId, windows),
+  );
+}
+
 export async function deletePlanMosaicAPI(planId: string, mosaicId: string): Promise<void> {
   return guard('errors.deleteMosaic', () => getBackend().plans.removeMosaic(planId, mosaicId));
 }

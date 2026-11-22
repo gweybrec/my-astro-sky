@@ -107,6 +107,17 @@ describe('buildPlanPdfTargets', () => {
       cols: 2,
       rows: 1,
       position: 0,
+      observationWindows: [
+        {
+          id: 'w1',
+          startFrac: 0.2,
+          endFrac: 0.5,
+          filter: 'Ha',
+          color: null,
+          frameSeconds: 300,
+          snap: false,
+        },
+      ],
     };
     const plan = {
       entries: [
@@ -140,7 +151,8 @@ describe('buildPlanPdfTargets', () => {
     // two tiles of 2° side by side with 10 % overlap: wider than one tile, as tall as one
     expect(m.wDeg).toBeGreaterThan(2);
     expect(m.hDeg).toBeCloseTo(1.5);
-    expect(pages[1].observationWindows).toBeUndefined();
+    // the mosaic's own windows go on its page
+    expect(pages[1].observationWindows).toEqual(mosaic.observationWindows);
     expect(pages[3].mosaic!.tiles).toEqual([]);
   });
 

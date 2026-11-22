@@ -31,7 +31,7 @@ export interface PlanPdfTarget {
 
 /**
  * The pages of a plan's PDF, in the plan's order (`night.infos`): a standalone target with its observation windows, a
- * mosaic with its framed tile grid when the plan's setup gives the tile size (`tile`; without it a mosaic has no page).
+ * mosaic with its own windows and its framed tile grid when the plan's setup gives the tile size (`tile`; without it a mosaic has no page).
  * The Moon overlay of the night goes on every page.
  */
 export function buildPlanPdfTargets(
@@ -65,7 +65,11 @@ export function buildPlanPdfTargets(
       .filter((en) => en.mosaicId === m.id && en.ra != null && en.dec != null)
       .map((en) => ({ ra: en.ra as number, dec: en.dec as number }));
     const env = outlineFromGrid(m.cols, m.rows, tile.wDeg, tile.hDeg, m.overlapPct);
-    targets.push({ ...page, mosaic: { wDeg: env.wDeg, hDeg: env.hDeg, paDeg: m.paDeg, tiles } });
+    targets.push({
+      ...page,
+      mosaic: { wDeg: env.wDeg, hDeg: env.hDeg, paDeg: m.paDeg, tiles },
+      observationWindows: m.observationWindows ?? [],
+    });
   }
   return targets;
 }

@@ -3542,7 +3542,7 @@ export class TargetsView {
           customLabel: customLocationLabel,
         }),
         sortKey,
-        firstWindowFracByEntry(plan.entries),
+        firstWindowFracByEntry([...plan.entries, ...plan.mosaics]),
       );
       currentInfos = infos;
       currentWin = win;
@@ -4044,7 +4044,8 @@ export class TargetsView {
   /**
    * One plan mosaic, an item of the plan's order like a target (`info`, resolved at its centre): its name · Mosaïque,
    * the panels summary with an info icon opening per-panel details, computable metadata only (altitude, angle, Moon,
-   * centre RA/Dec; no catalogue fields), the total integration, the trajectory chart, a show-on-map button zooming to
+   * centre RA/Dec; no catalogue fields), the total integration, the trajectory chart with the mosaic's observation
+   * windows (one set for the whole mosaic, as a target's), a show-on-map button zooming to
    * fit the whole mosaic and a delete button. `applyPreset` fills the panel and mosaic sizes and the total integration
    * (the single-object recipe × the tile count) once the plan's setup resolves. `onDeleted` runs once it is deleted.
    */
@@ -4073,8 +4074,10 @@ export class TargetsView {
     const left = document.createElement('div');
     left.className = `${TargetsView.PLAN_INFO_COL} shrink-0 flex flex-col gap-1`;
     const title = document.createElement('div');
-    title.className = 'text-sub text-bright truncate max-w-full';
+    // A long name wraps inside the column rather than being cut: a mosaic's name is often longer than a catalogue id.
+    title.className = 'text-sub text-bright break-words max-w-full';
     title.textContent = `${name} · ${t('targets.plan.mosaicLabel')}`;
+    title.title = title.textContent;
 
     // Computable metadata only — no rating/difficulty/magnitude (catalogue fields).
     // Two rows (like a standalone target) for breathing room: altitude/angle on
@@ -4141,6 +4144,22 @@ export class TargetsView {
     left.appendChild(totalEl);
 
     const chartWrap = this.buildPlanChart(curve, win, atDate, moon);
+    const chartBox = chartWrap.querySelector<HTMLElement>('.plan-chart-box');
+    // The chart with the mosaic's observation windows beneath it, as on a standalone target row.
+    const chartCol = document.createElement('div');
+    chartCol.className = 'flex-1 min-w-0 flex flex-col';
+    chartCol.appendChild(chartWrap);
+    if (chartBox) {
+      const windowUi = this.buildObservationWindowUi(
+        {
+          initial: mosaic.observationWindows ?? [],
+          save: (w) => this.plansStore.setMosaicObservationWindows(plan.id, mosaic.id, w),
+        },
+        chartBox,
+        win,
+      );
+      chartCol.appendChild(windowUi.toolbar);
+    }
 
     // Show-on-map: zoom to fit the whole mosaic (its envelope is the frame
     // used for the zoom calculation).
@@ -4162,7 +4181,7 @@ export class TargetsView {
       onDeleted();
     });
     row.appendChild(left);
-    row.appendChild(chartWrap);
+    row.appendChild(chartCol);
     row.appendChild(navBtn);
     row.appendChild(del);
 
@@ -4327,7 +4346,17 @@ export class TargetsView {
     chartCol.className = 'flex-1 min-w-0 flex flex-col';
     chartCol.appendChild(chartWrap);
     if (chartBox) {
-      const windowUi = this.buildObservationWindowUi(planId, info.entryId, chartBox, win);
+      const entry = this.plansStore.plans
+        .find((p) => p.id === planId)
+        ?.entries.find((e) => e.id === info.entryId);
+      const windowUi = this.buildObservationWindowUi(
+        {
+          initial: entry?.observationWindows ?? [],
+          save: (w) => this.plansStore.setEntryObservationWindows(planId, info.entryId, w),
+        },
+        chartBox,
+        win,
+      );
       chartCol.appendChild(windowUi.toolbar);
     }
 
@@ -4473,17 +4502,16 @@ export class TargetsView {
   }
 
   /**
-   * Interactive observation-window layer for a standalone plan row. Renders
+   * Interactive observation-window layer for a plan row (a standalone target or a mosaic). Renders
    * draggable shaded bands over the trajectory (inside `chartBox`) and a toolbar
    * beneath it — an "add" button plus one editor row per window: colour swatch,
    * filter picker, editable start/end clock times, read-only duration, editable
    * single-frame duration, a snap-to-frame toggle, and a remove button. Window
-   * edges are stored as fractions of the night window; edits persist (debounced)
-   * via the plans store.
+   * edges are stored as fractions of the night window; `source.save` persists each edit
+   * (the plans store debounces it), to the entry's or the mosaic's windows.
    */
   private buildObservationWindowUi(
-    planId: string,
-    entryId: string,
+    source: { initial: readonly ObservationWindow[]; save: (windows: ObservationWindow[]) => void },
     chartBox: HTMLElement,
     win: { start: Date; end: Date },
   ): { toolbar: HTMLElement } {
@@ -4496,21 +4524,13 @@ export class TargetsView {
     const fracToPct = (f: number) => ((padX + f * (W - padX)) / W) * 100;
     const readVar = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v);
 
-    const entry = () =>
-      this.plansStore.plans.find((p) => p.id === planId)?.entries.find((e) => e.id === entryId);
     // Working copy (source of truth is the store cache, snapshotted on build).
-    const windows: ObservationWindow[] = (entry()?.observationWindows ?? []).map((w) => ({ ...w }));
+    const windows: ObservationWindow[] = source.initial.map((w) => ({ ...w }));
 
     const knownFilterMap = new Map<string, string>();
     for (const name of OBS_WINDOW_FILTERS) knownFilterMap.set(name.toLowerCase(), name);
 
-    const persist = () => {
-      this.plansStore.setEntryObservationWindows(
-        planId,
-        entryId,
-        windows.map((w) => ({ ...w })),
-      );
-    };
+    const persist = () => source.save(windows.map((w) => ({ ...w })));
 
     // Snap step as a fraction of the night, or 0 when the window has no frame
     // duration / snap is off (→ free drag).
