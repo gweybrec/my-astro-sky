@@ -384,6 +384,38 @@ describe('MetadataSheet', () => {
     expect(rows()[2].find('input').exists()).toBe(false);
   });
 
+  it('saves a row with only a filter, shown as its badge alone', async () => {
+    mountSheet();
+    await wrapper.find('[data-test=add-exposure]').trigger('click');
+    const fresh = wrapper.findAll('[data-test=row-exposure]')[2];
+    fresh.findComponent({ name: 'FilterInput' }).vm.$emit('update:modelValue', 'OIII');
+    await fresh.find('[data-test=row-ok]').trigger('click');
+    await flushPromises();
+    expect(showToast).not.toHaveBeenCalled();
+    expect(save.mock.calls[0][0].integrations[2]).toEqual({
+      frames: 0,
+      seconds: 0,
+      filter: 'OIII',
+    });
+    const saved = wrapper.findAll('[data-test=row-exposure]')[2];
+    expect(saved.text()).toBe('OIII');
+    expect(saved.find('.target-filter-badge').exists()).toBe(true);
+  });
+
+  it('shows a placeholder without any exposure row, whose pen opens a new row', async () => {
+    mountSheet({ integrations: [] });
+    const placeholder = () => wrapper.find('[data-test=row-no-exposure]');
+    expect(placeholder().text()).toBe(t('gallery.sheet.noIntegration'));
+    await placeholder().find('[data-test=row-edit]').trigger('click');
+    expect(placeholder().exists()).toBe(false);
+    const fresh = wrapper.get('[data-test=row-exposure]');
+    expect(fresh.find('[data-test=exposure-frames]').exists()).toBe(true);
+    // ✕ takes the new row away and the placeholder comes back.
+    await fresh.find('[data-test=row-cancel]').trigger('click');
+    expect(placeholder().exists()).toBe(true);
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it('changes and removes an exposure row', async () => {
     mountSheet();
     const first = () => wrapper.findAll('[data-test=row-exposure]')[0];

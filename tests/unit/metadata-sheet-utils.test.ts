@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   foldedChipCount,
   calendarWeeks,
-  integrationRowText,
   integrationsTotalText,
   observationDateText,
 } from '../../src/metadata-sheet-utils';
@@ -45,23 +44,6 @@ describe('calendarWeeks', () => {
     expect(jan[0][0]).toMatchObject({ year: 2025, month: 11 });
     const dec = calendarWeeks(2025, 11);
     expect(dec[dec.length - 1][6]).toMatchObject({ year: 2026, month: 0 });
-  });
-});
-
-describe('integrationRowText', () => {
-  it('gives the count, the length and the total', () => {
-    expect(integrationRowText({ frames: 120, seconds: 180, filter: 'Ha' }, 'N/A', 's')).toBe(
-      '120 × 180s = 6h00',
-    );
-  });
-
-  it('writes a missing count or length as not given, without a total', () => {
-    expect(integrationRowText({ frames: 0, seconds: 10, filter: '' }, 'N/A', 's')).toBe(
-      'N/A × 10s',
-    );
-    expect(integrationRowText({ frames: 300, seconds: 0, filter: '' }, 'N/A', 's')).toBe(
-      '300 × N/A',
-    );
   });
 });
 

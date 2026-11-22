@@ -75,6 +75,26 @@ describe('PhotoFactsFold', () => {
     );
   });
 
+  it('lists partial rows, the filter as a badge after the time', async () => {
+    const photo = makePhoto({
+      integrations: [
+        { filter: 'Ha', frames: 30, seconds: 120 },
+        { filter: '', frames: 0, seconds: 10 },
+        { filter: 'OIII', frames: 0, seconds: 0 },
+      ],
+    });
+    const w = mount(PhotoFactsFold, { props: { photo } });
+    await flushPromises();
+    expect(w.findAll('[data-test="photo-facts-exposure"]').map((r) => r.text())).toEqual([
+      '30 × 120 sHa',
+      'N/A × 10 s',
+      'OIII',
+    ]);
+    const badges = w.findAll('[data-test="photo-facts-filter"]');
+    expect(badges.map((b) => b.text())).toEqual(['Ha', 'OIII']);
+    expect(badges[0].classes()).toContain('target-filter-badge');
+  });
+
   it('shows nothing when the only facts are the labels, already chips in the card', () => {
     const w = mount(PhotoFactsFold, { props: { photo: makePhoto({ labels: ['vespera'] }) } });
     expect(w.find('[data-test="photo-facts"]').exists()).toBe(false);

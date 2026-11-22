@@ -1,13 +1,19 @@
 import { getLang, t } from './i18n/index';
 import { CAPTURE_FIELDS } from './capture-fields';
 import { formatIntegrationTotal } from './format-utils';
+import {
+  integrationRowHasData,
+  integrationRowTime,
+  integrationTotalSeconds,
+} from './integration-rows';
 import { formatPlanDate } from './targets/plan';
 import type { Photo } from './types';
 
 /**
  * One read-only figure of a photo: a `mono` one is drawn in the mono face; a `line` one takes a line of its own, cut
  * with "…" when too long; a map sheet first stops under the line of the `stop` one (the equipment). The exposures
- * also come one per row in `exposures` (length and filter apart), for a place that lists them a line each. A `wide`
+ * also come one per row in `exposures` (time and filter apart, the filter drawn as its badge after the time; a row
+ * with only a filter has an empty time), for a place that lists them a line each. A `wide`
  * one (equipment, notes) is long text that a narrow place shows under its label rather than beside it.
  */
 export interface PhotoFact {
@@ -49,9 +55,9 @@ export function photoFacts(
       value: formatPlanDate(photo.observationDate.slice(0, 10), getLang()),
     });
   }
-  // Rows with a count and a length only, as the edit page counts them.
-  const rows = (photo.integrations ?? []).filter((row) => row.frames >= 1 && row.seconds >= 1);
-  const seconds = rows.reduce((sum, row) => sum + row.frames * row.seconds, 0);
+  // Every row the user wrote something in; only those with a count and a length make the total.
+  const rows = (photo.integrations ?? []).filter(integrationRowHasData);
+  const seconds = integrationTotalSeconds(rows);
   if (seconds > 0) {
     out.push({ label: t('mobile.photo.totalExposure'), value: formatIntegrationTotal(seconds) });
   }
@@ -89,15 +95,16 @@ export function photoFacts(
     }
   }
   if (rows.length) {
+    const na = t('modal.metadataIntegrationsFieldNA');
+    const suffix = ` ${t('modal.metadataIntegrationsSecondsSuffix')}`;
     const exposures = rows.map((row) => ({
-      time: `${row.frames} × ${row.seconds} ${t('modal.metadataIntegrationsSecondsSuffix')}`,
+      time: integrationRowTime(row, na, suffix),
       filter: row.filter,
     }));
     out.push({
       label: t('modal.metadataIntegrations'),
-      value: joined(exposures.map((e) => [e.filter, e.time].filter(Boolean).join(' '))),
+      value: joined(exposures.map((e) => [e.time, e.filter].filter(Boolean).join(' '))),
       exposures,
-      mono: true,
     });
   }
   if (!options.noChips && photo.labels?.length) {
@@ -120,8 +127,7 @@ export function photoFacts(
  * (["Seestar S50", "2h15", "12 oct. 2025"]), only the parts the photo has; empty when it has none.
  */
 export function photoSummaryParts(photo: Photo, setupName?: string): string[] {
-  const rows = (photo.integrations ?? []).filter((row) => row.frames >= 1 && row.seconds >= 1);
-  const seconds = rows.reduce((sum, row) => sum + row.frames * row.seconds, 0);
+  const seconds = integrationTotalSeconds(photo.integrations ?? []);
   return [
     setupName ?? photo.sharedGear?.setup,
     seconds > 0 ? formatIntegrationTotal(seconds) : undefined,

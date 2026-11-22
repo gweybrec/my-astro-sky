@@ -32,6 +32,7 @@ import type {
   QuarterTurns,
 } from '../types';
 import { sanitizeCaptureDetails } from '../wcs';
+import { integrationRowHasData } from '../integration-rows';
 import { sanitizeFitsCards, type FitsCard } from '../fits-header';
 
 /** Extensions an uploaded photo may have (lower case, with the dot). */
@@ -377,21 +378,21 @@ export function sanitizePois(rows: unknown): PointOfInterest[] {
 }
 
 /**
- * Integration rows as they are stored and returned: each row is read as whole numbers and a trimmed filter,
- * and a row without at least one frame, one second and a filter is dropped.
+ * Integration rows as they are stored and returned: each row is read as whole, non-negative numbers (anything else
+ * is 0, "not given") and a trimmed filter, and a row with nothing in it (no frame count, no length and no filter) is
+ * dropped. A partial row stays: "N/A × 10 s", "183 × N/A" or a filter alone are all something the user wrote down.
  */
 export function sanitizeIntegrationRows(rows: unknown): PhotoIntegration[] {
   if (!Array.isArray(rows)) return [];
-  return (
-    rows
-      .map((entry: any) => ({
-        frames: Number.isInteger(Number(entry?.frames)) ? Number(entry.frames) : 0,
-        seconds: Number.isInteger(Number(entry?.seconds)) ? Number(entry.seconds) : 0,
-        filter: typeof entry?.filter === 'string' ? entry.filter.trim() : '',
-      }))
-      // The filter may be empty: a header without FILTER (a camera without a filter wheel) still gives its exposures.
-      .filter((entry) => entry.frames >= 1 && entry.seconds >= 1)
-  );
+  const whole = (value: unknown) =>
+    Number.isInteger(Number(value)) && Number(value) >= 0 ? Number(value) : 0;
+  return rows
+    .map((entry: any) => ({
+      frames: whole(entry?.frames),
+      seconds: whole(entry?.seconds),
+      filter: typeof entry?.filter === 'string' ? entry.filter.trim() : '',
+    }))
+    .filter(integrationRowHasData);
 }
 
 /** The extension of a file name, lower-cased, with its dot ('' when there is none). Both slashes separate folders. */

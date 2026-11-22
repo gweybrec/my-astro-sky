@@ -5,7 +5,7 @@
  */
 import type { Photo } from '@myastrosky/core/types';
 import { getCaptureField } from '@myastrosky/core/capture-fields';
-import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
+import { integrationRowHasData, integrationRowText } from '@myastrosky/core/integration-rows';
 import { getLang, t } from './i18n';
 
 export interface VisitPhotoInfoRow {
@@ -17,18 +17,13 @@ export interface VisitPhotoInfoRow {
   oneLine?: boolean;
 }
 
-/** One line per exposure row: "120 × 180 s = 6h00, Ha"; a missing count or time is left out of the total. */
+/** One line per exposure row: "120 × 180 s = 6h00, Ha", "N/A × 10 s"; a row with only a filter is the filter alone. */
 function integrationLines(photo: Photo): string[] {
   const suffix = t('modal.metadataIntegrationsSecondsSuffix');
   const na = t('modal.metadataIntegrationsFieldNA');
-  return (photo.integrations ?? []).map((row) => {
-    const frames = row.frames >= 1 ? String(row.frames) : na;
-    const seconds = row.seconds >= 1 ? `${row.seconds}${suffix}` : na;
-    let line = `${frames} × ${seconds}`;
-    if (row.frames >= 1 && row.seconds >= 1) {
-      line += ` = ${formatIntegrationTotal(row.frames * row.seconds)}`;
-    }
-    return row.filter ? `${line}, ${row.filter}` : line;
+  return (photo.integrations ?? []).filter(integrationRowHasData).map((row) => {
+    const line = integrationRowText(row, na, suffix);
+    return [line, row.filter].filter(Boolean).join(', ');
   });
 }
 

@@ -48,17 +48,19 @@ function oldRouteSanitize(input: unknown) {
 
 /**
  * The old private `server/db.ts` function: maps, then drops the invalid rows. Ran on every write and read. Since
- * rows may have no filter (a header without FILTER), only the counts are required now.
+ * rows may have no filter (a header without FILTER), and since a partial row ("N/A × 10 s", a filter alone) is kept,
+ * only a row with nothing in it is dropped now; a negative count reads as not given.
  */
 function oldDbSanitize(rows: any) {
   if (!Array.isArray(rows)) return [];
+  const whole = (v: unknown) => (Number.isInteger(Number(v)) && Number(v) >= 0 ? Number(v) : 0);
   return rows
     .map((entry: any) => ({
-      frames: Number.isInteger(Number(entry?.frames)) ? Number(entry.frames) : 0,
-      seconds: Number.isInteger(Number(entry?.seconds)) ? Number(entry.seconds) : 0,
+      frames: whole(entry?.frames),
+      seconds: whole(entry?.seconds),
       filter: typeof entry?.filter === 'string' ? entry.filter.trim() : '',
     }))
-    .filter((entry) => entry.frames >= 1 && entry.seconds >= 1);
+    .filter((entry) => entry.frames >= 1 || entry.seconds >= 1 || entry.filter !== '');
 }
 
 const INTEGRATION_INPUTS: [string, unknown][] = [
@@ -88,6 +90,8 @@ const INTEGRATION_INPUTS: [string, unknown][] = [
   ['null entries', [null, { frames: 1, seconds: 1, filter: 'L' }]],
   ['non-object entries', ['x', 4, true, { frames: 2, seconds: 2, filter: 'G' }]],
   ['an empty object', [{}]],
+  ['only a filter', [{ frames: 0, seconds: 0, filter: 'Ha' }]],
+  ['nothing at all', [{ frames: 0, seconds: 0, filter: '  ' }]],
   ['an empty array', []],
   ['a string', 'not an array'],
   ['an object', { frames: 3, seconds: 60, filter: 'L' }],
@@ -304,13 +308,18 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
           integrations: [
             { frames: 2, seconds: 30, filter: ' R ' },
             { frames: 0, seconds: 30, filter: 'G' },
+            { frames: -1, seconds: 0, filter: ' ' },
           ],
           pointsOfInterest: [{ name: '', categoryId: 'c' }],
           captureDetails: { gain: 5, bogus: 1 } as never,
           gearSetupId: `  ${'g'.repeat(80)}  `,
         }),
       );
-      expect(dirty.integrations).toEqual([{ frames: 2, seconds: 30, filter: 'R' }]);
+      // A partial row stays; one with nothing in it goes.
+      expect(dirty.integrations).toEqual([
+        { frames: 2, seconds: 30, filter: 'R' },
+        { frames: 0, seconds: 30, filter: 'G' },
+      ]);
       expect(dirty.pointsOfInterest).toEqual([]);
       expect(dirty.captureDetails).toEqual({ gain: 5 });
       expect(dirty.gearSetupId).toBe('g'.repeat(64));
@@ -688,7 +697,7 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
         dsoIds: 'x' as never,
         labels: { a: 1 } as never,
         notes: 5 as never,
-        integrations: [{ frames: 0, seconds: 1, filter: 'L' }],
+        integrations: [{ frames: 0, seconds: 0, filter: '' }],
         observationDate: 5 as never,
         gearSetupId: 5 as never,
       });
@@ -1061,7 +1070,7 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
           notes: 'n',
           integrations: [
             { frames: 2, seconds: 3, filter: 'L' },
-            { frames: 0, seconds: 3, filter: 'L' },
+            { frames: 0, seconds: 0, filter: '' },
           ],
           thumbFilename: 'imp_thumb.jpg',
           observationDate: '2026-01-01',

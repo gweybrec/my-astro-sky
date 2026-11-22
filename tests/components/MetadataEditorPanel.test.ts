@@ -120,6 +120,24 @@ describe('MetadataEditorPanel integration rows', () => {
     expect(text).not.toContain('=');
   });
 
+  it('validates a row with only a filter and shows just its badge', async () => {
+    showToast.mockClear();
+    const wrapper = makeWrapper([]);
+    await wrapper.find('.integration-add-row').trigger('click');
+    wrapper.findComponent({ name: 'FilterInput' }).vm.$emit('update:modelValue', 'Ha');
+    await wrapper.find('.integration-row-validate').trigger('click');
+
+    expect(showToast).not.toHaveBeenCalled();
+    expect(wrapper.find('input.integration-frames-input').exists()).toBe(false);
+    expect(wrapper.find('.integration-row').text()).toBe('Ha');
+    expect(wrapper.find('.integration-row .target-filter-badge').exists()).toBe(true);
+  });
+
+  it('mounts a row with only a filter in display mode', () => {
+    const wrapper = makeWrapper([{ frames: 0, seconds: 0, filter: 'OIII' }]);
+    expect(wrapper.find('input.integration-frames-input').exists()).toBe(false);
+  });
+
   it('mounts an already-complete row in display mode', () => {
     const wrapper = makeWrapper([{ frames: 10, seconds: 60, filter: 'L' }]);
 

@@ -1,9 +1,10 @@
 /**
  * Pure helpers of the gallery's photo information panel (`MetadataSheet.vue`): how many object chips fit in the
- * folded list, the month grid of the date picker, and the text of an exposure row and of the total.
+ * folded list, the month grid of the date picker, and the text of the exposures' total.
  */
 import type { PhotoIntegration } from '@myastrosky/core/types';
 import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
+import { integrationRowComplete, integrationTotalSeconds } from '@myastrosky/core/integration-rows';
 
 /**
  * How many chips sit on the first `lines` lines, given each chip's top edge in order (a new line starts where the top
@@ -50,25 +51,10 @@ export function calendarWeeks(year: number, month: number): CalendarDay[][] {
   return weeks;
 }
 
-/** An exposure row as read: "120 × 180s = 6h00"; a missing count or length is `na`, and the total needs both. */
-export function integrationRowText(
-  row: PhotoIntegration,
-  na: string,
-  secondsSuffix: string,
-): string {
-  const frames = row.frames >= 1 ? String(row.frames) : na;
-  const seconds = row.seconds >= 1 ? `${row.seconds}${secondsSuffix}` : na;
-  const text = `${frames} × ${seconds}`;
-  return row.frames >= 1 && row.seconds >= 1
-    ? `${text} = ${formatIntegrationTotal(row.frames * row.seconds)}`
-    : text;
-}
-
 /** The total exposure of the rows that have both a count and a length, or `null` when fewer than two rows count. */
 export function integrationsTotalText(rows: readonly PhotoIntegration[]): string | null {
-  const complete = rows.filter((row) => row.frames >= 1 && row.seconds >= 1);
-  if (complete.length < 2) return null;
-  return formatIntegrationTotal(complete.reduce((sum, row) => sum + row.frames * row.seconds, 0));
+  if (rows.filter(integrationRowComplete).length < 2) return null;
+  return formatIntegrationTotal(integrationTotalSeconds(rows));
 }
 
 /** The observation date as read, in `lang` ("12 oct. 2025, 22:40"); `null` when there is none or it is not a date. */

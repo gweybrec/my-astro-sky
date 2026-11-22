@@ -154,6 +154,22 @@
         </template>
       </InlineEditRow>
 
+      <!-- No exposure yet: a placeholder whose pen opens a new row's editor. -->
+      <div v-if="rows.length === 0" class="sheet-row group" data-test="row-no-exposure">
+        <span class="sheet-value col-span-2 sheet-value--dim">{{
+          t('gallery.sheet.noIntegration')
+        }}</span>
+        <button
+          type="button"
+          class="sheet-icon-btn"
+          :title="t('gallery.sheet.addExposure')"
+          :aria-label="t('gallery.sheet.addExposure')"
+          data-test="row-edit"
+          @click="addIntegrationRow"
+          v-html="penSvg"
+        ></button>
+      </div>
+
       <InlineEditRow
         v-for="row in rows"
         :key="row._id"
@@ -169,7 +185,9 @@
         @remove="removeIntegrationRow(row._id)"
       >
         <span class="flex items-center gap-3 min-w-0">
-          <span class="flex-none">{{ integrationRowText(row, naText, secondsSuffix) }}</span>
+          <span v-if="integrationRowText(row, naText, secondsSuffix)" class="flex-none">{{
+            integrationRowText(row, naText, secondsSuffix)
+          }}</span>
           <span
             v-if="row.filter"
             :class="filterBadgeAttrs(row.filter).class"
@@ -504,15 +522,16 @@ import {
 } from '../../ui';
 import {
   foldedChipCount,
-  integrationRowText,
   integrationsTotalText,
   observationDateText,
 } from '../../metadata-sheet-utils';
+import { integrationRowHasData, integrationRowText } from '@myastrosky/core/integration-rows';
 import InlineEditRow, { EDIT_TRACKER_KEY, type EditTracker } from '../base/InlineEditRow.vue';
 import DateTimePicker from '../base/DateTimePicker.vue';
 import SheetSection from '../base/SheetSection.vue';
 import FilterInput from './FilterInput.vue';
 import plusSvg from '../../icons/plus.svg?raw';
+import penSvg from '../../icons/pen.svg?raw';
 
 const chevronDownSvg =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
@@ -687,7 +706,8 @@ const strip = (r: PhotoIntegration): PhotoIntegration => ({
 });
 async function saveIntegrationRow(id: number): Promise<boolean> {
   const b = buffer(id);
-  if (b.frames < 1 && b.seconds < 1) {
+  // Any one field is enough ("N/A × 10 s", a filter alone); a row with nothing in it is refused.
+  if (!integrationRowHasData(b)) {
     showToast({ message: t('errors.integrationRowIncomplete'), type: 'error', duration: 4000 });
     return false;
   }

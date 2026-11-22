@@ -78,6 +78,35 @@ describe('photoFacts', () => {
     expect(values).toContain('80');
     expect(values.some((v) => v.includes('-10'))).toBe(false);
   });
+
+  it('lists every exposure row with something in it, time first and filter after', () => {
+    const photo = makePhoto({
+      integrations: [
+        { filter: 'Ha', frames: 40, seconds: 300 },
+        { filter: '', frames: 0, seconds: 10 },
+        { filter: 'L', frames: 183, seconds: 0 },
+        { filter: 'OIII', frames: 0, seconds: 0 },
+      ],
+    });
+    const facts = photoFacts(photo);
+    const exposures = facts.find((f) => f.exposures)!;
+    expect(exposures.exposures).toEqual([
+      { time: '40 × 300 s', filter: 'Ha' },
+      { time: 'N/A × 10 s', filter: '' },
+      { time: '183 × N/A', filter: 'L' },
+      { time: '', filter: 'OIII' },
+    ]);
+    expect(exposures.value).toBe('40 × 300 s Ha · N/A × 10 s · 183 × N/A L · OIII');
+    expect(exposures.mono).toBeUndefined();
+    // Only the complete row makes the total.
+    expect(facts.find((f) => f.label === 'Total exposure')?.value).toBe('3h20');
+  });
+
+  it('has no total when no row has both a count and a length', () => {
+    const photo = makePhoto({ integrations: [{ filter: 'Ha', frames: 0, seconds: 300 }] });
+    const facts = photoFacts(photo);
+    expect(facts.map((f) => f.label)).toEqual(['Integration']);
+  });
 });
 
 describe('photoFacts noChips', () => {

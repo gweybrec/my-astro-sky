@@ -39,7 +39,7 @@
     </button>
     <div v-show="isOpen" class="flex flex-col mt-1" data-test="photo-facts-list">
       <template v-for="fact in facts" :key="fact.label">
-        <!-- The exposures take the full width, one line each: the time first, the filter after. -->
+        <!-- The exposures take the full width, one line each: the time first, the filter's badge after. -->
         <template v-if="fact.exposures">
           <div class="sheet-row grid-cols-[minmax(0,1fr)] !mx-0 !px-0 hover:!bg-transparent">
             <span class="sheet-label" :title="fact.label">{{ fact.label }}</span>
@@ -55,9 +55,18 @@
               data-test="photo-facts-exposure"
             >
               <span class="sheet-value font-mono">{{ exposure.time }}</span>
-              <span class="sheet-value text-secondary" :title="exposure.filter">{{
-                exposure.filter
-              }}</span>
+              <!-- The filter as its coloured badge; a row with only a filter has an empty time. -->
+              <span class="flex min-w-0">
+                <span
+                  v-if="exposure.filter"
+                  :class="filterBadgeAttrs(exposure.filter).class"
+                  :style="filterBadgeAttrs(exposure.filter).style"
+                  :title="catalogBadgeTitle(exposure.filter) ?? exposure.filter"
+                  class="min-w-0 truncate"
+                  data-test="photo-facts-filter"
+                  >{{ exposure.filter }}</span
+                >
+              </span>
             </div>
           </div>
         </template>
@@ -112,6 +121,7 @@ import { t } from '../../i18n';
 import { getGearSetups } from '../../api';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 import { photoFacts, photoSummaryParts } from '@myastrosky/core/photo-facts';
+import { filterBadgeAttrs, catalogBadgeTitle } from '../../chip-utils';
 import type { Photo } from '@myastrosky/core/types';
 
 /**

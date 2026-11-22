@@ -123,6 +123,13 @@ describe('a visited photo read-only rows', () => {
     expect(rows[4].lines).toEqual(['Clear night']);
   });
 
+  it('writes a row with only a filter as the filter alone', () => {
+    const rows = visitPhotoInfoRows(
+      photo({ integrations: [{ frames: 0, seconds: 0, filter: 'OIII' }] }),
+    );
+    expect(rows[0].lines).toEqual(['OIII']);
+  });
+
   it('puts the author first, on a line of its own', () => {
     const rows = visitPhotoInfoRows(photo({ author: 'Paul', notes: 'Clear' }));
     expect(rows.map((r) => [r.label, r.lines, r.oneLine ?? false])).toEqual([

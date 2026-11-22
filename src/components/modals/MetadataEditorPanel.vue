@@ -137,8 +137,9 @@
           ></button>
         </div>
 
-        <!-- Display mode: collapsed "N × Sec = Total" label. Either field may be
-             left blank ("N/A"); the total + "=" show only when both are set. -->
+        <!-- Display mode: collapsed "N × Sec = Total" label. Any field may be
+             left blank ("N/A"); the total + "=" show only when both are set, and a
+             row with only a filter shows just its badge. -->
         <div v-else class="integration-row min-h-[26px]">
           <span class="flex-1 min-w-0 truncate text-body text-secondary">
             {{ integrationRowLabel(row) }}
@@ -269,7 +270,7 @@ import { t } from '../../i18n';
 import { searchDSOs } from '@myastrosky/core/search';
 import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import { showToast } from '../../toast';
-import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
+import { integrationRowHasData, integrationRowText } from '@myastrosky/core/integration-rows';
 import { normalizeIntegrationFilterKey } from '../../batch-utils';
 import { isoToDatetimeLocal, datetimeLocalToIso } from '@myastrosky/core/datetime-local';
 import FilterInput from './FilterInput.vue';
@@ -482,24 +483,18 @@ function removeLabel(lbl: string) {
 type EditableRow = PhotoIntegration & { _open: boolean; _id: number };
 
 let rowSeq = 0;
-// A row is worth collapsing once it carries at least one value; either the frame
-// count or the exposure may be left blank (rendered as "N/A" in display mode).
-const hasData = (r: PhotoIntegration) => r.frames >= 1 || r.seconds >= 1;
+// A row is worth collapsing once it carries at least one value: a frame count, an
+// exposure or a filter (a missing number is rendered as "N/A" in display mode).
 const toRows = (list: PhotoIntegration[]): EditableRow[] =>
-  list.map((r) => ({ ...r, _open: !hasData(r), _id: ++rowSeq }));
+  list.map((r) => ({ ...r, _open: !integrationRowHasData(r), _id: ++rowSeq }));
 
-/** Collapsed-row text: "300 × N/A", "N/A × 10s", or "120 × 180s = 6h00". */
-function integrationRowLabel(row: PhotoIntegration): string {
-  const na = t('modal.metadataIntegrationsFieldNA');
-  const sfx = t('modal.metadataIntegrationsSecondsSuffix');
-  const framesText = row.frames >= 1 ? String(row.frames) : na;
-  const secondsText = row.seconds >= 1 ? `${row.seconds}${sfx}` : na;
-  let label = `${framesText} × ${secondsText}`;
-  if (row.frames >= 1 && row.seconds >= 1) {
-    label += ` = ${formatIntegrationTotal(row.frames * row.seconds)}`;
-  }
-  return label;
-}
+/** Collapsed-row text: "300 × N/A", "N/A × 10s", "120 × 180s = 6h00", or '' for a filter alone. */
+const integrationRowLabel = (row: PhotoIntegration): string =>
+  integrationRowText(
+    row,
+    t('modal.metadataIntegrationsFieldNA'),
+    t('modal.metadataIntegrationsSecondsSuffix'),
+  );
 
 const rows = ref<EditableRow[]>(toRows(props.integrations));
 
@@ -581,11 +576,11 @@ function addIntegrationRow() {
   emitRows();
 }
 
-// Collapse a row to its label. At least one of frames / seconds must be set;
-// the other may stay blank. Pure view change — no emit.
+// Collapse a row to its label. At least one of frames / seconds / filter must be
+// set; the others may stay blank. Pure view change — no emit.
 function validateRow(idx: number) {
   const r = rows.value[idx];
-  if (r.frames < 1 && r.seconds < 1) {
+  if (!integrationRowHasData(r)) {
     showToast({ message: t('errors.integrationRowIncomplete'), type: 'error', duration: 4000 });
     return;
   }

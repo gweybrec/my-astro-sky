@@ -785,7 +785,7 @@ const fr = {
     invalidIntegrationNumber:
       "Les champs poses et secondes de l'intégration doivent être numériques.",
     integrationRowIncomplete:
-      'Saisissez un nombre de poses ou une durée de pose avant de valider cette ligne.',
+      'Saisissez un nombre de poses, une durée de pose ou un filtre avant de valider cette ligne.',
     shareSky: 'Le partage du ciel a échoué',
     openSharedSky: "Le ciel partagé n'a pas pu être ouvert",
     loadSharedSkies: "Les ciels visités n'ont pas pu être chargés",
@@ -1105,6 +1105,7 @@ const fr = {
       chooseDate: 'Choisir la date',
       addObject: 'Ajouter un objet',
       addExposure: 'Ajouter des poses',
+      noIntegration: "Aucune information d'intégration",
       addCapture: 'Ajouter un détail de capture',
       addLabel: 'Ajouter une étiquette',
       addPoi: "Ajouter un point d'intérêt",

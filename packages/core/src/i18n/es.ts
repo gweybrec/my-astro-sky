@@ -782,7 +782,7 @@ const es: Translations = {
     invalidIntegrationNumber:
       'Los campos de integración de tomas y segundos deben ser valores numéricos.',
     integrationRowIncomplete:
-      'Introduce un número de tomas o un tiempo de exposición antes de validar esta fila.',
+      'Introduzca un número de tomas, un tiempo de exposición o un filtro antes de validar esta fila.',
     shareSky: 'No se pudo compartir el cielo',
     openSharedSky: 'No se pudo abrir el cielo compartido',
     loadSharedSkies: 'No se pudieron cargar los cielos visitados',
@@ -1102,6 +1102,7 @@ const es: Translations = {
       chooseDate: 'Elegir la fecha',
       addObject: 'Añadir un objeto',
       addExposure: 'Añadir exposiciones',
+      noIntegration: 'Sin información de integración',
       addCapture: 'Añadir un detalle de captura',
       addLabel: 'Añadir una etiqueta',
       addPoi: 'Añadir un punto de interés',

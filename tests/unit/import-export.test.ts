@@ -527,14 +527,18 @@ describe('DB import/export round-trip', () => {
         { frames: 0, seconds: 60, filter: 'G' } as any,
         { frames: 3.5, seconds: 60, filter: 'B' } as any,
         { frames: 3, seconds: 60, filter: '   ' } as any,
+        { frames: 0, seconds: 0, filter: '  ' } as any,
       ],
     );
 
     const all = await photos.list();
     expect(all).toHaveLength(1);
-    // A row without a filter is kept (a header without FILTER still gives its exposures).
+    // A row without a filter is kept (a header without FILTER still gives its exposures), and so is a partial one
+    // (a fractional count reads as not given); only a row with nothing in it goes.
     expect(all[0].integrations).toEqual([
       { frames: 5, seconds: 120, filter: 'R' },
+      { frames: 0, seconds: 60, filter: 'G' },
+      { frames: 0, seconds: 60, filter: 'B' },
       { frames: 3, seconds: 60, filter: '' },
     ]);
   });
@@ -1012,7 +1016,7 @@ describe('updateMetadata', () => {
     expect(p.originalName).toBe('Orion.jpg'); // must be unchanged
   });
 
-  it('drops invalid integrations during metadata update', async () => {
+  it('drops only empty integration rows during metadata update', async () => {
     const photos = photosOn(await import('../../server/db.js'));
 
     await seedPhoto(
@@ -1036,12 +1040,16 @@ describe('updateMetadata', () => {
       { frames: 0, seconds: 100, filter: 'R' } as any,
       { frames: 4, seconds: 0, filter: 'G' } as any,
       { frames: 3, seconds: 120, filter: ' ' } as any,
+      { frames: 0, seconds: 0, filter: '' } as any,
     ]);
     expect(changed).toBe(true);
 
     const p = (await photos.list())[0];
+    // Partial rows stay; the row with nothing in it goes.
     expect(p.integrations).toEqual([
       { frames: 18, seconds: 240, filter: 'OIII' },
+      { frames: 0, seconds: 100, filter: 'R' },
+      { frames: 4, seconds: 0, filter: 'G' },
       { frames: 3, seconds: 120, filter: '' },
     ]);
   });

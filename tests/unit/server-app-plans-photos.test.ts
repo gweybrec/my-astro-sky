@@ -1599,7 +1599,7 @@ describe('PATCH /api/photos/:id/metadata', () => {
     });
   });
 
-  it('drops the integration rows that are invalid', async () => {
+  it('cleans the integration rows, dropping the empty ones', async () => {
     const id = await onePhoto();
     expect(
       await patch(id, {
@@ -1621,12 +1621,19 @@ describe('PATCH /api/photos/:id/metadata', () => {
         ],
       }),
     ).toEqual(OK);
-    // Rows without a usable filter keep their counts with an empty filter.
+    // Rows without a usable filter keep their counts with an empty filter; a count that is not a whole positive
+    // number reads as not given and the row stays partial; only rows with nothing left in them go.
     expect((await readPhoto(id)).integrations).toEqual([
+      { frames: 0, seconds: 60, filter: 'L' },
+      { frames: 0, seconds: 60, filter: 'L' },
+      { frames: 0, seconds: 60, filter: 'L' },
+      { frames: 3, seconds: 0, filter: 'L' },
+      { frames: 3, seconds: 0, filter: 'L' },
       { frames: 3, seconds: 60, filter: '' },
       { frames: 3, seconds: 60, filter: '' },
       { frames: 3, seconds: 60, filter: '' },
       { frames: 3, seconds: 60, filter: '' },
+      { frames: 0, seconds: 60, filter: 'L' },
       { frames: 4, seconds: 120, filter: 'Ha' },
       { frames: 10, seconds: 300, filter: 'Oiii' },
     ]);

@@ -785,7 +785,7 @@ const de: Translations = {
     invalidIntegrationNumber:
       'Integrationsfelder für Frames und Sekunden müssen numerische Werte sein.',
     integrationRowIncomplete:
-      'Gib eine Bildanzahl oder eine Belichtungszeit ein, bevor du diese Zeile bestätigst.',
+      'Geben Sie eine Anzahl Belichtungen, eine Belichtungszeit oder einen Filter ein, bevor Sie diese Zeile bestätigen.',
     shareSky: 'Der Himmel konnte nicht geteilt werden',
     openSharedSky: 'Der geteilte Himmel konnte nicht geöffnet werden',
     loadSharedSkies: 'Die besuchten Himmel konnten nicht geladen werden',
@@ -1108,6 +1108,7 @@ const de: Translations = {
       chooseDate: 'Datum wählen',
       addObject: 'Objekt hinzufügen',
       addExposure: 'Belichtungen hinzufügen',
+      noIntegration: 'Keine Integrationsangaben',
       addCapture: 'Aufnahmedetail hinzufügen',
       addLabel: 'Etikett hinzufügen',
       addPoi: 'Interessanten Punkt hinzufügen',

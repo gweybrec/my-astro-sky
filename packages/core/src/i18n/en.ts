@@ -775,7 +775,8 @@ const en: Translations = {
     uploadFailed: 'Upload failed: {response}',
     networkError: 'Network error during upload',
     invalidIntegrationNumber: 'Integration frames and seconds must be numeric values.',
-    integrationRowIncomplete: 'Enter a frame count or an exposure time before validating this row.',
+    integrationRowIncomplete:
+      'Enter a frame count, an exposure time or a filter before validating this row.',
     shareSky: 'Sharing the sky failed',
     openSharedSky: 'The shared sky could not be opened',
     loadSharedSkies: 'The visited skies could not be loaded',
@@ -1091,6 +1092,7 @@ const en: Translations = {
       chooseDate: 'Choose the date',
       addObject: 'Add an object',
       addExposure: 'Add exposures',
+      noIntegration: 'No integration information',
       addCapture: 'Add a capture detail',
       addLabel: 'Add a label',
       addPoi: 'Add a point of interest',
