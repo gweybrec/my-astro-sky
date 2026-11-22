@@ -279,9 +279,13 @@ export async function seed({ ports }) {
   await api(base, 'PATCH', `/api/photos/${photoId}/metadata`, {
     dsoIds: (firstPhoto.photo ?? firstPhoto).dsoIds,
     observationDate: '2025-08-23T21:30:00.000Z',
+    // A partial row (no frame count) and a row with only a filter: the information sheet lists both, a badge alone
+    // for the second.
     integrations: [
       { frames: 60, seconds: 180, filter: 'Ha' },
       { frames: 20, seconds: 240, filter: 'OIII' },
+      { frames: 0, seconds: 120, filter: 'L' },
+      { frames: 0, seconds: 0, filter: 'SII' },
     ],
     gearSetupId: setup1.id,
     // What the gallery card adds to its chips: a label and a point of interest.
@@ -529,6 +533,13 @@ export const rules = [
     lines: '.mob-meta, .mob-credit-links',
     chips: 'ion-badge, ion-chip, .mob-badge, .mob-chip',
   },
+  // An exposure's time and its filter's badge, and an exposure row's "Filtres" and its badge, share a baseline.
+  {
+    id: 'exposure-baseline',
+    type: 'baseline',
+    lines: '.mob-exposures-row, .mob-integration-filter-name',
+    chips: '.mob-badge',
+  },
   // A file's header card: the keyword and the first line of its value share a baseline (a long value wraps under it).
   {
     id: 'card-baseline',
@@ -579,6 +590,13 @@ export const rules = [
     type: 'centreLine',
     bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .mob-stepper-row, .phone-field-unit-line, .mob-icon-row, .mob-map-top, .mob-timebar-row, .mob-when-row, .mob-form-row--search, .mob-type-row, .mob-add-row, .mob-wcs-row',
   },
+  // An exposure row's "Filtres" with its badge, and its compact "+", are centred on the filter line.
+  {
+    id: 'filter-plus',
+    type: 'rowCentre',
+    rows: '.mob-integration-filter',
+    items: '.mob-integration-filter-name, .mob-icon-btn',
+  },
   // The clear button of a search field is centred on the field.
   { id: 'search-clear', type: 'rowCentre', rows: '.mob-search-wrap', items: '.mob-search-clear' },
   // A card's label and value start on one line; the buttons of a photo's column start on one line.
@@ -605,12 +623,22 @@ export const rules = [
     within: '.mob-photo-card',
     lefts: '.mob-photo-card-name, .mob-tags > :first-child',
   },
-  // Every button is a touch target of at least 48 by 48.
+  // Every button is a touch target of at least 48 by 48; a secondary button (`.mob-icon-btn--compact`: an exposure
+  // row's "+" filter, inside a row whose main controls keep the touch size) of at least 32 by 32.
   {
     id: 'touch-size',
     type: 'touchSize',
-    items: 'ion-button.mob-btn, ion-button.mob-icon-btn, .mob-search-clear, .mob-sheet-grab',
+    items:
+      'ion-button.mob-btn, ion-button.mob-icon-btn:not(.mob-icon-btn--compact), .mob-search-clear, .mob-sheet-grab',
     min: 'var(--mobile-touch-min)',
+    minimum: true,
+    word: 'too small',
+  },
+  {
+    id: 'secondary-touch-size',
+    type: 'touchSize',
+    items: 'ion-button.mob-icon-btn--compact',
+    min: 'var(--space-11)',
     minimum: true,
     word: 'too small',
   },
@@ -1146,6 +1174,18 @@ export const views = [
     name: 'photo-edit',
     path: (ids) => `/gallery/photo/${ids.photo}/edit`,
     ready: '.mob-integration',
+  },
+  // An exposure row's "+" opens the list of filters, the recent ones first (board "Photo, modifier les infos, filtre").
+  {
+    name: 'photo-edit-filter',
+    path: (ids) => `/gallery/photo/${ids.photo}/edit`,
+    ready: '.mob-integration',
+    open: [
+      { click: '.mob-integration-filter ion-button' },
+      { wait: '.mob-sheet .mob-section-header' },
+      { pause: 600 },
+    ],
+    ...SHEET,
   },
   // The objects drawn over the seed's photo: the objects toggle of its column on, then its sheet with the catalogues
   // field under the facts (board "Photo, objets affichés"). Then each identification page (SkyBoT, TNS and the MPC answer from

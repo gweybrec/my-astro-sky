@@ -17,7 +17,14 @@ The rules every screen of the phone app (`apps/mobile/`) follows. The desktop's 
 - **Alignment comes from layout.** Items line up because of how their row arranges them (`align-items`, `gap`, grid tracks). Text beside a chip shares the baseline of the text inside the chip. An icon is aligned by its row and sized by a token or in `em`.
 - **No pixel offsets.** No literal length in a position, margin, transform or fixed height may be used to bring something into line: it would break when the text wraps, grows or is translated. `apps/mobile/scripts/check-no-nudges.mjs` runs in `npm run verify` and fails on them, and on a raw length in a size (`font-size`, `width`, `flex`, Ionic's `--width`…): sizes come from a token or a named variable in `ionic-tokens.css`.
 - Trailing items of a row (information button, switch, chevron, handle) are separated by the spacing token; they never touch.
-- Every touch area is at least 48 by 48 CSS pixels.
+- **Vertical spacing is set by the pair of elements, never per screen.** The gap between two stacked elements comes from the design system's stylesheet, by what the two elements are; a new pair gets its value in the design system (its README, "Vertical spacing") before a screen uses it:
+  - a sheet's title and its sub-line (`.mob-meta`): `--space-2`;
+  - a sheet's title and a field in its header (a search field, `.mob-sheet-header > .mob-form-row`): `--space-4`;
+  - a sheet's header and its body: `--space-4`;
+  - a section header: `--space-7` above, `--space-2` below;
+  - a field's label and the field: `--space-2`; one form row and the next: `--space-4`;
+  - facts: `--space-4` between lines, `--space-9` between two facts on a line.
+- Every touch area is at least 48 by 48 CSS pixels. A secondary button, one that is not among a screen's main controls and sits inside a row whose main controls keep that size (the compact icon button, `PhoneIconButton compact`: an exposure row's "+" filter), is at least 32 by 32 CSS pixels, the size of the compact chips.
 
 ## Navigation
 
@@ -33,6 +40,11 @@ The rules every screen of the phone app (`apps/mobile/`) follows. The desktop's 
 - A sheet closes when dragged down from its header, when its backdrop is tapped, and with the back button; it has no close button. On a sheet with Annuler / Valider this is the same as Annuler.
 - A sheet whose content scrolls shows a styled scroll bar that stays visible.
 - A long explanation goes behind an "i" button that opens a small sheet. State lines, warnings and the one-line reason of a disabled control stay printed.
+
+## A photo's exposures
+
+- Wherever a photo's facts are listed (the map's photo sheet, the gallery's information sheet), the exposures (`Intégration`) take a full line of their own: one line per exposure row, its time first (`40 × 300 s`, `N/A × 120 s`, `183 × N/A`), then its filter as a coloured badge (`PhoneFilterBadge`); a row with only a filter shows its badge alone. Filter names are often long, so they are never squeezed among the short facts.
+- In the edit form, a row's numbers come first and its filter on the line under them: "Filtres", the filter's badge and a compact "+" that opens the list of filters (recently used first, then all of them, with a search). There is no text field for the filter. A row may leave any field empty, but not all three.
 
 ## Buttons and icons
 

@@ -328,11 +328,11 @@ describe("a photo's own screen", () => {
     expect(w.findComponent(PhotoInfoSheet).props('open')).toBe(true);
     expect(w.find('.mob-sheet-title').text()).toBe("Galaxie d'Andromède");
     expect(w.find('.mob-sheet .mob-meta').text()).toContain('M31');
-    expect(w.findAll('.mob-sheet .mob-badge').map((b) => b.text())).toEqual([
+    expect(w.findAll('.mob-sheet .mob-meta .mob-badge').map((b) => b.text())).toEqual([
       'Galaxie spirale',
       'AND',
     ]);
-    // 60 x 180 s + 20 x 240 s = 4 h 20; the row without frames does not count.
+    // 60 x 180 s + 20 x 240 s = 4 h 20; the row without frames is listed but does not count.
     expect(facts(w)).toEqual([
       ['Nom du fichier', 'M31_2025-09-14_stack.jpg'],
       ["Date d'observation", '14 sept. 2025'],
@@ -340,11 +340,20 @@ describe("a photo's own screen", () => {
       ['Gain', '100'],
       ['Temp. capteur', '-10 °C'],
       ['Équipement', 'Équipement 1'],
-      ['Intégration', 'L 60 × 180 s · R 20 × 240 s'],
+      ['Intégration', '60 × 180 sL20 × 240 sRN/A × 120 sL'],
       ['Étiquettes', 'Seestar · Mosaïque'],
       ["Points d'intérêt", 'C/2023 A3'],
       ['Notes', 'Nuit claire.'],
     ]);
+    // the exposures take a full line: each row's time, then its filter as a coloured badge, in the body font
+    const exposures = w.find('.mob-fact--exposures .mob-exposures');
+    expect(exposures.findAll('.mob-exposures-time').map((e) => e.text())).toEqual([
+      '60 × 180 s',
+      '20 × 240 s',
+      'N/A × 120 s',
+    ]);
+    expect(exposures.findAll('.mob-badge--filter').map((b) => b.text())).toEqual(['L', 'R', 'L']);
+    expect(exposures.find('.m-mono').exists()).toBe(false);
     // its objects are compact chips above the facts, as on the map's photo sheet, that only show them (no tap)
     const chips = w.findAll('.mob-sheet .mob-pager .mob-chip');
     expect(chips.map((c) => c.text())).toEqual(['M31', 'M32']);
@@ -352,13 +361,14 @@ describe("a photo's own screen", () => {
       chips.every((c) => c.classes('mob-chip--still') && c.attributes('role') === undefined),
     ).toBe(true);
     expect(chips.every((c) => c.attributes('tabindex') === undefined)).toBe(true);
-    // facts without cards, none on a line of its own, the integration rows in the mono face; the sheet is
-    // a third of the screen at most in portrait
+    // facts without cards, only the exposures on a line of their own, in the body face; the sheet is a third of the
+    // screen at most in portrait
     expect(w.find('.mob-facts').classes()).toEqual(['mob-facts', 'mob-photo-facts']);
     expect(w.findAll('.mob-fact--wide')).toHaveLength(0);
     // 8 px under the title: the photo sheets' own spacing (the target pages put their facts right under the badges)
     expect(w.find('.mob-facts').classes()).toContain('mob-photo-facts');
-    expect(w.find('.mob-fact-value .m-mono').text()).toBe('L 60 × 180 s · R 20 × 240 s');
+    expect(w.findAll('.mob-fact--exposures')).toHaveLength(1);
+    expect(w.find('.mob-fact-value .m-mono').exists()).toBe(false);
     expect(w.find('.mob-sheet-modal').classes()).toContain('mob-sheet-modal--third');
     expect(w.findAll('.mob-photo-actions button').map((b) => b.text())).toEqual([
       'Charger un fichier WCS (fits/tiff)',

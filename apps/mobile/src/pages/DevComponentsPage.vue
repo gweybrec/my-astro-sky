@@ -15,6 +15,7 @@ import PhoneCheckRow from '../components/PhoneCheckRow.vue';
 import PhoneRadioGroup from '../components/PhoneRadioGroup.vue';
 import PhoneFab from '../components/PhoneFab.vue';
 import PhoneFacts from '../components/PhoneFacts.vue';
+import PhoneFilterBadge from '../components/PhoneFilterBadge.vue';
 import PhoneFooter from '../components/PhoneFooter.vue';
 import PhoneHelper from '../components/PhoneHelper.vue';
 import PhoneBusy from '../components/PhoneBusy.vue';
@@ -166,6 +167,7 @@ function raiseError() {
             ><AppIcon :svg="eyeIcon"
           /></PhoneIconButton>
           <PhoneIconButton label="Supprimer" danger><AppIcon :svg="trashIcon" /></PhoneIconButton>
+          <PhoneIconButton compact label="Compact"><AppIcon :svg="plusIcon" /></PhoneIconButton>
           <PhoneIconButton label="Désactivé" disabled><AppIcon :svg="plusIcon" /></PhoneIconButton>
           <PhoneIconButton float label="Sur la carte"><AppIcon :svg="plusIcon" /></PhoneIconButton>
           <PhoneIconButton float label="Sur la carte, activé" :pressed="true"
@@ -512,6 +514,10 @@ function raiseError() {
           <PhoneBadge kind="type">Galaxie</PhoneBadge>
           <PhoneBadge kind="const">Andromède</PhoneBadge>
           <PhoneBadge kind="warn">Date passée</PhoneBadge>
+          <PhoneFilterBadge filter="Ha" />
+          <PhoneFilterBadge filter="OIII" />
+          <PhoneFilterBadge filter="Antlia 3nm H-Alpha Pro" />
+          <PhoneFilterBadge filter="Mon filtre" />
         </div>
         <!-- A photo's objects: two lines of chips to a page, the others on the next pages. -->
         <PhoneChipPager
@@ -685,6 +691,23 @@ function raiseError() {
             },
             { label: 'Date d\'observation', value: '23 août 2025' },
             { label: 'Exposition totale', value: '6h' },
+          ]"
+        />
+        <!-- A photo's exposures on a full line: the time, then the filter's badge; a filter alone; a long name. -->
+        <PhoneFacts
+          :facts="[
+            { label: 'Exposition totale', value: '3h20' },
+            {
+              label: 'Intégration',
+              value: '',
+              exposures: [
+                { time: '40 × 300 s', filter: 'Ha' },
+                { time: 'N/A × 120 s', filter: 'Antlia 3nm H-Alpha Pro' },
+                { time: '183 × N/A', filter: '' },
+                { time: '', filter: 'Antlia ALP-T Dual Band 5nm' },
+              ],
+            },
+            { label: 'Gain', value: '100' },
           ]"
         />
         <PhoneHelper>Ligne d'état</PhoneHelper>

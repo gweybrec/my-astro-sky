@@ -17,6 +17,8 @@ const props = defineProps<{
   waiting?: boolean;
   /** The round button that floats over the map (`.mob-icon-btn--float`). */
   float?: boolean;
+  /** The 32 px button of a secondary action inside a row (`.mob-icon-btn--compact`: an exposure row's "+" filter). */
+  compact?: boolean;
   /** The button opens a popup that is open now (`aria-expanded`). */
   expanded?: boolean;
   /** Why the button cannot be used now: it is drawn disabled, takes no tap, and its long press names it and says why. */
@@ -63,6 +65,7 @@ function onClick(event: MouseEvent) {
       'mob-icon-btn--pressed': pressed,
       'mob-icon-btn--danger': danger,
       'mob-icon-btn--float': float,
+      'mob-icon-btn--compact': compact,
       'mob-icon-btn--unavailable': unavailable,
       'mob-waiting': waiting,
       'mob-icon-btn--held': style !== null,

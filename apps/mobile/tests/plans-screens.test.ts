@@ -962,7 +962,8 @@ describe('the plan entry page', () => {
     expect(ha.find('.mob-status--success').exists()).toBe(true);
     await w.find('input[type="search"]').setValue('ii');
     await settle();
-    expect(listed()).toEqual(['Ajouter un filtre', 'Aucun filtre', 'OIII', 'SII']);
+    // once a search is typed, "Aucun filtre" is not among the results
+    expect(listed()).toEqual(['Ajouter un filtre', 'OIII', 'SII']);
     await tapRow(w, 'OIII');
     expect(fieldLabel(w, 'Filtre')).toBe('Filtre : OIII');
     expect(backend.plans.updateEntry).not.toHaveBeenCalled();

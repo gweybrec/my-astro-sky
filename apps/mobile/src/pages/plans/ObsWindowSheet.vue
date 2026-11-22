@@ -19,7 +19,8 @@ import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 import PhoneNativePicker from '../../components/PhoneNativePicker.vue';
 import PhoneColorButton from '../../components/PhoneColorButton.vue';
 import AppIcon from '../../components/AppIcon.vue';
-import ObsWindowFilterSheet from './ObsWindowFilterSheet.vue';
+import FilterPickSheet from '../gear/FilterPickSheet.vue';
+import { OBS_WINDOW_FILTERS } from '@myastrosky/core/observation-windows';
 import { formatLongDuration } from '../../composables/usePlans';
 import { filterColor } from '../../filter-color';
 import caretIcon from '../../icons/chevron-down.svg?raw';
@@ -227,5 +228,10 @@ function addFilter() {
       }}</PhoneButton>
     </template>
   </PhoneSheet>
-  <ObsWindowFilterSheet v-model:open="filterOpen" v-model:value="filter" @add="addFilter" />
+  <FilterPickSheet
+    v-model:open="filterOpen"
+    v-model:value="filter"
+    :known="OBS_WINDOW_FILTERS"
+    @add="addFilter"
+  />
 </template>

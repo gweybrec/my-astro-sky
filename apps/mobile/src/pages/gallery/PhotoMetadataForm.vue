@@ -5,6 +5,7 @@ import { t } from '@myastrosky/core/i18n/index';
 import { CAPTURE_FIELDS } from '@myastrosky/core/capture-fields';
 import { datetimeLocalToIso, isoToDatetimeLocal } from '@myastrosky/core/datetime-local';
 import { formatIntegrationTotal } from '@myastrosky/core/format-utils';
+import { OBS_WINDOW_FILTERS } from '@myastrosky/core/observation-windows';
 import {
   filterLabelCandidates,
   type PhotoMetadataDraft,
@@ -27,6 +28,9 @@ import PhoneRemoveChips from '../../components/PhoneRemoveChips.vue';
 import PhoneRow from '../../components/PhoneRow.vue';
 import PhoneSectionHeader from '../../components/PhoneSectionHeader.vue';
 import PhoneTextArea from '../../components/PhoneTextArea.vue';
+import PhoneFilterBadge from '../../components/PhoneFilterBadge.vue';
+import FilterPickSheet from '../gear/FilterPickSheet.vue';
+import { noteFilterUse, recentFilters as recentFilterList } from '../../filter-usage';
 import caretIcon from '../../icons/chevron-down.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 import trashIcon from '@icons/trash.svg?raw';
@@ -36,18 +40,22 @@ import supernovaIcon from '@icons/poi-supernova.svg?raw';
 
 // The fields of a photo's metadata, as the desktop's editor (`MetadataEditorPanel.vue`) shows them: on "Modifier les
 // infos" (board "Photo, modifier les infos") and on "Photo à ajouter". The page holds the draft and saves it; adding a
-// point of interest and the identifications need a solved photo (`solved`), and open the page's own pages (`poi`).
+// point of interest and the identifications need a solved photo (`solved`), and open the page's own pages (`poi`). An
+// exposure row's filter is chosen in a list (board "Photo, modifier les infos, filtre"); "Ajouter un filtre" there asks
+// the page to open the filter's add page for that row (`add-filter`).
 const draft = defineModel<PhotoMetadataDraft>('draft', { required: true });
 const props = defineProps<{
   /** The labels of the other photos, offered while a label is typed. */
   knownLabels: string[];
+  /** The filters of the photos' exposure rows, the most recently used first: offered first when a filter is chosen. */
+  usedFilters: string[];
   setups: GearSetupData[];
   solved: boolean;
   wcsLoading: boolean;
   /** The page's footer: the toasts sit above it. */
   footerId: string;
 }>();
-const emit = defineEmits<{ poi: [path: string]; 'load-wcs': [] }>();
+const emit = defineEmits<{ poi: [path: string]; 'load-wcs': []; 'add-filter': [row: number] }>();
 const { showError } = useErrorToast({ above: props.footerId });
 const categoriesStore = usePoiCategoriesStore();
 
@@ -132,6 +140,35 @@ function setCount(index: number, key: 'frames' | 'seconds', text: string) {
     return;
   }
   draft.value.integrations[index][key] = parsed;
+}
+
+// The row whose filter is being chosen, in the list of filters.
+const filterRow = ref<number | null>(null);
+const filterOpen = computed({
+  get: () => filterRow.value !== null,
+  set: (isOpen: boolean) => {
+    if (!isOpen) filterRow.value = null;
+  },
+});
+const filterChoice = computed({
+  get: () =>
+    filterRow.value === null ? null : draft.value.integrations[filterRow.value]?.filter || null,
+  set: (filter: string | null) => {
+    const row = filterRow.value === null ? undefined : draft.value.integrations[filterRow.value];
+    if (row) row.filter = filter ?? '';
+    // Chosen is used: the filter is offered first next time, saved or not.
+    if (row && filter) noteFilterUse(filter);
+  },
+});
+// "Tous les filtres": the generic bands, then the filters already used on the photos.
+const knownFilters = computed(() => [...OBS_WINDOW_FILTERS, ...props.usedFilters]);
+// The recent filters, as many as the board shows: those just chosen first, then those of the photos.
+const recentFilters = computed(() => recentFilterList(props.usedFilters, 3));
+
+function addFilter() {
+  const index = filterRow.value;
+  filterRow.value = null;
+  if (index !== null) emit('add-filter', index);
 }
 
 const rowTotal = (row: { frames: number; seconds: number }) =>
@@ -283,13 +320,6 @@ function addCapture() {
   <PhoneSectionHeader>{{ t('modal.metadataIntegrations') }}</PhoneSectionHeader>
   <div v-for="(row, index) in draft.integrations" :key="index" class="mob-integration">
     <PhoneField
-      v-model="row.filter"
-      bare
-      class="mob-integration-filter"
-      :label="t('targets.plan.obsWindowFilter')"
-      :placeholder="t('modal.metadataIntegrationsFilterPlaceholder')"
-    />
-    <PhoneField
       bare
       inputmode="numeric"
       :model-value="shown(row.frames)"
@@ -315,6 +345,23 @@ function addCapture() {
     >
       <AppIcon :svg="trashIcon" />
     </PhoneIconButton>
+    <div class="mob-integration-filter">
+      <span class="mob-integration-filter-name"
+        ><span class="m-secondary">{{ t('mobile.photo.integrationFilters') }}</span
+        ><PhoneFilterBadge v-if="row.filter" :filter="row.filter"
+      /></span>
+      <PhoneIconButton
+        compact
+        :label="
+          t(row.filter ? 'mobile.photo.changeRowFilter' : 'mobile.photo.chooseRowFilter', {
+            n: index + 1,
+          })
+        "
+        @click="filterRow = index"
+      >
+        <AppIcon :svg="plusIcon" />
+      </PhoneIconButton>
+    </div>
   </div>
   <div class="mob-form-row mob-section-gap-sm">
     <PhoneButton block @click="draft.integrations.push({ frames: 0, seconds: 0, filter: '' })">
@@ -405,6 +452,13 @@ function addCapture() {
     v-model:value="setupChoice"
     :title="t('modal.metadataGearSetup')"
     :options="setupOptions"
+  />
+  <FilterPickSheet
+    v-model:open="filterOpen"
+    v-model:value="filterChoice"
+    :known="knownFilters"
+    :recent="recentFilters"
+    @add="addFilter"
   />
   <PhoneRadioSheet
     v-model:open="fieldListOpen"

@@ -34,6 +34,8 @@ import PhoneButton from '../components/PhoneButton.vue';
 import PhoneFooter from '../components/PhoneFooter.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhotoMetadataForm from './gallery/PhotoMetadataForm.vue';
+import { useRowFilterAdd } from '../composables/useRowFilterAdd';
+import { integrationRowHasData, recentIntegrationFilters } from '@myastrosky/core/integration-rows';
 
 // The board "Photo, modifier les infos": the form of a photo's metadata (`PhotoMetadataForm`), with what the desktop's
 // editor does (`MetadataEditorPanel.vue`): nothing is saved before Enregistrer, and leaving with changes asks first. The points of
@@ -63,6 +65,8 @@ const draft = reactive<PhotoMetadataDraft>({
   notes: '',
 });
 const knownLabels = ref<string[]>([]);
+const usedFilters = ref<string[]>([]);
+const addRowFilter = useRowFilterAdd(() => draft.integrations);
 const setups = ref<GearSetupData[]>([]);
 const saving = ref(false);
 /** The page is being left on purpose (saved, or the changes given up): nothing asks again. */
@@ -86,6 +90,7 @@ onMounted(async () => {
       pendingWcs.value = null;
     }
     knownLabels.value = [...new Set(photos.flatMap((p) => p.labels))];
+    usedFilters.value = recentIntegrationFilters(photos, Infinity);
     setups.value = await getGearSetups();
     void categoriesStore.ensureLoaded();
     // The objects' search needs the catalogues; until they are read it finds nothing.
@@ -166,6 +171,11 @@ useBackClose(
 
 async function save() {
   if (!photo.value || saving.value) return;
+  // An exposure row may leave any field empty, but not all three.
+  if (draft.integrations.some((row) => !integrationRowHasData(row))) {
+    void showError(new Error(t('errors.integrationRowIncomplete')));
+    return;
+  }
   saving.value = true;
   try {
     await updatePhotoMetadata(photo.value.id, draftToMetadata(draft, photo.value.originalName));
@@ -192,11 +202,13 @@ async function save() {
         <PhotoMetadataForm
           v-model:draft="draft"
           :known-labels="knownLabels"
+          :used-filters="usedFilters"
           :setups="setups"
           :solved="isSolved"
           :wcs-loading="wcsLoading"
           :footer-id="FOOTER_ID"
           @poi="openPoiPage"
+          @add-filter="addRowFilter"
           @load-wcs="loadWcs"
         />
       </div>

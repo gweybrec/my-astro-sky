@@ -84,6 +84,7 @@ import PhotoEditPage from '../src/pages/PhotoEditPage.vue';
 import { deliverPois } from '../src/identify-session';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 import { pendingWcs, type WcsLoaded } from '../src/composables/useWcsLoad';
+import { resetFilterUse } from '../src/filter-usage';
 
 /** "Photo, modifier les infos": the form of a photo's metadata. */
 
@@ -134,6 +135,7 @@ const save = async (w: Page) => {
 
 describe("a photo's edit page", () => {
   beforeEach(() => {
+    resetFilterUse();
     localStorage.setItem('lang', 'fr');
     solved.value = true;
     getPhotos
@@ -269,18 +271,92 @@ describe("a photo's edit page", () => {
   it('edits the integration rows: a new row, its total, a refused number, a removed row', async () => {
     const w = await mountPage();
     await byText(w, 'button', 'Ajouter une ligne').trigger('click');
-    const row = w.findAll('.mob-integration')[1];
-    const [filter, frames, seconds] = row.findAll('input');
-    await filter.setValue(' Ha ');
+    const line = w.findAll('.mob-integration')[1];
+    // the numbers first, then the filter on its own line under them, with no text field
+    const [frames, seconds] = line.findAll('input');
+    expect(line.findAll('input')).toHaveLength(2);
     await frames.setValue('10');
-    expect(row.find('.mob-integration-total').text()).toBe('');
+    expect(line.find('.mob-integration-total').text()).toBe('');
     await seconds.setValue('300');
-    expect(row.find('.mob-integration-total').text()).toBe('= 50min');
+    expect(line.find('.mob-integration-total').text()).toBe('= 50min');
     await seconds.setValue('abc');
     expect(showError).toHaveBeenCalledTimes(1);
+    expect(line.find('.mob-integration-filter').text()).toBe('Filtres');
+    await byLabel(w, 'button', 'Choisir le filtre de la ligne 2').trigger('click');
+    await row(w, 'Ha').trigger('click');
+    expect(w.findAll('.mob-integration')[1].find('.mob-badge--filter').text()).toBe('Ha');
     await byLabel(w, 'button', "Supprimer la ligne d'intégration").trigger('click');
     await save(w);
     expect(saved().integrations).toEqual([{ frames: 10, seconds: 300, filter: 'Ha' }]);
+  });
+
+  it("lists the filters of the photos' exposures first when a row's filter is chosen", async () => {
+    getPhotos.mockResolvedValue([
+      photo(),
+      photo({
+        id: 'p2',
+        observationDate: '2026-01-01T00:00:00.000Z',
+        integrations: [{ frames: 1, seconds: 1, filter: 'Antlia 3nm H-Alpha Pro' }],
+      }),
+    ]);
+    const w = await mountPage();
+    await byLabel(w, 'button', 'Changer le filtre de la ligne 1').trigger('click');
+    const sheet = w.findComponent({ name: 'FilterPickSheet' });
+    expect(sheet.findAll('.mob-section-header').map((h) => h.text())).toEqual([
+      'Récents',
+      'Tous les filtres',
+    ]);
+    const titles = sheet.findAll('.mob-row-title').map((t) => t.text());
+    // "Ajouter un filtre", "Aucun filtre", then the newest photo's filter first, each filter once
+    expect(titles.slice(2, 4)).toEqual(['Antlia 3nm H-Alpha Pro', 'L']);
+    expect(titles.filter((t) => t === 'L')).toHaveLength(1);
+  });
+
+  it('offers a filter just chosen first among the recent ones, before it is saved', async () => {
+    const w = await mountPage();
+    await byText(w, 'button', 'Ajouter une ligne').trigger('click');
+    await byLabel(w, 'button', 'Choisir le filtre de la ligne 2').trigger('click');
+    await row(w, 'OIII').trigger('click');
+    await byLabel(w, 'button', 'Changer le filtre de la ligne 1').trigger('click');
+    const sheet = w.findComponent({ name: 'FilterPickSheet' });
+    const titles = sheet.findAll('.mob-row-title').map((t) => t.text());
+    expect(titles.slice(2, 4)).toEqual(['OIII', 'L']);
+    expect(updatePhotoMetadata).not.toHaveBeenCalled();
+  });
+
+  it('hides "Aucun filtre" once a search is typed', async () => {
+    const w = await mountPage();
+    await byLabel(w, 'button', 'Changer le filtre de la ligne 1').trigger('click');
+    const sheet = w.findComponent({ name: 'FilterPickSheet' });
+    const titles = () => sheet.findAll('.mob-row-title').map((t) => t.text());
+    expect(titles()).toContain('Aucun filtre');
+    await sheet.find('.mob-sheet-header input').setValue('ha');
+    expect(titles()).not.toContain('Aucun filtre');
+    expect(titles()).toContain('Ha');
+  });
+
+  it('opens the filter add page from the list, for that row', async () => {
+    const w = await mountPage();
+    await byLabel(w, 'button', 'Changer le filtre de la ligne 1').trigger('click');
+    await row(w, 'Ajouter un filtre').trigger('click');
+    expect(push).toHaveBeenCalledWith('/settings/gear/filter/new');
+  });
+
+  it('keeps a row with a filter only, and refuses to save a row with nothing in it', async () => {
+    const w = await mountPage();
+    await byText(w, 'button', 'Ajouter une ligne').trigger('click');
+    await save(w);
+    expect(updatePhotoMetadata).not.toHaveBeenCalled();
+    expect(showError.mock.calls[0][0].message).toBe(
+      'Saisissez un nombre de poses, une durée de pose ou un filtre avant de valider cette ligne.',
+    );
+    await byLabel(w, 'button', 'Choisir le filtre de la ligne 2').trigger('click');
+    await row(w, 'OIII').trigger('click');
+    await save(w);
+    expect(saved().integrations).toEqual([
+      { frames: 40, seconds: 180, filter: 'L' },
+      { frames: 0, seconds: 0, filter: 'OIII' },
+    ]);
   });
 
   it('sets and empties the observation date', async () => {

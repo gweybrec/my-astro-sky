@@ -136,6 +136,16 @@ input:focus-visible {
   width: var(--space-9);
   height: var(--space-9);
 }
+/* A compact icon button (32 px, the size of the compact chips): a secondary action inside a row whose main controls
+   keep the touch size, such as the "+" that chooses an exposure row's filter. */
+.mob-icon-btn.mob-icon-btn--compact {
+  width: var(--space-11);
+  height: var(--space-11);
+}
+.mob-icon-btn.mob-icon-btn--compact svg {
+  width: var(--space-7);
+  height: var(--space-7);
+}
 .mob-icon-btn:active {
   background: var(--accent-fill-lg);
   border-color: var(--border-focus);
@@ -794,6 +804,12 @@ input:focus-visible {
   margin-top: var(--space-2);
 }
 
+/* A field in a sheet's header (a search under the title): `space-4` below the title, the same gap the header leaves
+   below itself. The design system's vertical spacing rule (README, "Vertical spacing") lists every such gap. */
+.mob-sheet-header > .mob-form-row {
+  padding-top: var(--space-4);
+}
+
 /* ── Mobile layer: photo flows ──────────────────────────────────────────────────────────────────── */
 /* Helper text under a control or a list: the visible home of every explanation and every reason a control is disabled. */
 .mob-helper {
@@ -1296,35 +1312,52 @@ svg.mob-icon--sm,
   flex: none;
 }
 /* Integration row: the filter on its own line, then  N x sec s = total  and a 48px remove button; the same columns in every row. */
+/* Exposure row: frame count x length (s) = total, then on its own line the filter (its badge and a compact "+"). Rows are
+   told apart by a visible divider. */
 .mob-integration {
   display: grid;
-  grid-template-columns:
-    var(--space-18) var(--space-7) var(--space-18) var(--space-7) minmax(0, 1fr)
-    var(--mobile-touch-min);
+  grid-template-columns: auto var(--space-7) auto var(--space-7) minmax(0, 1fr) var(
+      --mobile-touch-min
+    );
   align-items: center;
   column-gap: var(--space-4);
-  row-gap: var(--space-4);
+  row-gap: var(--space-3);
   padding: var(--space-4) var(--mobile-gutter-end) var(--space-4) var(--mobile-gutter);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-white-md);
 }
+/* The filter line: "Filtres" with the filter's badge (`.mob-integration-filter-name`, sharing a baseline), then the
+   compact "+", all centred on the line. */
 .mob-integration-filter {
   grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.mob-integration-filter-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  min-width: 0;
 }
 .mob-integration .mob-field,
 .mob-field-row .mob-field {
   text-align: center;
   padding: 0 var(--space-4);
 }
-.mob-integration-filter .mob-field {
-  text-align: left;
-  padding: 0 var(--space-7);
+/* An exposure row's count and length: room for five digits ("23456") and no wider, digits of equal width. */
+.mob-integration .mob-field {
+  width: calc(5ch + var(--space-7));
+  padding: 0 var(--space-3);
+  font-variant-numeric: tabular-nums;
 }
 .mob-integration-unit {
   text-align: center;
   color: var(--text-secondary);
 }
+/* The total follows the unit of the length ("s  = 2h00"), part of the row's figures, not pushed to the row's far end. */
 .mob-integration-total {
-  text-align: right;
+  text-align: left;
   color: var(--text-secondary);
   white-space: nowrap;
 }

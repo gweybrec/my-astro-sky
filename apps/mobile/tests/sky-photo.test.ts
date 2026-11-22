@@ -102,10 +102,14 @@ describe('the photo sheet', () => {
       ['Gain', '100'],
       ['Offset', '50'],
       ['Équipement', 'Newton 200 + ASI 183'],
-      ['Intégration', 'Ha 40 × 300 s'],
+      ['Intégration', '40 × 300 sHa'],
       ['Étiquettes', 'Seestar'],
       ['Notes', 'Nuit claire'],
     ]);
+    // the exposure's time comes first, then its filter as a badge
+    const exposure = w.find('.mob-fact--exposures');
+    expect(exposure.find('.mob-exposures-time').text()).toBe('40 × 300 s');
+    expect(exposure.find('.mob-badge--filter').text()).toBe('Ha');
     // the objects are the chips above, the name is the title: neither is repeated
     const order = [...w.find('.mob-sheet-body').element.children].map((e) => e.className);
     expect(order.findIndex((c) => c.includes('mob-facts'))).toBeGreaterThan(
