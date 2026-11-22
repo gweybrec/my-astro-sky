@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import MetadataEditorPanel from '../../src/components/modals/MetadataEditorPanel.vue';
 import type { PhotoIntegration } from '@myastrosky/core/types';
+import { t } from '../../src/i18n';
 
 const showToast = vi.fn();
 vi.mock('../../src/toast', () => ({ showToast: (...args: unknown[]) => showToast(...args) }));
@@ -45,7 +46,52 @@ function lastIntegrations(wrapper: ReturnType<typeof makeWrapper>): PhotoIntegra
   return ev ? (ev[ev.length - 1][0] as PhotoIntegration[]) : undefined;
 }
 
+describe('MetadataEditorPanel sections', () => {
+  const labels = (w: ReturnType<typeof mount>) => w.findAll('.metadata-label').map((l) => l.text());
+
+  function mountFields(fields?: 'top' | 'rest') {
+    const w = makeWrapper([]);
+    return fields ? w.setProps({ fields }).then(() => w) : Promise.resolve(w);
+  }
+
+  it("follows the gallery's photo panel: objects, acquisition, equipment and exposures, then the rest", async () => {
+    const w = await mountFields();
+    const order = labels(w);
+    const at = (key: string) => order.indexOf(key);
+    expect(at(t('modal.metadataDsos'))).toBeLessThan(at(t('gallery.sheet.sectionAcquisition')));
+    expect(at(t('gallery.sheet.sectionAcquisition'))).toBeLessThan(
+      at(t('gallery.sheet.sectionGear')),
+    );
+    expect(at(t('gallery.sheet.sectionGear'))).toBeLessThan(at(t('modal.metadataLabels')));
+    expect(at(t('modal.metadataLabels'))).toBeLessThan(at(t('modal.metadataCapture')));
+    expect(at(t('modal.metadataCapture'))).toBeLessThan(at(t('modal.metadataNotes')));
+    // The equipment comes first in its section, above the exposure rows.
+    const gear = w.findAll('.metadata-field').find((f) => f.find('.integration-rows').exists())!;
+    expect(gear.find('select').exists()).toBe(true);
+  });
+
+  it('shows the equipment alone at the top of "Ajouter des photos", the exposures with the rest', async () => {
+    const top = await mountFields('top');
+    expect(labels(top)).toEqual([t('modal.metadataGearSetup'), t('modal.metadataLabels')]);
+    expect(top.find('.integration-rows').exists()).toBe(false);
+
+    const rest = await mountFields('rest');
+    expect(labels(rest)).toContain(t('gallery.sheet.sectionGear'));
+    expect(rest.find('.integration-rows').exists()).toBe(true);
+    expect(rest.findAll('select').length).toBe(1); // only "Ajouter un champ" of the capture details
+  });
+});
+
 describe('MetadataEditorPanel integration rows', () => {
+  it('says there is no exposure yet, until a row is added', async () => {
+    const wrapper = makeWrapper([]);
+    expect(wrapper.find('[data-test="no-integration"]').text()).toBe(
+      t('gallery.sheet.noIntegration'),
+    );
+    await wrapper.find('.integration-add-row').trigger('click');
+    expect(wrapper.find('[data-test="no-integration"]').exists()).toBe(false);
+  });
+
   it('adds a row in edit mode', async () => {
     const wrapper = makeWrapper([]);
     await wrapper.find('.integration-add-row').trigger('click');

@@ -687,7 +687,7 @@ const fr = {
     metadataPoiManageCategories: 'Gérer les catégories…',
     close: 'Fermer',
     metadataIntegrations: 'Intégration',
-    metadataIntegrationsAddRow: '+ Ajouter une ligne',
+    metadataIntegrationsAddRow: '+ Ajouter des poses',
     metadataIntegrationsFramesPlaceholder: 'N',
     metadataIntegrationsFramesTooltip: "Nombre de poses dans cette séquence d'intégration",
     metadataIntegrationsSecondsPlaceholder: 'sec',

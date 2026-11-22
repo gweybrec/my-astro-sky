@@ -685,7 +685,7 @@ const es: Translations = {
     metadataPoiManageCategories: 'Gestionar categorías…',
     close: 'Cerrar',
     metadataIntegrations: 'Integración',
-    metadataIntegrationsAddRow: '+ Añadir fila',
+    metadataIntegrationsAddRow: '+ Añadir exposiciones',
     metadataIntegrationsFramesPlaceholder: 'N',
     metadataIntegrationsFramesTooltip: 'Número de tomas en esta secuencia de integración',
     metadataIntegrationsSecondsPlaceholder: 'seg',

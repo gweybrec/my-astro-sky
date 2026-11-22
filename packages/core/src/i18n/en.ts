@@ -680,7 +680,7 @@ const en: Translations = {
     metadataPoiManageCategories: 'Manage categories…',
     close: 'Close',
     metadataIntegrations: 'Integration',
-    metadataIntegrationsAddRow: '+ Add row',
+    metadataIntegrationsAddRow: '+ Add exposures',
     metadataIntegrationsFramesPlaceholder: 'N',
     metadataIntegrationsFramesTooltip: 'Number of frames in this integration sequence',
     metadataIntegrationsSecondsPlaceholder: 'sec',

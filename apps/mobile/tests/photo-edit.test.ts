@@ -167,7 +167,18 @@ describe("a photo's edit page", () => {
     expect((byLabel(w, 'input', 'Nom du fichier').element as HTMLInputElement).value).toBe(
       'M31_stack.jpg',
     );
-    expect(chips(w)).toEqual(['M31', 'M110', 'LRGB', 'C/2023 A3']);
+    // The sections and their order are the desktop gallery's photo panel's.
+    expect(w.findAll('.mob-section-header').map((h) => h.text())).toEqual([
+      'Nom du fichier',
+      'Objets dans cette image',
+      'Acquisition',
+      'Équipement et capture',
+      "Points d'intérêt",
+      'Étiquettes',
+      'Détails de capture',
+      'Notes',
+    ]);
+    expect(chips(w)).toEqual(['M31', 'M110', 'C/2023 A3', 'LRGB']);
     expect(w.findAll('.mob-integration')).toHaveLength(1);
     expect(w.find('.mob-integration-total').text()).toBe('= 2h00');
     expect(byLabel(w, 'button', 'Équipement : Équipement 1').exists()).toBe(true);
@@ -318,9 +329,21 @@ describe("a photo's edit page", () => {
     ]);
   });
 
+  it('says there is no exposure yet, until one is added', async () => {
+    getPhotos.mockResolvedValue([photo({ integrations: [] })]);
+    const w = await mountPage();
+    const helper = () =>
+      w.findAll('.mob-helper').filter((h) => h.text() === "Aucune information d'intégration");
+    expect(w.findAll('.mob-integration')).toHaveLength(0);
+    expect(helper()).toHaveLength(1);
+    await byText(w, 'button', 'Ajouter des poses').trigger('click');
+    expect(w.findAll('.mob-integration')).toHaveLength(1);
+    expect(helper()).toHaveLength(0);
+  });
+
   it('edits the integration rows: a new row, its total, a refused number, a removed row', async () => {
     const w = await mountPage();
-    await byText(w, 'button', 'Ajouter une ligne').trigger('click');
+    await byText(w, 'button', 'Ajouter des poses').trigger('click');
     const line = w.findAll('.mob-integration')[1];
     // the numbers first, then the filter on its own line under them, with no text field
     const [frames, seconds] = line.findAll('input');
@@ -364,7 +387,7 @@ describe("a photo's edit page", () => {
 
   it('offers a filter just chosen first among the recent ones, before it is saved', async () => {
     const w = await mountPage();
-    await byText(w, 'button', 'Ajouter une ligne').trigger('click');
+    await byText(w, 'button', 'Ajouter des poses').trigger('click');
     await byLabel(w, 'button', 'Choisir le filtre de la ligne 2').trigger('click');
     await row(w, 'OIII').trigger('click');
     await byLabel(w, 'button', 'Changer le filtre de la ligne 1').trigger('click');
@@ -394,7 +417,7 @@ describe("a photo's edit page", () => {
 
   it('keeps a row with a filter only, and refuses to save a row with nothing in it', async () => {
     const w = await mountPage();
-    await byText(w, 'button', 'Ajouter une ligne').trigger('click');
+    await byText(w, 'button', 'Ajouter des poses').trigger('click');
     await save(w);
     expect(updatePhotoMetadata).not.toHaveBeenCalled();
     expect(showError.mock.calls[0][0].message).toBe(

@@ -686,7 +686,7 @@ const de: Translations = {
     metadataPoiManageCategories: 'Kategorien verwalten…',
     close: 'Schließen',
     metadataIntegrations: 'Integration',
-    metadataIntegrationsAddRow: '+ Zeile hinzufügen',
+    metadataIntegrationsAddRow: '+ Belichtungen hinzufügen',
     metadataIntegrationsFramesPlaceholder: 'N',
     metadataIntegrationsFramesTooltip: 'Anzahl der Einzelbilder in dieser Integrationssequenz',
     metadataIntegrationsSecondsPlaceholder: 'sek',

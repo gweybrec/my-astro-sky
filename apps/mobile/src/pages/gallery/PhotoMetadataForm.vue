@@ -21,6 +21,7 @@ import AppIcon from '../../components/AppIcon.vue';
 import PhoneAddRow from '../../components/PhoneAddRow.vue';
 import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneField from '../../components/PhoneField.vue';
+import PhoneHelper from '../../components/PhoneHelper.vue';
 import PhoneIconButton from '../../components/PhoneIconButton.vue';
 import PhoneNativePicker from '../../components/PhoneNativePicker.vue';
 import PhoneRadioSheet from '../../components/PhoneRadioSheet.vue';
@@ -38,8 +39,8 @@ import asteroidIcon from '@icons/poi-asteroid.svg?raw';
 import cometIcon from '@icons/poi-comet.svg?raw';
 import supernovaIcon from '@icons/poi-supernova.svg?raw';
 
-// The fields of a photo's metadata, as the desktop's editor (`MetadataEditorPanel.vue`) shows them: on "Modifier les
-// infos" (board "Photo, modifier les infos") and on "Photo à ajouter". The page holds the draft and saves it; adding a
+// The fields of a photo's metadata, in the sections and order of the desktop gallery's photo panel (`MetadataSheet.vue`):
+// on "Modifier les infos" (board "Photo, modifier les infos") and on "Photo à ajouter". The page holds the draft and saves it; adding a
 // point of interest and the identifications need a solved photo (`solved`), and open the page's own pages (`poi`). An
 // exposure row's filter is chosen in a list (board "Photo, modifier les infos, filtre"); "Ajouter un filtre" there asks
 // the page to open the filter's add page for that row (`add-filter`).
@@ -263,61 +264,45 @@ function addCapture() {
     <PhoneRow v-for="r in dsoResults" :key="r.id" :title="r.title" button @click="addDso(r.id)" />
   </IonList>
 
-  <PhoneSectionHeader>{{ t('modal.metadataLabels') }}</PhoneSectionHeader>
-  <PhoneRemoveChips
-    :items="draft.labels.map((label) => ({ label }))"
-    @remove="draft.labels.splice($event, 1)"
+  <PhoneSectionHeader>{{ t('gallery.sheet.sectionAcquisition') }}</PhoneSectionHeader>
+  <PhoneField
+    :model-value="dateLocal.replace('T', ' ')"
+    readonly
+    :aria-label="t('modal.metadataObsDate')"
+    @click="datePicker?.open()"
   />
-  <PhoneAddRow
-    v-model="labelInput"
-    :placeholder="t('modal.metadataLabelsPlaceholder')"
-    :aria-label="t('modal.metadataLabelsPlaceholder')"
-    @add="addLabel(labelInput)"
+  <PhoneNativePicker
+    ref="datePicker"
+    type="datetime-local"
+    :value="dateLocal"
+    @pick="draft.observationDate = datetimeLocalToIso($event)"
+    @clear="draft.observationDate = ''"
   />
-  <IonList v-if="labelSuggestions.length" class="mob-list" lines="none">
-    <PhoneRow
-      v-for="label in labelSuggestions"
-      :key="label"
-      :title="label"
-      button
-      @click="addLabel(label)"
-    />
-  </IonList>
 
-  <PhoneSectionHeader>{{ t('modal.metadataPoi') }}</PhoneSectionHeader>
-  <PhoneRemoveChips :items="poiChips" @remove="draft.pointsOfInterest.splice($event, 1)" />
-  <!-- As the desktop: adding a point needs a solved photo; the identifications show only for one. -->
-  <IonList class="mob-list" lines="none">
-    <PhoneRow
-      :title="withoutPlus(t('poi.addPoi'))"
-      :lead="plusIcon"
-      button
-      :disabled="!solved"
-      @click="emit('poi', 'poi')"
-    />
-    <template v-if="solved">
-      <PhoneRow
-        :title="t('asteroid.menuLabel')"
-        :lead="asteroidIcon"
-        button
-        @click="emit('poi', 'identify/asteroid')"
-      />
-      <PhoneRow
-        :title="t('supernova.menuLabel')"
-        :lead="supernovaIcon"
-        button
-        @click="emit('poi', 'identify/supernova')"
-      />
-      <PhoneRow
-        :title="t('comet.menuLabel')"
-        :lead="cometIcon"
-        button
-        @click="emit('poi', 'identify/comet')"
-      />
-    </template>
-  </IonList>
+  <PhoneSectionHeader>{{ t('gallery.sheet.sectionGear') }}</PhoneSectionHeader>
+  <div class="mob-form-row">
+    <PhoneButton
+      variant="field"
+      text-style="body"
+      block
+      :aria-label="
+        t('mobile.format.labelValue', {
+          label: t('modal.metadataGearSetup'),
+          value: setupName,
+        })
+      "
+      @click="setupOpen = true"
+    >
+      <span class="mob-btn-label">{{ setupName }}</span>
+      <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
+    </PhoneButton>
+  </div>
 
-  <PhoneSectionHeader>{{ t('modal.metadataIntegrations') }}</PhoneSectionHeader>
+  <!-- No exposure yet: said as the desktop's photo panel says it, above the button that adds one
+       (board "Photo, modifier les infos, sans intégration"). -->
+  <PhoneHelper v-if="draft.integrations.length === 0">{{
+    t('gallery.sheet.noIntegration')
+  }}</PhoneHelper>
   <div v-for="(row, index) in draft.integrations" :key="index" class="mob-integration">
     <PhoneField
       bare
@@ -369,39 +354,59 @@ function addCapture() {
     </PhoneButton>
   </div>
 
-  <PhoneSectionHeader>{{ t('modal.metadataObsDate') }}</PhoneSectionHeader>
-  <PhoneField
-    :model-value="dateLocal.replace('T', ' ')"
-    readonly
-    :aria-label="t('modal.metadataObsDate')"
-    @click="datePicker?.open()"
-  />
-  <PhoneNativePicker
-    ref="datePicker"
-    type="datetime-local"
-    :value="dateLocal"
-    @pick="draft.observationDate = datetimeLocalToIso($event)"
-    @clear="draft.observationDate = ''"
-  />
+  <PhoneSectionHeader>{{ t('modal.metadataPoi') }}</PhoneSectionHeader>
+  <PhoneRemoveChips :items="poiChips" @remove="draft.pointsOfInterest.splice($event, 1)" />
+  <!-- As the desktop: adding a point needs a solved photo; the identifications show only for one. -->
+  <IonList class="mob-list" lines="none">
+    <PhoneRow
+      :title="withoutPlus(t('poi.addPoi'))"
+      :lead="plusIcon"
+      button
+      :disabled="!solved"
+      @click="emit('poi', 'poi')"
+    />
+    <template v-if="solved">
+      <PhoneRow
+        :title="t('asteroid.menuLabel')"
+        :lead="asteroidIcon"
+        button
+        @click="emit('poi', 'identify/asteroid')"
+      />
+      <PhoneRow
+        :title="t('supernova.menuLabel')"
+        :lead="supernovaIcon"
+        button
+        @click="emit('poi', 'identify/supernova')"
+      />
+      <PhoneRow
+        :title="t('comet.menuLabel')"
+        :lead="cometIcon"
+        button
+        @click="emit('poi', 'identify/comet')"
+      />
+    </template>
+  </IonList>
 
-  <PhoneSectionHeader>{{ t('modal.metadataGearSetup') }}</PhoneSectionHeader>
-  <div class="mob-form-row">
-    <PhoneButton
-      variant="field"
-      text-style="body"
-      block
-      :aria-label="
-        t('mobile.format.labelValue', {
-          label: t('modal.metadataGearSetup'),
-          value: setupName,
-        })
-      "
-      @click="setupOpen = true"
-    >
-      <span class="mob-btn-label">{{ setupName }}</span>
-      <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
-    </PhoneButton>
-  </div>
+  <PhoneSectionHeader>{{ t('modal.metadataLabels') }}</PhoneSectionHeader>
+  <PhoneRemoveChips
+    :items="draft.labels.map((label) => ({ label }))"
+    @remove="draft.labels.splice($event, 1)"
+  />
+  <PhoneAddRow
+    v-model="labelInput"
+    :placeholder="t('modal.metadataLabelsPlaceholder')"
+    :aria-label="t('modal.metadataLabelsPlaceholder')"
+    @add="addLabel(labelInput)"
+  />
+  <IonList v-if="labelSuggestions.length" class="mob-list" lines="none">
+    <PhoneRow
+      v-for="label in labelSuggestions"
+      :key="label"
+      :title="label"
+      button
+      @click="addLabel(label)"
+    />
+  </IonList>
 
   <PhoneSectionHeader>{{ t('modal.metadataCapture') }}</PhoneSectionHeader>
   <div v-for="f in presentFields" :key="f.id" class="mob-field-row">

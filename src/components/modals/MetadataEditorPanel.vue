@@ -42,51 +42,47 @@
     </div>
   </div>
 
-  <!-- Labels -->
-  <div class="metadata-field" v-if="shows('top')">
-    <label class="metadata-label">{{ t('modal.metadataLabels') }}</label>
-    <div class="tag-chips">
-      <span v-for="lbl in labels" :key="lbl" class="tag-chip label-chip">
-        {{ lbl }}
-        <button type="button" class="tag-chip-remove" @click="removeLabel(lbl)">×</button>
-      </span>
-    </div>
-    <div class="tag-input-wrap relative">
-      <input
-        type="text"
-        class="tag-input"
-        :placeholder="t('modal.metadataLabelsPlaceholder')"
-        v-model="labelInput"
-        @input="showLabelSuggest = true"
-        @focus="showLabelSuggest = true"
-        @keydown="onLabelKeydown"
-        @blur="onLabelBlur"
-      />
-      <div v-if="showLabelSuggest && labelSuggestions.length" class="tag-suggest">
-        <div
-          v-for="suggestion in labelSuggestions"
-          :key="suggestion"
-          class="tag-suggest-item"
-          @mousedown.prevent="selectLabelSuggestion(suggestion)"
-        >
-          {{ suggestion }}
-        </div>
-      </div>
-    </div>
+  <!-- The sections and their order are the gallery's photo panel's (MetadataSheet.vue). -->
+  <!-- Acquisition -->
+  <div class="metadata-field" v-if="shows('rest')">
+    <label class="metadata-label">{{ t('gallery.sheet.sectionAcquisition') }}</label>
+    <input
+      type="datetime-local"
+      class="dialog-input"
+      :title="t('modal.metadataObsDatePlaceholder')"
+      :aria-label="t('modal.metadataObsDate')"
+      :value="obsDateLocal"
+      @input="onObsDateInput"
+    />
   </div>
 
-  <!-- Points of Interest -->
-  <PoiEditor
-    v-if="shows('rest')"
-    :pois="pointsOfInterest"
-    :photo="photo"
-    @update:pois="emit('update:pointsOfInterest', $event)"
-  />
-
-  <!-- Integrations -->
-  <div class="metadata-field" v-if="shows('rest')">
-    <label class="metadata-label">{{ t('modal.metadataIntegrations') }}</label>
-    <div class="integration-rows">
+  <!-- Equipment and exposures; "Ajouter des photos" shows the equipment alone at its top ('top'), the exposures
+       with the rest. -->
+  <div class="metadata-field">
+    <label class="metadata-label">{{
+      fields === 'top' ? t('modal.metadataGearSetup') : t('gallery.sheet.sectionGear')
+    }}</label>
+    <select
+      v-if="shows('top')"
+      class="dialog-input"
+      :class="{ 'mb-2': shows('rest') }"
+      :title="t('modal.metadataGearSetupPlaceholder')"
+      :aria-label="t('modal.metadataGearSetup')"
+      :value="gearSetupId ?? ''"
+      @change="onSetupChange"
+    >
+      <option value="">{{ t('modal.metadataGearSetupNone') }}</option>
+      <option v-for="s in gearSetups" :key="s.id" :value="s.id">{{ s.name || s.id }}</option>
+    </select>
+    <!-- No exposure yet: says so, as the gallery's photo panel does, above the button that adds one. -->
+    <div
+      v-if="shows('rest') && rows.length === 0"
+      class="integration-row min-h-[26px]"
+      data-test="no-integration"
+    >
+      <span class="text-body text-dim">{{ t('gallery.sheet.noIntegration') }}</span>
+    </div>
+    <div v-if="shows('rest')" class="integration-rows">
       <template v-for="(row, idx) in rows" :key="row._id">
         <!-- Edit mode: N × Sec + filter inputs -->
         <div v-if="row._open" class="integration-row">
@@ -164,6 +160,7 @@
       </template>
     </div>
     <button
+      v-if="shows('rest')"
       type="button"
       class="integration-add-btn integration-add-row"
       @click="addIntegrationRow"
@@ -172,30 +169,45 @@
     </button>
   </div>
 
-  <!-- Observation date -->
-  <div class="metadata-field" v-if="shows('rest')">
-    <label class="metadata-label">{{ t('modal.metadataObsDate') }}</label>
-    <input
-      type="datetime-local"
-      class="dialog-input"
-      :title="t('modal.metadataObsDatePlaceholder')"
-      :value="obsDateLocal"
-      @input="onObsDateInput"
-    />
-  </div>
+  <!-- Points of Interest -->
+  <PoiEditor
+    v-if="shows('rest')"
+    :pois="pointsOfInterest"
+    :photo="photo"
+    @update:pois="emit('update:pointsOfInterest', $event)"
+  />
 
-  <!-- Gear setup link -->
+  <!-- Labels -->
   <div class="metadata-field" v-if="shows('top')">
-    <label class="metadata-label">{{ t('modal.metadataGearSetup') }}</label>
-    <select
-      class="dialog-input"
-      :title="t('modal.metadataGearSetupPlaceholder')"
-      :value="gearSetupId ?? ''"
-      @change="onSetupChange"
-    >
-      <option value="">{{ t('modal.metadataGearSetupNone') }}</option>
-      <option v-for="s in gearSetups" :key="s.id" :value="s.id">{{ s.name || s.id }}</option>
-    </select>
+    <label class="metadata-label">{{ t('modal.metadataLabels') }}</label>
+    <div class="tag-chips">
+      <span v-for="lbl in labels" :key="lbl" class="tag-chip label-chip">
+        {{ lbl }}
+        <button type="button" class="tag-chip-remove" @click="removeLabel(lbl)">×</button>
+      </span>
+    </div>
+    <div class="tag-input-wrap relative">
+      <input
+        type="text"
+        class="tag-input"
+        :placeholder="t('modal.metadataLabelsPlaceholder')"
+        v-model="labelInput"
+        @input="showLabelSuggest = true"
+        @focus="showLabelSuggest = true"
+        @keydown="onLabelKeydown"
+        @blur="onLabelBlur"
+      />
+      <div v-if="showLabelSuggest && labelSuggestions.length" class="tag-suggest">
+        <div
+          v-for="suggestion in labelSuggestions"
+          :key="suggestion"
+          class="tag-suggest-item"
+          @mousedown.prevent="selectLabelSuggestion(suggestion)"
+        >
+          {{ suggestion }}
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Capture details (dynamic, opt-in fields) -->
