@@ -7,11 +7,11 @@
  * Usage: node scripts/add-constellations.mjs
  *
  * Boundary table source: CDS VI/42 (Roman 1987)
- * https://cdsarc.cds.unistra.fr/ftp/VI/42/data.dat
+ * https://cdsarc.cds.unistra.fr/ftp/VI/42/data.dat (or a VizieR mirror, see fetch-text.mjs)
  */
 
 import { readFileSync, writeFileSync } from 'fs';
-import { fetchText } from './fetch-text.mjs';
+import { cdsFile } from './fetch-text.mjs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -48,9 +48,8 @@ function j2000ToB1875(raDeg, decDeg) {
 // Format: fixed-width cols 1-4 RA (hours), 5-10 Dec (deg), 11-13 abbr (B1875)
 // Format: 4 space-separated columns: ra_lower ra_upper dec_lower constellation (B1875)
 async function fetchBoundaries() {
-  const url = 'https://cdsarc.cds.unistra.fr/ftp/VI/42/data.dat';
   console.log('Fetching boundary data from CDS...');
-  const text = await fetchText(url, 'the constellation boundary table');
+  const text = await cdsFile('VI/42/data.dat', 'the constellation boundary table');
   const table = [];
   for (const line of text.split('\n')) {
     const parts = line.trim().split(/\s+/);

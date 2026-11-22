@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 // @ts-expect-error -- plain .mjs build script, no type declarations
-import { describeFetchError, fetchText } from '../../scripts/fetch-text.mjs';
+import { describeFetchError, fetchFromMirrors, fetchText } from '../../scripts/fetch-text.mjs';
 
 /** The shape of Node's fetch failure: "fetch failed", the real error in `cause`. */
 function fetchFailed(cause: unknown): Error {
@@ -72,5 +72,43 @@ describe('fetchText', () => {
   it('returns the text on success', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('hello')));
     await expect(fetchText('https://example.org/x.dat', 'the X catalogue')).resolves.toBe('hello');
+  });
+});
+
+describe('fetchFromMirrors', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const down = () => Promise.reject(fetchFailed(sysError('ECONNREFUSED', 'connect ECONNREFUSED')));
+
+  it('falls back to the next mirror, then starts from the one that answered', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mirrors = ['https://main.example/', 'https://mirror.example/'];
+    const fetchMock = vi.fn((url: string) =>
+      url.startsWith('https://main.') ? down() : Promise.resolve(new Response(`got ${url}`)),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(fetchFromMirrors(mirrors, 'a/b.dat', 'the file')).resolves.toBe(
+      'got https://mirror.example/a/b.dat',
+    );
+    await fetchFromMirrors(mirrors, 'c.dat', 'the file');
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'https://main.example/a/b.dat',
+      'https://mirror.example/a/b.dat',
+      'https://mirror.example/c.dat',
+    ]);
+  });
+
+  it('lists every mirror and its reason when all fail', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn(down));
+    const error = await fetchFromMirrors(['https://a.example/', 'https://b.example/'], 'x', 'the X')
+      .then(() => null)
+      .catch((e: Error) => e);
+    expect(error?.message).toMatch(/^Could not download the X from any mirror:/);
+    expect(error?.message).toContain('https://a.example/x: the server refused the connection');
+    expect(error?.message).toContain('https://b.example/x: the server refused the connection');
   });
 });

@@ -4,7 +4,7 @@
  * Usage: node scripts/generate-dso.mjs
  */
 
-import { fetchText } from './fetch-text.mjs';
+import { cdsFile, fetchText } from './fetch-text.mjs';
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -516,7 +516,7 @@ async function fetchNGC() {
 
 async function fetchLBN() {
   console.log('Downloading LBN catalog...');
-  return fetchText('https://cdsarc.cds.unistra.fr/ftp/VII/9/catalog.dat', 'the LBN catalogue');
+  return cdsFile('VII/9/catalog.dat', 'the LBN catalogue');
 }
 
 // Parse LBN catalog.dat (B1950 coords).
@@ -551,7 +551,7 @@ function parseLBN(text) {
 
 async function fetchLDN() {
   console.log('Downloading LDN catalog...');
-  return fetchText('https://cdsarc.cds.unistra.fr/ftp/VII/7A/ldn', 'the LDN catalogue');
+  return cdsFile('VII/7A/ldn', 'the LDN catalogue');
 }
 
 // Parse LDN catalog (B1950 coords) using the VII/7A ReadMe's fixed-width byte
@@ -1014,10 +1014,7 @@ const DUPLICATE_MERGE_ALIASES = {
 
 async function fetchBarnard() {
   console.log('Downloading Barnard catalog...');
-  return fetchText(
-    'https://cdsarc.cds.unistra.fr/ftp/VII/220A/barnard.dat',
-    'the Barnard catalogue',
-  );
+  return cdsFile('VII/220A/barnard.dat', 'the Barnard catalogue');
 }
 
 // Parse Barnard's Catalogue of Dark Objects (VII/220A).
@@ -1048,7 +1045,7 @@ function parseBarnard(text) {
 
 async function fetchVdB() {
   console.log('Downloading vdB catalog...');
-  return fetchText('https://cdsarc.cds.unistra.fr/ftp/VII/21/catalog.dat', 'the vdB catalogue');
+  return cdsFile('VII/21/catalog.dat', 'the vdB catalogue');
 }
 
 // Parse van den Bergh (1966) catalog.dat (galactic coordinates, epoch 1958 IAU).

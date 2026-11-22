@@ -25,8 +25,7 @@
  */
 
 import fs from 'fs';
-import https from 'https';
-import { URL } from 'url';
+import { fetchFromMirrors, SIMBAD_TAP_MIRRORS } from './fetch-text.mjs';
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -73,7 +72,7 @@ switch (scope) {
 
 console.log(`Scope: ${scope} → ${targets.length} objects to check`);
 console.log(`Coordinate threshold: ${degThreshold}°`);
-console.log(`SIMBAD TAP endpoint: https://simbad.cds.unistra.fr/simbad/sim-tap/sync`);
+console.log(`SIMBAD TAP endpoint: ${SIMBAD_TAP_MIRRORS[0]} (mirrors if it is down)`);
 console.log('─'.repeat(70));
 
 // ── ID normalisation: our format → SIMBAD format ─────────────────────────────
@@ -104,32 +103,6 @@ function toSimbadId(id) {
 }
 
 // ── SIMBAD TAP query ──────────────────────────────────────────────────────────
-const TAP_URL = 'https://simbad.cds.unistra.fr/simbad/sim-tap/sync';
-
-/** Fetch a URL, return body as string */
-function httpGet(urlStr) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(urlStr);
-    const options = {
-      hostname: u.hostname,
-      path: u.pathname + u.search,
-      method: 'GET',
-      headers: { 'User-Agent': 'my-astro-sky-validator/1.0' },
-    };
-    const req = https.request(options, (res) => {
-      let body = '';
-      res.on('data', (d) => (body += d));
-      res.on('end', () => resolve(body));
-    });
-    req.on('error', reject);
-    req.setTimeout(30000, () => {
-      req.destroy();
-      reject(new Error('timeout'));
-    });
-    req.end();
-  });
-}
-
 /**
  * Query SIMBAD TAP for a single identifier.
  * Returns { main_id, ra, dec, otype, ids } or null if not found.
@@ -141,9 +114,9 @@ JOIN basic b ON b.oid = i.oidref
 JOIN ids ON b.oid = ids.oidref
 WHERE i.id = '${simbadId.replace(/'/g, "''")}'`;
 
-  const url = `${TAP_URL}?REQUEST=doQuery&LANG=ADQL&FORMAT=json&QUERY=${encodeURIComponent(adql)}`;
+  const query = `?REQUEST=doQuery&LANG=ADQL&FORMAT=json&QUERY=${encodeURIComponent(adql)}`;
   try {
-    const body = await httpGet(url);
+    const body = await fetchFromMirrors(SIMBAD_TAP_MIRRORS, query, 'a SIMBAD query');
     const json = JSON.parse(body);
     if (!json.data || json.data.length === 0) return null;
     const [main_id, ra, dec, otype, ids] = json.data[0];

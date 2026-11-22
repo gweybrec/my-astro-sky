@@ -4,6 +4,24 @@
 
 const TIMEOUT_MS = 60_000;
 
+/**
+ * Where the CDS catalogue files (cdsarc's /ftp/<catalogue>/<file>) can be downloaded, CDS
+ * first. NAOJ and China-VO serve them over plain HTTP only, so they come last.
+ */
+export const CDS_FILE_MIRRORS = [
+  'https://cdsarc.cds.unistra.fr/ftp/',
+  'https://vizier.cfa.harvard.edu/ftp/cats/',
+  'http://vizier.nao.ac.jp/ftp/cats/',
+  'http://vizier.china-vo.org/ftp/cats/',
+];
+
+/** SIMBAD's TAP query endpoint, CDS first, then its mirrors (CfA Harvard, IDIA South Africa). */
+export const SIMBAD_TAP_MIRRORS = [
+  'https://simbad.cds.unistra.fr/simbad/sim-tap/sync',
+  'https://simbad.cfa.harvard.edu/simbad/sim-tap/sync',
+  'https://simbad.idia.ac.za/simbad/sim-tap/sync',
+];
+
 /** Plain reasons for the network error codes Node reports. */
 const REASONS = {
   ECONNREFUSED: 'the server refused the connection (server down, or the port is blocked)',
@@ -75,4 +93,35 @@ export async function fetchText(url, what) {
       `Could not download ${what} from ${url}: the server answered HTTP ${res.status} ${res.statusText}`.trim(),
     );
   return await res.text();
+}
+
+/** Per mirror list, the one that answered last: later calls start there (a down server costs one time-out, not one per call). */
+const workingMirror = new WeakMap();
+
+/**
+ * The text at `base + suffix`, trying each base of `mirrors` in turn until one answers.
+ * Each failure is logged; when every mirror fails, the error lists all of them.
+ */
+export async function fetchFromMirrors(mirrors, suffix, what) {
+  const start = workingMirror.get(mirrors) ?? 0;
+  const order = [...mirrors.slice(start), ...mirrors.slice(0, start)];
+  const failures = [];
+  for (const base of order) {
+    try {
+      const text = await fetchText(base + suffix, what);
+      if (base !== mirrors[0] && workingMirror.get(mirrors) !== mirrors.indexOf(base))
+        console.warn(`  (${what}: using the mirror ${new URL(base).host})`);
+      workingMirror.set(mirrors, mirrors.indexOf(base));
+      return text;
+    } catch (error) {
+      failures.push(error.message);
+      if (base !== order.at(-1)) console.warn(`  ${error.message} — trying the next mirror`);
+    }
+  }
+  throw new Error(`Could not download ${what} from any mirror:\n  ${failures.join('\n  ')}`);
+}
+
+/** A CDS catalogue file, e.g. cdsFile('VII/9/catalog.dat', 'the LBN catalogue'), from CDS or a mirror. */
+export function cdsFile(path, what) {
+  return fetchFromMirrors(CDS_FILE_MIRRORS, path, what);
 }

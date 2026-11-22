@@ -21,8 +21,9 @@ column, which is retained but currently only informational. `tests/unit/dso-json
 still asserts the committed `dso.json` has all these columns fully populated, so CI
 catches it if the generation chain is ever broken apart again.
 
-Downloads go through `scripts/fetch-text.mjs`, which names the file, the server and the reason. A failed
-download stops `generate-dso.mjs` or `add-constellations.mjs` before they write, leaving `dso.json` as it was.
+Downloads go through `scripts/fetch-text.mjs`, which names the file, the server and the reason. CDS files
+and SIMBAD queries fall back to mirrors (`CDS_FILE_MIRRORS`, `SIMBAD_TAP_MIRRORS`) when CDS is down. A
+failed download stops `generate-dso.mjs` or `add-constellations.mjs` before they write.
 
 `add-ratings.mjs` is idempotent: it strips any derived columns from a prior run before
 recomputing, so it's also safe to run standalone (`node scripts/add-ratings.mjs`) after
