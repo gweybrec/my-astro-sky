@@ -107,6 +107,7 @@ const de: Translations['mobile'] = {
     searchLabel: 'Plan suchen',
     scopeLabel: 'Angezeigte Pläne',
     moon: 'Mond',
+    noObsWindow: 'Noch kein Beobachtungsfenster',
     phase0: 'Neumond',
     phase1: 'Zunehmende Sichel',
     phase2: 'Erstes Viertel',

@@ -398,7 +398,7 @@ describe('the plan detail page', () => {
     withMosaic();
     const { w, router } = await show(PlanDetailPage, '/plans/p1');
     expect(w.text()).toContain('2 objets');
-    expect(mosaicRow(w).text()).toContain('2 tuiles');
+    expect(mosaicRow(w).text()).toContain("Pas encore de fenêtre d'observation · 2 tuiles");
     // one item for the mosaic, none for its tiles
     expect(w.findAll('.mob-list .mob-row')).toHaveLength(2);
     await mosaicRow(w).trigger('click');
@@ -407,11 +407,37 @@ describe('the plan detail page', () => {
     expect(skyPlanView.value).toBeNull();
   });
 
-  it("gives a mosaic's row its first window, as a target's", async () => {
+  it("gives a mosaic's row its windows, then its number of tiles", async () => {
     withMosaic([window1]);
     const { w } = await show(PlanDetailPage, '/plans/p1');
-    expect(mosaicRow(w).text()).toMatch(/\d\d:\d\d – \d\d:\d\d/);
-    expect(mosaicRow(w).text()).not.toContain('tuiles');
+    expect(mosaicRow(w).text()).toMatch(/\d\d:\d\d – \d\d:\d\d · 2 tuiles/);
+    expect(mosaicRow(w).text()).not.toContain('Pas encore');
+  });
+
+  it("spans a target's row from the start of its first window to the end of its last", async () => {
+    const late = { ...window1, id: 'w2', startFrac: 0.5, endFrac: 0.6 };
+    backend.plans.list.mockImplementation(async () => [
+      plan('p1', 'Nuit', [entry('e1', 'M31', { observationWindows: [late, window1] })]),
+    ]);
+    const one = await show(PlanDetailPage, '/plans/p1');
+    const [start] = one.w.text().match(/\d\d:\d\d(?= – )/)!;
+    const [end] = one.w.text().match(/(?<= – )\d\d:\d\d/)!;
+    backend.plans.list.mockImplementation(async () => [
+      plan('p1', 'Nuit', [entry('e1', 'M31', { observationWindows: [window1] })]),
+    ]);
+    const first = await show(PlanDetailPage, '/plans/p1');
+    backend.plans.list.mockImplementation(async () => [
+      plan('p1', 'Nuit', [entry('e1', 'M31', { observationWindows: [late] })]),
+    ]);
+    const last = await show(PlanDetailPage, '/plans/p1');
+    expect(first.w.text()).toContain(`${start} – `);
+    expect(last.w.text()).toContain(` – ${end}`);
+  });
+
+  it('says a target has no window yet instead of an empty line', async () => {
+    backend.plans.list.mockImplementation(async () => [plan('p1', 'Nuit', [entry('e1', 'M31')])]);
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    expect(w.find('.mob-list .mob-row').text()).toContain("Pas encore de fenêtre d'observation");
   });
 
   describe("a mosaic's page", () => {

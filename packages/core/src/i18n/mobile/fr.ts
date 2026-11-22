@@ -104,6 +104,7 @@ const fr = {
     searchLabel: 'Rechercher un plan',
     scopeLabel: 'Plans affichés',
     moon: 'Lune',
+    noObsWindow: "Pas encore de fenêtre d'observation",
     phase0: 'Nouvelle Lune',
     phase1: 'Premier croissant',
     phase2: 'Premier quartier',

@@ -105,6 +105,7 @@ const en: Translations['mobile'] = {
     searchLabel: 'Search for a plan',
     scopeLabel: 'Plans shown',
     moon: 'Moon',
+    noObsWindow: 'No observation window yet',
     phase0: 'New Moon',
     phase1: 'Waxing crescent',
     phase2: 'First quarter',

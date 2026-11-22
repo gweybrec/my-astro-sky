@@ -55,12 +55,13 @@ import caretIcon from '../icons/chevron-down.svg?raw';
 
 // The boards "Détail du plan", "Plan, actions" and "Plan, confirmer la suppression": the night of the plan, then its
 // plan's equipment (a field: choosing another may ask about its mosaics, board "Ciel, changer d'équipement"), then its
-// targets in the plan's sort, each with its first observation window. A tap opens the target. The button beside the
+// targets in the plan's sort, each with its observation windows (start of the first – end of the last, else "no window
+// yet"). A tap opens the target. The button beside the
 // actions chooses the sort (the desktop's sorts; as there, no order by hand): the list is sorted again when this page
 // is entered, after a target's windows were changed on its page. The actions rename the plan, export it as a PDF (the desktop's, through the share sheet) and delete it; "Afficher sur la carte" opens the map in a mode of its own on the plan's frames (the
 // desktop selects the plan's frames and opens its frame manager), its back arrow returning here. The plus opens the Cibles list for this plan (boards "Plan, ajouter une cible"), as the
 // desktop's "Trouver des cibles" of a plan; the targets added there show when this page is entered again. A mosaic is
-// an item of the plan like a target (its name · Mosaïque, its first window, else its number of tiles): sorted with
+// an item of the plan like a target (its name · Mosaïque, its windows or "no window yet", then its number of tiles): sorted with
 // them, a tap opens its page (board "Plan, détail d'une mosaïque").
 // The night is a field above the equipment (the calendar sheet, as the Targets' night). When it has passed and
 // the plan is still current (board "Plan, détail, date passée"), a warning row offers to archive the plan or to move
@@ -152,28 +153,31 @@ const rows = computed(() => {
     }
   }
   const win = night.value?.win;
-  /** The first of the windows, as a range of the night's clock (empty without one). */
-  const firstRange = (windows: readonly { startFrac: number; endFrac: number }[]) => {
-    const first = [...windows].sort((a, b) => a.startFrac - b.startFrac)[0];
-    return first && win
-      ? `${fracToClock(first.startFrac, win)} – ${fracToClock(first.endFrac, win)}`
-      : '';
+  /** From the start of the first window to the end of the last, on the night's clock (empty without one). */
+  const windowsRange = (windows: readonly { startFrac: number; endFrac: number }[]) => {
+    if (!windows.length || !win) return '';
+    const start = Math.min(...windows.map((w) => w.startFrac));
+    const end = Math.max(...windows.map((w) => w.endFrac));
+    return `${fracToClock(start, win)} – ${fracToClock(end, win)}`;
   };
   return items.map(({ id, name, mosaic }) => {
+    const windows = mosaic
+      ? (mosaic.observationWindows ?? [])
+      : (p.entries.find((e) => e.id === id)?.observationWindows ?? []);
+    const range = windowsRange(windows);
+    // Windows but no night to put them on (no location): no range, and no "no window" either.
+    const when = windows.length ? range : t('mobile.plans.noObsWindow');
     if (mosaic) {
-      const tiles = p.entries.filter((e) => e.mosaicId === mosaic.id).length;
-      const range = firstRange(mosaic.observationWindows ?? []);
+      const tiles = `${p.entries.filter((e) => e.mosaicId === mosaic.id).length} ${t('fovOverlay.mosaicPanels')}`;
       return {
         id,
         title: `${name} · ${t('targets.plan.mosaicLabel')}`,
-        sub: range || `${tiles} ${t('fovOverlay.mosaicPanels')}`,
+        sub: when ? `${when} · ${tiles}` : tiles,
         mono: !!range,
         mosaic,
       };
     }
-    const entry = p.entries.find((e) => e.id === id);
-    const range = firstRange(entry?.observationWindows ?? []);
-    return { id, title: name, sub: range, mono: true, mosaic: undefined };
+    return { id, title: name, sub: when, mono: !!range, mosaic: undefined };
   });
 });
 

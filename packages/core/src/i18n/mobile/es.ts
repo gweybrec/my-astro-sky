@@ -105,6 +105,7 @@ const es: Translations['mobile'] = {
     searchLabel: 'Buscar un plan',
     scopeLabel: 'Planes mostrados',
     moon: 'Luna',
+    noObsWindow: 'Aún no hay ventana de observación',
     phase0: 'Luna nueva',
     phase1: 'Creciente',
     phase2: 'Cuarto creciente',
