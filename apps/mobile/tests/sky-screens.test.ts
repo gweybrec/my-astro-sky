@@ -277,7 +277,7 @@ describe('the display sheet ("Ciel, affichage")', () => {
     const w = mountSheet();
     const text = w.text();
     expect(text).toContain('Types');
-    expect(text).toContain('13 / 13');
+    expect(text).toContain('14 / 14');
     expect(text).toContain('Occidental classique');
     expect(text).toContain('Nord');
     expect(text).toContain('Stéréo');

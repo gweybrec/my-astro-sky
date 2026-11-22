@@ -223,6 +223,7 @@ export class SkyMap {
     'EN',
     'RN',
     'PN',
+    'PPN',
     'SNR',
     'DN',
     'PS',

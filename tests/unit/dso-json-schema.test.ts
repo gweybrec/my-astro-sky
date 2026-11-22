@@ -63,6 +63,34 @@ describe('public/data/dso.json schema integrity', () => {
     }
   });
 
+  it('holds the 16 protoplanetary nebulae, each with a constellation and four names', () => {
+    const ppn = dso.data.filter((row) => row[idx('type')] === 'PPN');
+    expect(ppn.map((row) => row[idx('id')]).sort()).toEqual(
+      [
+        'CRL2688',
+        'HD44179',
+        'IRAS04395+3601',
+        'IRAS09371+1212',
+        'IRAS12419-5414',
+        'IRAS13208-6020',
+        'IRAS16594-4656',
+        'IRAS17150-3224',
+        'IRAS17163-3907',
+        'IRAS18059-3211',
+        'IRAS19024+0044',
+        'IRAS19343+2926',
+        'IRAS20068+4051',
+        'IRAS22036+5306',
+        'IRAS23166+1655',
+        'OH231.8+4.2',
+      ].sort(),
+    );
+    for (const row of ppn) {
+      expect(row[idx('constellation')]).toMatch(/^[A-Z][a-z]{2}$/);
+      for (const f of ['nameFr', 'nameEn', 'nameEs', 'nameDe']) expect(row[idx(f)]).toBeTruthy();
+    }
+  });
+
   it('containerId is either null or a non-empty string id', () => {
     const containerIdx = idx('containerId');
     for (const row of dso.data) {

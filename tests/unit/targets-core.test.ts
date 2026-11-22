@@ -75,6 +75,34 @@ describe('targets preferences', () => {
     expect(loadTargetsPrefs().enabledCatalogs).toEqual(['M', 'Other']);
   });
 
+  it('ticks the protoplanetary nebulae once in a type filter saved before they existed', () => {
+    const store = createMemoryStore();
+    store.set(
+      'targets-prefs-v3',
+      JSON.stringify({
+        setupId: null,
+        lat: null,
+        lon: null,
+        lastDateISO: null,
+        enabledTypes: ['PN'],
+      }),
+    );
+    configureStorage(store);
+    expect(loadTargetsPrefs().enabledTypes).toEqual(['PN', 'PPN']);
+  });
+
+  it('keeps the protoplanetary nebulae unticked once the filter was saved after the update', () => {
+    saveTargetsPrefs({
+      setupId: null,
+      lat: null,
+      lon: null,
+      lastDateISO: null,
+      enabledTypes: ['PN'],
+    });
+    expect(loadTargetsPrefs().enabledTypes).toEqual(['PN']);
+    expect(loadTargetsPrefs()).not.toHaveProperty('ppnTypeAdded');
+  });
+
   it('puts the night back to today at start, keeping the filters', () => {
     saveTargetsPrefs({ setupId: 's1', lat: 1, lon: 2, lastDateISO: '2020-01-01', minAltDeg: 30 });
     resetTargetsNightToToday();

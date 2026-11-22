@@ -159,6 +159,12 @@ export const DSO_MARKER_STYLES: Record<DSOType, DsoMarkerStyle> = {
     stroke: { color: 'rgba(80, 200, 220, 0.8)', lineWidth: 1 },
     innerCircle: { ratio: 0.4, color: 'rgba(80, 200, 220, 0.5)' },
   },
+  // Protoplanetary nebula: the planetary nebula's double circle, in warm amber-pink (mostly scattered starlight).
+  PPN: {
+    shape: 'circle',
+    stroke: { color: 'rgba(235, 150, 120, 0.8)', lineWidth: 1 },
+    innerCircle: { ratio: 0.4, color: 'rgba(235, 150, 120, 0.5)' },
+  },
   // Supernova remnant: green-teal ellipse, hollow centre (inner-radius gradient).
   SNR: {
     shape: 'ellipse',
@@ -206,6 +212,7 @@ export const DSO_LABEL_COLORS: Partial<Record<DSOType, string>> = {
   EN: 'rgba(220, 100, 100, 0.8)',
   RN: 'rgba(160, 175, 185, 0.75)',
   PN: 'rgba(80, 200, 220, 0.9)',
+  PPN: 'rgba(235, 150, 120, 0.9)',
   SNR: 'rgba(80, 200, 150, 0.8)',
   DN: 'rgba(120, 120, 140, 0.6)',
   PS: 'rgba(230, 220, 200, 0.8)',

@@ -72,6 +72,7 @@ The file is an array of objects. Find the entry by `id` (case-insensitive, e.g. 
 | `EN`  | Emission nebula       |
 | `RN`  | Reflection nebula     |
 | `PN`  | Planetary nebula      |
+| `PPN` | Protoplanetary nebula |
 | `SNR` | Supernova remnant     |
 | `DN`  | Dark nebula           |
 | `?`   | Unknown               |

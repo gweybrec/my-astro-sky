@@ -12,13 +12,13 @@ Produces heuristic "ballpark" integration time and filter recommendations for a 
 
 Four tables cover the object families, indexed by `difficulty` 1–5:
 
-| Difficulty | Default (EN, SNR, RN, DN) | Globular clusters (GC) | Open clusters (OC) | Planetary nebulae (PN) |
-| :--------: | :-----------------------: | :--------------------: | :----------------: | :--------------------: |
-|     1      |          0.25 h           |         0.25 h         |       0.15 h       |         0.15 h         |
-|     2      |          0.75 h           |         0.50 h         |       0.33 h       |         0.33 h         |
-|     3      |           2.5 h           |         1.0 h          |       0.75 h       |         0.75 h         |
-|     4      |           4.0 h           |         2.0 h          |       1.5 h        |         1.5 h          |
-|     5      |           8.0 h           |         4.0 h          |       3.0 h        |         3.0 h          |
+| Difficulty | Default (EN, SNR, RN, DN) | Globular clusters (GC) | Open clusters (OC) | Planetary nebulae (PN, PPN) |
+| :--------: | :-----------------------: | :--------------------: | :----------------: | :-------------------------: |
+|     1      |          0.25 h           |         0.25 h         |       0.15 h       |           0.15 h            |
+|     2      |          0.75 h           |         0.50 h         |       0.33 h       |           0.33 h            |
+|     3      |           2.5 h           |         1.0 h          |       0.75 h       |           0.75 h            |
+|     4      |           4.0 h           |         2.0 h          |       1.5 h        |            1.5 h            |
+|     5      |           8.0 h           |         4.0 h          |       3.0 h        |            3.0 h            |
 
 Galaxies (GxS, GxE, GxI, Gx) share the Default table but get a capped aperture factor (see below).
 
@@ -35,7 +35,7 @@ Exponent 1.5 is softer than the physically exact quadratic (^2) to keep the reco
 | Type family              |         Cap constant          | Value | Rationale                                                                                               |
 | ------------------------ | :---------------------------: | :---: | ------------------------------------------------------------------------------------------------------- |
 | GC, OC                   | `CLUSTER_MAX_APERTURE_FACTOR` |  3.0  | Resolution-limited; bright stars saturate SNR in <1 h on any aperture                                   |
-| PN                       |   `PN_MAX_APERTURE_FACTOR`    |  3.0  | Compact, high surface brightness; ring/shell structure readable in 30–60 min                            |
+| PN, PPN                  |   `PN_MAX_APERTURE_FACTOR`    |  3.0  | Compact, high surface brightness; ring/shell structure readable in 30–60 min                            |
 | Gx (all galaxy subtypes) |   `GX_MAX_APERTURE_FACTOR`    |  4.0  | Benefit from more time than clusters, but spiral structure is not 8× harder than for a 200 mm scope     |
 | EN, SNR, RN, DN, ?       |   `EN_MAX_APERTURE_FACTOR`    |  5.0  | Large diffuse targets do scale with aperture, but capped to prevent 12h+ recommendations on tiny scopes |
 
@@ -78,12 +78,12 @@ if (!mono || builtIn)
     note: noteColorCamera
 
 else (mono camera, non-integrated scope)
-  if type ∈ {EN, PN, SNR} OR displayName matches /nebul|nébul/i
+  if type ≠ PPN AND (type ∈ {EN, PN, SNR} OR displayName matches /nebul|nébul/i)
     → Ha (40%) + OIII (40%) + SII (20%)  [narrowband]
       note: noteNarrowband
       if type = PN: omit SII
         note: notePlanetaryNeb
-  else (GC, OC, Gx*, RN, DN, ?)
+  else (GC, OC, Gx*, RN, DN, PPN, ?)  — a protoplanetary nebula shines by scattered starlight
     → L (50%) + R (17%) + G (17%) + B (16%)  [LRGB]
       if type = GC or OC:
         note: noteCluster

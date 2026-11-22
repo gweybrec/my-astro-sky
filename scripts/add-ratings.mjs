@@ -472,6 +472,9 @@ function computeRating({ catalogs, type, mag, majAxis, nameFr, nameEn, pdf750, a
   }
 
   // ── Heuristic fallback (no source matched) ──
+  // Protoplanetary nebulae are arcsecond-sized: 2 for the named ones, 1 for a bare designation
+  // (which fills their name columns too, so the "named → 3" rule below would misfire).
+  if (type === 'PPN') return nameEn && !catalogs.includes(nameEn) ? 2 : 1;
   if (nameFr || nameEn) return 3;
 
   const sz = majAxis ?? 0;
@@ -519,6 +522,8 @@ function typeDifficultyHeuristic(type, mag, emissionLines) {
       return 1;
     case 'PN':
       return mag !== null && mag > 12 ? 3 : 2;
+    case 'PPN':
+      return 4; // arcsecond-sized shells: long focal length and good seeing
     case 'EN':
       return emissionLines ? 2 : 3;
     case 'RN':

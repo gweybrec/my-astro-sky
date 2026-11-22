@@ -18,6 +18,7 @@ export const DSO_EDIT_TYPES: DSOType[] = [
   'EN',
   'RN',
   'PN',
+  'PPN',
   'SNR',
   'DN',
   'PS',

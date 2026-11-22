@@ -809,7 +809,7 @@ describe('the types sheet', () => {
     const w = show(TypesSheet, { props: { open: true }, global: app().global });
     await settle();
     const boxes = w.findAll('[role="checkbox"]');
-    expect(boxes).toHaveLength(14);
+    expect(boxes).toHaveLength(15);
     expect(boxes[0].text()).toContain('Tous');
     expect(boxes[0].attributes('aria-checked')).toBe('false');
     const en = boxes.find((b) => b.text().includes('Nébuleuses en émission'))!;
@@ -825,12 +825,12 @@ describe('the types sheet', () => {
     const w = show(TypesSheet, { props: { open: true }, global: app().global });
     await settle();
     await w.findAll('[role="checkbox"]')[0].trigger('click');
-    expect(prefsOf().enabledTypes).toHaveLength(13);
+    expect(prefsOf().enabledTypes).toHaveLength(14);
     await w.findAll('[role="checkbox"]')[0].trigger('click');
     expect(prefsOf().enabledTypes).toEqual([]);
     const reset = w.findAll('button').find((b) => b.text() === 'Réinitialiser')!;
     await reset.trigger('click');
-    expect(prefsOf().enabledTypes).toHaveLength(13);
+    expect(prefsOf().enabledTypes).toHaveLength(14);
   });
 
   it('closes on "Appliquer"', async () => {

@@ -12,6 +12,7 @@ export const ALL_DSO_TYPES = [
   'EN',
   'RN',
   'PN',
+  'PPN',
   'SNR',
   'DN',
   'PS',

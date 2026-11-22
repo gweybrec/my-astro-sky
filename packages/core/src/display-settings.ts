@@ -15,6 +15,7 @@ export const DSO_TYPES_ALL = [
   'EN',
   'RN',
   'PN',
+  'PPN',
   'SNR',
   'DN',
   'PS',
@@ -108,6 +109,18 @@ export function renameLegacyCatalogs(catalogs: string[]): string[] {
   return [...new Set(catalogs.map((c) => (c === 'LPN' ? 'Other' : c)))];
 }
 
+/**
+ * A saved type selection with 'PPN' (protoplanetary nebulae, added later) ticked after 'PN' when the user had planetary
+ * nebulae ticked. Callers run it only on a record saved without the `ppnTypeAdded` mark (written by every save from
+ * this version on), so a later untick is kept.
+ */
+export function addProtoplanetaryType(types: string[]): string[] {
+  if (types.includes('PPN') || !types.includes('PN')) return types;
+  const next = [...types];
+  next.splice(next.indexOf('PN') + 1, 0, 'PPN');
+  return next;
+}
+
 export function loadSettings(): DisplaySettings {
   try {
     const raw = storage().get(SETTINGS_KEY);
@@ -137,6 +150,9 @@ export function loadSettings(): DisplaySettings {
         const i = settings.dsoTypes.indexOf('Gx');
         settings.dsoTypes.splice(i, 0, 'GxS', 'GxE', 'GxI');
       }
+      // Migration: tick the protoplanetary nebulae once for users who see planetary nebulae
+      if (!parsed.ppnTypeAdded) settings.dsoTypes = addProtoplanetaryType(settings.dsoTypes);
+      delete settings.ppnTypeAdded;
       // Migration: the former 'LPN' family is now part of 'Other'
       settings.dsoCatalogs = renameLegacyCatalogs(settings.dsoCatalogs);
       settings.mapRotationDeg = normalizeRotationDeg(Number(settings.mapRotationDeg) || 0);
@@ -159,5 +175,6 @@ function pinAutoStarBudget(settings: DisplaySettings): DisplaySettings {
 }
 
 export function saveSettings(settings: DisplaySettings): void {
-  storage().set(SETTINGS_KEY, JSON.stringify(settings));
+  // The mark tells loadSettings this record already knows the 'PPN' type, so it is not ticked again.
+  storage().set(SETTINGS_KEY, JSON.stringify({ ...settings, ppnTypeAdded: true }));
 }

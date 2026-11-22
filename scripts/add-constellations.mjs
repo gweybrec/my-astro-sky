@@ -11,6 +11,7 @@
  */
 
 import { readFileSync, writeFileSync } from 'fs';
+import { fetchText } from './fetch-text.mjs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -49,9 +50,7 @@ function j2000ToB1875(raDeg, decDeg) {
 async function fetchBoundaries() {
   const url = 'https://cdsarc.cds.unistra.fr/ftp/VI/42/data.dat';
   console.log('Fetching boundary data from CDS...');
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
-  const text = await res.text();
+  const text = await fetchText(url, 'the constellation boundary table');
   const table = [];
   for (const line of text.split('\n')) {
     const parts = line.trim().split(/\s+/);
@@ -889,10 +888,14 @@ function getConstellation(raDeg, decDeg) {
 // ─── Main (async: fetches boundary data, then patches dso.json) ─────────────
 async function main() {
   // Fetch the authoritative Roman 1987 boundary table from CDS (overrides legacy fallback)
+  // The legacy table above cannot place anything (its rows lack a column the lookup reads),
+  // so without the CDS table every constellation would be blanked: stop before writing.
   try {
     BOUNDARIES = await fetchBoundaries();
   } catch (e) {
-    console.warn('Warning: could not fetch CDS data, using fallback table:', e.message);
+    console.error(`Error: ${e.message}`);
+    console.error('public/data/dso.json was not changed.');
+    process.exit(1);
   }
 
   const raw = JSON.parse(readFileSync(DSO_PATH, 'utf8'));

@@ -4,6 +4,7 @@
  * Usage: node scripts/generate-dso.mjs
  */
 
+import { fetchText } from './fetch-text.mjs';
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -420,6 +421,7 @@ const TYPE_MAP = {
   RN: 'RN',
   RefN: 'RN',
   PN: 'PN',
+  PPN: 'PPN',
   SNR: 'SNR',
   DN: 'DN',
   DrkN: 'DN',
@@ -505,19 +507,16 @@ function precess1950to2000(ra_deg, dec_deg) {
 }
 
 async function fetchNGC() {
-  const url = 'https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv';
   console.log('Downloading OpenNGC CSV...');
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return await res.text();
+  return fetchText(
+    'https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv',
+    'the OpenNGC catalogue',
+  );
 }
 
 async function fetchLBN() {
-  const url = 'https://cdsarc.cds.unistra.fr/ftp/VII/9/catalog.dat';
   console.log('Downloading LBN catalog...');
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`LBN HTTP ${res.status}`);
-  return await res.text();
+  return fetchText('https://cdsarc.cds.unistra.fr/ftp/VII/9/catalog.dat', 'the LBN catalogue');
 }
 
 // Parse LBN catalog.dat (B1950 coords).
@@ -551,11 +550,8 @@ function parseLBN(text) {
 }
 
 async function fetchLDN() {
-  const url = 'https://cdsarc.cds.unistra.fr/ftp/VII/7A/ldn';
   console.log('Downloading LDN catalog...');
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`LDN HTTP ${res.status}`);
-  return await res.text();
+  return fetchText('https://cdsarc.cds.unistra.fr/ftp/VII/7A/ldn', 'the LDN catalogue');
 }
 
 // Parse LDN catalog (B1950 coords) using the VII/7A ReadMe's fixed-width byte
@@ -1017,11 +1013,11 @@ const DUPLICATE_MERGE_ALIASES = {
 };
 
 async function fetchBarnard() {
-  const url = 'https://cdsarc.cds.unistra.fr/ftp/VII/220A/barnard.dat';
   console.log('Downloading Barnard catalog...');
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Barnard HTTP ${res.status}`);
-  return res.text();
+  return fetchText(
+    'https://cdsarc.cds.unistra.fr/ftp/VII/220A/barnard.dat',
+    'the Barnard catalogue',
+  );
 }
 
 // Parse Barnard's Catalogue of Dark Objects (VII/220A).
@@ -1051,11 +1047,8 @@ function parseBarnard(text) {
 }
 
 async function fetchVdB() {
-  const url = 'https://cdsarc.cds.unistra.fr/ftp/VII/21/catalog.dat';
   console.log('Downloading vdB catalog...');
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`vdB HTTP ${res.status}`);
-  return await res.text();
+  return fetchText('https://cdsarc.cds.unistra.fr/ftp/VII/21/catalog.dat', 'the vdB catalogue');
 }
 
 // Parse van den Bergh (1966) catalog.dat (galactic coordinates, epoch 1958 IAU).
@@ -1110,37 +1103,24 @@ async function main() {
   console.log(`Parsed ${rows.length} rows from OpenNGC`);
 
   // ── Step 2: Download LBN / LDN / vdB / Barnard catalogs ─────────────────
-  let lbnEntries = [];
-  let ldnEntries = [];
-  let vdbEntries = [];
-  let barnardEntries = [];
-  try {
-    const lbnText = await fetchLBN();
-    lbnEntries = parseLBN(lbnText);
-    console.log(`Parsed ${lbnEntries.length} LBN entries`);
-  } catch (e) {
-    console.warn(`Warning: could not fetch LBN: ${e.message}`);
+  // All four are required: without one, thousands of objects would silently drop out of
+  // dso.json, so a failed download stops here and leaves the current file untouched.
+  const downloads = await Promise.allSettled([fetchLBN(), fetchLDN(), fetchVdB(), fetchBarnard()]);
+  const failures = downloads.filter((d) => d.status === 'rejected').map((d) => d.reason.message);
+  if (failures.length > 0) {
+    for (const f of failures) console.error(`Error: ${f}`);
+    console.error('public/data/dso.json was not changed.');
+    process.exit(1);
   }
-  try {
-    const ldnText = await fetchLDN();
-    ldnEntries = parseLDN(ldnText);
-    console.log(`Parsed ${ldnEntries.length} LDN entries`);
-  } catch (e) {
-    console.warn(`Warning: could not fetch LDN: ${e.message}`);
-  }
-  try {
-    const vdbText = await fetchVdB();
-    vdbEntries = parseVdB(vdbText);
-    console.log(`Parsed ${vdbEntries.length} vdB entries`);
-  } catch (e) {
-    console.warn(`Warning: could not fetch vdB: ${e.message}`);
-  }
-  try {
-    barnardEntries = parseBarnard(await fetchBarnard());
-    console.log(`Parsed ${barnardEntries.length} Barnard entries`);
-  } catch (e) {
-    console.warn(`Warning: could not fetch Barnard: ${e.message}`);
-  }
+  const [lbnText, ldnText, vdbText, barnardText] = downloads.map((d) => d.value);
+  const lbnEntries = parseLBN(lbnText);
+  console.log(`Parsed ${lbnEntries.length} LBN entries`);
+  const ldnEntries = parseLDN(ldnText);
+  console.log(`Parsed ${ldnEntries.length} LDN entries`);
+  const vdbEntries = parseVdB(vdbText);
+  console.log(`Parsed ${vdbEntries.length} vdB entries`);
+  const barnardEntries = parseBarnard(barnardText);
+  console.log(`Parsed ${barnardEntries.length} Barnard entries`);
 
   // ── Step 3: Build SH2-number → LBN-seq map (from LBN cross-refs) ─────────
   // LBN's xrefCat='S', xrefNum=NN means this LBN entry corresponds to SH2-NN.
@@ -1972,6 +1952,224 @@ async function main() {
     lpnAdded++;
   }
   console.log(`Added ${lpnAdded} standalone Large PN entries`);
+
+  // ── Step 11b: Protoplanetary nebulae ──────────────────────────────────────
+  // The list of fr.wikipedia "Liste de protonébuleuses planétaires" (16 objects, south included).
+  // None is in another catalogue, so they fall in the "Other" family under a compact designation.
+  // Names: each language's own Wikipedia; the English name where that Wikipedia has none
+  // (checked 2026-11-22). Coordinates (J2000), V magnitude and size: the en.wikipedia infoboxes
+  // (SIMBAD values); null where the infobox gives none.
+  // [id, ra, dec, majAxis', minAxis', mag, [fr, en, es, de], otherCatIds]
+  const ppnEntries = [
+    [
+      'IRAS12419-5414',
+      hms(12, 44, 45.45),
+      dms(54, 31, 11.4, true),
+      1.445,
+      0.724,
+      null,
+      ['Nébuleuse du Boomerang', 'Boomerang Nebula', 'Nebulosa Boomerang', 'Bumerangnebel'],
+      ['IRAS 12419-5414', 'ESO 172-7'],
+    ],
+    [
+      'OH231.8+4.2',
+      hms(7, 42, 16.83),
+      dms(14, 42, 52.1, true),
+      1.0,
+      0.17,
+      9.47,
+      [
+        "Nébuleuse de l'Œuf pourri",
+        'Calabash Nebula',
+        'Nebulosa de la Calabaza',
+        'Calabash Nebula',
+      ],
+      ['OH 231.8+04.2'],
+    ],
+    [
+      'CRL2688',
+      hms(21, 2, 18.75),
+      dms(36, 41, 37.8),
+      0.5,
+      0.25,
+      14.0,
+      ["Nébuleuse de l'Œuf", 'Egg Nebula', 'Nebulosa del Huevo', 'Eier-Nebel'],
+      ['CRL 2688', 'AFGL 2688', 'V1610 Cyg'],
+    ],
+    [
+      'IRAS09371+1212',
+      hms(9, 39, 53.96),
+      dms(11, 58, 52.4),
+      0.42,
+      null,
+      11,
+      [
+        'Nébuleuse du Lion givré',
+        'Frosty Leo Nebula',
+        'Nebulosa Helada de Leo',
+        'Frosty Leo Nebula',
+      ],
+      ['IRAS 09371+1212'],
+    ],
+    [
+      'HD44179',
+      hms(6, 19, 58.216),
+      dms(10, 38, 14.691, true),
+      null,
+      null,
+      9.02,
+      [
+        'Nébuleuse du Rectangle rouge',
+        'Red Rectangle Nebula',
+        'Nebulosa del Rectángulo Rojo',
+        'Roter Rechtecknebel',
+      ],
+      ['HD 44179', 'RAFGL 915'],
+    ],
+    [
+      'IRAS18059-3211',
+      hms(18, 9, 13.4),
+      dms(32, 10, 50.0, true),
+      null,
+      null,
+      14.4,
+      ['Hamburger de Gomez', "Gomez's Hamburger", 'Hamburguesa de Gómez', "Gomez's Hamburger"],
+      ['IRAS 18059-3211'],
+    ],
+    [
+      'IRAS17150-3224',
+      hms(17, 18, 20),
+      dms(32, 27, 22, true),
+      null,
+      null,
+      null,
+      [
+        'Nébuleuse de la Barbe à papa',
+        'Cotton Candy Nebula',
+        'Nebulosa Algodón de Azúcar',
+        'Cotton Candy Nebula',
+      ],
+      ['IRAS 17150-3224'],
+    ],
+    [
+      'IRAS16594-4656',
+      hms(17, 3, 10.08),
+      dms(47, 0, 27.7, true),
+      null,
+      null,
+      null,
+      ['Nébuleuse du Nénuphar', 'Water Lily Nebula', 'Nebulosa Nenúfar', 'Water Lily Nebula'],
+      ['IRAS 16594-4656', 'PN G340.3-03.2'],
+    ],
+    [
+      'IRAS22036+5306',
+      hms(22, 5, 30.29),
+      dms(53, 21, 32.8),
+      null,
+      null,
+      null,
+      null,
+      ['IRAS 22036+5306', '2MASS J22053028+5321327'],
+    ],
+    [
+      'IRAS04395+3601',
+      hms(4, 42, 53.64),
+      dms(36, 6, 53.4),
+      null,
+      null,
+      null,
+      ['Nébuleuse de Westbrook', 'Westbrook Nebula', 'Nebulosa de Westbrook', 'Westbrook Nebula'],
+      ['IRAS 04395+3601', 'CRL 618', 'RAFGL 618'],
+    ],
+    [
+      'IRAS13208-6020',
+      hms(13, 24, 4.4),
+      dms(60, 36, 30.7, true),
+      null,
+      null,
+      null,
+      null,
+      ['IRAS 13208-6020'],
+    ],
+    [
+      'IRAS20068+4051',
+      hms(20, 8, 38.455),
+      dms(41, 0, 40.69),
+      null,
+      null,
+      null,
+      null,
+      ['IRAS 20068+4051'],
+    ],
+    [
+      'IRAS23166+1655',
+      hms(23, 19, 12.607),
+      dms(17, 11, 33.13),
+      null,
+      null,
+      null,
+      ['LL Pegasi', 'LL Pegasi', 'LL Pegasi', 'LL Pegasi'],
+      ['IRAS 23166+1655', 'LL Peg', 'RAFGL 3068'],
+    ],
+    [
+      // 'M 1-92' (with the space) never reads as a Messier number.
+      'IRAS19343+2926',
+      hms(19, 36, 18.0),
+      dms(29, 33, 0),
+      0.27,
+      0.13,
+      11.7,
+      ['M 1-92', "Minkowski's Footprint", "Minkowski's Footprint", 'Minkowskis Fußabdruck'],
+      ['IRAS 19343+2926', 'M 1-92'],
+    ],
+    [
+      'IRAS19024+0044',
+      hms(19, 5, 2),
+      dms(0, 48, 50.9),
+      null,
+      null,
+      null,
+      ['Starfish Nebula', 'Starfish Nebula', 'Starfish Nebula', 'Starfish Nebula'],
+      ['IRAS 19024+0044'],
+    ],
+    [
+      'IRAS17163-3907',
+      hms(17, 19, 49.33),
+      dms(39, 10, 37.94, true),
+      null,
+      null,
+      12.45,
+      ["Nébuleuse de l'Œuf au plat", 'Fried Egg Nebula', 'Fried Egg Nebula', 'Fried Egg Nebula'],
+      ['IRAS 17163-3907', 'Hen 3-1379'],
+    ],
+  ];
+  const takenIds = new Set(data.map((r) => String(r[0]).toUpperCase()));
+  for (const [id, ra, dec, majAxis, minAxis, mag, names, otherCatIds] of ppnEntries) {
+    if (takenIds.has(id.toUpperCase()))
+      throw new Error(`Protoplanetary nebula ${id} already exists`);
+    // An object with no proper name shows its designation ("IRAS 22036+5306").
+    const [fr, en, es, de] = names ?? Array(4).fill(otherCatIds[0]);
+    data.push([
+      id,
+      Math.round(ra * 10000) / 10000,
+      Math.round(dec * 10000) / 10000,
+      'PPN',
+      majAxis,
+      minAxis,
+      0,
+      mag,
+      fr,
+      en,
+      es,
+      de,
+      [id, ...otherCatIds],
+      null,
+      null,
+      null,
+      null,
+    ]);
+  }
+  console.log(`Added ${ppnEntries.length} protoplanetary nebulae`);
 
   // ── Step 12: Abell Planetary Nebulae (Abell 1966) ─────────────────────────
   // Source: SIMBAD TAP query 'PN A66 %' (scripts/download-abell-pn.py).

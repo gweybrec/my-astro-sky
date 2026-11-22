@@ -239,6 +239,7 @@ export type DSOType =
   | 'EN'
   | 'RN'
   | 'PN'
+  | 'PPN' // protoplanetary nebula: a star shedding its envelope, just before the planetary-nebula stage
   | 'SNR'
   | 'DN'
   | 'MS' // multiple/double star — synthetic recommender target only (see multiple-stars.ts)

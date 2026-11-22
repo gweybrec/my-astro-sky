@@ -1,6 +1,6 @@
 import { storage } from '../platform/storage';
 import { TARGETS_PREFS_KEY } from '../observer-location';
-import { renameLegacyCatalogs } from '../display-settings';
+import { addProtoplanetaryType, renameLegacyCatalogs } from '../display-settings';
 import { todayISO } from './format';
 
 export type SortKey =
@@ -54,7 +54,12 @@ export function loadTargetsPrefs(): TargetsPrefs {
       if ('setupId' in parsed) {
         if (parsed.enabledCatalogs)
           parsed.enabledCatalogs = renameLegacyCatalogs(parsed.enabledCatalogs);
-        return parsed;
+        // A record saved before the 'PPN' type existed: tick it once beside the planetary nebulae
+        // (the mark is storage only: kept out of the preferences, which are compared to tell a new search)
+        const { ppnTypeAdded, ...prefs } = parsed as TargetsPrefs & { ppnTypeAdded?: boolean };
+        if (prefs.enabledTypes && !ppnTypeAdded)
+          prefs.enabledTypes = addProtoplanetaryType(prefs.enabledTypes);
+        return prefs;
       }
     }
     // Migrate from v2 (had telescopeId/cameraId/accessoryId) — copy non-gear fields
@@ -67,7 +72,7 @@ export function loadTargetsPrefs(): TargetsPrefs {
         lon: old.lon ?? null,
         lastDateISO: old.lastDateISO ?? null,
         coordFormat: old.coordFormat,
-        enabledTypes: old.enabledTypes,
+        enabledTypes: old.enabledTypes && addProtoplanetaryType(old.enabledTypes),
         sortBy: old.sortBy,
         horizonDirs: old.horizonDirs,
         enabledRatings: old.enabledRatings,
@@ -84,7 +89,8 @@ export function loadTargetsPrefs(): TargetsPrefs {
 }
 
 export function saveTargetsPrefs(p: TargetsPrefs): void {
-  storage().set(TARGETS_PREFS_KEY, JSON.stringify(p));
+  // The mark tells loadTargetsPrefs this record already knows the 'PPN' type, so it is not ticked again.
+  storage().set(TARGETS_PREFS_KEY, JSON.stringify({ ...p, ppnTypeAdded: true }));
 }
 
 /**

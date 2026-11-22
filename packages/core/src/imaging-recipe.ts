@@ -51,7 +51,7 @@ const HOURS_BY_DIFFICULTY_PN = [0.15, 0.33, 0.75, 1.5, 3.0]; // planetary nebula
  * Every type family has a cap so the factor doesn't balloon to 8× on a 50 mm
  * smart telescope and produce absurd multi-hour recommendations:
  *   - GC/OC: cap 3 — resolution-limited, SNR saturates fast
- *   - PN: cap 3 — compact, high surface brightness, SNR saturates fast
+ *   - PN, PPN: cap 3 — compact, high surface brightness, SNR saturates fast
  *   - Galaxies: cap 4 — benefit from more time than clusters, but not 8×
  *   - EN/SNR/RN/DN/?: cap 5 — large diffuse targets do scale more, but still bounded
  */
@@ -74,7 +74,7 @@ const MAX_TOTAL_HOURS = 6.0;
 function computeTotalHours(dso: DSO, apertureMm: number): number {
   const isGC = dso.type === 'GC';
   const isOC = dso.type === 'OC';
-  const isPN = dso.type === 'PN';
+  const isPN = dso.type === 'PN' || dso.type === 'PPN'; // protoplanetary nebulae are as compact
   const isGx = dso.type === 'GxS' || dso.type === 'GxE' || dso.type === 'GxI' || dso.type === 'Gx';
   const table = isGC
     ? HOURS_BY_DIFFICULTY_GC
@@ -121,9 +121,11 @@ export function recommendRecipe(dso: DSO, preset: GearPreset): ImagingRecipe {
   const noteKeys: string[] = [];
 
   const emissionTypes: DSO['type'][] = ['EN', 'PN', 'SNR'];
+  // A protoplanetary nebula shines by scattered starlight, not emission lines, whatever its name says.
   const isEmission =
-    emissionTypes.includes(dso.type) ||
-    (typeof dso.displayName === 'string' && /nebul|nébul/i.test(dso.displayName));
+    dso.type !== 'PPN' &&
+    (emissionTypes.includes(dso.type) ||
+      (typeof dso.displayName === 'string' && /nebul|nébul/i.test(dso.displayName)));
 
   // Color / built-in telescopes → single session
   if (!preset.mono || preset.builtIn) {

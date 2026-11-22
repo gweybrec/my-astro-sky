@@ -65,6 +65,7 @@ node scripts/add-constellations.mjs
 3. **SH2 objects**: treat all OpenNGC SH2 coordinates as suspect until verified against SIMBAD — the systematic drift pattern is real.
 4. **Abell planetary nebulae**: use PN G identifiers (in the `catalogs` array) to unambiguously verify coordinates. Do not use "Abell N" queries in SIMBAD (hits galaxy clusters).
 5. **After any coordinate edit**: run `node scripts/add-constellations.mjs` to recompute the `constellation` field.
+6. **Protoplanetary nebulae** (Step 11b of `generate-dso.mjs`, type `PPN`): the 16 objects of the fr.wikipedia list, in the `Other` family under IRAS-style ids. Their names are each language's Wikipedia name (English where that Wikipedia has none). Coordinates, V magnitude and size come from the en.wikipedia infoboxes and should be checked against SIMBAD at the next regeneration. Alias `M 1-92` keeps its space so it never reads as a Messier number.
 
 ---
 
@@ -132,6 +133,8 @@ SB thresholds (after applying the magnitude cap):
 - Type RN or DN → +1 (reflection/dark nebulae are harder)
 - Has emission lines → −1 (narrowband filters make it easier)
 - Messier cap at 2 applies here as well
+
+**Protoplanetary nebulae (`PPN`)** have no astrogenerator entry: difficulty 4 (arcsecond-sized shells), rating 2 when named, 1 for a bare IRAS designation.
 
 **Key design decision:** difficulty reflects how quickly a target _appears_ in an image, not how impressive the final result can be. A galaxy that needs 5 hours to show fine spiral structure but appears in 20 minutes is still difficulty 2.
 

@@ -72,6 +72,24 @@ describe('recommendRecipe()', () => {
     expect(recipe.noteKeys).toContain('notePlanetaryNeb');
   });
 
+  it('uses LRGB for a protoplanetary nebula, even one named "Nébuleuse…"', () => {
+    const egg = dso({ type: 'PPN', displayName: "Nébuleuse de l'Œuf", emissionLines: null });
+    const recipe = recommendRecipe(egg, preset());
+
+    expect(recipe.filters.map((f) => f.name)).toEqual(['L', 'R', 'G', 'B']);
+    expect(recipe.noteKeys).not.toContain('noteNarrowband');
+    expect(
+      recommendRecipe(egg, preset({ mono: false, hasDualBandFilter: true })).filters[0].name,
+    ).toBe('RGB');
+  });
+
+  it('gives a protoplanetary nebula the planetary-nebula hours (compact object)', () => {
+    const small = preset({ apertureMm: 50 });
+    const ppn = recommendRecipe(dso({ type: 'PPN', difficulty: 4, mag: 9 }), small).totalHours;
+    const pn = recommendRecipe(dso({ type: 'PN', difficulty: 4, mag: 9 }), small).totalHours;
+    expect(ppn).toBe(pn);
+  });
+
   it('uses LRGB for non-emission mono targets (galaxy)', () => {
     const recipe = recommendRecipe(dso({ type: 'GxS', displayName: 'Andromeda Galaxy' }), preset());
 

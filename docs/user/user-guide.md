@@ -343,7 +343,7 @@ All settings are saved in the browser and persist across sessions.
 - Sky opacity, background gradient opacity
 - Default photo opacity for new uploads
 
-**Filters**: DSO type (Gx, OC, GC, EN, RN, PN, SNR, DN) and catalog (Messier, NGC, IC, Sharpless).
+**Filters**: DSO type (Gx, OC, GC, EN, RN, PN, PPN — protoplanetary nebulae, SNR, DN) and catalog (Messier, NGC, IC, Sharpless).
 
 ---
 
