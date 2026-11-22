@@ -4,9 +4,6 @@ import { t } from '@myastrosky/core/i18n/index';
 import type { Photo } from '@myastrosky/core/types';
 import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import type { PhotoLayer } from '@myastrosky/render/photo-layer';
-import { deletePhotoAPI } from '@myastrosky/app-state/api';
-import { useConfirm } from '../../composables/useConfirm';
-import { useErrorToast } from '../../composables/useErrorToast';
 import PhoneMapSheet from '../../components/PhoneMapSheet.vue';
 import PhoneChipPager from '../../components/PhoneChipPager.vue';
 import PhoneIconButton from '../../components/PhoneIconButton.vue';
@@ -19,32 +16,29 @@ import imageIcon from '@icons/image.svg?raw';
 import moveIcon from '../../icons/move.svg?raw';
 import stackIcon from '../../icons/stack-order.svg?raw';
 import penIcon from '@icons/pen.svg?raw';
-import trashIcon from '@icons/trash.svg?raw';
 
 // The board "Ciel, photo sélectionnée": a placed photo picked on the map, in a sheet over the bottom of the map. Its name,
 // the objects it shows (a chip each, the most important catalogue first, two lines to a page in portrait and one in
 // landscape, pages swiped), what is known of it, read only, its opacity on the map and its actions; the body scrolls.
-// Hiding the photo, opening it in the gallery, editing its information and deleting it are done here; the display order
-// opens its page (`order`), and repositioning the placement screen on the map (`reposition`).
+// Hiding the photo and opening it in the gallery are done here; editing its information opens its page (`edit`, where
+// the photo is also deleted), the display order its page (`order`), and repositioning the placement screen on the map
+// (`reposition`).
 // It closes as the object sheet does: dragging down, the handle, a tap on an empty spot and the back button.
 const props = defineProps<{ photo: Photo; layer: PhotoLayer }>();
 const emit = defineEmits<{
   close: [];
-  removed: [];
   dso: [id: string];
   gallery: [];
   edit: [];
   order: [];
   reposition: [];
 }>();
-const { confirm } = useConfirm();
-const { showError } = useErrorToast();
 
 const placed = () =>
   [...props.layer.getPlacedPhotos(), ...props.layer.getVisitPhotos()].find(
     (p) => p.photo.id === props.photo.id,
   );
-// A visited sky's photo is someone else's: it is looked at, never changed (no reposition, order, edit or delete).
+// A visited sky's photo is someone else's: it is looked at, never changed (no reposition, order or edit).
 const visited = !!props.photo.sharedSkyId;
 const opacity = ref(placed()?.opacity ?? 1);
 const visible = ref(placed()?.visible ?? true);
@@ -53,24 +47,6 @@ watch(opacity, (value) => props.layer.setPhotoOpacity(props.photo.id, value));
 function toggleVisible() {
   props.layer.toggleVisibility(props.photo.id);
   visible.value = !visible.value;
-}
-
-async function remove() {
-  const ok = await confirm({
-    title: t('photos.deleteConfirmTitle'),
-    message: t('photos.deleteConfirmMessage', { name: props.photo.originalName }),
-    confirmLabel: t('photos.deleteConfirmAction'),
-    destructive: true,
-  });
-  if (!ok) return;
-  try {
-    await deletePhotoAPI(props.photo.id);
-  } catch (error) {
-    await showError(error);
-    return;
-  }
-  props.layer.removePhotosFromMap([props.photo.id]);
-  emit('removed');
 }
 
 // The objects of the photo, the most important catalogue first (`PhoneChipPager`: two lines of chips to a page in
@@ -116,9 +92,6 @@ const ids = sortDsoIdsByImportance(props.photo.dsoIds ?? []);
         <PhoneIconButton :label="t('gallery.editMetadata')" @click="emit('edit')"
           ><AppIcon :svg="penIcon"
         /></PhoneIconButton>
-        <PhoneIconButton danger :label="t('photos.delete')" @click="remove">
-          <AppIcon :svg="trashIcon" />
-        </PhoneIconButton>
       </template>
     </div>
   </PhoneMapSheet>

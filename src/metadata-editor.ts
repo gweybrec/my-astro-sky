@@ -37,6 +37,7 @@ import uploadSvg from './icons/upload.svg?raw';
 import { pinia } from './pinia-instance';
 import { RAW_COMPANION_ACCEPT } from '@myastrosky/core/photo-formats';
 import { isTopmostOverlay } from './popup-utils';
+import { confirmPhotoDelete } from './photo-delete-confirm';
 
 const DEFAULT_INTEGRATION_FILTERS = ['L', 'R', 'G', 'B', 'Ha', 'OIII', 'SII', 'RGB'];
 
@@ -68,8 +69,10 @@ export function buildMetadataEditorPanel(
    * `headersButton: false`: no "Headers" button (the stand-alone editor; the headers are read in the photo's panel).
    * `sheet`: the gallery's photo panel: the facts read as text, each changed in place and saved at once (no Save
    * button); the "Headers" and "Load a WCS" buttons come first in its `.wcs-load-row`.
+   * `onDelete`: a "Delete this photo" button at the left of Cancel and Save; once confirmed, the editor closes and this
+   * is called (the map's editor: deleting is not offered in the photo's sheet on the map).
    */
-  options: { headersButton?: boolean; sheet?: boolean } = {},
+  options: { headersButton?: boolean; sheet?: boolean; onDelete?: () => void } = {},
 ): {
   teardown: () => void;
   isDirty: () => boolean;
@@ -362,6 +365,20 @@ export function buildMetadataEditorPanel(
   const btnRow = document.createElement('div');
   btnRow.className = 'meta-editor-btns';
 
+  const onDelete = options.onDelete;
+  if (onDelete) {
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-danger mr-auto';
+    deleteBtn.textContent = t('photos.deleteThisPhoto');
+    deleteBtn.addEventListener('click', async () => {
+      if (!(await confirmPhotoDelete(current.originalName))) return;
+      onClose();
+      onDelete();
+    });
+    btnRow.appendChild(deleteBtn);
+  }
+
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.className = 'btn-cancel';
@@ -409,6 +426,8 @@ export function showMetadataEditor(
   onSaved: (updated: Photo) => void,
   knownLabels?: string[],
   knownFilters?: string[],
+  /** Adds "Delete this photo" to the editor; called once the delete is confirmed and the editor closed. */
+  onDelete?: () => void,
 ): void {
   // ── Overlay ──────────────────────────────────────────────────────────────
   const overlay = document.createElement('div');
@@ -454,7 +473,7 @@ export function showMetadataEditor(
     knownLabels,
     knownFilters,
     undefined,
-    { headersButton: false },
+    { headersButton: false, onDelete },
   );
   teardown = panel.teardown;
 

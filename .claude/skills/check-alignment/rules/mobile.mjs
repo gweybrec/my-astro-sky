@@ -589,10 +589,12 @@ export const rules = [
     lines: 'ion-button.mob-btn--busy .mob-btn-content',
     icon: 'ion-spinner',
   },
-  // Items side by side in a bar, a footer, a field row share their centre line.
+  // Items side by side in a bar, a footer, a field row share their centre line. A footer's delete button
+  // (`.mob-footer-delete`) takes a row of its own in portrait, by design.
   {
     id: 'centre-line',
     type: 'centreLine',
+    children: ':scope > :not(.mob-footer-delete)',
     bars: '.mob-topbar, .mob-sheet-footer, .mob-footer, .mob-input-row, .mob-stepper-row, .phone-field-unit-line, .mob-icon-row, .mob-map-top, .mob-timebar-row, .mob-when-row, .mob-form-row--search, .mob-type-row, .mob-add-row, .mob-wcs-row',
   },
   // An exposure row's "Filtres" with its badge, and its compact "+", are centred on the filter line.

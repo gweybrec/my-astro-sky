@@ -385,11 +385,6 @@ function goToDso(id: string) {
   skyFocus.value = null;
   sky?.focus(focus);
 }
-const photoRemoved = () => {
-  clearSkySelection();
-  void reloadPhotos();
-};
-
 // The frames (fields of view). The selected frame has its sheet (board "Ciel, cadre sélectionné"); a frame and an
 // object are not selected together. "Ajouter un cadre" of an object opens "Créer un cadre".
 // The frames have their sheet on the map and in the modes showing a target or a plan, not in the other modes.
@@ -603,7 +598,6 @@ onBeforeUnmount(() => {
               :photo="skySelection.photo"
               :layer="photoLayer"
               @close="clearSkySelection"
-              @removed="photoRemoved"
               @dso="goToDso"
               @gallery="openInGallery(skySelection.photo.id)"
               @edit="editPhoto(skySelection.photo.id)"

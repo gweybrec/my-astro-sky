@@ -6,19 +6,11 @@ import type { Photo } from '@myastrosky/core/types';
 import type { PhotoLayer } from '@myastrosky/render/photo-layer';
 import { ionicStubs, mapSheetHost } from './helpers';
 
-const deletePhotoAPI = vi.fn();
 const getGearSetups = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
-  deletePhotoAPI: (...a: unknown[]) => deletePhotoAPI(...a),
   getGearSetups: () => getGearSetups(),
 }));
-const confirm = vi.fn();
-const showError = vi.fn();
-vi.mock('../src/composables/useConfirm', () => ({
-  useConfirm: () => ({ confirm }),
-  showInfo: vi.fn(),
-}));
-vi.mock('../src/composables/useErrorToast', () => ({ useErrorToast: () => ({ showError }) }));
+vi.mock('../src/composables/useConfirm', () => ({ showInfo: vi.fn() }));
 
 import SkyPhotoSheet from '../src/pages/sky/SkyPhotoSheet.vue';
 import PhoneSliderRow from '../src/components/PhoneSliderRow.vue';
@@ -62,10 +54,7 @@ describe('the photo sheet', () => {
     localStorage.setItem('lang', 'fr');
     configureStorage(createMemoryStore());
     setActivePinia(createPinia());
-    deletePhotoAPI.mockReset().mockResolvedValue(undefined);
     getGearSetups.mockReset().mockResolvedValue([{ id: 's1', name: 'Newton 200 + ASI 183' }]);
-    confirm.mockReset().mockResolvedValue(true);
-    showError.mockReset();
   });
 
   it('names the photo and lists its objects as chips, the most important catalogue first', () => {
@@ -199,35 +188,6 @@ describe('the photo sheet', () => {
     expect(layer.toggleVisibility).toHaveBeenCalledTimes(2);
   });
 
-  it('deletes only after the confirmation, and tells the page', async () => {
-    const { w, layer } = mountSheet();
-    await button(w, 'Supprimer').trigger('click');
-    await flushPromises();
-    expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ destructive: true }));
-    expect(deletePhotoAPI).toHaveBeenCalledWith('p1');
-    expect(layer.removePhotosFromMap).toHaveBeenCalledWith(['p1']);
-    expect(w.emitted('removed')).toHaveLength(1);
-  });
-
-  it('keeps the photo when the delete is not confirmed', async () => {
-    confirm.mockResolvedValue(false);
-    const { w } = mountSheet();
-    await button(w, 'Supprimer').trigger('click');
-    await flushPromises();
-    expect(deletePhotoAPI).not.toHaveBeenCalled();
-    expect(w.emitted('removed')).toBeUndefined();
-  });
-
-  it('shows the red toast and keeps the photo when the delete fails', async () => {
-    deletePhotoAPI.mockRejectedValue(new Error('boom'));
-    const { w, layer } = mountSheet();
-    await button(w, 'Supprimer').trigger('click');
-    await flushPromises();
-    expect(showError).toHaveBeenCalled();
-    expect(layer.removePhotosFromMap).not.toHaveBeenCalled();
-    expect(w.emitted('removed')).toBeUndefined();
-  });
-
   it('opens the photo in the gallery', async () => {
     const { w } = mountSheet();
     await button(w, 'Ouvrir dans la galerie').trigger('click');
@@ -253,6 +213,7 @@ describe('the photo sheet', () => {
     expect(w.emitted('reposition')).toHaveLength(1);
   });
 
+  // Deleting the photo is on its edit page (board "Photo, modifier les infos").
   it('has the actions of the board, in its order', () => {
     const { w } = mountSheet();
     expect(w.findAll('.mob-icon-row button').map((b) => b.attributes('aria-label'))).toEqual([
@@ -261,7 +222,6 @@ describe('the photo sheet', () => {
       'Repositionner',
       "Ordre d'affichage",
       'Modifier les métadonnées',
-      'Supprimer',
     ]);
   });
 

@@ -15,6 +15,7 @@ const dialogs = vi.hoisted(() => ({
   showFitsHeaders: vi.fn(() => Promise.resolve()),
 }));
 const showWcsConflicts = vi.hoisted(() => vi.fn());
+const confirmPhotoDelete = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/api', () => api);
 // The WCS reading flow is shared and calls the package's data functions.
@@ -22,6 +23,7 @@ vi.mock('@myastrosky/app-state/api', () => api);
 vi.mock('../../src/toast', () => ({ showToast }));
 vi.mock('../../src/wcs-dialogs', () => dialogs);
 vi.mock('../../src/wcs-conflicts', () => ({ showWcsConflicts }));
+vi.mock('../../src/photo-delete-confirm', () => ({ confirmPhotoDelete }));
 // The form itself is not under test: only the draft it is given.
 vi.mock('../../src/components/modals/MetadataEditorPanel.vue', () => ({
   default: { render: () => null },
@@ -223,6 +225,59 @@ describe('buildMetadataEditorPanel, loading a WCS file', () => {
     const modal = document.querySelector('.meta-editor-overlay')!;
     expect(modal.querySelector('[data-test=fits-headers-btn]')).toBeNull();
     modal.remove();
+  });
+});
+
+describe('the stand-alone editor, deleting the photo', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    document.querySelectorAll('.meta-editor-overlay').forEach((el) => el.remove());
+  });
+  const buttons = () =>
+    [
+      ...document.querySelectorAll<HTMLButtonElement>(
+        '.meta-editor-overlay .meta-editor-btns button',
+      ),
+    ].map((b) => b.textContent);
+  const deleteButton = () =>
+    document.querySelector<HTMLButtonElement>(
+      '.meta-editor-overlay .meta-editor-btns .btn-danger',
+    )!;
+
+  it('has "Delete this photo" at the left of Cancel and Save when asked for', () => {
+    showMetadataEditor(photo(), vi.fn(), [], [], vi.fn());
+    expect(buttons()).toEqual([
+      t('photos.deleteThisPhoto'),
+      t('gallery.cancelEdit'),
+      t('gallery.saveMetadata'),
+    ]);
+  });
+
+  it('has only Cancel and Save without it', () => {
+    showMetadataEditor(photo(), vi.fn());
+    expect(buttons()).toEqual([t('gallery.cancelEdit'), t('gallery.saveMetadata')]);
+  });
+
+  it('closes and hands over the delete once confirmed, saving nothing', async () => {
+    confirmPhotoDelete.mockResolvedValue(true);
+    const onDelete = vi.fn();
+    showMetadataEditor(photo(), vi.fn(), [], [], onDelete);
+    deleteButton().click();
+    await flushPromises();
+    expect(confirmPhotoDelete).toHaveBeenCalledWith('M31.jpg');
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(api.updatePhotoMetadata).not.toHaveBeenCalled();
+    expect(document.querySelector('.meta-editor-overlay')).toBeNull();
+  });
+
+  it('stays open and deletes nothing when the delete is not confirmed', async () => {
+    confirmPhotoDelete.mockResolvedValue(false);
+    const onDelete = vi.fn();
+    showMetadataEditor(photo(), vi.fn(), [], [], onDelete);
+    deleteButton().click();
+    await flushPromises();
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(document.querySelector('.meta-editor-overlay')).not.toBeNull();
   });
 });
 

@@ -14,6 +14,7 @@ import {
 } from '@myastrosky/core/photo-metadata-draft';
 import type { Photo } from '@myastrosky/core/types';
 import {
+  deletePhotoAPI,
   getGearSetups,
   getPhotos,
   setPhotoFitsHeaders,
@@ -29,6 +30,7 @@ import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
 import { pendingWcs, useWcsLoad, type WcsLoaded } from '../composables/useWcsLoad';
 import { receivePois } from '../identify-session';
+import { skySelection } from '../composables/useSkySelection';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneButton from '../components/PhoneButton.vue';
 import PhoneFooter from '../components/PhoneFooter.vue';
@@ -42,7 +44,8 @@ import { integrationRowHasData, recentIntegrationFilters } from '@myastrosky/cor
 // interest added by hand or found by an identification join the form (`receivePois`), as the desktop's PoiEditor.
 // "Charger un fichier WCS" fills only the empty fields from a solved file's header, unsaved as the rest; a file read
 // from the photo's sheet (`pendingWcs`) is filled in the same way when the form opens.
-// The toasts of the form sit above its footer (board "Photo, fichier non résolu").
+// The toasts of the form sit above its footer (board "Photo, fichier non résolu"). "Supprimer cette photo" is in the
+// footer, under Annuler and Enregistrer in portrait and at their left in landscape.
 const FOOTER_ID = 'photo-edit-footer';
 const route = useRoute();
 const router = useRouter();
@@ -187,6 +190,33 @@ async function save() {
     saving.value = false;
   }
 }
+
+// Deleting the photo, once confirmed, gives up the changes too. The page goes back: the map's sheet of this photo
+// closes, and the photo's own page, gone, falls back to the gallery.
+async function remove() {
+  if (!photo.value || saving.value) return;
+  const target = photo.value;
+  const ok = await confirm({
+    title: t('photos.deleteConfirmTitle'),
+    message: t('photos.deleteConfirmMessage', { name: target.originalName }),
+    confirmLabel: t('photos.deleteConfirmAction'),
+    destructive: true,
+  });
+  if (!ok) return;
+  saving.value = true;
+  try {
+    await deletePhotoAPI(target.id);
+  } catch (error) {
+    void showError(error);
+    saving.value = false;
+    return;
+  }
+  const selected = skySelection.value;
+  if (selected?.kind === 'photo' && selected.photo.id === target.id) skySelection.value = null;
+  leaving = true;
+  if (window.history.state?.back) router.back();
+  else void router.replace('/tabs/gallery');
+}
 </script>
 
 <template>
@@ -213,7 +243,16 @@ async function save() {
         />
       </div>
     </IonContent>
-    <PhoneFooter :id="FOOTER_ID">
+    <PhoneFooter :id="FOOTER_ID" class="mob-footer--delete">
+      <PhoneButton
+        variant="danger"
+        size="lg"
+        class="mob-footer-delete"
+        :disabled="!photo || saving"
+        @click="remove"
+      >
+        {{ t('photos.deleteThisPhoto') }}
+      </PhoneButton>
       <PhoneButton size="lg" @click="cancel">{{ t('gallery.cancelEdit') }}</PhoneButton>
       <PhoneButton variant="confirm" size="lg" :disabled="!photo || saving" @click="save">
         {{ t('gallery.saveMetadata') }}

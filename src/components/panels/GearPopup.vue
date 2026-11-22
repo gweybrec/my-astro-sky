@@ -25,9 +25,6 @@
         <button class="gear-popup-action-btn" @click="onEditMeta">
           {{ t('gallery.editMetadata') }}
         </button>
-        <button class="gear-popup-delete-btn" @click="onDelete">
-          {{ t('photos.delete') }}
-        </button>
       </div>
     </div>
   </Teleport>
@@ -40,7 +37,6 @@ import { useCanvasStore } from '../../stores/canvas';
 import { usePhotosStore } from '../../stores/photos';
 import { positionPopup } from '../../popup-utils';
 import { showMetadataEditor } from '../../metadata-editor';
-import { confirmPhotoDelete } from '../../photo-delete-confirm';
 import { showToast } from '../../toast';
 import { updatePhotoOrder } from '../../api';
 
@@ -61,11 +57,6 @@ const popupEl = ref<HTMLElement | null>(null);
 const currentOpacity = computed(() => {
   const placed = photosStore.placedPhotos.find((p) => p.photo.id === props.photoId);
   return placed?.opacity ?? 1;
-});
-
-const photoName = computed(() => {
-  const placed = photosStore.placedPhotos.find((p) => p.photo.id === props.photoId);
-  return placed?.photo.originalName ?? '';
 });
 
 function onOpacityInput(e: Event) {
@@ -107,14 +98,12 @@ function onEditMeta() {
     },
     allLabels,
     allFilters,
+    // Deleting the photo is in its editor; it can be undone for a few seconds, as from the gallery.
+    () => deleteWithUndo(ph.originalName),
   );
 }
 
-async function onDelete() {
-  const confirmed = await confirmPhotoDelete(photoName.value);
-  if (!confirmed) return;
-  const name = photoName.value;
-  emit('close');
+function deleteWithUndo(name: string) {
   const overlay = canvasStore.overlay;
   if (!overlay) return;
   overlay.hidePhoto(props.photoId);

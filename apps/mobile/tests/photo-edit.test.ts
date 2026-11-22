@@ -8,12 +8,14 @@ const getGearSetups = vi.fn();
 const updatePhotoMetadata = vi.fn();
 const solveWCS = vi.fn();
 const setPhotoFitsHeaders = vi.fn();
+const deletePhotoAPI = vi.fn();
 vi.mock('@myastrosky/app-state/api', () => ({
   solveWCS: (...a: unknown[]) => solveWCS(...a),
   setPhotoFitsHeaders: (...a: unknown[]) => setPhotoFitsHeaders(...a),
   getPhotos: () => getPhotos(),
   getGearSetups: () => getGearSetups(),
   updatePhotoMetadata: (...a: unknown[]) => updatePhotoMetadata(...a),
+  deletePhotoAPI: (...a: unknown[]) => deletePhotoAPI(...a),
 }));
 vi.mock('@myastrosky/app-state/stores/poi-categories', () => ({
   usePoiCategoriesStore: () => ({
@@ -85,6 +87,7 @@ import { deliverPois } from '../src/identify-session';
 import PhoneNativePicker from '../src/components/PhoneNativePicker.vue';
 import { pendingWcs, type WcsLoaded } from '../src/composables/useWcsLoad';
 import { resetFilterUse } from '../src/filter-usage';
+import { skySelection } from '../src/composables/useSkySelection';
 
 /** "Photo, modifier les infos": the form of a photo's metadata. */
 
@@ -146,6 +149,8 @@ describe("a photo's edit page", () => {
       ]);
     getGearSetups.mockReset().mockResolvedValue([{ id: 's1', name: 'Équipement 1' }]);
     updatePhotoMetadata.mockReset().mockResolvedValue(undefined);
+    deletePhotoAPI.mockReset().mockResolvedValue(undefined);
+    skySelection.value = null;
     confirm.mockReset().mockResolvedValue(true);
     showError.mockReset();
     showNotice.mockReset();
@@ -189,6 +194,51 @@ describe("a photo's edit page", () => {
     });
     expect(replace).toHaveBeenCalledWith('/gallery/photo/p1');
     expect(confirm).not.toHaveBeenCalled();
+  });
+
+  // "Supprimer cette photo" is in the footer with Annuler and Enregistrer (first in the markup: the left of the row in
+  // landscape; the style puts it on a row of its own under them in portrait).
+  it('has the delete button in its footer', async () => {
+    const w = await mountPage();
+    expect(w.findAll('.mob-footer button').map((b) => b.text())).toEqual([
+      'Supprimer cette photo',
+      'Annuler',
+      'Enregistrer',
+    ]);
+    expect(byText(w, 'button', 'Supprimer cette photo').classes()).toContain('mob-footer-delete');
+  });
+
+  it('deletes the photo once confirmed, closes its sheet on the map and leaves to the gallery', async () => {
+    skySelection.value = { kind: 'photo', photo: photo() };
+    const w = await mountPage();
+    await byText(w, 'button', 'Supprimer cette photo').trigger('click');
+    await flushPromises();
+    expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ destructive: true }));
+    expect(deletePhotoAPI).toHaveBeenCalledWith('p1');
+    expect(updatePhotoMetadata).not.toHaveBeenCalled();
+    expect(skySelection.value).toBeNull();
+    // No page to go back to here: the gallery, as the photo's own page is gone.
+    expect(replace).toHaveBeenCalledWith('/tabs/gallery');
+  });
+
+  it('keeps the photo and the page when the delete is not confirmed', async () => {
+    confirm.mockResolvedValue(false);
+    const w = await mountPage();
+    await byText(w, 'button', 'Supprimer cette photo').trigger('click');
+    await flushPromises();
+    expect(deletePhotoAPI).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+    expect(back).not.toHaveBeenCalled();
+  });
+
+  it('shows the red toast and stays when the delete fails', async () => {
+    deletePhotoAPI.mockRejectedValue(new Error('boom'));
+    const w = await mountPage();
+    await byText(w, 'button', 'Supprimer cette photo').trigger('click');
+    await flushPromises();
+    expect(showError).toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+    expect(byText(w, 'button', 'Supprimer cette photo').attributes('disabled')).toBeUndefined();
   });
 
   it('removes an object and adds the typed one, without its spaces', async () => {

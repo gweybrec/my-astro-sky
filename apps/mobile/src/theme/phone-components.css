@@ -566,6 +566,24 @@ ion-fab-button.mob-fab::part(native) {
 ion-footer.mob-footer::before {
   display: none;
 }
+/* A footer with a delete button (`.mob-footer--delete`, board "Photo, modifier les infos"): in portrait it takes a row of
+   its own under the other buttons, full width; in landscape it is the first of the row, at the left, as wide as they are. */
+ion-footer.mob-footer.mob-footer--delete {
+  flex-wrap: wrap;
+}
+ion-footer.mob-footer.mob-footer--delete > ion-button.mob-btn.mob-footer-delete {
+  order: 1;
+  flex: 1 1 100%;
+}
+@media (orientation: landscape) {
+  ion-footer.mob-footer.mob-footer--delete {
+    flex-wrap: nowrap;
+  }
+  ion-footer.mob-footer.mob-footer--delete > ion-button.mob-btn.mob-footer-delete {
+    order: 0;
+    flex: 0 0 var(--mobile-footer-button-width);
+  }
+}
 
 /* ── Section header: `ion-list-header.mob-section-header`. */
 ion-list-header.mob-section-header {
