@@ -27,7 +27,6 @@ import PhoneTargetRow from '../components/PhoneTargetRow.vue';
 import PhoneSegmented from '../components/PhoneSegmented.vue';
 import PhoneRow from '../components/PhoneRow.vue';
 import PhoneTags from '../components/PhoneTags.vue';
-import imageIcon from '@icons/image.svg?raw';
 
 // The boards "Ciel, recherche" and "Ciel, recherche, photos": the results in two tabs. "Ciel": a star or a deep-sky
 // object by name or catalogue number. A deep-sky object is listed as the targets of Cibles are, its score and field fit
@@ -204,7 +203,6 @@ const cancel = () => router.back();
             v-for="r in photoResults"
             :key="r.photo.id"
             :title="r.photo.originalName"
-            :thumb="imageIcon"
             roomy
             button
             @click="choosePhoto(r.photo)"
