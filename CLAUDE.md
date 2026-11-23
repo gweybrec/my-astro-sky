@@ -51,6 +51,7 @@ Project-specific skills live in `.claude/skills/`. The harness auto-invokes them
 | `add-dso-catalog`       | Integrating a new DSO catalog (RCW, Barnard, Abell…)                                                                    |
 | `override-dso-metadata` | Correcting DSO names, types, coordinates, or ratings in the static catalog                                              |
 | `test-placement`        | Testing astrophoto upload, plate solving, and sky-map placement                                                         |
+| `demo-sky`              | Building a new version of the demo shared sky from Wikimedia Commons photos: fetch, local solve, review, build          |
 | `profile-performance`   | Profiling a perf trace / janky pan-zoom: parse a CPU trace into hot functions, pick an optimisation, A/B benchmark      |
 | `mobile-screen`         | Building or changing a screen of the phone app (`apps/mobile`): mockup, shared components, alignment, tests             |
 | `mobile-device-test`    | Testing the phone app on the user's real Android phone (build, install, drive, restore settings; never an emulator)     |
