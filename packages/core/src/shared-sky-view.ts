@@ -25,7 +25,8 @@ export function skyChoiceOptions(skies: readonly SharedSky[]): SkyChoiceOption[]
 
 /**
  * The skies shown, from what was remembered (`{ shown: [...] }`, or the earlier single choice `{ mode, skyId }`), kept
- * to the skies that still exist, in the list's order. Anything unreadable shows the user's own sky alone.
+ * to the skies that still exist, in the list's order. Anything unreadable shows the user's own sky alone, and so does a
+ * choice whose skies were all deleted since (elsewhere, while this app was closed). A choice of none stays none.
  */
 // `unknown`: read back from storage.
 export function rememberedSkiesShown(kept: unknown, skies: readonly SharedSky[]): string[] {
@@ -36,7 +37,8 @@ export function rememberedSkiesShown(kept: unknown, skies: readonly SharedSky[])
     else if (k.mode === 'visit') values = [k.skyId];
     else if (k.mode === 'both') values = [MY_SKY, k.skyId];
   }
-  return keepKnownSkies(values, skies);
+  const known = keepKnownSkies(values, skies);
+  return known.length === 0 && values.length > 0 ? [MY_SKY] : known;
 }
 
 /** `values` kept to the user's own sky and the skies that exist, in the list's order, each once. */

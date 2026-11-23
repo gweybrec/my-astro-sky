@@ -103,10 +103,12 @@ describe('shared-skies store', () => {
   });
 
   it('does not show again a remembered sky that was deleted since, nor an unreadable choice', async () => {
+    // Deleted while the app was closed (another window, another device): the user's own sky is shown again.
     storage().set('sharedSkyView', JSON.stringify({ shown: ['gone'] }));
     const store = useSharedSkiesStore();
     await store.load();
-    expect(store.shown).toEqual([]);
+    expect(store.shown).toEqual([MY_SKY]);
+    expect(JSON.parse(storage().get('sharedSkyView')!)).toEqual({ shown: [MY_SKY] });
 
     storage().set('sharedSkyView', '{ not json');
     setActivePinia(createPinia());

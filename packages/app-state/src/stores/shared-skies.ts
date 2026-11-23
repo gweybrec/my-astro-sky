@@ -120,10 +120,14 @@ export const useSharedSkiesStore = defineStore('sharedSkies', () => {
       reportError('shared_skies_load_failed', err);
       return;
     }
-    const before = shown.value.join('|');
+    let before = shown.value.join('|');
     if (!loaded.value) {
       loaded.value = true;
-      shown.value = rememberedSkiesShown(recall(), skies.value);
+      const kept = recall();
+      shown.value = rememberedSkiesShown(kept, skies.value);
+      // A choice corrected on reading (skies deleted since, an earlier format) is written back as it now stands.
+      const keptShown = (kept as { shown?: unknown } | null)?.shown;
+      before = Array.isArray(keptShown) ? keptShown.join('|') : '\0';
     } else {
       // A visit deleted is no longer shown; when it was the only sky shown, the user's own is shown again.
       const kept = keepKnownSkies(shown.value, skies.value);

@@ -46,6 +46,10 @@ describe('the skies shown', () => {
   it('reads back what was remembered, and the earlier single choice', () => {
     expect(rememberedSkiesShown({ shown: ['sky-paul-1'] }, SKIES)).toEqual(['sky-paul-1']);
     expect(rememberedSkiesShown({ shown: [] }, SKIES)).toEqual([]);
+    // Skies all deleted since: the user's own is shown again; one left is shown alone.
+    expect(rememberedSkiesShown({ shown: ['gone'] }, SKIES)).toEqual([MY_SKY]);
+    expect(rememberedSkiesShown({ mode: 'visit', skyId: 'gone' }, SKIES)).toEqual([MY_SKY]);
+    expect(rememberedSkiesShown({ shown: ['gone', 'sky-paul-1'] }, SKIES)).toEqual(['sky-paul-1']);
     expect(rememberedSkiesShown({ mode: 'visit', skyId: 'sky-zoe-01' }, SKIES)).toEqual([
       'sky-zoe-01',
     ]);
