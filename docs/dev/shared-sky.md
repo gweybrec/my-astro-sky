@@ -60,7 +60,7 @@ by a filter someone could forget:
 - a visit's files have names made at import, so they never take the file of a user's photo, even when
   the visitor opens their own sky or a sky restored from the same backup;
 - on the map, `PhotoLayer.getPlacedPhotos()` returns the user's photos only. A visit's photos are given
-  with `setVisitPhotos` and read with `getVisitPhotos`; the draw order, the statistics, the target
+  with `setVisitPhotos` and read with `getVisitPhotos`; the saved draw order, the statistics, the target
   recommender's "already photographed" and the export picker read the first list. "Delete all data"
   removes the visits only when its own "visited skies" box is ticked, one visit at a time through
   `remove`.
@@ -125,6 +125,10 @@ sheet. No archive is held in memory in either direction.
   senders may use the same id.
 - `src/main.ts` watches it and gives the visits' photos to the map layer and to the gallery; a visit's
   outlines are drawn in their own colour (`VISIT_OUTLINE`).
+- A visited photo clicked on the map, or found by the photo search (which lists the photos of every
+  sky shown), shows its card in the side panel like the user's own; its settings keep the opacity and
+  the display order but not reposition nor edit. `PhotoLayer.getShownPhotos()` lists both kinds, in
+  drawing order; a visited photo's new place in that order is not saved.
 - A visited photo opens in the photo view without the editor: `src/visit-photo-info.ts` writes the
   same information as text.
 - A `.myastrosky` file dropped on the window opens the shared skies window, which reads it.
@@ -143,4 +147,5 @@ sheet. No archive is held in memory in either direction.
   `sky-map-setup.ts` gives the visit to the map layer as `src/main.ts` does on the desktop; the gallery and the photo
   page add the visit's photos to the user's own (or show them alone).
 - A visited photo is read-only on every screen: no reposition, display order, edit, delete, WCS file or quarter
-  turn; its gear is listed as the sender named it (`photoFacts`).
+  turn; its gear is listed as the sender named it (`photoFacts`). The Ciel search's Photos tab lists the photos of
+  the skies shown, visited ones included.

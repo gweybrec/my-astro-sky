@@ -154,16 +154,13 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
     gallery.loadPhotos(overlay.getPlacedPhotos().map((p) => p.photo));
   });
 
-  // Clicking a photo on the sky map selects it in the photos panel
+  // Clicking a photo on the sky map selects it in the photos panel; a visited sky's photo too (its card offers no
+  // change of the photo itself).
+  const shownPhotoNamed = (name: string) =>
+    overlay.getShownPhotos().find((p) => p.photo.originalName === name);
   skyMap.setOnPhotoClick((photoName) => {
-    const placed = overlay.getPlacedPhotos().find((p) => p.photo.originalName === photoName);
-    if (placed) {
-      usePhotosStore(pinia).selectPhoto(placed.photo.id);
-      return;
-    }
-    // A visited sky's photo is not in the photos panel (it lists the user's own): it opens in the photo view.
-    const visited = overlay.getVisitPhotos().find((p) => p.photo.originalName === photoName);
-    if (visited) gallery.openPhoto(visited.photo.id);
+    const placed = shownPhotoNamed(photoName);
+    if (placed) usePhotosStore(pinia).selectPhoto(placed.photo.id);
   });
 
   // Clicking a DSO on the sky map triggers the same search-display flow as the search box
@@ -180,7 +177,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay, gallery: Gallery)
     selectedName: () => {
       const id = usePhotosStore(pinia).selectedPhotoId;
       if (!id) return null;
-      return overlay.getPlacedPhotos().find((p) => p.photo.id === id)?.photo.originalName ?? null;
+      return overlay.getShownPhotos().find((p) => p.photo.id === id)?.photo.originalName ?? null;
     },
     clear: () => usePhotosStore(pinia).selectPhoto(null),
   });

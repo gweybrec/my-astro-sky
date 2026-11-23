@@ -9,15 +9,21 @@ vi.mock('../../src/toast', () => ({ showToast }));
 
 import GearPopup from '../../src/components/panels/GearPopup.vue';
 import { useCanvasStore } from '../../src/stores/canvas';
+import { usePhotosStore } from '../../src/stores/photos';
 import { t } from '../../src/i18n';
 
 /** The gear popup of a photo on the map: deleting the photo is in its editor, not here. */
 
 const photo = { id: 'p1', originalName: 'M31.jpg', labels: [], integrations: [] };
+const visitPhoto = { id: 'v1', originalName: 'M42.jpg', labels: [], sharedSkyId: 'sky1' };
 
 function fakeOverlay() {
   return {
     getPlacedPhotos: () => [{ photo, opacity: 1 }],
+    getShownPhotos: () => [
+      { photo, opacity: 1 },
+      { photo: visitPhoto, opacity: 0.4 },
+    ],
     setPhotoOpacity: vi.fn(),
     startRepositioning: vi.fn(),
     updatePhotoData: vi.fn(),
@@ -67,6 +73,20 @@ describe('GearPopup', () => {
     expect(overlay.unhidePhoto).toHaveBeenCalledWith('p1');
     toast.onExpire();
     expect(overlay.removePhoto).toHaveBeenCalledWith('p1');
+    w.unmount();
+  });
+
+  it("offers only the opacity and the display order for a visited sky's photo", () => {
+    usePhotosStore().syncFromOverlay();
+    const w = mount(GearPopup, {
+      props: { photoId: 'v1', anchorRect: new DOMRect(0, 0, 10, 10) },
+      attachTo: document.body,
+    });
+    const labels = [...document.querySelectorAll('.photo-gear-popup button')].map((b) =>
+      b.textContent?.trim(),
+    );
+    expect(labels).toEqual([t('photos.zOrder')]);
+    expect(document.querySelector<HTMLInputElement>('.gear-popup-slider')!.value).toBe('0.4');
     w.unmount();
   });
 });

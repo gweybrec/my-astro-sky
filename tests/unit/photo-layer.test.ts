@@ -416,6 +416,22 @@ describe('PhotoLayer', () => {
       expect(shown(container)).toEqual(['/files/1.jpg', '/files/v1.jpg']);
     });
 
+    it('lists the photos of the skies shown in drawing order, and every id for a reorder', () => {
+      const { layer } = make();
+      layer.loadPhotos([placedPhoto('1'), placedPhoto('2')]);
+      layer.setVisitPhotos([visit('v1')]);
+      const ids = () => layer.getShownPhotos().map((p) => p.photo.id);
+      expect(ids()).toEqual(['1', '2', 'v1']);
+      layer.setOwnPhotosShown(false);
+      expect(ids()).toEqual(['v1']);
+      expect(layer.getAllPhotoIds()).toEqual(['1', '2', 'v1']);
+      // A visited photo moved under the user's own.
+      layer.setPhotoOrder(['v1', '1', '2']);
+      layer.setOwnPhotosShown(true);
+      expect(ids()).toEqual(['v1', '1', '2']);
+      expect(layer.getPlacedPhotos().map((p) => p.photo.id)).toEqual(['1', '2']);
+    });
+
     it('replaces the visited sky shown by another, and removes it with an empty list', () => {
       const { container, layer } = make();
       layer.loadPhotos([placedPhoto('1')]);

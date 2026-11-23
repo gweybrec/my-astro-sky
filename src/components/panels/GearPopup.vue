@@ -15,14 +15,15 @@
         />
       </div>
       <!-- Action buttons -->
+      <!-- A visited sky's photo is someone else's: it is reordered and faded, never repositioned nor edited. -->
       <div class="gear-popup-actions-section">
-        <button class="gear-popup-action-btn" @click="onReposition">
+        <button v-if="!visited" class="gear-popup-action-btn" @click="onReposition">
           {{ t('photos.reposition') }}
         </button>
         <button class="gear-popup-action-btn" @click="onDrawOrder">
           {{ t('photos.zOrder') }}
         </button>
-        <button class="gear-popup-action-btn" @click="onEditMeta">
+        <button v-if="!visited" class="gear-popup-action-btn" @click="onEditMeta">
           {{ t('gallery.editMetadata') }}
         </button>
       </div>
@@ -54,10 +55,8 @@ const canvasStore = useCanvasStore();
 const photosStore = usePhotosStore();
 const popupEl = ref<HTMLElement | null>(null);
 
-const currentOpacity = computed(() => {
-  const placed = photosStore.placedPhotos.find((p) => p.photo.id === props.photoId);
-  return placed?.opacity ?? 1;
-});
+const currentOpacity = computed(() => photosStore.findPhoto(props.photoId)?.opacity ?? 1);
+const visited = computed(() => !!photosStore.findPhoto(props.photoId)?.photo.sharedSkyId);
 
 function onOpacityInput(e: Event) {
   const overlay = canvasStore.overlay;

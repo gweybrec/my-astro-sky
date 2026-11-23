@@ -32,6 +32,8 @@ vi.mock('@myastrosky/core/search', async (importOriginal) => ({
 
 import SkySearchPage from '../src/pages/SkySearchPage.vue';
 import { useSkyTimeStore } from '@myastrosky/app-state/stores/sky-time';
+import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
+import type { SharedSkyPhoto } from '@myastrosky/core/domain/shared-sky';
 import type { GearPreset } from '@myastrosky/core/gear-presets';
 import {
   clearSkySelection,
@@ -103,7 +105,7 @@ function mountPage() {
   const wrapper = mount(SkySearchPage, {
     global: { stubs: ionicStubs, plugins: [router, pinia] },
   });
-  return { wrapper, back, time: useSkyTimeStore(pinia) };
+  return { wrapper, back, time: useSkyTimeStore(pinia), sharedSkies: useSharedSkiesStore(pinia) };
 }
 
 const type = async (wrapper: ReturnType<typeof mount>, text: string) => {
@@ -325,5 +327,17 @@ describe('the search page, Photos tab', () => {
     expect(skySelection.value).toEqual({ kind: 'photo', photo: photos[2] });
     expect(skyPhotoFocus.value).toBe('M31_mosaic');
     expect(back).toHaveBeenCalled();
+  });
+
+  it('lists the photos of the visited skies shown, and the own ones only while that sky is ticked', async () => {
+    const { wrapper, sharedSkies } = mountPage();
+    sharedSkies.visitPhotos = [
+      { ...photo('M42_friend', { ...placedAt, dsoIds: ['M42'] }), sharedSkyId: 'sky1' },
+    ] as SharedSkyPhoto[];
+    await photosTab(wrapper, 'm42');
+    expect(names(wrapper)).toEqual(['M42_friend.jpg', 'M42_stack.jpg', 'Orion_wide.jpg']);
+    sharedSkies.shown = ['sky1'];
+    await flushPromises();
+    expect(names(wrapper)).toEqual(['M42_friend.jpg']);
   });
 });

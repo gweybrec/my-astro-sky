@@ -479,6 +479,19 @@ export class PhotoLayer {
   }
 
   /**
+   * Every photo of the skies shown, the user's own (unless only visited skies are shown) and the visited ones, in
+   * drawing order (the last on top). Only for what is looked at on the map, such as its display order.
+   */
+  getShownPhotos(): PlacedPhoto[] {
+    return this.placedPhotos.filter((p) => !p.pendingDelete && !this.hiddenByVisit(p));
+  }
+
+  /** The ids of every photo on the layer, shown or not, in drawing order: the full list `setPhotoOrder` takes. */
+  getAllPhotoIds(): string[] {
+    return this.placedPhotos.map((p) => p.photo.id);
+  }
+
+  /**
    * A placed photo's mesh in canvas pixels at an arbitrary view (see `computePhotoCanvasMesh`), independent of what is
    * on screen. Null when the photo cannot be placed or its centre falls outside the border circle. Used by the map
    * export to draw the photos as the map does, at the live view or another.
@@ -643,7 +656,7 @@ export class PhotoLayer {
   setPhotoOrder(photoIds: string[]) {
     if (photoIds.length === 0) return;
 
-    // A visited sky's photos keep their place above the user's own, which are the ones reordered.
+    // The photos left out of `photoIds` go above the ones listed, in their order (a visited sky's newly shown).
     const placedById = new Map(this.placedPhotos.map((placed) => [placed.photo.id, placed]));
     const reordered: PlacedPhoto[] = [];
     const seen = new Set<string>();

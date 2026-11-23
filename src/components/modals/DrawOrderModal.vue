@@ -51,7 +51,11 @@ import { t } from '../../i18n';
 import BaseModal from '../base/BaseModal.vue';
 import { useCanvasStore } from '../../stores/canvas';
 import { usePhotosStore } from '../../stores/photos';
-import { filterDrawOrderPhotos, mergeFilteredOrder } from '@myastrosky/core/photo-draw-order';
+import {
+  filterDrawOrderPhotos,
+  fullPhotoOrder,
+  mergeFilteredOrder,
+} from '@myastrosky/core/photo-draw-order';
 import { updatePhotoOrder } from '../../api';
 import { showToast } from '../../toast';
 
@@ -66,7 +70,8 @@ const filterQuery = ref('');
 const overlapOnly = ref(true);
 const listScrollTop = ref(0);
 
-const displayOrder = computed(() => [...photosStore.placedPhotos].reverse());
+// The photos of the skies shown, visited ones included, the top one first.
+const displayOrder = computed(() => [...photosStore.shownPhotos].reverse());
 
 const filteredIds = computed(() => {
   const overlay = canvasStore.overlay;
@@ -88,8 +93,7 @@ const visibleItems = computed(() =>
 );
 
 const photoName = computed(() => {
-  const placed = photosStore.placedPhotos.find((p) => p.photo.id === props.photoId);
-  return placed?.photo.originalName ?? '';
+  return photosStore.findPhoto(props.photoId)?.photo.originalName ?? '';
 });
 
 watch([filterQuery, overlapOnly], async () => {
@@ -209,8 +213,11 @@ function onMouseUp() {
 
   const overlay = canvasStore.overlay;
   if (overlay) {
-    overlay.setPhotoOrder(mergedDisplay.reverse());
+    // The photos not shown (the user's own while only visited skies are) keep their places.
+    const allIds = overlay.getAllPhotoIds();
+    overlay.setPhotoOrder(fullPhotoOrder(allIds, mergedDisplay.reverse()));
     photosStore.syncFromOverlay();
+    // Only the user's own photos' order is saved; a visited sky's keeps its new place until the app is reloaded.
     const ids = overlay.getPlacedPhotos().map((p) => p.photo.id);
     void updatePhotoOrder(ids).catch(() => {
       showToast({ message: t('errors.updatePhoto'), type: 'error', duration: 3500 });

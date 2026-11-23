@@ -18,6 +18,7 @@ import { catalogsReady } from '../catalogs';
 import { targetCard } from '../target-card';
 import { reloadTargetsPrefs, targetsPrefs } from '../composables/useTargets';
 import { isPlacedPhoto } from '@myastrosky/core/photo-placement';
+import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
 import { photoTags } from '../photo-tags';
 import { selectSearchResult, skyPhotoFocus, skySelection } from '../composables/useSkySelection';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
@@ -81,8 +82,15 @@ async function readPhotos() {
 }
 void readPhotos();
 
+// The photos of the skies shown on the map: the user's own (when their sky is ticked) and the visited skies' shown.
+const sharedSkies = useSharedSkiesStore();
+const shownPhotos = computed(() => [
+  ...(sharedSkies.ownShown ? placed.value : []),
+  ...sharedSkies.visitPhotos.filter((p) => isPlacedPhoto(p)),
+]);
+
 const photoResults = computed(() => {
-  const matches = buildPhotoQueryMatches(placed.value, query.value);
+  const matches = buildPhotoQueryMatches(shownPhotos.value, query.value);
   const byId = new Map(matches.map((m) => [m.photo.id, m]));
   return smartSortPhotos(matches.map((m) => m.photo)).map((photo) => {
     const match = byId.get(photo.id)!;
@@ -90,7 +98,8 @@ const photoResults = computed(() => {
       photo,
       tags: photoTags(
         { pois: match.matchingPois, labels: match.matchingLabels, dsoIds: match.matchingDsoIds },
-        poiCategories.categories,
+        // A visited sky's points take their colours from its sender's categories.
+        photo.sharedSkyId ? sharedSkies.visitPoiCategories : poiCategories.categories,
       ),
     };
   });

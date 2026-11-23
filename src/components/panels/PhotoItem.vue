@@ -76,6 +76,7 @@ import imageSvg from '../../icons/image.svg?raw';
 import type { PlacedPhoto } from '../../photo-overlay';
 import type { PointOfInterest } from '@myastrosky/core/types';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
+import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
 import { resolveCategory } from '@myastrosky/core/poi';
 import { poiTypeIcon } from '../../poi-icons';
 import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
@@ -94,7 +95,11 @@ const sortedDsoChips = computed(() => sortDsoIdsByImportance(props.dsoChips));
 
 const poiCategoriesStore = usePoiCategoriesStore();
 poiCategoriesStore.ensureLoaded();
-const poiCategories = computed(() => poiCategoriesStore.categories);
+const sharedSkies = useSharedSkiesStore();
+// A visited sky's points of interest take their colours from its sender's categories, not from the user's.
+const poiCategories = computed(() =>
+  props.placed.photo.sharedSkyId ? sharedSkies.visitPoiCategories : poiCategoriesStore.categories,
+);
 
 defineEmits<{
   'name-click': [];

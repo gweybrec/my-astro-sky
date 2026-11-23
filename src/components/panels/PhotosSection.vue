@@ -99,6 +99,7 @@ import DrawOrderModal from '../modals/DrawOrderModal.vue';
 import { useCanvasStore } from '../../stores/canvas';
 import { usePhotosStore } from '../../stores/photos';
 import { useUiStore } from '../../stores/ui';
+import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
 import { buildPhotoQueryMatches, smartSortPhotos } from '@myastrosky/core/photo-search';
 import { isPlacedPhoto } from '@myastrosky/core/photo-placement';
 import { triggerSelectDSOForPhotoChip, triggerBatchModal } from '../../ui';
@@ -107,6 +108,7 @@ import { ANY_PHOTO_EXT_RE, PHOTO_PICKER_ACCEPT } from '@myastrosky/core/photo-fo
 
 const canvasStore = useCanvasStore();
 const photosStore = usePhotosStore();
+const sharedSkies = useSharedSkiesStore();
 
 const searchInputEl = ref<HTMLInputElement | null>(null);
 const searchInput = ref('');
@@ -117,18 +119,21 @@ const gearPhotoId = ref<string | null>(null);
 const gearAnchorRect = ref<DOMRect | null>(null);
 const drawOrderPhotoId = ref<string | null>(null);
 
+// The selected photo: the user's own or a visited sky's (see the map's click).
 const selectedPlaced = computed(() =>
-  photosStore.selectedPhotoId
-    ? (photosStore.placedPhotos.find((p) => p.photo.id === photosStore.selectedPhotoId) ?? null)
-    : null,
+  photosStore.selectedPhotoId ? photosStore.findPhoto(photosStore.selectedPhotoId) : null,
 );
 
 // Build search matches from current query
 const searchMatches = computed(() => {
   const query = searchInput.value.trim().toLowerCase();
   if (!query) return [];
-  // A photo stored without a placement waits in the gallery: it is not on the map, nor in its photo list.
-  const all = photosStore.placedPhotos.filter((p) => isPlacedPhoto(p.photo));
+  // The photos of the skies shown on the map: the user's own (when their sky is ticked) and the visited ones. A photo
+  // stored without a placement waits in the gallery: it is not on the map, nor in its photo list.
+  const all = [
+    ...(sharedSkies.ownShown ? photosStore.placedPhotos : []),
+    ...photosStore.visitPhotos,
+  ].filter((p) => isPlacedPhoto(p.photo));
   const matches = buildPhotoQueryMatches(
     all.map((p) => p.photo),
     query,
@@ -170,7 +175,7 @@ function clearSearch() {
 }
 
 function selectFromDropdown(photoId: string) {
-  const placed = photosStore.placedPhotos.find((p) => p.photo.id === photoId);
+  const placed = photosStore.findPhoto(photoId);
   if (!placed) return;
   photosStore.selectPhoto(photoId);
   searchInput.value = placed.photo.originalName;
