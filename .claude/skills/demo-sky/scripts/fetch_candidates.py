@@ -32,6 +32,13 @@ CAPTURE = re.compile(
     re.I,
 )
 
+# In the file name or description: hints of a wide field (a camera lens or a small refractor, a mosaic).
+WIDE = re.compile(
+    r"wide[- ]?field|widefield|\blens\b|objekti|objectif|samyang|rokinon|redcat|\bmosai[cq]|"
+    r"\b(1[0-9]|[2-9][0-9]|[12][0-9]{2}|300) ?mm\b(?! ?(f/|telescope))",
+    re.I,
+)
+
 
 def wikidata_category(article: str) -> tuple[str | None, str | None]:
     """The Commons category (P373) and the image (P18) of an English Wikipedia article."""
@@ -113,6 +120,8 @@ def score(c: dict) -> float | None:
         s -= 1
     if CAPTURE.search(desc) or CAPTURE.search(c["title"]):
         s += 2
+    if WIDE.search(desc) or WIDE.search(c["title"]):
+        s += 1.5  # wide fields read better in a demo than tight crops
     if c["mime"] == "image/jpeg":
         s += 0.5
     return s

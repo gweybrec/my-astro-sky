@@ -24,6 +24,11 @@ user names.
 - **Photographs only:** no planetarium-software renderings, simulations, charts or annotated versions.
 - **Plate-solved locally** (solve-field): never upload anything to astrometry.net (root `CLAUDE.md`).
 - **Only what the page states:** never guess an exposure, a gear item or a date.
+- **Wider photos below smaller ones:** the order of the photos in the package is their draw order once opened
+  (the first is drawn at the bottom, the last on top), and a visitor cannot reorder them. So the package lists
+  the photos from the widest field to the smallest: a small photo inside a wide one (M42 in the Barnard's Loop
+  field) stays visible on top of it instead of being hidden under it. `build-package.mts` sorts by `fieldDeg`;
+  never write the photos in solve or target order.
 - **A built version is never overwritten**, and every version keeps the same sky id (`sky.json`), so a visitor
   who opens a newer one gets it as an update of the same visit.
 - The working folder, the solver and its index files stay **outside the repository**. Never write a path of
@@ -104,11 +109,14 @@ Scripts live in `.claude/skills/demo-sky/scripts/`; run the Python ones with `py
    - Write the entry in `entries.json`.
 6. **Build:** from the repository root,
    `DEMO_SKY_DIR=… npx tsx .claude/skills/demo-sky/scripts/build-package.mts v3`. It refuses to run while a
-   kept photo has no entry or no fetched page, and checks the package with the app's own parser. The file
-   name uses keyboard characters only: `MyAstroSky demo - Wikimedia Commons v3.myastrosky`.
+   kept photo has no entry or no fetched page, writes the photos widest field first (see the rules), and
+   checks the package with the app's own parser. The file name uses keyboard characters only:
+   `MyAstroSky demo - Wikimedia Commons v3.myastrosky`.
 7. **Check in the app:** start the dev server, `POST /api/shared-skies/inspect` the package (field `bundle`)
    then `POST /api/shared-skies/open/<ticket>`; all photos must import with 9 reference points and an author.
-   Show only that sky, zoom on a few photos and check them against the catalog outlines. Afterwards delete
+   Show only that sky, zoom on a few photos and check them against the catalog outlines. Zoom also on a wide
+   field holding smaller photos (Barnard's Loop, the Gamma Cygni region): the smaller ones must show on top of
+   it, and `GET /api/shared-skies/<skyId>/photos` must list the widest first. Afterwards delete
    the visit (`DELETE /api/shared-skies/<skyId>`) and stop the server you started.
 8. **Hand over** the package and `CREDITS-<label>.html` (the attribution list to share with it), with the
    objects added, those dropped and why.

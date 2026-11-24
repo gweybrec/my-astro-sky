@@ -54,6 +54,7 @@ interface Solved {
   wcs: string;
   width: number;
   height: number;
+  fieldDeg: number;
   title: string;
   image: string;
 }
@@ -83,7 +84,10 @@ const photos: SharedPhoto[] = [];
 const pictures: { file: string; bytes: Uint8Array }[] = [];
 const credits: { entry: Entry; detail: Detail; title: string }[] = [];
 
-for (const [dsoId, s] of Object.entries(solved)) {
+// A photo's place in the package is its draw order once opened (the first is drawn at the bottom): the widest fields
+// go first so that the smaller photos inside them stay visible on top.
+const byWidestField = Object.entries(solved).sort(([, a], [, b]) => b.fieldDeg - a.fieldDeg);
+for (const [dsoId, s] of byWidestField) {
   const entry = entries[dsoId];
   const detail = details[dsoId];
   const wcs = wcsFromHeader(parseFITSHeader(await readFile(join(ROOT, s.wcs), 'utf-8')));
