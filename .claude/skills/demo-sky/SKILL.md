@@ -109,6 +109,9 @@ Scripts live in `.claude/skills/demo-sky/scripts/`; run the Python ones with `py
      source that look rendered).
    - **Author:** the photographer as the page names them (a "Photo by X" line beats the uploader's account);
      a duo as "A, B"; at most 60 characters.
+   - **Points of interest:** a comet, asteroid, supernova or satellite the page names in the frame becomes a
+     pinned POI. Read its pixel off the picture, then `poi_position.py ID:x:y` gives its RA/Dec. A named
+     object outside the stored picture (SN 1987A beside the Tarantula crop) gets none.
    - Write the entry in `entries.json`.
 6. **Build:** from the repository root,
    `DEMO_SKY_DIR=… npx tsx .claude/skills/demo-sky/scripts/build-package.mts v3`. It refuses to run while a
@@ -142,7 +145,10 @@ Scripts live in `.claude/skills/demo-sky/scripts/`; run the Python ones with `py
       "accessory": "EQ6R-PRO mount"
     },
     "captureDetails": { "setTemp": -20, "gain": 75, "offset": 15, "iso": 800, "binning": "2x2" },
-    "note": "Anything else worth a line: site, palette, a comet in the field."
+    "note": "Anything else worth a line: site, palette, a comet in the field.",
+    "pointsOfInterest": [
+      { "name": "C/2025 K1 (ATLAS)", "categoryId": "cat-comet", "ra": 27.7942, "dec": 61.6858 }
+    ]
   }
 }
 ```
@@ -155,6 +161,8 @@ Scripts live in `.claude/skills/demo-sky/scripts/`; run the Python ones with `py
   `{ "frames": 1, "seconds": <total s> }`. Frames without a length: `{ "frames": N, "seconds": 0 }`. A filter
   without exposures: `{ "frames": 0, "seconds": 0, "filter": "…" }`.
 - `captureDetails`: only `gain`, `offset`, `iso`, `ccdTemp`, `setTemp`, `binning` (`packages/core/src/capture-fields.ts`).
+- `pointsOfInterest`: optional; `categoryId` is one of the app's default POI types (`cat-comet`, `cat-asteroid`,
+  `cat-satellite`, `cat-iss`, `cat-supernova`), and the build adds the types used to the package.
 - The license, its link and the source page come from `details.json`; the build writes them into the notes.
 
 ## What is kept from past runs

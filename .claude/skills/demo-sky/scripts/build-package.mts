@@ -49,7 +49,18 @@ interface Entry {
   gear?: { setup?: string; telescope?: string; camera?: string; accessory?: string };
   captureDetails?: Record<string, number | string>;
   note?: string | null;
+  /** Comets, asteroids, supernovae… in the frame, pinned at their sky position (degrees). */
+  pointsOfInterest?: { name: string; categoryId: string; ra: number; dec: number }[];
 }
+
+/** The app's default POI categories (packages/core/src/services/poi-categories.ts): a package carries those it uses. */
+const POI_CATEGORIES: Record<string, { name: string; color: string }> = {
+  'cat-comet': { name: 'Comet', color: '#4ea1ff' },
+  'cat-asteroid': { name: 'Asteroid', color: '#c9a227' },
+  'cat-satellite': { name: 'Satellite', color: '#7bd88f' },
+  'cat-iss': { name: 'ISS', color: '#cbd5e1' },
+  'cat-supernova': { name: 'Supernova', color: '#ff5a5a' },
+};
 interface Solved {
   wcs: string;
   width: number;
@@ -125,7 +136,7 @@ for (const [dsoId, s] of byWidestField) {
     dsoIds: [dsoId, ...found.filter((id) => id !== dsoId)],
     labels: [],
     notes: lines.join('\n'),
-    pointsOfInterest: [],
+    pointsOfInterest: entry.pointsOfInterest ?? [],
     observationDate: date,
     integrations: entry.integrations ?? [],
     author: entry.author,
@@ -137,6 +148,10 @@ for (const [dsoId, s] of byWidestField) {
   credits.push({ entry, detail, title: s.title });
 }
 
+const usedCategories = [...new Set(photos.flatMap((p) => p.pointsOfInterest.map((poi) => poi.categoryId)))];
+const unknownCategory = usedCategories.find((id) => !POI_CATEGORIES[id]);
+if (unknownCategory) throw new Error(`Unknown POI category ${unknownCategory}`);
+
 const manifest: ShareManifest = {
   kind: SHARE_KIND,
   formatVersion: SHARE_FORMAT_VERSION,
@@ -144,7 +159,7 @@ const manifest: ShareManifest = {
   senderName: sky.senderName,
   sharedAt: new Date().toISOString(),
   photos,
-  poiCategories: [],
+  poiCategories: usedCategories.map((id) => ({ id, ...POI_CATEGORIES[id] })),
 };
 
 // Keyboard characters only in the file name: "MyAstroSky demo · Wikimedia Commons" → "MyAstroSky demo - Wikimedia
