@@ -84,6 +84,9 @@ Scripts live in `.claude/skills/demo-sky/scripts/`; run the Python ones with `py
    objects in the order they are wanted**: `solve.py` tries them in that order and stops at the total, so
    a mix must be interleaved, not grouped by kind. Skip objects already inside an existing photo (M32 in
    M31, M65 in the Leo Triplet). Add about 1.7× the number of photos wanted: many will fail or be rejected.
+   **Spread over the sky:** count the kept photos per constellation (`constellation` field) and favour the
+   constellations with few or none; popular regions (Orion, Sagittarius, Cygnus) fill up first otherwise.
+   Keep to objects and fields smaller than a whole constellation.
 2. **Candidates:** `fetch_candidates.py`. Commons category from Wikidata, else a designation category
    (`Messier 81`, `NGC 281`, `Sh2-155`…). A category holding only sub-categories gives no candidate.
 3. **Solve:** `solve.py <total>`, in the background, `<total>` = photos already kept + new ones wanted +
