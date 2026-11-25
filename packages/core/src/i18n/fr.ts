@@ -1422,6 +1422,8 @@ const fr = {
     difficultyFilter: 'Difficulté',
     catalogFilter: 'Catalogues',
     includeOversized: 'Inclure les objets trop grands pour le champ',
+    mosaic: 'Mosaïque',
+    mosaicRecommended: 'Mosaïque recommandée',
     includeOversizedTooltip:
       "Inclut les objets plus grands que le champ, jusqu'à une mosaïque de 3 × 3. Ils sont classés après ceux qui tiennent dans le champ.",
     excludePhotographed: 'Exclure les objets déjà photographiés',
@@ -1431,7 +1433,7 @@ const fr = {
     minAlt: 'Min',
     maxAlt: 'Max',
     altRangeTooltip:
-      "Exclure les objets dont l'altitude au plus haut pendant la nuit est inférieure à l'altitude minimale ou supérieure à l'altitude maximale.",
+      "Garder les objets qui passent au moins une heure entre l'altitude minimale et l'altitude maximale pendant la nuit.",
     timeWindowLabel: "Fenêtre d'observation",
     timeWindowStart: 'De',
     timeWindowEnd: 'à',
@@ -1497,6 +1499,8 @@ const fr = {
       noDarkNight:
         'Pas de nuit astronomique ce soir à cette latitude (soleil trop haut). Les résultats sont basés sur une fenêtre nautique.',
       noWindowOverlap: 'Pas de ciel noir pendant la fenêtre horaire sélectionnée.',
+      noAstroDarkness:
+        'Pas de nuit noire : cibles calculées pour les heures les plus sombres ({start}–{end})',
       maxAlt: 'Alt. max',
       bestTime: 'Au plus haut',
       size: 'Taille',

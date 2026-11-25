@@ -42,10 +42,11 @@
   - `reloadUserOverrides()` — re-fetches all overrides from the server and re-applies them (called after import).
 - **DSO editor** (`dso-editor.ts`): Modal for editing any DSO metadata field at runtime — names (FR/EN/ES/DE), RA, Dec, constellation, rating (1–5), difficulty (1–5), type. Saves the override to the server via `upsertDsoOverride` and applies it in-memory immediately. The "Reset to defaults" button fills the form with the original catalog values without closing; clicking Save then deletes the override.
 - **Target recommender** (`target-recommender.ts`): `recommendTargets(dsos, preset, location, dateNight, limit, options)` scores and filters DSOs for a given night:
-  - 45% altitude score (linear above 30°, best at 70°+)
-  - 35% FOV fit score (best when object spans 15–70% of the short FOV axis)
-  - 20% brightness score (margin below gear limiting magnitude, capped by the catalogue difficulty)
-  - the sum multiplied by a difficulty factor (×1 at 1/5 down to ×0.6 at 5/5), so easier targets rank first
+  - kept when it spends an hour between the minimum and maximum altitude (a peak above the maximum is fine)
+  - 45% altitude score (by airmass, full from 50°)
+  - 35% FOV fit score (best when object spans 15–70% of the frame at its best angle, along the diagonal when long and thin; up to 10 % larger still fits, 25 % on a smart telescope)
+  - 20% brightness score (margin below gear limiting magnitude; the difficulty when no magnitude is known)
+  - the sum multiplied by a difficulty factor (×1 at 1/5 down to ×0.6 at 5/5) and a rating factor (×1 at 5★ down to ×0.6 at 1★); ranked by score alone
   - Pre-filters by magnitude limit, minimum altitude 30°, declination quick-filter
   - `options.allowOversized = true` keeps objects larger than the frame up to a 3×3 mosaic, with a FOV fit that falls with the panel count
 - **Gear presets** (`gear-presets.ts`): Defines `GearPreset` interface and `GEAR_PRESETS` array. Each preset encodes aperture, focal length, sensor size, pixel size, mono flag. Exports `fovDeg()`, `pixelScaleArcsec()`, `limitingMag()`.

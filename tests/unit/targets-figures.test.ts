@@ -47,6 +47,7 @@ describe('targetFigures', () => {
       maxAltDeg: null,
       scorePct: null,
       fovFitPct: Math.round(scoreDso(M31, REFRACTOR, 0).fovFitScore * 100),
+      needsMosaic: false,
     });
     const noSetup = targetFigures(M31, STRASBOURG, null);
     expect(noSetup.bestTimeUtc).toBeInstanceOf(Date);

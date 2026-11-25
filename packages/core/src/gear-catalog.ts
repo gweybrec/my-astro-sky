@@ -183,6 +183,7 @@ export function buildGearPreset(
     builtIn: telescope.is_smart_telescope,
     maxSubSec: telescope.max_sub_exposure_sec,
     hasDualBandFilter: telescope.has_dual_band_filter ?? false,
+    ...(telescope.is_smart_telescope && telescope.mosaic ? { smartMosaic: telescope.mosaic } : {}),
   };
 }
 

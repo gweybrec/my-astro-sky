@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { DSO } from '@myastrosky/core/types';
 import type { GearPreset } from '@myastrosky/core/gear-presets';
-import { MAX_TOTAL_HOURS, recommendRecipe } from '@myastrosky/core/imaging-recipe';
+import {
+  MAX_TOTAL_HOURS,
+  MIN_SUBS_PER_FILTER,
+  recommendRecipe,
+} from '@myastrosky/core/imaging-recipe';
 
 function dso(overrides: Partial<DSO> = {}): DSO {
   return {
@@ -21,6 +25,17 @@ function dso(overrides: Partial<DSO> = {}): DSO {
     difficulty: 2,
     ...overrides,
   };
+}
+
+/** A 50 mm f/5 smart telescope (Seestar S50, Vespera): built-in colour camera, 10 s subs. */
+function smartScope(): GearPreset {
+  return preset({
+    apertureMm: 50,
+    focalLengthMm: 250,
+    mono: false,
+    builtIn: true,
+    maxSubSec: 10,
+  });
 }
 
 function preset(overrides: Partial<GearPreset> = {}): GearPreset {
@@ -84,7 +99,7 @@ describe('recommendRecipe()', () => {
   });
 
   it('gives a protoplanetary nebula the planetary-nebula hours (compact object)', () => {
-    const small = preset({ apertureMm: 50 });
+    const small = smartScope();
     const ppn = recommendRecipe(dso({ type: 'PPN', difficulty: 4, mag: 9 }), small).totalHours;
     const pn = recommendRecipe(dso({ type: 'PN', difficulty: 4, mag: 9 }), small).totalHours;
     expect(ppn).toBe(pn);
@@ -220,41 +235,76 @@ describe('recommendRecipe()', () => {
     expect(at(4)).toBeLessThan(at(5));
   });
 
-  it('PN at 50 mm stays within reasonable bounds (≤ 1.5 h)', () => {
-    // Without the PN correction, M57 (diff 2) and M97 (diff 2) returned 6 h on a Vespera/S50.
-    const m57 = recommendRecipe(
-      dso({ type: 'PN', difficulty: 2, mag: 8.8 }),
-      preset({ apertureMm: 50 }),
-    );
-    const m97 = recommendRecipe(
-      dso({ type: 'PN', difficulty: 2, mag: 9.9 }),
-      preset({ apertureMm: 50 }),
-    );
+  it('PN at 50 mm takes a few hours, not a night (≤ 3 h)', () => {
+    // M57 and M97 (difficulty 1) on a Vespera/S50: compact and bright, the aperture factor is capped.
+    const m57 = recommendRecipe(dso({ type: 'PN', difficulty: 1, mag: 8.8 }), smartScope());
+    const m97 = recommendRecipe(dso({ type: 'PN', difficulty: 1, mag: 9.9 }), smartScope());
 
-    expect(m57.totalHours).toBeLessThanOrEqual(1.5);
-    expect(m97.totalHours).toBeLessThanOrEqual(1.5);
+    expect(m57.totalHours).toBeLessThanOrEqual(3);
+    expect(m97.totalHours).toBeLessThanOrEqual(3);
   });
 
-  it('galaxy at 50 mm stays within reasonable bounds (≤ 3.5 h)', () => {
-    // Without the galaxy cap, NGC4236/M109/NGC4631 (all diff 2) returned 6 h on a Vespera/S50.
-    const ngc4236 = recommendRecipe(
-      dso({ type: 'GxS', difficulty: 2, mag: 9.77 }),
-      preset({ apertureMm: 50 }),
-    );
+  it('galaxy at 50 mm f/5 stays within reasonable bounds (≤ 3.5 h)', () => {
+    // NGC4236/M109/NGC4631 (all diff 2) on a Vespera/S50: f/5, so the reference time.
+    const ngc4236 = recommendRecipe(dso({ type: 'GxS', difficulty: 2, mag: 9.77 }), smartScope());
     expect(ngc4236.totalHours).toBeLessThanOrEqual(3.5);
+  });
+
+  it('scales nebula and galaxy time with the focal ratio, not the aperture', () => {
+    const m81 = dso({ type: 'GxS', difficulty: 1, mag: 6.9 });
+    const at = (apertureMm: number, focalLengthMm: number) =>
+      recommendRecipe(m81, preset({ apertureMm, focalLengthMm, mono: false })).totalHours;
+    expect(at(203, 1280)).toBeCloseTo(2 * (1280 / 203 / 5) ** 2, 1); // C8 at f/6.3: about 3 h
+    expect(at(203, 2032)).toBeCloseTo(8, 0); // C8 at f/10: four times f/5
+    expect(at(100, 500)).toBeCloseTo(at(200, 1000), 6); // same f/5, same time
+  });
+
+  it('gives every filter at least 20 subs, shortening them to a usual length first', () => {
+    // Wizard Nebula (open cluster in a nebula), mono: a short total split in three filters.
+    const wizard = recommendRecipe(
+      dso({ type: 'OC', difficulty: 1, mag: 7.2, displayName: 'Wizard Nebula' }),
+      preset(),
+    );
+    for (const f of wizard.filters) {
+      expect(f.count).toBeGreaterThanOrEqual(MIN_SUBS_PER_FILTER);
+      expect([60, 90, 120, 180, 240, 300, 600, 900]).toContain(f.subSeconds);
+    }
+  });
+
+  it('gives a cluster inside an emission nebula the nebula hours and filters', () => {
+    // Christmas Tree Cluster: an open cluster, but SH2-273 (the Cone) is what gets imaged.
+    const christmasTree = dso({
+      type: 'OC',
+      difficulty: 1,
+      mag: 3.9,
+      displayName: 'Christmas Tree Cluster',
+      catalogs: ['NGC2264', 'LBN911', 'SH2-273'],
+    });
+    const plainCluster = dso({
+      type: 'OC',
+      difficulty: 1,
+      mag: 3.9,
+      displayName: 'M35',
+      catalogs: ['M35'],
+    });
+    const f5 = preset({ focalLengthMm: 1000, apertureMm: 200 });
+    const tree = recommendRecipe(christmasTree, f5);
+    expect(tree.filters.map((f) => f.name)).toEqual(['Ha', 'OIII', 'SII']);
+    expect(tree.totalHours).toBeGreaterThan(recommendRecipe(plainCluster, f5).totalHours);
+  });
+
+  it('splits a planetary nebula evenly between Ha and OIII, adding up to the total', () => {
+    const recipe = recommendRecipe(dso({ type: 'PN', difficulty: 4, mag: 12 }), preset());
+    expect(recipe.filters.map((f) => f.name)).toEqual(['Ha', 'OIII']);
+    expect(recipe.filters[0].hours).toBeCloseTo(recipe.filters[1].hours, 6);
+    expect(recipe.filters.reduce((a, f) => a + f.hours, 0)).toBeCloseTo(recipe.totalHours, 6);
   });
 
   it('GC at 50 mm stays within reasonable bounds (≤ 1.5 h)', () => {
     // Vespera / S50 aperture. Without the cluster correction this returned 2 h for diff-1
     // and 6 h for diff-2 (M2), which is unrealistic for a compact bright globular.
-    const m13 = recommendRecipe(
-      dso({ type: 'GC', difficulty: 1, mag: 5.8 }),
-      preset({ apertureMm: 50 }),
-    );
-    const m2 = recommendRecipe(
-      dso({ type: 'GC', difficulty: 2, mag: 6.25 }),
-      preset({ apertureMm: 50 }),
-    );
+    const m13 = recommendRecipe(dso({ type: 'GC', difficulty: 1, mag: 5.8 }), smartScope());
+    const m2 = recommendRecipe(dso({ type: 'GC', difficulty: 2, mag: 6.25 }), smartScope());
 
     expect(m13.totalHours).toBeLessThanOrEqual(1.5);
     expect(m2.totalHours).toBeLessThanOrEqual(1.5);
@@ -286,7 +336,7 @@ describe('recommendRecipe()', () => {
     for (const f of recipe.filters) {
       expect(f.count).toBeGreaterThan(0);
       expect(Number.isInteger(f.count)).toBe(true);
-      expect([120, 300, 600, 900].includes(f.subSeconds)).toBe(true);
+      expect([60, 90, 120, 180, 240, 300, 600, 900].includes(f.subSeconds)).toBe(true);
     }
   });
 });

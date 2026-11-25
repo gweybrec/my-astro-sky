@@ -1423,6 +1423,8 @@ const de: Translations = {
     difficultyFilter: 'Schwierigkeit',
     catalogFilter: 'Kataloge',
     includeOversized: 'Objekte größer als das Gesichtsfeld einschließen',
+    mosaic: 'Mosaik',
+    mosaicRecommended: 'Mosaik empfohlen',
     includeOversizedTooltip:
       'Schließt Objekte ein, die größer als das Gesichtsfeld sind, bis zu einem 3 × 3-Mosaik. Sie stehen hinter denen, die ins Bildfeld passen.',
     excludePhotographed: 'Bereits fotografierte Objekte ausschließen',
@@ -1432,7 +1434,7 @@ const de: Translations = {
     minAlt: 'Min.',
     maxAlt: 'Max.',
     altRangeTooltip:
-      'Objekte ausschließen, deren größte Höhe während der Nacht unter dem Minimum oder über dem Maximum liegt.',
+      'Objekte behalten, die nachts mindestens eine Stunde zwischen der minimalen und der maximalen Höhe verbringen.',
     timeWindowLabel: 'Beobachtungsfenster',
     timeWindowStart: 'Von',
     timeWindowEnd: 'Bis',
@@ -1498,6 +1500,8 @@ const de: Translations = {
       noDarkNight:
         'Heute Nacht keine astronomische Nacht bei dieser Breite (Sonne zu hoch). Ergebnisse basieren auf dem nautischen Dämmerfenster.',
       noWindowOverlap: 'Kein dunkler Himmel während des gewählten Zeitfensters.',
+      noAstroDarkness:
+        'Keine volle Dunkelheit: Ziele für die dunkelsten Stunden berechnet ({start}–{end})',
       maxAlt: 'Max. Höhe',
       bestTime: 'Am höchsten um',
       size: 'Größe',

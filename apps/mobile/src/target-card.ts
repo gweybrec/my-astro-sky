@@ -10,7 +10,8 @@ import type { DSO } from '@myastrosky/core/types';
 /**
  * What a deep-sky object's row shows in the Cibles list and the map's search (PhoneTargetRow): its name with the
  * rating, its main designation followed by the one searched when it differs ("M31 · NGC224"), its type and
- * constellation, and the figures known: the highest point "time (altitude)", magnitude, size, score and field fit.
+ * constellation, the mosaic badge when a smart telescope shoots it in mosaic mode, and the figures known: the highest
+ * point "time (altitude)", magnitude, size, score and field fit.
  */
 export function targetCard(dso: DSO, figures: Partial<TargetFigures>, query = '') {
   // Under a name the main designation; without one the title is it. An object in no named catalogue has only a
@@ -48,6 +49,7 @@ export function targetCard(dso: DSO, figures: Partial<TargetFigures>, query = ''
         ? formatMultiplicity(dso.multiplicity, t)
         : t(`dso.types.${dso.type}`),
     constellation: dso.constellation?.toUpperCase(),
+    mosaic: figures.needsMosaic ? t('targets.mosaic') : undefined,
     rating: dso.rating !== null ? '★'.repeat(dso.rating) + '☆'.repeat(5 - dso.rating) : undefined,
     facts,
   };

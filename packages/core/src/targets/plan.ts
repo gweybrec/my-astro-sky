@@ -247,14 +247,15 @@ export function scorePlanEntry(
   preset: GearPreset,
   maxAltDeg: number,
   prefs: { includeOversized?: boolean; minAltDeg?: number },
-): { scorePct: number; fovFitPct: number; recipe: ImagingRecipe } {
-  const { score, fovFitScore } = scoreDso(dso, preset, maxAltDeg, {
+): { scorePct: number; fovFitPct: number; needsMosaic: boolean; recipe: ImagingRecipe } {
+  const { score, fovFitScore, needsMosaic } = scoreDso(dso, preset, maxAltDeg, {
     allowOversized: prefs.includeOversized ?? false,
     minAltDeg: prefs.minAltDeg ?? 20,
   });
   return {
     scorePct: Math.round(score * 100),
     fovFitPct: Math.round(fovFitScore * 100),
+    needsMosaic,
     recipe: recommendRecipe(dso, preset),
   };
 }

@@ -366,6 +366,13 @@ export default defineConfig({
     'targets-outside-title':
       'col-span-full mt-4 mb-0 text-small font-medium uppercase tracking-[0.06em] text-label',
     'targets-card-dim': 'opacity-55',
+    // A target a smart telescope shoots in its mosaic mode: a chip in its own colour beside the constellation's.
+    'targets-card-mosaic':
+      'shrink-0 text-small leading-[normal] rounded-[var(--radius-sm)] px-[var(--space-3h)] py-[var(--space-1)] border border-solid bg-[var(--target-mosaic-bg)] border-[var(--target-mosaic-border)] text-[var(--target-mosaic-text)]',
+    // A night without astronomical darkness: one line under the results toolbar, moon icon then text.
+    'targets-darkness-line':
+      'col-span-full flex items-center gap-4 px-4 py-2 text-small text-secondary border-b border-b-solid border-[var(--border-panel)]',
+    'targets-darkness-icon': 'flex shrink-0 [&>svg]:w-[12px] [&>svg]:h-[12px]',
     'targets-card-warn':
       'shrink-0 text-small leading-[normal] rounded-[var(--radius-sm)] px-[var(--space-3h)] py-[var(--space-1)] status-warn border-solid',
 

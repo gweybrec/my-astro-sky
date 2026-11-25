@@ -5,7 +5,7 @@ import { IonPage, IonContent, onIonViewWillEnter } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import { getAccessories, getCameras, getTelescopes } from '@myastrosky/core/gear-catalog';
 import { ALL_DSO_TYPES } from '@myastrosky/core/targets/filters';
-import { todayISO } from '@myastrosky/core/targets/format';
+import { formatClock24, todayISO } from '@myastrosky/core/targets/format';
 import { planSearchPrefs } from '@myastrosky/core/targets/night';
 import { matchesTargetQuery } from '@myastrosky/core/targets/query';
 import { outsideLabels } from '@myastrosky/core/targets/outside';
@@ -42,6 +42,7 @@ import SearchSettingsSheet from './targets/SearchSettingsSheet.vue';
 import slidersIcon from '../icons/sliders.svg?raw';
 import shuffleIcon from '../icons/shuffle.svg?raw';
 import caretIcon from '../icons/chevron-down.svg?raw';
+import moonIcon from '@icons/moon.svg?raw';
 import plusIcon from '@icons/plus.svg?raw';
 import mapPinIcon from '@icons/map-pin.svg?raw';
 
@@ -85,6 +86,8 @@ let altRange = { minAltDeg: 0, maxAltDeg: 90 };
 const scroller = ref<HTMLElement | null>(null);
 /** Why the list is empty: the search found nothing, or it could not run (each reason has its own board). */
 const emptyKind = ref<RecommendationEmptyReason | 'no-match'>('no-match');
+/** The darkest hours searched on a night without astronomical darkness ("Pas de nuit noire" line); null otherwise. */
+const darkestHours = ref<string | null>(null);
 const typesOpen = ref(false);
 const settingsOpen = ref(false);
 const setupsOpen = ref(false);
@@ -148,6 +151,7 @@ const toRow = (s: TargetSuggestion) => ({
       maxAltDeg: s.maxAltDeg,
       scorePct: Math.round(s.score * 100),
       fovFitPct: Math.round(s.fovFitScore * 100),
+      needsMosaic: s.needsMosaic ?? false,
     },
     search.value,
   ),
@@ -245,12 +249,19 @@ async function runSearch() {
       shuffled = keepShuffle;
       foundOutside = result.outside;
       altRange = result.altRange;
+      darkestHours.value = result.noAstroDarkness
+        ? t('targets.results.noAstroDarkness', {
+            start: formatClock24(result.noAstroDarkness.start),
+            end: formatClock24(result.noAstroDarkness.end),
+          })
+        : null;
       sort();
       emptyKind.value = 'no-match';
     } else {
       found = pool = foundOutside = [];
       shuffled = false;
       sorted.value = sortedOutside.value = [];
+      darkestHours.value = null;
       emptyKind.value = result.reason;
     }
     resetVisible();
@@ -260,6 +271,7 @@ async function runSearch() {
     found = pool = foundOutside = [];
     shuffled = false;
     sorted.value = sortedOutside.value = [];
+    darkestHours.value = null;
     emptyKind.value = 'no-match';
     void showError(error);
   } finally {
@@ -352,6 +364,10 @@ function openTarget(id: string) {
         <span class="mob-btn-caret" aria-hidden="true"><AppIcon :svg="caretIcon" /></span>
       </PhoneButton>
     </div>
+    <!-- A night without astronomical darkness (board "Cibles, nuit sans obscurité totale"). -->
+    <div v-if="darkestHours" class="mob-status-line m-secondary" role="status">
+      <AppIcon :svg="moonIcon" cls="mob-icon--sm" /><span>{{ darkestHours }}</span>
+    </div>
     <IonContent :scroll-y="false">
       <div
         ref="scroller"
@@ -396,6 +412,7 @@ function openTarget(id: string) {
               :designation="row.designation"
               :type-label="row.typeLabel"
               :constellation="row.constellation"
+              :mosaic="row.mosaic"
               :rating="row.rating"
               :facts="row.facts"
               @click="openTarget(row.id)"
@@ -413,6 +430,7 @@ function openTarget(id: string) {
                 :designation="row.designation"
                 :type-label="row.typeLabel"
                 :constellation="row.constellation"
+                :mosaic="row.mosaic"
                 :rating="row.rating"
                 :facts="row.facts"
                 :warnings="row.warnings"

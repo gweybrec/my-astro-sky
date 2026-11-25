@@ -363,6 +363,16 @@ function raiseError() {
             :facts="targetFacts"
             :warnings="['Trop grande pour le champ', 'Déjà photographiée']"
           />
+          <!-- A smart telescope's target shot in mosaic mode: the mosaic badge after the constellation's. -->
+          <PhoneTargetRow
+            title="Nébuleuse d'Orion"
+            designation="M42"
+            type-label="Nébuleuse en émission"
+            constellation="ORI"
+            mosaic="Mosaïque"
+            rating="★★★★★"
+            :facts="targetFacts"
+          />
           <PhoneTargetRow
             title="Véga"
             designation="α LYR"
@@ -502,6 +512,13 @@ function raiseError() {
           />
         </IonList>
 
+        <!-- The information line under the context fields (a night without full darkness): icon and wrapping text. -->
+        <div class="mob-status-line m-secondary" role="status">
+          <AppIcon :svg="moonIcon" cls="mob-icon--sm" /><span
+            >Pas de nuit noire : cibles calculées pour les heures les plus sombres
+            (23:40–01:20)</span
+          >
+        </div>
         <PhoneSectionHeader>Puces et badges</PhoneSectionHeader>
         <div
           class="mob-form-row"
@@ -514,6 +531,7 @@ function raiseError() {
           <PhoneBadge kind="type">Galaxie</PhoneBadge>
           <PhoneBadge kind="const">Andromède</PhoneBadge>
           <PhoneBadge kind="warn">Date passée</PhoneBadge>
+          <PhoneBadge kind="mosaic">Mosaïque recommandée</PhoneBadge>
           <PhoneFilterBadge filter="Ha" />
           <PhoneFilterBadge filter="OIII" />
           <PhoneFilterBadge filter="Antlia 3nm H-Alpha Pro" />

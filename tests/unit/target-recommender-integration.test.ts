@@ -6,8 +6,8 @@
  * act as regression tests for the ranking and altitude filtering logic.
  *
  * Test invariants documented here:
- *  - At 45.17°N, M13 transits at 81.3° → excluded by maxAlt=80, included by maxAlt=90.
- *  - M92 transits at 88°  → excluded by maxAlt=80, included by maxAlt=90.
+ *  - At 45.17°N, M13 transits at 81.3° and M92 at 88°: both kept with maxAlt=80, since they spend hours
+ *    below it (an object is kept when it spends an hour within the altitude range).
  *  - M10 transits at 40.7° and M12 at 43.1° → always included when maxAlt≥44°.
  *  - With Messier+GC filter (~12 objects), all three must appear in top results.
  *  - With all-catalog GC filter (~30–50 objects), M13 ranks top-5; M10/M12 appear in top 25 (their
@@ -164,23 +164,13 @@ describe('integration — Messier GC filter, lat=45.17°N, June 12 2026', () => 
     expect(ids, 'M13 missing').toContain('M13');
   });
 
-  it('M13 (transit 81.3°) is excluded by maxAlt=80 — and only M13', () => {
+  it('M13 (transit 81.3°) and M92 (transit 87.9°) are kept with maxAlt=80, with M10 and M12', () => {
     const results = recommendTargets(mesGCs, c8Preset, june12location, june12night, limit, {
       minAltDeg: 20,
       maxAltDeg: 80,
     });
     const ids = results.map((r) => r.dso.id);
-    expect(ids, 'M13 should be excluded when maxAlt=80').not.toContain('M13');
-    expect(ids, 'M10 should still appear when maxAlt=80').toContain('M10');
-    expect(ids, 'M12 should still appear when maxAlt=80').toContain('M12');
-  });
-
-  it('M92 (transit 87.9°) is excluded by maxAlt=80', () => {
-    const ids = recommendTargets(mesGCs, c8Preset, june12location, june12night, limit, {
-      minAltDeg: 20,
-      maxAltDeg: 80,
-    }).map((r) => r.dso.id);
-    expect(ids).not.toContain('M92');
+    for (const id of ['M13', 'M92', 'M10', 'M12']) expect(ids, `${id} missing`).toContain(id);
   });
 
   it('M13 rank is 1st or 2nd among Messier GCs when maxAlt=90 (rating=5, best fov-fit)', () => {
@@ -237,12 +227,13 @@ describe('integration — all-catalog GC filter, lat=45.17°N, June 12 2026', ()
     expect(idx, 'M13 should rank in the top 3 GCs').toBeLessThanOrEqual(2);
   });
 
-  it('M13 excluded by maxAlt=80 even in all-catalog GC pool', () => {
+  it('M13 ranks in the top 3 of the all-catalog GC pool with maxAlt=80 too', () => {
     const ids = recommendTargets(allGCs, c8Preset, june12location, june12night, 50, {
       minAltDeg: 20,
       maxAltDeg: 80,
     }).map((r) => r.dso.id);
-    expect(ids).not.toContain('M13');
+    expect(ids.indexOf('M13')).toBeGreaterThanOrEqual(0);
+    expect(ids.indexOf('M13')).toBeLessThanOrEqual(2);
   });
 
   it('M10 and M12 still appear in top 20 with maxAlt=80', () => {
@@ -338,18 +329,18 @@ describe('integration — score ranking regression with C8 CLC preset', () => {
     expect(m12!.score).toBeGreaterThan(m10!.score);
   });
 
-  it('altScore for M10 (transit 40.7°, minAlt=20) ≈ 0.42 ± 0.05', () => {
+  it('altScore for M10 (transit 40.7°, minAlt=20) ≈ 0.86 ± 0.05 (by airmass, full from 50°)', () => {
     const results = recommendTargets(mesGCSubset, c8Preset, june12location, june12night, 4, {
       minAltDeg: 20,
       maxAltDeg: 90,
     });
     const m10 = results.find((r) => r.dso.id === 'M10');
     expect(m10).toBeDefined();
-    expect(m10!.altScore).toBeGreaterThan(0.35);
-    expect(m10!.altScore).toBeLessThan(0.55);
+    expect(m10!.altScore).toBeGreaterThan(0.81);
+    expect(m10!.altScore).toBeLessThan(0.91);
   });
 
-  it('M13 altScore = 1 (transit 81.3° is above the 70° cap)', () => {
+  it('M13 altScore = 1 (transit 81.3° is above 50°)', () => {
     const results = recommendTargets(mesGCSubset, c8Preset, june12location, june12night, 4, {
       minAltDeg: 20,
       maxAltDeg: 90,

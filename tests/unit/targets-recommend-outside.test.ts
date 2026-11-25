@@ -51,13 +51,14 @@ const dso = (id: string, ra: number, dec: number, majAxis = 5): DSO =>
     difficulty: 2,
   }) as DSO;
 
-// A June night at 45° N, all at RA 18h (due south around midnight): culminations near 89° (dec 44°), 21° (dec -24°), 78° (dec 33°) and 68° (dec 23°).
+// A June night at 45° N, all at RA 18h (due south around midnight): culminations near 89° (dec 44°, above the 60°
+// maximum the whole short night), 21° (dec -24°, below the 30° minimum), 55° (dec 10°) and 50° (dec 5°).
 const DSOS = [
   dso('HIGH', 270, 44.3),
   dso('LOW', 270, -24.4),
-  dso('INSIDE', 270, 33.0),
-  dso('BIG', 270, 33.0, 120), // 2° in a 1.15° frame: a 2×2 mosaic
-  dso('SHOT', 270, 22.7),
+  dso('INSIDE', 270, 10.0),
+  dso('BIG', 270, 10.0, 120), // 2° in a 1.15° frame: a 2×2 mosaic
+  dso('SHOT', 270, 5.0),
 ];
 
 const prefs = (over: Partial<TargetsPrefs> = {}): TargetsPrefs =>
@@ -67,7 +68,7 @@ const prefs = (over: Partial<TargetsPrefs> = {}): TargetsPrefs =>
     setupId: 's1',
     enabledTypes: ['EN'],
     minAltDeg: 30,
-    maxAltDeg: 80,
+    maxAltDeg: 60,
     excludePhotographed: true,
     ...over,
   }) as TargetsPrefs;
@@ -97,7 +98,7 @@ describe('the search with the objects outside the criteria', () => {
       BIG: ['too-big'],
       SHOT: ['photographed'],
     });
-    expect(r.altRange).toEqual({ minAltDeg: 30, maxAltDeg: 80 });
+    expect(r.altRange).toEqual({ minAltDeg: 30, maxAltDeg: 60 });
   });
 
   it('finds the same targets, and nothing apart, when the objects outside are not asked for', () => {
@@ -122,6 +123,17 @@ describe('the search with the objects outside the criteria', () => {
   it('applies the default altitude range when none is set', () => {
     const r = run(prefs({ minAltDeg: undefined, maxAltDeg: undefined }));
     expect(r.altRange).toEqual({ minAltDeg: 20, maxAltDeg: 80 });
+  });
+});
+
+describe('a night without astronomical darkness', () => {
+  it('is reported with the darkest hours searched, and not on a night that gets dark', () => {
+    expect(run(prefs()).noAstroDarkness).toBeNull(); // 45° N in June: a short dark night
+    const north = run(prefs({ lat: 60 })); // 60° N in June: the sun stays above −18°
+    expect(north.noAstroDarkness).not.toBeNull();
+    expect(north.noAstroDarkness!.end.getTime()).toBeGreaterThan(
+      north.noAstroDarkness!.start.getTime(),
+    );
   });
 });
 

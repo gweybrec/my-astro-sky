@@ -4,6 +4,7 @@ import {
   altitudeAtDeg,
   transitLstHours,
   maxAltDuringWindow,
+  altitudeOverWindow,
   transitTonight,
   mightBeVisible,
   sampleAltCurve,
@@ -133,6 +134,28 @@ describe('maxAltDuringWindow', () => {
     const { atDate } = maxAltDuringWindow(84, -1.2, 48.85, 2.35, windowStart, windowEnd);
     expect(atDate.getTime()).toBeGreaterThanOrEqual(windowStart.getTime());
     expect(atDate.getTime()).toBeLessThanOrEqual(windowEnd.getTime());
+  });
+});
+
+describe('altitudeOverWindow', () => {
+  const start = new Date('2024-01-15T19:00:00Z');
+  const end = new Date('2024-01-16T05:00:00Z');
+
+  it('counts the minutes spent within the altitude range', () => {
+    // Orion's belt from Paris peaks near 41°: a few hours above 20°, none above 45°.
+    const all = altitudeOverWindow(84, -1.2, 48.85, 2.35, start, end, -90, 90);
+    expect(all.minutesInRange).toBe(610); // 61 samples of 10 min over the 10 h window, ends included
+    const above20 = altitudeOverWindow(84, -1.2, 48.85, 2.35, start, end, 20, 90).minutesInRange;
+    expect(above20).toBeGreaterThan(180);
+    expect(above20).toBeLessThan(600);
+    expect(altitudeOverWindow(84, -1.2, 48.85, 2.35, start, end, 45, 90).minutesInRange).toBe(0);
+  });
+
+  it('agrees with maxAltDuringWindow on the peak', () => {
+    const a = altitudeOverWindow(84, -1.2, 48.85, 2.35, start, end, 20, 80);
+    const b = maxAltDuringWindow(84, -1.2, 48.85, 2.35, start, end);
+    expect(a.maxAltDeg).toBe(b.maxAltDeg);
+    expect(a.atDate.getTime()).toBe(b.atDate.getTime());
   });
 });
 

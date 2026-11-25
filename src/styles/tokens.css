@@ -301,6 +301,10 @@
   --target-const-bg: rgba(30, 80, 50, 0.3);
   --target-const-border: rgba(50, 120, 70, 0.35);
   --target-const-text: #6a8;
+  /* A target a smart telescope shoots in its mosaic mode: violet, a colour no other badge uses. */
+  --target-mosaic-text: #b9a2f5;
+  --target-mosaic-bg: rgba(60, 35, 100, 0.45);
+  --target-mosaic-border: rgba(185, 162, 245, 0.5);
   --target-type-bg: rgba(20, 18, 14, 0.8);
   --target-type-border: rgba(192, 120, 48, 0.2);
   --target-fov-fill-start: rgba(192, 120, 48, 0.6);

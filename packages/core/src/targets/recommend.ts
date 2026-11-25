@@ -1,4 +1,4 @@
-import { dateToJD, lstHours } from '../astro-time';
+import { dateToJD, lstHours, twilightWindow } from '../astro-time';
 import { DSO_CATALOGS_ALL, getDSOs } from '../catalog/dso-registry';
 import { getConstellationInfos } from '../catalog/star-registry';
 import type { HorizonProfile } from '../horizon-io';
@@ -55,6 +55,11 @@ export type RecommendationResult =
       /** The altitude range searched, defaults applied (what the "too low / too high" warnings compare with). */
       altRange: { minAltDeg: number; maxAltDeg: number };
       preset: GearPreset;
+      /**
+       * Set when the night has no astronomical darkness (the sun stays above −18°): the darkest hours searched instead,
+       * for the "Pas de nuit noire" line.
+       */
+      noAstroDarkness: { start: Date; end: Date } | null;
       location: ObserverLocation;
       dateNight: Date;
       dateStr: string;
@@ -135,6 +140,9 @@ function prepare(
   }
 
   const altRange = { minAltDeg: prefs.minAltDeg ?? 20, maxAltDeg: prefs.maxAltDeg ?? 80 };
+  // A night whose sun stays above −18° (a summer night far north): the search falls back to the darkest hours.
+  const dark = twilightWindow(dateNight, lat, lon);
+  const noAstroDarkness = dark && dark.limitDeg === -18 ? null : nightWindow(location, dateNight);
   const recommender = createRecommender(preset, location, dateNight, {
     allowOversized: prefs.includeOversized ?? false,
     ...altRange,
@@ -178,7 +186,17 @@ function prepare(
     const outside = scored
       .filter((s) => s.outside && inSkyArea(s))
       .sort((a, b) => b.score - a.score);
-    return { kind: 'ok', suggestions, outside, altRange, preset, location, dateNight, dateStr };
+    return {
+      kind: 'ok',
+      suggestions,
+      outside,
+      altRange,
+      preset,
+      noAstroDarkness,
+      location,
+      dateNight,
+      dateStr,
+    };
   };
 
   return { kind: 'ready', pool, recommender, finish };

@@ -27,6 +27,9 @@
   --accent-danger: rgba(200, 70, 70, 0.85);
   --color-danger: #c77;
   --status-success-border: rgba(50, 120, 60, 0.3);
+  --target-mosaic-text: #b9a2f5;
+  --target-mosaic-bg: rgba(60, 35, 100, 0.45);
+  --target-mosaic-border: rgba(185, 162, 245, 0.5);
   --status-success-bg: rgba(30, 80, 40, 0.3);
   --status-success-text: #8c8;
   --status-error-bg: rgba(100, 30, 30, 0.3);
@@ -254,6 +257,9 @@
   --accent-danger: rgba(200, 70, 70, 0.85);
   --color-danger: #c77;
   --status-success-border: rgba(50, 120, 60, 0.3);
+  --target-mosaic-text: #b9a2f5;
+  --target-mosaic-bg: rgba(60, 35, 100, 0.45);
+  --target-mosaic-border: rgba(185, 162, 245, 0.5);
   --status-success-bg: rgba(30, 80, 40, 0.3);
   --status-success-text: #8c8;
   --status-error-bg: rgba(100, 30, 30, 0.3);
@@ -481,6 +487,9 @@
   --accent-danger: rgba(200, 70, 70, 0.85);
   --color-danger: #c77;
   --status-success-border: rgba(50, 120, 60, 0.3);
+  --target-mosaic-text: #b9a2f5;
+  --target-mosaic-bg: rgba(60, 35, 100, 0.45);
+  --target-mosaic-border: rgba(185, 162, 245, 0.5);
   --status-success-bg: rgba(30, 80, 40, 0.3);
   --status-success-text: #8c8;
   --status-error-bg: rgba(100, 30, 30, 0.3);
@@ -708,6 +717,9 @@
   --accent-danger: rgba(132, 0, 0, 0.85);
   --color-danger: #a40000;
   --status-success-border: rgba(122, 0, 0, 0.3);
+  --target-mosaic-text: #e01010;
+  --target-mosaic-bg: rgba(90, 0, 0, 0.45);
+  --target-mosaic-border: rgba(200, 0, 0, 0.5);
   --status-success-bg: rgba(81, 0, 0, 0.3);
   --status-success-text: #d80000;
   --status-error-bg: rgba(62, 0, 0, 0.3);

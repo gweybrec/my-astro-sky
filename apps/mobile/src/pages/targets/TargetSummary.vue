@@ -26,7 +26,8 @@ import filterIcon from '../../icons/filter.svg?raw';
 // d'une cible": its designation, type and constellation, its figures as facts, its
 // altitude over the night (with the plan's observation windows as bands) and its suggested filters (board
 // "Plan, cible, filtres suggérés": the desktop's recipe, in a sheet). The equipment is the plan's or the search's,
-// shown where it is chosen, not here.
+// shown where it is chosen, not here. A target a smart telescope shoots in its mosaic mode has the "Mosaïque
+// recommandée" badge on a line of its own under the designation (board "Cibles, détail d'une cible, mosaïque").
 const props = defineProps<{
   dso: DSO;
   /** The target over the night: its altitude curve, highest point, best time and Moon distance. */
@@ -125,6 +126,9 @@ const suggestedFilters = computed(() =>
       <PhoneBadge v-if="dso.constellation" kind="const">{{
         dso.constellation.toUpperCase()
       }}</PhoneBadge>
+    </div>
+    <div v-if="scores?.needsMosaic" class="mob-row-badges">
+      <PhoneBadge kind="mosaic">{{ t('targets.mosaicRecommended') }}</PhoneBadge>
     </div>
   </div>
   <PhoneFacts :facts="facts" />

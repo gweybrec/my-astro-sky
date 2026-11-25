@@ -4,7 +4,13 @@ import {
   recommendTargets,
   scoreDso,
   fitsInFrame,
+  frameFill,
+  FIT_TOLERANCE,
+  SMART_FIT_TOLERANCE,
+  fitTolerance,
   difficultyFactor,
+  needsSmartMosaic,
+  ratingFactor,
   oversizePanels,
   MAX_OVERSIZE_PANELS,
 } from '@myastrosky/core/target-recommender';
@@ -124,26 +130,40 @@ describe('recommendTargets scoring — individual scores via TargetSuggestion ou
     }
   });
 
-  it('diversity cap: max 2 of same DSO type when alternatives exist', () => {
-    // 3 galaxies + 3 emission nebulae, all well-placed (dec=45°, winter night)
-    // limit=4: diversity cap yields ≤2 Gx + ≤2 EN = 4 total, no top-up needed
+  it('ranks by score alone, with no quota per object type', () => {
+    // Three fine galaxies and three weak (1★) nebulae: the galaxies take the top three.
     const galaxies = [1, 2, 3].map((i) =>
-      makeDSO({ id: `GX${i}`, type: 'Gx' as any, dec: 45, ra: 120 + i, mag: 7.0, majAxis: 20 }),
+      makeDSO({
+        id: `GX${i}`,
+        type: 'Gx' as any,
+        dec: 45,
+        ra: 120 + i,
+        mag: 7.0,
+        majAxis: 20,
+        rating: 5,
+      }),
     );
     const nebulae = [1, 2, 3].map((i) =>
-      makeDSO({ id: `EN${i}`, type: 'EN' as any, dec: 45, ra: 124 + i, mag: 7.0, majAxis: 20 }),
+      makeDSO({
+        id: `EN${i}`,
+        type: 'EN' as any,
+        dec: 45,
+        ra: 124 + i,
+        mag: 7.0,
+        majAxis: 20,
+        rating: 1,
+      }),
     );
     const results = recommendTargets(
-      [...galaxies, ...nebulae],
+      [...nebulae, ...galaxies],
       testPreset,
       testLocation,
       winterNight,
       4,
     );
-    if (results.length >= 2) {
-      const gxCount = results.filter((r) => r.dso.type === 'Gx').length;
-      expect(gxCount).toBeLessThanOrEqual(2);
-    }
+    expect(results.slice(0, 3).every((r) => r.dso.type === 'Gx')).toBe(true);
+    for (let i = 1; i < results.length; i++)
+      expect(results[i].score).toBeLessThanOrEqual(results[i - 1].score);
   });
 
   it('all score fields are in [0, 1]', () => {
@@ -527,20 +547,22 @@ describe('recommendTargets — maxAltDeg option', () => {
     mag: 6.52,
   });
 
-  it('M13 (transit ≈81°) is excluded when maxAltDeg=80', () => {
-    const results = recommendTargets([m13], testPreset, june12location, june12night, 10, {
+  it('keeps M13 (transit ≈81°) and M92 (transit ≈88°) with maxAltDeg=80: they spend hours below it', () => {
+    const results = recommendTargets([m13, m92], testPreset, june12location, june12night, 10, {
       minAltDeg: 20,
       maxAltDeg: 80,
     });
-    expect(results.map((r) => r.dso.id)).not.toContain('M13');
+    expect(results.map((r) => r.dso.id).sort()).toEqual(['M13', 'M92']);
   });
 
-  it('M92 (transit ≈88°) is excluded when maxAltDeg=80', () => {
-    const results = recommendTargets([m92], testPreset, june12location, june12night, 10, {
+  it('leaves out an object above the maximum altitude the whole night', () => {
+    // Near the pole from 45° N: about 40–50° all night, above a 35° maximum.
+    const polar = makeDSO({ id: 'POLAR', ra: 30, dec: 85, type: 'GC' as any, majAxis: 10, mag: 6 });
+    const results = recommendTargets([polar], testPreset, june12location, june12night, 10, {
       minAltDeg: 20,
-      maxAltDeg: 80,
+      maxAltDeg: 35,
     });
-    expect(results.map((r) => r.dso.id)).not.toContain('M92');
+    expect(results).toHaveLength(0);
   });
 
   it('M10 (transit ≈41°) is included when maxAltDeg=80', () => {
@@ -604,8 +626,8 @@ describe('altScore formula uses minAlt', () => {
 
 // ─── Group 8: diversity cap with limit=5000 is a no-op ───────────────────────
 
-describe('diversity cap with limit=5000', () => {
-  it('all 4 GC candidates appear when limit=5000 (top-up restores overflow)', () => {
+describe('ranking with limit=5000', () => {
+  it('all 4 GC candidates appear when limit=5000', () => {
     const june12location = { latDeg: 45.17, lonDeg: 5.0 };
     const june12night = new Date('2026-06-12T12:00:00Z');
     const gcObjects = [
@@ -618,36 +640,7 @@ describe('diversity cap with limit=5000', () => {
       minAltDeg: 20,
       maxAltDeg: 90,
     });
-    expect(results).toHaveLength(4); // all 4 should appear (2 in diverse, 2 in top-up)
-  });
-
-  it('diversity cap limits to 2 of each type when limit is small', () => {
-    // limit=3: diversity cap gives 2 GC + 1 OC, not 3 GC
-    const june12location = { latDeg: 45.17, lonDeg: 5.0 };
-    const june12night = new Date('2026-06-12T12:00:00Z');
-    const gcObjects = [
-      makeDSO({ id: 'GC1', ra: 250.423, dec: 36.461, type: 'GC' as any, majAxis: 16.5, mag: 5.8 }),
-      makeDSO({ id: 'GC2', ra: 254.287, dec: -4.099, type: 'GC' as any, majAxis: 9.3, mag: 4.98 }),
-      makeDSO({ id: 'GC3', ra: 251.811, dec: -1.948, type: 'GC' as any, majAxis: 11.1, mag: 6.07 }),
-    ];
-    const ocObject = makeDSO({
-      id: 'OC1',
-      ra: 282.8,
-      dec: -6.3,
-      type: 'OC' as any,
-      majAxis: 14,
-      mag: 5.8,
-    });
-    const results = recommendTargets(
-      [...gcObjects, ocObject],
-      testPreset,
-      june12location,
-      june12night,
-      3,
-      { minAltDeg: 20, maxAltDeg: 90 },
-    );
-    const gcCount = results.filter((r) => r.dso.type === 'GC').length;
-    expect(gcCount).toBeLessThanOrEqual(2);
+    expect(results).toHaveLength(4);
   });
 });
 
@@ -671,11 +664,42 @@ describe('scoreDso — standalone single-object scoring (used by plans)', () => 
     expect(difficultyFactor(makeDSO({ id: 'Y', difficulty: null }))).toBe(1);
   });
 
-  it('caps the brightness of a bright-magnitude object by its difficulty', () => {
-    const hard = makeDSO({ id: 'HARD', mag: 5, difficulty: 5 }); // large and diffuse despite its magnitude
-    expect(scoreDso(hard, testPreset, 70).brightnessScore).toBe(0);
+  it('ranks a finer target above a weaker one placed and framed the same', () => {
+    const scores = [5, 4, 3, 2, 1].map(
+      (rating) => scoreDso(makeDSO({ id: `R${rating}`, rating }), testPreset, 70).score,
+    );
+    for (let i = 1; i < scores.length; i++) expect(scores[i]).toBeLessThan(scores[i - 1]);
+    expect(ratingFactor(makeDSO({ id: 'A', rating: 1 }))).toBe(0.6);
+    expect(ratingFactor(makeDSO({ id: 'B', rating: null }))).toBe(1);
+  });
+
+  it('gives the full altitude score from 50°', () => {
+    const dso = makeDSO({ id: 'ALT' });
+    expect(scoreDso(dso, testPreset, 50).altScore).toBe(1);
+    // By airmass: 35° keeps about 0.73 of the score (2.92 at 20°, 1.74 at 35°, 1.31 at 50°).
+    expect(scoreDso(dso, testPreset, 35).altScore).toBeCloseTo(0.73, 2);
+    expect(scoreDso(dso, testPreset, 25).altScore).toBeLessThan(0.4);
+    expect(scoreDso(dso, testPreset, 55, { minAltDeg: 60 }).altScore).toBe(0); // below the minimum
+  });
+
+  it('scores brightness by magnitude when known, by difficulty when not', () => {
+    const hard = makeDSO({ id: 'HARD', mag: 5, difficulty: 5 }); // bright magnitude, held down by the factor
+    const easy = makeDSO({ id: 'EASY', mag: 5, difficulty: 1 });
+    expect(scoreDso(hard, testPreset, 70).brightnessScore).toBe(
+      scoreDso(easy, testPreset, 70).brightnessScore,
+    );
+    expect(scoreDso(hard, testPreset, 70).score).toBeCloseTo(
+      scoreDso(easy, testPreset, 70).score * 0.6,
+      6,
+    );
     const unknown = makeDSO({ id: 'UNK', mag: null, difficulty: null });
     expect(scoreDso(unknown, testPreset, 70).brightnessScore).toBe(0.4);
+  });
+
+  it('scores the framing with the camera turned: a long object along the long side', () => {
+    // A 2.4° × 1.5° object in the 2.55° × 1.71° frame fits, so it is not scored as too large.
+    const fitting = makeDSO({ id: 'FIT', majAxis: 144, minAxis: 90 });
+    expect(scoreDso(fitting, testPreset, 70).fovFitScore).toBeGreaterThanOrEqual(0.7);
   });
 
   it('scores an object that recommendTargets would filter out (faint, sizeless)', () => {
@@ -693,7 +717,9 @@ describe('scoreDso — standalone single-object scoring (used by plans)', () => 
     const dso = makeDSO({ id: 'M', majAxis: 30, mag: 6 });
     const r = scoreDso(dso, testPreset, 70);
     const expected =
-      (0.45 * r.altScore + 0.35 * r.fovFitScore + 0.2 * r.brightnessScore) * difficultyFactor(dso);
+      (0.45 * r.altScore + 0.35 * r.fovFitScore + 0.2 * r.brightnessScore) *
+      difficultyFactor(dso) *
+      ratingFactor(dso);
     expect(r.score).toBeCloseTo(expected, 6);
   });
 
@@ -740,10 +766,13 @@ describe('recommendTargets — multiple stars (type MS)', () => {
     expect(res.length).toBe(1);
   });
 
-  it('ignores the upper altitude cap that would exclude an equivalent near-zenith DSO', () => {
-    const asDso = makeDSO({ ...nearZenith, id: 'DSO', majAxis: 30 });
+  it('ignores the upper altitude cap that would exclude an equivalent DSO', () => {
+    // Near the pole from Paris: about 44–54° all night, above a 40° maximum for a DSO.
+    const polar = { ra: 120, dec: 85, mag: 2.0 };
+    const capped = { minAltDeg: 20, maxAltDeg: 40 };
+    const asDso = makeDSO({ ...polar, id: 'DSO', majAxis: 30 });
     const asMs = makeDSO({
-      ...nearZenith,
+      ...polar,
       id: 'MS2',
       majAxis: null,
       minAxis: null,
@@ -752,13 +781,13 @@ describe('recommendTargets — multiple stars (type MS)', () => {
       type: 'MS' as any,
       multiplicity: { components: 2, sep: '20' } as any,
     });
-    // The DSO transits above the 80° cap → excluded; the star is kept (overhead is fine).
+    // The DSO stays above the cap all night → excluded; the star is kept (overhead is fine).
     expect(
-      recommendTargets([asDso], testPreset, testLocation, winterNight, 5000, opts).length,
+      recommendTargets([asDso], testPreset, testLocation, winterNight, 5000, capped).length,
     ).toBe(0);
-    expect(recommendTargets([asMs], testPreset, testLocation, winterNight, 5000, opts).length).toBe(
-      1,
-    );
+    expect(
+      recommendTargets([asMs], testPreset, testLocation, winterNight, 5000, capped).length,
+    ).toBe(1);
   });
 });
 
@@ -803,18 +832,54 @@ describe('recommendTargets — objects larger than the frame', () => {
     expect(ids).toEqual(['LONG']);
   });
 
-  it('fitsInFrame checks the long axis against the long side and the short one against the short side', () => {
-    expect(fitsInFrame(120, 60, 1.5, 2)).toBe(true);
-    expect(fitsInFrame(150, 60, 1.5, 2)).toBe(false); // 2.5° > long side
-    expect(fitsInFrame(120, 100, 1.5, 2)).toBe(false); // 1.67° wide > short side
-    expect(fitsInFrame(100, null, 1.5, 2)).toBe(false); // round 1.67° > short side
-    expect(fitsInFrame(90, null, 1.5, 2)).toBe(true);
+  it('fitsInFrame turns the object to its best angle, along the diagonal when long and thin', () => {
+    // A 2° × 1.5° frame: its diagonal is 2.5°.
+    expect(fitsInFrame(120, 60, 1.5, 2)).toBe(true); // 2° × 1° along the long side
+    expect(fitsInFrame(150, 15, 1.5, 2)).toBe(true); // 2.5° × 0.25°: longer than the long side, fits the diagonal
+    expect(fitsInFrame(200, 15, 1.5, 2)).toBe(false); // 3.3° × 0.25°: longer than the diagonal too
+    expect(fitsInFrame(90, null, 1.5, 2)).toBe(true); // round 1.5°: just touches the short side
+  });
+
+  it('gives a smart telescope a quarter of margin, other setups 10 %', () => {
+    expect(fitTolerance({ builtIn: true } as GearPreset)).toBe(SMART_FIT_TOLERANCE);
+    expect(fitTolerance({ builtIn: false } as GearPreset)).toBe(FIT_TOLERANCE);
+    expect(SMART_FIT_TOLERANCE).toBe(1.25);
+    // Round 1.8° in a 1.5° short side: 20 % too large, fits only with the smart telescope's margin.
+    expect(fitsInFrame(108, null, 1.5, 2)).toBe(false);
+    expect(fitsInFrame(108, null, 1.5, 2, SMART_FIT_TOLERANCE)).toBe(true);
+  });
+
+  it('fitsInFrame lets an object up to 10 % larger than the frame through, cut only at its edges', () => {
+    expect(frameFill(96, null, 1.5, 2)).toBeCloseTo(1.067, 2); // round 1.6° in the 1.5° short side
+    expect(fitsInFrame(96, null, 1.5, 2)).toBe(true);
+    expect(fitsInFrame(102, null, 1.5, 2)).toBe(false); // round 1.7°: 13 % too large
+    expect(FIT_TOLERANCE).toBe(1.1);
+  });
+
+  it('counts M31 (diagonal) and the Pleiades (a quarter larger) as Seestar S50 mosaic targets, not the Heart', () => {
+    // The S50's mosaic area is 2.57° × 1.47° (diagonal 2.96°); M31 is 2.96° × 1.16°.
+    const s50: GearPreset = {
+      apertureMm: 50,
+      focalLengthMm: 250,
+      sensorWidthMm: 5.6,
+      sensorHeightMm: 3.2,
+      pixelSizeUm: 2.9,
+      mono: false,
+      builtIn: true,
+      hasDualBandFilter: true,
+      smartMosaic: { scale: 2 },
+    };
+    expect(needsSmartMosaic(177.8, 69.7, s50)).toBe(true);
+    expect(needsSmartMosaic(110, null, s50)).toBe(true); // Pleiades, 1.8° round: within a smart telescope's 25 %
+    expect(needsSmartMosaic(150, null, s50)).toBe(false); // Heart, 2.5° round
   });
 });
 
 describe('objects outside the criteria (keepOutside)', () => {
   // Near Orion on a winter night in Paris: dec -1.2° culminates at about 40°.
   const orion = makeDSO({ id: 'ORI', majAxis: 20, minAxis: 15 });
+  // Near the pole: about 44–54° all night, so above a 40° maximum the whole time.
+  const polar = makeDSO({ id: 'POLAR', ra: 84, dec: 85, majAxis: 20, minAxis: 15 });
   const collect = (dsos: DSO[], opts: Parameters<typeof createRecommender>[3]) => {
     const r = createRecommender(testPreset, testLocation, winterNight, opts);
     const collected = r.collect(dsos);
@@ -822,10 +887,15 @@ describe('objects outside the criteria (keepOutside)', () => {
   };
 
   it('leaves out an object above the maximum altitude, or tags it too-high when asked', () => {
-    expect(collect([orion], { maxAltDeg: 30 }).collected).toHaveLength(0);
-    const { collected, ranked } = collect([orion], { maxAltDeg: 30, keepOutside: true });
+    expect(collect([polar], { maxAltDeg: 40 }).collected).toHaveLength(0);
+    const { collected, ranked } = collect([polar], { maxAltDeg: 40, keepOutside: true });
     expect(collected.map((c) => c.outside)).toEqual([['too-high']]);
     expect(ranked).toHaveLength(0);
+  });
+
+  it('keeps an object peaking above the maximum altitude for the hours it is below it', () => {
+    // Culminates near 40°: more than an hour between 20° and 35°.
+    expect(collect([orion], { maxAltDeg: 35 }).collected).toHaveLength(1);
   });
 
   it('tags an object below the minimum altitude too-low', () => {
@@ -839,9 +909,9 @@ describe('objects outside the criteria (keepOutside)', () => {
   });
 
   it('tags an object larger than the frame too-big, with the altitude reasons too', () => {
-    const big = makeDSO({ id: 'BIG', majAxis: 600, minAxis: 600 });
+    const big = makeDSO({ id: 'BIG', dec: 85, majAxis: 600, minAxis: 600 });
     expect(collect([big], {}).collected).toHaveLength(0);
-    const { collected } = collect([big], { maxAltDeg: 30, keepOutside: true });
+    const { collected } = collect([big], { maxAltDeg: 40, keepOutside: true });
     expect(collected.map((c) => c.outside)).toEqual([['too-big', 'too-high']]);
     expect(collected[0].fovFitScore).toBeGreaterThanOrEqual(0);
   });
@@ -852,5 +922,61 @@ describe('objects outside the criteria (keepOutside)', () => {
     expect(ranked.map((c) => c.dso.id)).toEqual(['ORI']);
     expect(ranked[0].outside).toBeUndefined();
     expect(collected).toHaveLength(2);
+  });
+});
+
+describe('smart telescopes: targets that need the mosaic mode', () => {
+  // Seestar S50: 1.28° × 0.73° frame, its mosaic mode doubles each side (2.57° × 1.47°).
+  const seestar: GearPreset = {
+    apertureMm: 50,
+    focalLengthMm: 250,
+    sensorWidthMm: 5.6,
+    sensorHeightMm: 3.2,
+    pixelSizeUm: 2.9,
+    mono: false,
+    builtIn: true,
+    hasDualBandFilter: true,
+    smartMosaic: { scale: 2 },
+  };
+  // Vespera II: 2.57° × 1.44° frame, a mosaic up to a 4.33° long edge and 10.56 deg².
+  const vespera: GearPreset = {
+    ...seestar,
+    sensorWidthMm: 11.2,
+    sensorHeightMm: 6.3,
+    smartMosaic: { max_long_edge_deg: 4.33, max_area_deg2: 10.56 },
+  };
+
+  it('is true only for an object larger than the frame and within the mosaic area', () => {
+    expect(needsSmartMosaic(90, 60, seestar)).toBe(true); // M42: 1.5° × 1°
+    expect(needsSmartMosaic(20, 15, seestar)).toBe(false); // fits the frame
+    expect(needsSmartMosaic(180, 180, seestar)).toBe(false); // 3°: beyond the mosaic
+    expect(needsSmartMosaic(90, 60, { ...seestar, smartMosaic: undefined })).toBe(false);
+    expect(needsSmartMosaic(null, null, seestar)).toBe(false);
+  });
+
+  it('holds the Vespera to its area cap as well as its long edge', () => {
+    expect(needsSmartMosaic(240, 150, vespera)).toBe(true); // 4° × 2.5° = 10 deg²
+    expect(needsSmartMosaic(250, 250, vespera)).toBe(false); // 17 deg²
+  });
+
+  it('keeps such a target in the search, marked, without "too big"', () => {
+    const m42 = makeDSO({ id: 'M42', majAxis: 90, minAxis: 60, mag: 4, rating: 5, difficulty: 1 });
+    const r = createRecommender(seestar, testLocation, winterNight, { keepOutside: true });
+    const [s] = r.collect([m42]);
+    expect(s.needsMosaic).toBe(true);
+    expect(s.outside).toBeUndefined();
+    expect(r.finish([s], 10)).toHaveLength(1);
+    // A target that fits the frame is not marked.
+    const [small] = r.collect([makeDSO({ id: 'SMALL', majAxis: 20, minAxis: 15 })]);
+    expect(small.needsMosaic).toBeUndefined();
+  });
+
+  it('reports it from scoreDso too, for the target detail', () => {
+    expect(
+      scoreDso(makeDSO({ id: 'M42', majAxis: 90, minAxis: 60 }), seestar, 60).needsMosaic,
+    ).toBe(true);
+    expect(scoreDso(makeDSO({ id: 'S', majAxis: 20, minAxis: 15 }), seestar, 60).needsMosaic).toBe(
+      false,
+    );
   });
 });

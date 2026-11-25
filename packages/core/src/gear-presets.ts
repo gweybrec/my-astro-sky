@@ -4,6 +4,8 @@
  * stored or edited by the user directly.
  */
 
+import type { SmartMosaicCapability } from './mosaic';
+
 export interface GearPreset {
   /** Objective aperture in mm */
   apertureMm: number;
@@ -23,6 +25,8 @@ export interface GearPreset {
   hasDualBandFilter: boolean;
   /** Maximum sub-exposure enforced by the telescope firmware (smart scopes only) */
   maxSubSec?: number;
+  /** A smart telescope's mosaic mode (one frame it enlarges); absent without one. */
+  smartMosaic?: SmartMosaicCapability;
 }
 
 // ─── Derived helpers ─────────────────────────────────────────────────────────

@@ -1888,6 +1888,26 @@ svg.mob-icon--sm,
   background: var(--status-success-bg);
   border-color: var(--status-success-border);
 }
+/* `.mob-badge--mosaic`: a target larger than a smart telescope's frame, shot in its mosaic mode ("Mosaïque"), in a
+   colour of its own beside the type and constellation badges. */
+.mob-badge--mosaic {
+  flex: none;
+  color: var(--target-mosaic-text);
+  background: var(--target-mosaic-bg);
+  border-color: var(--target-mosaic-border);
+}
+/* `.mob-status-line`: slim, non-interactive line under the top bar (a night without full darkness). */
+.mob-status-line {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--space-14);
+  padding: var(--space-2) var(--mobile-gutter);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-panel);
+  color: var(--text-secondary);
+}
 .mob-row-badges {
   display: flex;
   flex-wrap: wrap;

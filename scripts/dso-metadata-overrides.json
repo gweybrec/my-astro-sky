@@ -407,7 +407,8 @@
     "constellation": "Gem",
     "rating": 4,
     "difficulty": 1,
-    "catalogs": ["M35", "NGC2168", "Cr 82", "C 0605+243"]
+    "catalogs": ["M35", "NGC2168", "Cr 82", "C 0605+243"],
+    "mag": 5.3
   },
   {
     "id": "M34",
@@ -705,7 +706,9 @@
       "es": "Nebulosa del Águila",
       "de": "Adlernebel"
     },
-    "type": "EN"
+    "type": "EN",
+    "majAxis": 35,
+    "minAxis": 28
   },
   {
     "id": "vdB10",
@@ -766,7 +769,8 @@
       "en": "Globular Cluster M71",
       "es": "Cúmulo globular M71",
       "de": "Kugelsternhaufen M71"
-    }
+    },
+    "mag": 8.19
   },
   {
     "id": "NGC7160",
@@ -787,7 +791,8 @@
       "es": "Cúmulo globular del Sagitario",
       "de": "Schützenkugelhaufen"
     },
-    "majAxis": 24
+    "majAxis": 24,
+    "mag": 5.1
   },
   {
     "id": "vdB133",
@@ -1532,7 +1537,8 @@
       "es": "Cúmulo globular M62",
       "de": "Kugelsternhaufen M62"
     },
-    "majAxis": 14
+    "majAxis": 14,
+    "mag": 6.45
   },
   {
     "id": "M103",
@@ -2284,7 +2290,8 @@
       "en": "Globular Cluster M69",
       "es": "Cúmulo globular M69",
       "de": "Kugelsternhaufen M69"
-    }
+    },
+    "mag": 7.64
   },
   {
     "id": "M51",
@@ -2783,7 +2790,8 @@
       "en": "Globular Cluster M107",
       "es": "Cúmulo globular M107",
       "de": "Kugelsternhaufen M107"
-    }
+    },
+    "mag": 7.93
   },
   {
     "id": "M86",
@@ -3058,7 +3066,8 @@
       "en": "Globular Cluster M70",
       "es": "Cúmulo globular M70",
       "de": "Kugelsternhaufen M70"
-    }
+    },
+    "mag": 7.87
   },
   {
     "id": "NGC3115",

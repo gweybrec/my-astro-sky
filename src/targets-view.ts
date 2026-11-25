@@ -88,6 +88,7 @@ import trashSvg from './icons/trash.svg?raw';
 import archiveSvg from './icons/archive.svg?raw';
 import unarchiveSvg from './icons/unarchive.svg?raw';
 import penSvg from './icons/pen.svg?raw';
+import moonSvg from './icons/moon.svg?raw';
 import mapPinSvg from './icons/map-pin.svg?raw';
 import listPlusSvg from './icons/list-plus.svg?raw';
 import targetSvg from './icons/target.svg?raw';
@@ -1014,6 +1015,8 @@ export class TargetsView {
   private lastPool: TargetSuggestion[] = [];
   /** The objects outside the criteria (altitude, size, photographed), listed after the targets, dimmed. */
   private lastOutside: TargetSuggestion[] = [];
+  /** The darkest hours searched on a night without astronomical darkness; null on a night that gets dark. */
+  private lastNoAstroDarkness: { start: Date; end: Date } | null = null;
   /** The altitude range of the last search, which the "too low / too high" warnings print. */
   private lastAltRange = { minAltDeg: 20, maxAltDeg: 80 };
   private lastSuggestions: TargetSuggestion[] = [];
@@ -2125,6 +2128,7 @@ export class TargetsView {
       const { suggestions, preset, location, dateNight } = result;
       this.lastOutside = result.outside;
       this.lastAltRange = result.altRange;
+      this.lastNoAstroDarkness = result.noAstroDarkness;
 
       allGenBtns.forEach((b) => {
         b.disabled = false;
@@ -2268,6 +2272,23 @@ export class TargetsView {
     toolbar.appendChild(paginationEl);
     el.appendChild(toolbar);
 
+    // A night without astronomical darkness: one information line under the toolbar, with the darkest hours searched.
+    if (this.lastNoAstroDarkness) {
+      const darkness = document.createElement('div');
+      darkness.className = 'targets-darkness-line';
+      darkness.setAttribute('role', 'status');
+      const icon = document.createElement('span');
+      icon.className = 'targets-darkness-icon';
+      icon.innerHTML = moonSvg;
+      const text = document.createElement('span');
+      text.textContent = t('targets.results.noAstroDarkness', {
+        start: formatTime(this.lastNoAstroDarkness.start),
+        end: formatTime(this.lastNoAstroDarkness.end),
+      });
+      darkness.append(icon, text);
+      el.appendChild(darkness);
+    }
+
     pageSlice.forEach((s, i) => {
       const absoluteIndex = this.currentPage * pageSize + i;
       if (absoluteIndex === sortedTargets.length) {
@@ -2361,6 +2382,17 @@ export class TargetsView {
       const constInfo = getConstellationInfos().find((c) => c.id === dso.constellation);
       if (constInfo) constEl.title = constInfo.name;
       chipsRow.appendChild(constEl);
+    }
+    // Larger than a smart telescope's frame, within its mosaic mode: the user enlarges the frame to suit. The short
+    // label keeps it on the chips' row; the full wording is its tooltip.
+    if (s.needsMosaic) {
+      chipsRow.appendChild(
+        Object.assign(document.createElement('div'), {
+          className: 'targets-card-mosaic',
+          textContent: t('targets.mosaic'),
+          title: t('targets.mosaicRecommended'),
+        }),
+      );
     }
     header.appendChild(chipsRow);
     // Outside the search's criteria: the card is dimmed, with one warning chip per criterion missed under the chips.

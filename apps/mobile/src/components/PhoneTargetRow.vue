@@ -7,7 +7,8 @@ import PhoneFacts from './PhoneFacts.vue';
 // stars at its right end, then the designation with the type and constellation badges, then the figures as compact
 // facts (a deep-sky object) or the magnitude line (a star). A row is a tap target. A target outside the search's criteria
 // (`warnings`, board "Cibles, hors de vos critères") is dimmed, with one warning badge per criterion it misses under the
-// designation line; it stays a tap target like the others.
+// designation line; it stays a tap target like the others. A target a smart telescope shoots in its mosaic mode has the
+// "Mosaïque" badge after the constellation's (board "Cibles, télescope intelligent, mosaïque").
 defineProps<{
   title: string;
   /** The main catalogue designation when it is not the name itself, and the one searched when it differs (M31 · NGC224). */
@@ -16,6 +17,8 @@ defineProps<{
   typeLabel?: string;
   /** The constellation's three letters; the badge is not drawn without it. */
   constellation?: string;
+  /** The mosaic badge's text ("Mosaïque"), for a target larger than a smart telescope's frame; none without it. */
+  mosaic?: string;
   /** The stars of the rating ("★★★★☆"), at the right end of the name. */
   rating?: string;
   /** A star's third line ("Magnitude 1.2"). */
@@ -47,6 +50,7 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
           <span v-if="designation">{{ designation }}</span>
           <PhoneBadge v-if="typeLabel" kind="type">{{ typeLabel }}</PhoneBadge>
           <PhoneBadge v-if="constellation" kind="const">{{ constellation }}</PhoneBadge>
+          <PhoneBadge v-if="mosaic" kind="mosaic">{{ mosaic }}</PhoneBadge>
         </span>
         <span v-if="warnings?.length" class="mob-row-badges mob-target-warnings">
           <PhoneBadge v-for="w in warnings" :key="w" kind="warn">{{ w }}</PhoneBadge>

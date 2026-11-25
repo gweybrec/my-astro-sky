@@ -13,6 +13,8 @@ export interface TargetFigures {
   scorePct: number | null;
   /** How well it fills the setup's field, in percent; null without the setup. */
   fovFitPct: number | null;
+  /** Larger than a smart telescope's frame, within its mosaic mode: "Mosaïque recommandée". */
+  needsMosaic: boolean;
 }
 
 /**
@@ -42,5 +44,6 @@ export function targetFigures(
     maxAltDeg: peak?.maxAltDeg ?? null,
     scorePct: scores && peak ? Math.round(scores.score * 100) : null,
     fovFitPct: scores ? Math.round(scores.fovFitScore * 100) : null,
+    needsMosaic: scores?.needsMosaic ?? false,
   };
 }

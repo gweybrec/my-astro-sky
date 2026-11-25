@@ -96,9 +96,39 @@ export function maxAltDuringWindow(
   windowEnd: Date,
   stepMin = 10,
 ): { maxAltDeg: number; atDate: Date } {
+  const { maxAltDeg, atDate } = altitudeOverWindow(
+    raDeg,
+    decDeg,
+    latDeg,
+    lonDeg,
+    windowStart,
+    windowEnd,
+    -90,
+    90,
+    stepMin,
+  );
+  return { maxAltDeg, atDate };
+}
+
+/**
+ * An object's altitude over a window, sampled every `stepMin` minutes: its highest point and when, and how many
+ * minutes it spends between `minAltDeg` and `maxAltDeg` (each sample counts for `stepMin` minutes).
+ */
+export function altitudeOverWindow(
+  raDeg: number,
+  decDeg: number,
+  latDeg: number,
+  lonDeg: number,
+  windowStart: Date,
+  windowEnd: Date,
+  minAltDeg: number,
+  maxAltDeg: number,
+  stepMin = 10,
+): { maxAltDeg: number; atDate: Date; minutesInRange: number } {
   const dtMs = stepMin * 60 * 1000;
   let best = -Infinity;
   let bestDate = windowStart;
+  let inRange = 0;
 
   for (let t = windowStart.getTime(); t <= windowEnd.getTime(); t += dtMs) {
     const date = new Date(t);
@@ -109,9 +139,10 @@ export function maxAltDuringWindow(
       best = altDeg;
       bestDate = date;
     }
+    if (altDeg >= minAltDeg && altDeg <= maxAltDeg) inRange++;
   }
 
-  return { maxAltDeg: best, atDate: bestDate };
+  return { maxAltDeg: best, atDate: bestDate, minutesInRange: inRange * stepMin };
 }
 
 /**

@@ -1406,6 +1406,8 @@ const en: Translations = {
     difficultyFilter: 'Difficulty',
     catalogFilter: 'Catalogs',
     includeOversized: 'Include objects larger than FOV',
+    mosaic: 'Mosaic',
+    mosaicRecommended: 'Mosaic recommended',
     includeOversizedTooltip:
       'Include objects larger than the field of view, up to a 3 × 3 mosaic. They rank below those that fit in the frame.',
     excludePhotographed: 'Exclude already photographed objects',
@@ -1415,7 +1417,7 @@ const en: Translations = {
     minAlt: 'Min',
     maxAlt: 'Max',
     altRangeTooltip:
-      'Exclude objects whose highest altitude during the night is below the minimum or above the maximum.',
+      'Keep the objects that spend at least an hour between the minimum and maximum altitude during the night.',
     timeWindowLabel: 'Observation window',
     timeWindowStart: 'From',
     timeWindowEnd: 'To',
@@ -1479,6 +1481,7 @@ const en: Translations = {
       noDarkNight:
         'No astronomical night tonight at this latitude (sun too high). Results based on nautical twilight window.',
       noWindowOverlap: 'No dark sky during the selected time window.',
+      noAstroDarkness: 'No full darkness: targets calculated for the darkest hours ({start}–{end})',
       maxAlt: 'Max alt.',
       bestTime: 'Highest at',
       size: 'Size',

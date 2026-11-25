@@ -45,6 +45,7 @@ vi.mock('@myastrosky/core/targets/recommend', () => ({
 }));
 
 import TargetsPage from '../src/pages/TargetsPage.vue';
+import TargetSummary from '../src/pages/targets/TargetSummary.vue';
 import TypesSheet from '../src/pages/targets/TypesSheet.vue';
 import SearchSettingsSheet from '../src/pages/targets/SearchSettingsSheet.vue';
 import RegionsPage from '../src/pages/RegionsPage.vue';
@@ -496,6 +497,37 @@ describe('the Cibles page', () => {
       'Trop grande pour le champ',
       'Déjà photographiée',
     ]);
+  });
+
+  it('puts the violet "Mosaïque" badge after the constellation of a target needing the mosaic mode', async () => {
+    const m42 = { ...suggestion(dso({ id: 'M42', catalogs: ['M42'] }), 38, 23), needsMosaic: true };
+    search.mockResolvedValue(ok([m42, suggestion(dso({}), 86, 21)]));
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    const rows = w.findAll('.mob-row--roomy');
+    const badges = rows[0].findAll('.mob-meta .mob-badge');
+    expect(badges.map((b) => b.text())).toEqual(['Nébuleuse en émission', 'CYG', 'Mosaïque']);
+    expect(badges[2].classes('mob-badge--mosaic')).toBe(true);
+    expect(rows[1].find('.mob-badge--mosaic').exists()).toBe(false);
+  });
+
+  it('says when the night has no full darkness, with the darkest hours searched', async () => {
+    search.mockResolvedValue({
+      ...ok([suggestion(dso({}), 86, 21)]),
+      noAstroDarkness: { start: new Date(2026, 5, 12, 23, 40), end: new Date(2026, 5, 13, 1, 20) },
+    });
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    expect(w.find('.mob-status-line').text()).toBe(
+      'Pas de nuit noire : cibles calculées pour les heures les plus sombres (23:40–01:20)',
+    );
+  });
+
+  it('has no darkness line on a night that gets dark', async () => {
+    search.mockResolvedValue({ ...ok([suggestion(dso({}), 86, 21)]), noAstroDarkness: null });
+    const w = show(TargetsPage, { global: app().global });
+    await settle();
+    expect(w.find('.mob-status-line').exists()).toBe(false);
   });
 
   it('has no title for the objects outside the criteria when there are none', async () => {
@@ -1200,5 +1232,37 @@ describe('the regions page', () => {
       .trigger('click');
     await settle();
     expect(showError).toHaveBeenCalled();
+  });
+});
+
+describe("a target's detail", () => {
+  const scores = (needsMosaic: boolean) => ({
+    scorePct: 87,
+    fovFitPct: 70,
+    needsMosaic,
+    recipe: { filters: [], totalHours: 2, noteKeys: [] },
+  });
+
+  it('shows "Mosaïque recommandée" on a line of its own under the designation when the mosaic mode is needed', () => {
+    const w = show(TargetSummary, {
+      props: {
+        dso: dso({ id: 'M42', catalogs: ['M42'] }),
+        info: null,
+        night: null,
+        scores: scores(true),
+      },
+      global: app().global,
+    });
+    const line = w.find('.mob-sheet-header .mob-row-badges');
+    expect(line.find('.mob-badge--mosaic').text()).toBe('Mosaïque recommandée');
+    expect(w.find('.mob-meta .mob-badge--mosaic').exists()).toBe(false);
+  });
+
+  it('has no such line otherwise', () => {
+    const w = show(TargetSummary, {
+      props: { dso: dso({}), info: null, night: null, scores: scores(false) },
+      global: app().global,
+    });
+    expect(w.find('.mob-badge--mosaic').exists()).toBe(false);
   });
 });

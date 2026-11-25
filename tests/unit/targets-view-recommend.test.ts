@@ -108,10 +108,15 @@ describe('TargetsView — objects outside the criteria', () => {
   });
 
   /** Draws the results of a search that found `targets` and `outside`. */
-  function render(targets: object[], outside: object[]): HTMLElement {
+  function render(
+    targets: object[],
+    outside: object[],
+    noAstroDarkness: { start: Date; end: Date } | null = null,
+  ): HTMLElement {
     const view = new TargetsView({} as SkyMap, () => {}) as any;
     view.lastPool = targets;
     view.lastOutside = outside;
+    view.lastNoAstroDarkness = noAstroDarkness;
     view.lastPreset = preset;
     view.lastAltRange = { minAltDeg: 20, maxAltDeg: 80 };
     const el = document.createElement('div');
@@ -148,5 +153,30 @@ describe('TargetsView — objects outside the criteria', () => {
   it('has no title when none were found', () => {
     const el = render([target('IN')], []);
     expect(el.querySelector('.targets-outside-title')).toBeNull();
+  });
+
+  it('puts a "Mosaic" chip after the constellation chip of a target needing the mosaic mode', () => {
+    const el = render([{ ...target('M42'), needsMosaic: true }, target('SMALL')], []);
+    const cards = el.querySelectorAll('.target-card');
+    const chips = [...cards[0].querySelector('.target-card-chips')!.children].map(
+      (c) => c.className,
+    );
+    expect(chips.at(-1)).toBe('targets-card-mosaic');
+    const chip = cards[0].querySelector<HTMLElement>('.targets-card-mosaic')!;
+    expect(chip.textContent).toBe('Mosaic');
+    expect(chip.title).toBe('Mosaic recommended');
+    expect(cards[1].querySelector('.targets-card-mosaic')).toBeNull();
+  });
+
+  it('says when the night has no full darkness, under the toolbar, and not otherwise', () => {
+    const start = new Date(2026, 5, 21, 23, 40);
+    const end = new Date(2026, 5, 22, 1, 20);
+    const el = render([target('IN')], [], { start, end });
+    const line = el.querySelector('.targets-darkness-line')!;
+    expect(line.textContent).toContain(
+      'No full darkness: targets calculated for the darkest hours',
+    );
+    expect(line.previousElementSibling!.classList).toContain('targets-sort-bar');
+    expect(render([target('IN')], []).querySelector('.targets-darkness-line')).toBeNull();
   });
 });
