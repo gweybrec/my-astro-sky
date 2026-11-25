@@ -4,7 +4,8 @@
  *
  * Scoring (0-100):
  *   45% — altitude score   (linear above 30°, best at 70°+)
- *   35% — FOV fit score    (best when object spans 15-70% of short FOV side)
+ *   35% — FOV fit score    (best when object spans 15-70% of short FOV side; an object larger than the
+ *                           frame, kept by `allowOversized`, scores lower the more mosaic panels it needs)
  *   20% — brightness score (margin below limiting magnitude)
  */
 
@@ -14,6 +15,7 @@ import { fovDeg, limitingMag } from './gear-presets';
 import { twilightWindow, dateToJD, lstHours } from './astro-time';
 import { maxAltDuringWindow, mightBeVisible, altAzFromRaDec } from './sky-geometry';
 import { horizonAltAt, type HorizonProfile } from './horizon-io';
+import { planGrid } from './mosaic';
 
 export interface ObserverLocation {
   latDeg: number;
@@ -40,9 +42,18 @@ export interface TargetSuggestion {
 
 const MAX_RESULTS = 8;
 
+/** Largest mosaic (in panels) an object larger than the frame may need to be kept by `allowOversized`: a 3×3. */
+export const MAX_OVERSIZE_PANELS = 9;
+/** Overlap between mosaic panels when counting them (the mosaic form's default, `MOSAIC_DEFAULT_OVERLAP`). */
+const OVERSIZE_OVERLAP_PCT = 20;
+
 /** Options of the recommendation (see {@link recommendTargets}). */
 export interface RecommendOptions {
-  ignoreFovFit?: boolean;
+  /**
+   * Keep objects larger than the frame when they fit in a mosaic of at most {@link MAX_OVERSIZE_PANELS} panels,
+   * with a FOV-fit score that falls with the number of panels (larger ones stay out).
+   */
+  allowOversized?: boolean;
   minAltDeg?: number;
   maxAltDeg?: number;
   timeWindow?: { start: Date; end: Date };
@@ -124,13 +135,14 @@ export function createRecommender(
       if (!isMultipleStar && !majAxisArcmin) continue;
 
       // Objects larger than the frame are left out unless the user asked for them ("Include objects larger than
-      // FOV"): a low FOV-fit score alone would still list them, only further down.
+      // FOV"), and even then when they would need more than a 3×3 mosaic: a low FOV-fit score alone would still
+      // list them, only further down.
       const outside: OutsideReason[] = [];
-      if (
-        !isMultipleStar &&
-        !options.ignoreFovFit &&
-        !fitsInFrame(majAxisArcmin!, dso.minAxis, minFovDeg, maxFovDeg)
-      ) {
+      const panels =
+        isMultipleStar || fitsInFrame(majAxisArcmin!, dso.minAxis, minFovDeg, maxFovDeg)
+          ? 1
+          : oversizePanels(majAxisArcmin!, dso.minAxis, minFovDeg, maxFovDeg);
+      if (panels > 1 && (!options.allowOversized || panels > MAX_OVERSIZE_PANELS)) {
         if (!options.keepOutside) continue;
         outside.push('too-big');
       }
@@ -177,7 +189,11 @@ export function createRecommender(
 
       // ─ FOV fit score (0-1) ─ (point-like stars are FOV-neutral)
       const objDeg = (majAxisArcmin ?? 0) / 60; // convert arcmin to deg
-      const fovFitScore = isMultipleStar || options.ignoreFovFit ? 1.0 : fovFit(objDeg, minFovDeg);
+      const fovFitScore = isMultipleStar
+        ? 1.0
+        : panels > 1
+          ? oversizeFit(panels)
+          : fovFit(objDeg, minFovDeg);
 
       // ─ Brightness score (0-1) ─
       const brightnessScore = brightnessScoreFn(dso.mag, magLimit);
@@ -259,16 +275,26 @@ export function scoreDso(
   dso: DSO,
   preset: GearPreset,
   maxAltDeg: number,
-  options: { ignoreFovFit?: boolean; minAltDeg?: number } = {},
+  options: { allowOversized?: boolean; minAltDeg?: number } = {},
 ): { score: number; fovFitScore: number; altScore: number; brightnessScore: number } {
   const fov = fovDeg(preset);
   const magLimit = limitingMag(preset);
   const minFovDeg = Math.min(fov.wDeg, fov.hDeg);
+  const maxFovDeg = Math.max(fov.wDeg, fov.hDeg);
   const minAlt = options.minAltDeg ?? 20;
 
   const altScore = altitudeScore(maxAltDeg, minAlt);
   const objDeg = (dso.majAxis ?? 0) / 60;
-  const fovFitScore = options.ignoreFovFit ? 1.0 : objDeg > 0 ? fovFit(objDeg, minFovDeg) : 0;
+  let fovFitScore = 0;
+  if (objDeg > 0) {
+    // Larger than the frame and allowed: scored by its mosaic panels, unless it needs more than a 3×3.
+    const panels =
+      options.allowOversized && !fitsInFrame(dso.majAxis!, dso.minAxis, minFovDeg, maxFovDeg)
+        ? oversizePanels(dso.majAxis!, dso.minAxis, minFovDeg, maxFovDeg)
+        : 1;
+    fovFitScore =
+      panels > 1 && panels <= MAX_OVERSIZE_PANELS ? oversizeFit(panels) : fovFit(objDeg, minFovDeg);
+  }
   const brightnessScore = brightnessScoreFn(dso.mag, magLimit);
   const score = 0.45 * altScore + 0.35 * fovFitScore + 0.2 * brightnessScore;
   return { score, fovFitScore, altScore, brightnessScore };
@@ -289,7 +315,33 @@ export function fitsInFrame(
   return majDeg <= maxFovDeg && minDeg <= minFovDeg;
 }
 
+/**
+ * Panels of the smallest mosaic (20 % overlap) that covers an object, the camera turned whichever way needs fewer.
+ * Axes in arcminutes, sides in degrees.
+ */
+export function oversizePanels(
+  majAxisArcmin: number,
+  minAxisArcmin: number | null,
+  minFovDeg: number,
+  maxFovDeg: number,
+): number {
+  const majDeg = majAxisArcmin / 60;
+  const minDeg = (minAxisArcmin ?? majAxisArcmin) / 60;
+  const along = planGrid(maxFovDeg, minFovDeg, majDeg, minDeg, OVERSIZE_OVERLAP_PCT);
+  const across = planGrid(minFovDeg, maxFovDeg, majDeg, minDeg, OVERSIZE_OVERLAP_PCT);
+  return Math.min(along.cols * along.rows, across.cols * across.rows);
+}
+
 // ─── Score helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * FOV fit of an object larger than the frame: 0.55 for a 2-panel mosaic down to 0.15 for a 3×3, below any object
+ * that fits well, so such objects never top the list on framing alone.
+ */
+function oversizeFit(panels: number): number {
+  const t = Math.min(1, Math.max(0, (panels - 2) / (MAX_OVERSIZE_PANELS - 2)));
+  return 0.55 - t * 0.4;
+}
 
 function altitudeScore(altDeg: number, minAlt: number): number {
   if (altDeg < minAlt) return 0;

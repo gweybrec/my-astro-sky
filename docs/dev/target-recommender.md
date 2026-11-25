@@ -15,7 +15,7 @@ Ranks DSOs for a given night, observer location, and gear preset. Returns up to 
 | `location`               | `{ latDeg, lonDeg }` | Observer coordinates                                                           |
 | `dateNight`              | `Date`               | Any moment on the target night (used to find the dark window)                  |
 | `limit`                  | `number`             | Max results (default 8; the UI passes 5000)                                    |
-| `options.ignoreFovFit`   | `boolean`            | Force `fovFitScore = 1.0` for all objects                                      |
+| `options.allowOversized` | `boolean`            | Keep objects larger than the frame up to a 3×3 mosaic, scored by panel count   |
 | `options.minAltDeg`      | `number`             | Minimum transit altitude threshold (default 20°)                               |
 | `options.maxAltDeg`      | `number`             | Maximum transit altitude threshold — rejects near-zenith objects (default 90°) |
 | `options.horizonProfile` | `HorizonProfile`     | Terrain skyline; rejects objects hidden behind terrain at their peak azimuth   |
@@ -98,7 +98,7 @@ Piecewise function of `ratio = majAxisArcmin / (60 · minFovDeg)`:
 | 0.70–1.00   | 1.0→0.7     | Slightly large              |
 | >1.00       | 0.7→0       | Too large for frame         |
 
-When `ignoreFovFit = true`, this score is fixed at 1.0 for all objects.
+With `allowOversized` ("Include objects larger than FOV"), an object that does not fit the frame even with the camera turned is counted in mosaic panels (`oversizePanels`: 20 % overlap, the orientation needing fewer). Up to `MAX_OVERSIZE_PANELS` (9, a 3×3) it is kept with a fit of 0.55 (2 panels) down to 0.15 (9 panels), so it ranks below well-framed objects; beyond that it stays out (`too-big`). Objects that fit keep the table above.
 
 #### Brightness score
 
@@ -174,7 +174,7 @@ Page size: `prefs.pageSize` (default 15, options 5–50).
 With `includeOutside` (both Targets tabs ask for it), objects that miss **only** the altitude range, the frame size or "Already photographed" are kept and returned apart in `result.outside`. Each carries its reasons in `outside` (`too-low`, `too-high`, `too-big`, `photographed`). The recommender's `keepOutside` option does this:
 
 - `too-low` only for an object whose peak is still above 0°. An object that never rises stays out.
-- `too-big` only when `includeOversized` is off, and `photographed` only when `excludePhotographed` is on.
+- `too-big` when `includeOversized` is off, or when the object needs more than a 3×3 mosaic; and `photographed` only when `excludePhotographed` is on.
 - `finish` ranks only the objects inside the criteria. The direction and sky-region filters apply to both lists.
 
 The other criteria still leave objects out as before: type, catalogue, rating, difficulty, constellation, magnitude limit and terrain horizon.

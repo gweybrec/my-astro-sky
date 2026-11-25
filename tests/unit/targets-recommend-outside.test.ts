@@ -56,7 +56,7 @@ const DSOS = [
   dso('HIGH', 270, 44.3),
   dso('LOW', 270, -24.4),
   dso('INSIDE', 270, 33.0),
-  dso('BIG', 270, 33.0, 600),
+  dso('BIG', 270, 33.0, 120), // 2° in a 1.15° frame: a 2×2 mosaic
   dso('SHOT', 270, 22.7),
 ];
 

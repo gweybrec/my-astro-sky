@@ -136,7 +136,7 @@ function prepare(
 
   const altRange = { minAltDeg: prefs.minAltDeg ?? 20, maxAltDeg: prefs.maxAltDeg ?? 80 };
   const recommender = createRecommender(preset, location, dateNight, {
-    ignoreFovFit: prefs.includeOversized ?? false,
+    allowOversized: prefs.includeOversized ?? false,
     ...altRange,
     timeWindow: timeWindow ?? undefined,
     horizonProfile: prefs.respectHorizon ? (input.horizonProfile ?? null) : null,

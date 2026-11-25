@@ -54,9 +54,17 @@ describe('targetFigures', () => {
     expect(noSetup.fovFitPct).toBeNull();
   });
 
-  it('counts an oversized object as fitting when the search includes them', () => {
-    const huge = { ...M31, majAxis: 2000 } as DSO;
-    expect(targetFigures(huge, null, REFRACTOR).fovFitPct).toBeLessThan(100);
-    expect(targetFigures(huge, null, REFRACTOR, { includeOversized: true }).fovFitPct).toBe(100);
+  it('scores an object up to a 3×3 mosaic by its panels when the search includes them', () => {
+    const mosaic = { ...M31, majAxis: 300, minAxis: 300 } as DSO; // 5° in a 3.4° × 2.2° frame
+    const without = targetFigures(mosaic, null, REFRACTOR).fovFitPct!;
+    const withOversized = targetFigures(mosaic, null, REFRACTOR, {
+      includeOversized: true,
+    }).fovFitPct!;
+    expect(withOversized).toBeGreaterThan(without);
+    expect(withOversized).toBeLessThan(55);
+    const huge = { ...M31, majAxis: 2000 } as DSO; // far beyond a 3×3 mosaic: no help
+    expect(targetFigures(huge, null, REFRACTOR, { includeOversized: true }).fovFitPct).toBe(
+      targetFigures(huge, null, REFRACTOR).fovFitPct,
+    );
   });
 });

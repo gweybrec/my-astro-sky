@@ -1424,7 +1424,7 @@ const de: Translations = {
     catalogFilter: 'Kataloge',
     includeOversized: 'Objekte größer als das Gesichtsfeld einschließen',
     includeOversizedTooltip:
-      'Schließt Nebel ein, die größer als das Gesichtsfeld sind. Das Foto zeigt einen Ausschnitt des Objekts.',
+      'Schließt Objekte ein, die größer als das Gesichtsfeld sind, bis zu einem 3 × 3-Mosaik. Sie stehen hinter denen, die ins Bildfeld passen.',
     excludePhotographed: 'Bereits fotografierte Objekte ausschließen',
     excludePhotographedTooltip:
       'Schließt Objekte aus, die in den DSO-Metadaten Ihrer Fotos vorhanden sind. Nützlich, um neue Ziele zu entdecken.',

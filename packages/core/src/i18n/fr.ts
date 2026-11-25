@@ -1423,7 +1423,7 @@ const fr = {
     catalogFilter: 'Catalogues',
     includeOversized: 'Inclure les objets trop grands pour le champ',
     includeOversizedTooltip:
-      "Inclut les nébuleuses plus grandes que le champ. La photo sera un cadrage partiel de l'objet.",
+      "Inclut les objets plus grands que le champ, jusqu'à une mosaïque de 3 × 3. Ils sont classés après ceux qui tiennent dans le champ.",
     excludePhotographed: 'Exclure les objets déjà photographiés',
     excludePhotographedTooltip:
       'Exclut les objets présents dans les métadonnées DSO de vos photos. Utile pour découvrir de nouvelles cibles.',

@@ -4,6 +4,8 @@ import {
   recommendTargets,
   scoreDso,
   fitsInFrame,
+  oversizePanels,
+  MAX_OVERSIZE_PANELS,
 } from '@myastrosky/core/target-recommender';
 import { mightBeVisible, maxAltDuringWindow } from '@myastrosky/core/sky-geometry';
 import { twilightWindow } from '@myastrosky/core/astro-time';
@@ -667,12 +669,19 @@ describe('scoreDso — standalone single-object scoring (used by plans)', () => 
     expect(r.score).toBeCloseTo(expected, 6);
   });
 
-  it('ignoreFovFit forces a perfect FOV-fit score', () => {
-    const dso = makeDSO({ id: 'BIG', majAxis: 600, mag: 6 }); // huge object: normally penalised
-    const normal = scoreDso(dso, testPreset, 70);
-    const ignored = scoreDso(dso, testPreset, 70, { ignoreFovFit: true });
-    expect(ignored.fovFitScore).toBe(1);
-    expect(ignored.fovFitScore).toBeGreaterThan(normal.fovFitScore);
+  it('allowOversized scores a larger object by its mosaic panels, below a well-framed one', () => {
+    const mosaic = makeDSO({ id: 'MID', majAxis: 240, minAxis: 150, mag: 6 }); // 4° × 2.5°: a 2×2 mosaic
+    const framed = makeDSO({ id: 'FRAMED', majAxis: 60, minAxis: 40, mag: 6 });
+    const tiny = makeDSO({ id: 'TINY', majAxis: 1, mag: 6 });
+    const opts = { allowOversized: true };
+    const mosaicFit = scoreDso(mosaic, testPreset, 70, opts).fovFitScore;
+    expect(mosaicFit).toBeGreaterThan(scoreDso(mosaic, testPreset, 70).fovFitScore);
+    expect(mosaicFit).toBeLessThan(0.55);
+    expect(mosaicFit).toBeLessThan(scoreDso(framed, testPreset, 70, opts).fovFitScore);
+    // An object that fits keeps its own fit: a tiny one is not promoted.
+    expect(scoreDso(tiny, testPreset, 70, opts).fovFitScore).toBe(
+      scoreDso(tiny, testPreset, 70).fovFitScore,
+    );
   });
 
   it('altScore is 0 below the minimum altitude and clamps to 1 at high altitude', () => {
@@ -729,14 +738,32 @@ describe('recommendTargets — objects larger than the frame', () => {
   // The test preset's frame is about 2.55° × 1.71°.
   const big = makeDSO({ id: 'LOOP', majAxis: 1200, minAxis: null }); // 20°, like Barnard's Loop
   const fitting = makeDSO({ id: 'FITS', majAxis: 60, minAxis: 40 });
+  const mid = makeDSO({ id: 'MID', majAxis: 240, minAxis: 150 }); // 4° × 2.5°: a 2×2 mosaic
 
   it('leaves them out unless they are asked for', () => {
     const ids = (opts = {}) =>
-      recommendTargets([big, fitting], testPreset, testLocation, winterNight, 10, opts).map(
+      recommendTargets([big, mid, fitting], testPreset, testLocation, winterNight, 10, opts).map(
         (s) => s.dso.id,
       );
     expect(ids()).toEqual(['FITS']);
-    expect(ids({ ignoreFovFit: true }).sort()).toEqual(['FITS', 'LOOP']);
+    expect(ids({ allowOversized: true }).sort()).toEqual(['FITS', 'MID']);
+  });
+
+  it('counts the panels of the smallest mosaic, camera turned', () => {
+    // 4° × 2.5°: 2×2 with the long axis along the frame's long side, 3×1 turned — 3 is fewer.
+    expect(oversizePanels(240, 150, 1.71, 2.55)).toBe(3);
+    expect(oversizePanels(1200, null, 1.71, 2.55)).toBeGreaterThan(MAX_OVERSIZE_PANELS);
+  });
+
+  it('even when asked for, leaves out those needing more than a 3×3 mosaic and ranks the others lower', () => {
+    const res = createRecommender(testPreset, testLocation, winterNight, {
+      allowOversized: true,
+      keepOutside: true,
+    }).collect([big, mid, fitting]);
+    const loop = res.find((s) => s.dso.id === 'LOOP');
+    expect(loop?.outside).toEqual(['too-big']);
+    const score = (id: string) => res.find((s) => s.dso.id === id)!.score;
+    expect(score('MID')).toBeLessThan(score('FITS'));
   });
 
   it('keeps an elongated object that fits with the camera turned', () => {

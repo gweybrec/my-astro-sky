@@ -33,7 +33,7 @@ export function targetFigures(
       : null;
   const scores = preset
     ? scoreDso(dso, preset, peak?.maxAltDeg ?? 0, {
-        ignoreFovFit: prefs.includeOversized ?? false,
+        allowOversized: prefs.includeOversized ?? false,
         minAltDeg: prefs.minAltDeg ?? 20,
       })
     : null;

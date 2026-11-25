@@ -1407,7 +1407,7 @@ const en: Translations = {
     catalogFilter: 'Catalogs',
     includeOversized: 'Include objects larger than FOV',
     includeOversizedTooltip:
-      'Include nebulae larger than the field of view. The photo will be a framed portion of the object.',
+      'Include objects larger than the field of view, up to a 3 × 3 mosaic. They rank below those that fit in the frame.',
     excludePhotographed: 'Exclude already photographed objects',
     excludePhotographedTooltip:
       'Excludes objects present in the DSO metadata of your photos. Useful for discovering new targets.',

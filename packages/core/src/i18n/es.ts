@@ -1419,7 +1419,7 @@ const es: Translations = {
     catalogFilter: 'Catálogos',
     includeOversized: 'Incluir objetos más grandes que el campo',
     includeOversizedTooltip:
-      'Incluye nebulosas más grandes que el campo de visión. La foto será un encuadre parcial del objeto.',
+      'Incluye objetos más grandes que el campo de visión, hasta un mosaico de 3 × 3. Se clasifican después de los que caben en el campo.',
     excludePhotographed: 'Excluir objetos ya fotografiados',
     excludePhotographedTooltip:
       'Excluye los objetos presentes en los metadatos DSO de tus fotos. Útil para descubrir nuevos objetivos.',

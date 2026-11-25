@@ -249,7 +249,7 @@ export function scorePlanEntry(
   prefs: { includeOversized?: boolean; minAltDeg?: number },
 ): { scorePct: number; fovFitPct: number; recipe: ImagingRecipe } {
   const { score, fovFitScore } = scoreDso(dso, preset, maxAltDeg, {
-    ignoreFovFit: prefs.includeOversized ?? false,
+    allowOversized: prefs.includeOversized ?? false,
     minAltDeg: prefs.minAltDeg ?? 20,
   });
   return {
