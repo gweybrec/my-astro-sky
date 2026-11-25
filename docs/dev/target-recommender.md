@@ -75,8 +75,11 @@ Applied inside `recommendTargets`, in order:
 ### Stage 3 — Scoring (0–1 composite)
 
 ```
-score = 0.45·altScore + 0.35·fovFitScore + 0.20·brightnessScore
+score = (0.45·altScore + 0.35·fovFitScore + 0.20·brightnessScore) · difficultyFactor
+difficultyFactor = 1 − 0.1·(difficulty − 1)      (×1 at 1/5 … ×0.6 at 5/5; ×1 when unknown)
 ```
+
+The difficulty factor ranks easier targets above hard ones placed and framed as well; hard ones stay listed, lower.
 
 #### Altitude score
 
@@ -103,10 +106,12 @@ With `allowOversized` ("Include objects larger than FOV"), an object that does n
 #### Brightness score
 
 ```
-brightnessScore = min(1, (magLimit − mag) / 4)
+fromMag        = min(1, (magLimit − mag) / 4)      (0 below the limit)
+fromDifficulty = (5 − difficulty) / 4              (1 → 1, 5 → 0)
+brightnessScore = min(fromMag, fromDifficulty)
 ```
 
-Score is 0 at the magnitude limit and saturates at 1 when 4+ magnitudes brighter.
+`fromMag` is 0 at the magnitude limit and saturates at 1 when 4+ magnitudes brighter. The difficulty caps it because a total magnitude says little about a large faint nebula. With no magnitude, the difficulty alone is used; with neither, 0.4.
 
 ---
 

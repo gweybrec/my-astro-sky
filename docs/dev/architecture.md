@@ -44,7 +44,8 @@
 - **Target recommender** (`target-recommender.ts`): `recommendTargets(dsos, preset, location, dateNight, limit, options)` scores and filters DSOs for a given night:
   - 45% altitude score (linear above 30°, best at 70°+)
   - 35% FOV fit score (best when object spans 15–70% of the short FOV axis)
-  - 20% brightness score (margin below gear limiting magnitude)
+  - 20% brightness score (margin below gear limiting magnitude, capped by the catalogue difficulty)
+  - the sum multiplied by a difficulty factor (×1 at 1/5 down to ×0.6 at 5/5), so easier targets rank first
   - Pre-filters by magnitude limit, minimum altitude 30°, declination quick-filter
   - `options.allowOversized = true` keeps objects larger than the frame up to a 3×3 mosaic, with a FOV fit that falls with the panel count
 - **Gear presets** (`gear-presets.ts`): Defines `GearPreset` interface and `GEAR_PRESETS` array. Each preset encodes aperture, focal length, sensor size, pixel size, mono flag. Exports `fovDeg()`, `pixelScaleArcsec()`, `limitingMag()`.

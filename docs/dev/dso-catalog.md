@@ -126,12 +126,14 @@ SB thresholds (after applying the magnitude cap):
 | ≤ 24.5             | 4              |
 | > 24.5             | 5              |
 
-**Non-galaxy difficulty** uses astrogenerator `difficulte` (1–4) as the base, with adjustments:
+**Planetary nebula difficulty** uses the mean surface brightness over the ellipse, `SB = mag + 2.5·log10(π/4 · maj · min)` (axes in arcsec): ≤ 20.3 → 1, ≤ 22 → 2, ≤ 23.5 → 3, ≤ 25 → 4, else 5. The total magnitude alone makes a large old PN (Abell, Jones, PuWe) look easy. A PN with no magnitude comes from a survey of faint ones (Outters, WeDe, HFG…): 5 when larger than 1′, else 4. The Messier cap applies; no emission-line bonus (the SB already assumes narrowband).
+
+**Non-galaxy difficulty** uses astrogenerator `difficulte` (1–4) as the base. An emission nebula or remnant without one takes its catalogue's brightness class, judged on red (Hα) plates: Sharpless `Bright` (VII/20; 3 brightest → 3, 2 → 4, 1 faintest → 5, kept in `scripts/sharpless-bright.json` since the CDS mirrors serve that catalogue only gzipped), else LBN `Bright` (VII/9, downloaded; 1–2 → 3, 3–4 → 4, 5–6 → 5). Adjustments:
 
 - Size > 300' → 5 (impossible to image as a single frame)
 - Size > 120' → +1 (low surface brightness from sheer extent)
 - Type RN or DN → +1 (reflection/dark nebulae are harder)
-- Has emission lines → −1 (narrowband filters make it easier)
+- Has emission lines → −1 (narrowband filters make it easier), except when the base is a catalogue brightness class
 - Messier cap at 2 applies here as well
 
 **Protoplanetary nebulae (`PPN`)** have no astrogenerator entry: difficulty 4 (arcsecond-sized shells), rating 2 when named, 1 for a bare IRAS designation.

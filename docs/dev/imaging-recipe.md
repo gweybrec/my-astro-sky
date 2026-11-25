@@ -16,9 +16,11 @@ Four tables cover the object families, indexed by `difficulty` 1–5:
 | :--------: | :-----------------------: | :--------------------: | :----------------: | :-------------------------: |
 |     1      |          0.25 h           |         0.25 h         |       0.15 h       |           0.15 h            |
 |     2      |          0.75 h           |         0.50 h         |       0.33 h       |           0.33 h            |
-|     3      |           2.5 h           |         1.0 h          |       0.75 h       |           0.75 h            |
-|     4      |           4.0 h           |         2.0 h          |       1.5 h        |            1.5 h            |
-|     5      |           8.0 h           |         4.0 h          |       3.0 h        |            3.0 h            |
+|     3      |           2.5 h           |         1.0 h          |       0.75 h       |            1.5 h            |
+|     4      |           8.0 h           |         2.0 h          |       1.5 h        |            6.0 h            |
+|     5      |          25.0 h           |         4.0 h          |       3.0 h        |           25.0 h            |
+
+Difficulty 4–5 nebulae and galaxies (faint Sharpless/LBN regions, old planetary nebulae such as Abell 31 or Outters 4) are multi-night projects, hence tens of hours. A planetary nebula's difficulty comes from its surface brightness (see `docs/dev/dso-catalog.md`), so PN difficulty 1–2 are the small bright ones and 4–5 the large faint ones.
 
 Galaxies (GxS, GxE, GxI, Gx) share the Default table but get a capped aperture factor (see below).
 
@@ -52,7 +54,7 @@ Exponent 1.5 is softer than the physically exact quadratic (^2) to keep the reco
 
 `totalHours = clamp(base × apertureFactor, 0.15, MAX_TOTAL_HOURS)`
 
-`MAX_TOTAL_HOURS = 6.0` — no single-session recommendation should exceed one long night. The 0.15 h floor ensures at least 9 minutes are recommended even on trivial targets.
+`MAX_TOTAL_HOURS = 40.0` — the faintest targets on a small aperture are several nights' work, not a season's. The 0.15 h floor ensures at least 9 minutes are recommended even on trivial targets.
 
 ### Magnitude fallback
 
@@ -134,7 +136,7 @@ Vespera (50 mm, OSC, builtIn) — RGB path:
 | M97 Owl      | PN   |  2   |     ~59 min |
 | M27 Dumbbell | PN   |  1   |     ~27 min |
 | M42 Orion    | EN   |  1   | ~1 h 15 min |
-| NGC7023 Iris | RN   |  5   |        ~6 h |
+| NGC7023 Iris | RN   |  5   |       ~40 h |
 | M51          | GxS  |  1   |        ~1 h |
 | NGC4236      | GxS  |  2   |        ~3 h |
 | M109         | GxS  |  2   |        ~3 h |
@@ -145,7 +147,7 @@ Vespera (50 mm, OSC, builtIn) — RGB path:
 
 | Constant                      | Effect                                                            |
 | ----------------------------- | ----------------------------------------------------------------- |
-| `HOURS_BY_DIFFICULTY_DEFAULT` | Base hours for EN, SNR, RN, DN at 200 mm (diff 1–5)               |
+| `HOURS_BY_DIFFICULTY_DEFAULT` | Base hours for EN, SNR, RN, DN and galaxies at 200 mm (diff 1–5)  |
 | `HOURS_BY_DIFFICULTY_GC`      | Base hours for globular clusters at 200 mm                        |
 | `HOURS_BY_DIFFICULTY_OC`      | Base hours for open clusters at 200 mm                            |
 | `HOURS_BY_DIFFICULTY_PN`      | Base hours for planetary nebulae at 200 mm                        |

@@ -4,6 +4,7 @@ import {
   recommendTargets,
   scoreDso,
   fitsInFrame,
+  difficultyFactor,
   oversizePanels,
   MAX_OVERSIZE_PANELS,
 } from '@myastrosky/core/target-recommender';
@@ -651,6 +652,32 @@ describe('diversity cap with limit=5000', () => {
 });
 
 describe('scoreDso — standalone single-object scoring (used by plans)', () => {
+  it('scores an unmeasured faint object by its difficulty, below an easy one placed the same', () => {
+    const faint = makeDSO({ id: 'OU4', type: 'PN' as any, mag: null, difficulty: 5 });
+    const easy = makeDSO({ id: 'EASY', type: 'PN' as any, mag: null, difficulty: 1 });
+    expect(scoreDso(faint, testPreset, 70).brightnessScore).toBe(0);
+    expect(scoreDso(easy, testPreset, 70).brightnessScore).toBe(1);
+    expect(scoreDso(faint, testPreset, 70).score).toBeLessThan(
+      scoreDso(easy, testPreset, 70).score,
+    );
+  });
+
+  it('ranks an easier target above a harder one placed and framed the same', () => {
+    const scores = [1, 2, 3, 4, 5].map(
+      (difficulty) => scoreDso(makeDSO({ id: `D${difficulty}`, difficulty }), testPreset, 70).score,
+    );
+    for (let i = 1; i < scores.length; i++) expect(scores[i]).toBeLessThan(scores[i - 1]);
+    expect(difficultyFactor(makeDSO({ id: 'X', difficulty: 5 }))).toBeCloseTo(0.6, 10);
+    expect(difficultyFactor(makeDSO({ id: 'Y', difficulty: null }))).toBe(1);
+  });
+
+  it('caps the brightness of a bright-magnitude object by its difficulty', () => {
+    const hard = makeDSO({ id: 'HARD', mag: 5, difficulty: 5 }); // large and diffuse despite its magnitude
+    expect(scoreDso(hard, testPreset, 70).brightnessScore).toBe(0);
+    const unknown = makeDSO({ id: 'UNK', mag: null, difficulty: null });
+    expect(scoreDso(unknown, testPreset, 70).brightnessScore).toBe(0.4);
+  });
+
   it('scores an object that recommendTargets would filter out (faint, sizeless)', () => {
     // No majAxis and very faint → recommendTargets skips it entirely, but a
     // plan can still contain it, so scoreDso must return a finite score.
@@ -665,7 +692,8 @@ describe('scoreDso — standalone single-object scoring (used by plans)', () => 
   it('score equals the weighted sum of its components', () => {
     const dso = makeDSO({ id: 'M', majAxis: 30, mag: 6 });
     const r = scoreDso(dso, testPreset, 70);
-    const expected = 0.45 * r.altScore + 0.35 * r.fovFitScore + 0.2 * r.brightnessScore;
+    const expected =
+      (0.45 * r.altScore + 0.35 * r.fovFitScore + 0.2 * r.brightnessScore) * difficultyFactor(dso);
     expect(r.score).toBeCloseTo(expected, 6);
   });
 

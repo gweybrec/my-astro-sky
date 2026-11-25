@@ -6,7 +6,9 @@
  *   45% — altitude score   (linear above 30°, best at 70°+)
  *   35% — FOV fit score    (best when object spans 15-70% of short FOV side; an object larger than the
  *                           frame, kept by `allowOversized`, scores lower the more mosaic panels it needs)
- *   20% — brightness score (margin below limiting magnitude)
+ *   20% — brightness score (margin below limiting magnitude, capped by the catalogue difficulty)
+ * The sum is then multiplied by the difficulty factor (×1 at 1/5 down to ×0.6 at 5/5), so easier
+ * targets rank above hard ones placed as well; hard ones stay listed, lower.
  */
 
 import type { DSO } from './types';
@@ -196,13 +198,13 @@ export function createRecommender(
           : fovFit(objDeg, minFovDeg);
 
       // ─ Brightness score (0-1) ─
-      const brightnessScore = brightnessScoreFn(dso.mag, magLimit);
+      const brightnessScore = brightnessScoreFn(dso, magLimit);
 
       // Multiple stars: rank by altitude + their own quality rating (0★ = unresolvable by
       // the setup, which sinks them). Everything else: altitude + FOV fit + brightness.
       const score = isMultipleStar
         ? 0.5 * altScore + 0.5 * ((dso.rating ?? 0) / 5)
-        : 0.45 * altScore + 0.35 * fovFitScore + 0.2 * brightnessScore;
+        : (0.45 * altScore + 0.35 * fovFitScore + 0.2 * brightnessScore) * difficultyFactor(dso);
 
       candidates.push({
         dso,
@@ -295,8 +297,9 @@ export function scoreDso(
     fovFitScore =
       panels > 1 && panels <= MAX_OVERSIZE_PANELS ? oversizeFit(panels) : fovFit(objDeg, minFovDeg);
   }
-  const brightnessScore = brightnessScoreFn(dso.mag, magLimit);
-  const score = 0.45 * altScore + 0.35 * fovFitScore + 0.2 * brightnessScore;
+  const brightnessScore = brightnessScoreFn(dso, magLimit);
+  const score =
+    (0.45 * altScore + 0.35 * fovFitScore + 0.2 * brightnessScore) * difficultyFactor(dso);
   return { score, fovFitScore, altScore, brightnessScore };
 }
 
@@ -365,9 +368,24 @@ function fovFit(objDeg: number, minFovDeg: number): number {
   return Math.max(0, 0.7 - (ratio - 1.0) * 0.7);
 }
 
-function brightnessScoreFn(mag: number | null, magLimit: number): number {
-  if (mag === null) return 0.4; // unknown magnitude — neutral
-  const margin = magLimit - mag;
-  if (margin < 0) return 0;
-  return Math.min(1, margin / 4); // 0 margin → 0, 4+ mag margin → 1
+/** Multiplies the score so easier targets rank higher: ×1 at difficulty 1, −0.1 per step, ×0.6 at 5. */
+export function difficultyFactor(dso: DSO): number {
+  if (dso.difficulty === null || dso.difficulty === undefined) return 1;
+  return 1 - 0.1 * (Math.min(5, Math.max(1, dso.difficulty)) - 1);
+}
+
+/**
+ * How easily the object shows up: its margin below the limiting magnitude, capped by its difficulty (1 → 1,
+ * 5 → 0). A total magnitude says little about a large faint nebula, and many have none at all: those are
+ * scored by their difficulty alone, so an unmeasured faint planetary nebula no longer counts as average.
+ */
+function brightnessScoreFn(dso: DSO, magLimit: number): number {
+  const fromDifficulty =
+    dso.difficulty !== null && dso.difficulty !== undefined
+      ? Math.min(1, Math.max(0, (5 - dso.difficulty) / 4))
+      : null;
+  if (dso.mag === null) return fromDifficulty ?? 0.4; // neither known — neutral
+  const margin = magLimit - dso.mag;
+  const fromMag = margin < 0 ? 0 : Math.min(1, margin / 4); // 0 margin → 0, 4+ mag margin → 1
+  return fromDifficulty === null ? fromMag : Math.min(fromMag, fromDifficulty);
 }

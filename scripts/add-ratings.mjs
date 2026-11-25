@@ -16,6 +16,7 @@ import https from 'https';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { cdsFile } from './fetch-text.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -514,6 +515,63 @@ function applyRatingFloors(rating, catalogs) {
 
 // ─── Difficulty computation ───────────────────────────────────────────────────
 
+/**
+ * The brightness classes the nebula catalogues give, by our catalogue id: Sharpless (VII/20 `Bright`,
+ * 1 = faintest … 3 = brightest) as `SH2-<n>` and Lynds LBN (VII/9 `Bright`, byte 55, 1 = brightest … 6 =
+ * barely detectable) as `LBN<n>`. Both were judged on red (Hα) plates, so they say how faint the nebula is
+ * in narrowband too. The Sharpless classes are kept in sharpless-bright.json (number → class): the CDS
+ * mirrors serve that catalogue only gzipped. Regenerate from byte 55 of VII/20/catalog.dat.
+ */
+const SHARPLESS_BRIGHT_PATH = path.join(__dirname, 'sharpless-bright.json');
+
+function loadSharplessBright() {
+  const raw = JSON.parse(fs.readFileSync(SHARPLESS_BRIGHT_PATH, 'utf8'));
+  return new Map(Object.entries(raw).map(([num, bright]) => [`SH2-${num}`, bright]));
+}
+
+function parseLbnBright(text) {
+  const map = new Map();
+  for (const line of text.split(/\r?\n/)) {
+    const seq = parseInt(line.slice(1, 5), 10);
+    const bright = parseInt(line.slice(54, 55), 10);
+    if (seq > 0 && bright >= 1 && bright <= 6) map.set(`LBN${seq}`, bright);
+  }
+  return map;
+}
+
+/** Difficulty from a catalogue brightness class (Sharpless first, it is the finer survey), or null. */
+function nebulaClassDifficulty(catalogs, sharplessBright, lbnBright) {
+  for (const cat of catalogs) {
+    const m = /^sh2-(\d+)$/i.exec(cat);
+    const b = m ? sharplessBright.get(`SH2-${parseInt(m[1], 10)}`) : undefined;
+    if (b !== undefined) return b === 3 ? 3 : b === 2 ? 4 : 5;
+  }
+  for (const cat of catalogs) {
+    const b = lbnBright.get(cat);
+    if (b !== undefined) return b <= 2 ? 3 : b <= 4 ? 4 : 5;
+  }
+  return null;
+}
+
+/**
+ * Difficulty of a planetary nebula from its mean surface brightness (mag/arcsec² over its ellipse): the
+ * total magnitude alone makes a large old PN (Abell, Jones, PuWe…) look easy. With no magnitude the PN
+ * comes from a discovery survey of faint ones, so it is hard: 5 when larger than 1′, else 4.
+ */
+export function planetaryDifficulty(mag, majAxis, minAxis) {
+  const maj = majAxis ?? 0;
+  if (mag === null || mag === undefined || mag <= 0) return maj >= 1 ? 5 : 4;
+  if (maj <= 0) return mag > 12 ? 3 : 2;
+  const areaArcsec2 = (Math.PI / 4) * maj * 60 * (minAxis ?? maj) * 60;
+  const sb = mag + 2.5 * Math.log10(areaArcsec2);
+  if (sb <= PN_SB_LIMITS[0]) return 1;
+  if (sb <= PN_SB_LIMITS[1]) return 2;
+  if (sb <= PN_SB_LIMITS[2]) return 3;
+  if (sb <= PN_SB_LIMITS[3]) return 4;
+  return 5;
+}
+const PN_SB_LIMITS = [20.3, 22, 23.5, 25];
+
 function typeDifficultyHeuristic(type, mag, emissionLines) {
   switch (type) {
     case 'OC':
@@ -537,9 +595,26 @@ function typeDifficultyHeuristic(type, mag, emissionLines) {
   }
 }
 
-function computeDifficulty({ catalogs, type, mag, majAxis, emissionLines, surfBrMap, agMap }) {
+export function computeDifficulty({
+  catalogs,
+  type,
+  mag,
+  majAxis,
+  minAxis = null,
+  emissionLines,
+  surfBrMap = new Map(),
+  agMap = new Map(),
+  sharplessBright = new Map(),
+  lbnBright = new Map(),
+}) {
   const sz = majAxis ?? 0;
   const isMessier = catalogs.some((c) => /^M\d+$/.test(c));
+
+  // ── Planetary nebula: surface brightness, not total magnitude ──
+  if (type === 'PN') {
+    const d = planetaryDifficulty(mag, majAxis, minAxis);
+    return isMessier ? Math.min(d, 2) : d;
+  }
 
   // ── Galaxy: SurfBr is the gold standard ──
   // Match every galaxy subtype (Gx, GxS, GxE, GxI, …) — not just the bare 'Gx' code,
@@ -592,6 +667,14 @@ function computeDifficulty({ catalogs, type, mag, majAxis, emissionLines, surfBr
     }
   }
 
+  // Emission nebulae and remnants with no visual rating: the brightness class of their catalogue, which
+  // already judges them in Hα (so no narrowband bonus below).
+  let fromClass = false;
+  if (base === null && (type === 'EN' || type === 'SNR')) {
+    base = nebulaClassDifficulty(catalogs, sharplessBright, lbnBright);
+    fromClass = base !== null;
+  }
+
   if (base === null) {
     base = typeDifficultyHeuristic(type, mag, emissionLines);
   }
@@ -602,7 +685,7 @@ function computeDifficulty({ catalogs, type, mag, majAxis, emissionLines, surfBr
 
   // Type adjustments
   if (type === 'RN' || type === 'DN') base = base + 1; // extended, low SB
-  if (emissionLines) base = base - 1; // narrowband reduces difficulty
+  if (emissionLines && !fromClass) base = base - 1; // narrowband reduces difficulty
 
   const result = Math.max(1, Math.min(5, base));
   // Messier catalog = beginner-accessible by definition
@@ -651,6 +734,20 @@ async function main() {
     );
   }
 
+  // Brightness classes of the Sharpless and LBN catalogues, for nebulae with no visual rating
+  const sharplessBright = loadSharplessBright();
+  let lbnBright = new Map();
+  try {
+    lbnBright = parseLbnBright(await cdsFile('VII/9/catalog.dat', 'the LBN catalogue'));
+  } catch (e) {
+    console.warn(
+      `  WARNING: ${e.message}. LBN nebulae without a visual rating keep the heuristic.`,
+    );
+  }
+  console.log(
+    `  Brightness classes: ${sharplessBright.size} Sharpless, ${lbnBright.size} LBN entries`,
+  );
+
   // Load dso.json
   const dsoJson = JSON.parse(fs.readFileSync(DSO_JSON_PATH, 'utf8'));
 
@@ -684,6 +781,7 @@ async function main() {
   const idxNameEn = fields.indexOf('nameEn');
   const idxCatalogs = fields.indexOf('catalogs');
   const idxEmLines = fields.indexOf('emissionLines');
+  const idxMinAxisIn = fields.indexOf('minAxis');
 
   // Append new field names
   dsoJson.fields.push('rating', 'difficulty');
@@ -717,6 +815,7 @@ async function main() {
     const type = row[idxType];
     const mag = row[idxMag];
     const majAxis = row[idxMajAxis];
+    const minAxis = idxMinAxisIn >= 0 ? row[idxMinAxisIn] : null;
     const nameFr = row[idxNameFr];
     const nameEn = idxNameEn >= 0 ? row[idxNameEn] : null;
     const emissionLines = idxEmLines >= 0 ? row[idxEmLines] : null;
@@ -737,9 +836,12 @@ async function main() {
       type,
       mag,
       majAxis,
+      minAxis,
       emissionLines,
       surfBrMap,
       agMap,
+      sharplessBright,
+      lbnBright,
     });
 
     row.push(rating, difficulty);
@@ -943,7 +1045,10 @@ function computeRenderPriority(data, { idxRa, idxDec, idxMag, idxRating }) {
   for (let i = 0; i < n; i++) data[i].push(priority[i]);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Run only as a script, not when a test imports the difficulty functions.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

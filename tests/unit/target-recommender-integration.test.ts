@@ -10,7 +10,8 @@
  *  - M92 transits at 88°  → excluded by maxAlt=80, included by maxAlt=90.
  *  - M10 transits at 40.7° and M12 at 43.1° → always included when maxAlt≥44°.
  *  - With Messier+GC filter (~12 objects), all three must appear in top results.
- *  - With all-catalog GC filter (~30–50 objects), M13 ranks top-5; M10/M12 appear in top 20.
+ *  - With all-catalog GC filter (~30–50 objects), M13 ranks top-5; M10/M12 appear in top 25 (their
+ *    difficulty 2 ranks them just below the many difficulty-1 GCs placed as well).
  */
 
 import { describe, it, expect, vi, beforeAll } from 'vitest';
@@ -210,16 +211,16 @@ describe('integration — all-catalog GC filter, lat=45.17°N, June 12 2026', ()
     expect(allGCs.length).toBeGreaterThan(100);
   });
 
-  it('M10 appears in top 20 all-catalog GC results with maxAlt=90', () => {
-    const ids = recommendTargets(allGCs, c8Preset, june12location, june12night, 20, {
+  it('M10 appears in top 25 all-catalog GC results with maxAlt=90', () => {
+    const ids = recommendTargets(allGCs, c8Preset, june12location, june12night, 25, {
       minAltDeg: 20,
       maxAltDeg: 90,
     }).map((r) => r.dso.id);
     expect(ids).toContain('M10');
   });
 
-  it('M12 appears in top 20 all-catalog GC results with maxAlt=90', () => {
-    const ids = recommendTargets(allGCs, c8Preset, june12location, june12night, 20, {
+  it('M12 appears in top 25 all-catalog GC results with maxAlt=90', () => {
+    const ids = recommendTargets(allGCs, c8Preset, june12location, june12night, 25, {
       minAltDeg: 20,
       maxAltDeg: 90,
     }).map((r) => r.dso.id);

@@ -39,11 +39,16 @@ function magBand(mag: number | null): MagBand {
  * Clusters use lower tables because they are resolution-limited rather than
  * SNR-limited: stacking more frames on a compact, bright cluster yields
  * diminishing returns much faster than it does for a faint diffuse nebula.
+ * Difficulty 4–5 nebulae and galaxies (faint Sharpless/LBN regions, old
+ * planetary nebulae like Abell 31 or Outters 4, tidal streams) are multi-night
+ * projects: tens of hours, as amateurs who image them report.
  */
-const HOURS_BY_DIFFICULTY_DEFAULT = [0.25, 0.75, 2.5, 4.0, 8.0]; // large nebulae (EN, SNR, RN, DN)
+const HOURS_BY_DIFFICULTY_DEFAULT = [0.25, 0.75, 2.5, 8.0, 25.0]; // nebulae (EN, SNR, RN, DN), galaxies
 const HOURS_BY_DIFFICULTY_GC = [0.25, 0.5, 1.0, 2.0, 4.0]; // globular clusters
 const HOURS_BY_DIFFICULTY_OC = [0.15, 0.33, 0.75, 1.5, 3.0]; // open clusters
-const HOURS_BY_DIFFICULTY_PN = [0.15, 0.33, 0.75, 1.5, 3.0]; // planetary nebulae
+// Planetary nebulae: difficulty comes from surface brightness, so 1–2 are the small bright ones (M57)
+// and 4–5 the large faint ones (Abell, Jones, Outters).
+const HOURS_BY_DIFFICULTY_PN = [0.15, 0.33, 1.5, 6.0, 25.0];
 
 /**
  * Aperture scaling factor normalised to 200 mm.
@@ -64,8 +69,8 @@ const PN_MAX_APERTURE_FACTOR = 3.0;
 const GX_MAX_APERTURE_FACTOR = 4.0;
 const EN_MAX_APERTURE_FACTOR = 5.0; // EN, SNR, RN, DN, unknown
 
-/** Absolute ceiling — no single-session recommendation should exceed one long night. */
-const MAX_TOTAL_HOURS = 6.0;
+/** Absolute ceiling: the faintest targets on a small aperture are several nights' work, not a season's. */
+export const MAX_TOTAL_HOURS = 40.0;
 
 /**
  * Compute total integration hours from DSO difficulty + gear aperture.

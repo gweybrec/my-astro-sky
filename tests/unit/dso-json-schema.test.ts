@@ -98,4 +98,23 @@ describe('public/data/dso.json schema integrity', () => {
       expect(v === null || (typeof v === 'string' && v.length > 0)).toBe(true);
     }
   });
+
+  // Difficulty of planetary nebulae comes from surface brightness, and of Sharpless/LBN nebulae from their
+  // catalogue's brightness class (scripts/add-ratings.mjs): large faint ones must not read as easy.
+  it.each([
+    ['Outters4', 5],
+    ['WeDe1', 5],
+    ['Jones1', 5],
+    ['PuWe1', 5],
+    ['Abell31', 5],
+    ['SH2-129', 5],
+  ])('rates the faint %s at difficulty %i', (id, difficulty) => {
+    const row = dso.data.find((r) => r[idx('id')] === id)!;
+    expect(row[idx('difficulty')]).toBe(difficulty);
+  });
+
+  it.each(['M57', 'M27', 'M97', 'NGC6543', 'NGC7000'])('keeps %s easy (difficulty ≤ 2)', (id) => {
+    const row = dso.data.find((r) => r[idx('id')] === id)!;
+    expect(row[idx('difficulty')] as number).toBeLessThanOrEqual(2);
+  });
 });

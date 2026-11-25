@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DSO } from '@myastrosky/core/types';
 import type { GearPreset } from '@myastrosky/core/gear-presets';
-import { recommendRecipe } from '@myastrosky/core/imaging-recipe';
+import { MAX_TOTAL_HOURS, recommendRecipe } from '@myastrosky/core/imaging-recipe';
 
 function dso(overrides: Partial<DSO> = {}): DSO {
   return {
@@ -133,7 +133,7 @@ describe('recommendRecipe()', () => {
       preset({ apertureMm: 1000 }),
     );
 
-    expect(tinyScope.totalHours).toBeLessThanOrEqual(12);
+    expect(tinyScope.totalHours).toBeLessThanOrEqual(MAX_TOTAL_HOURS);
     expect(hugeScope.totalHours).toBeGreaterThanOrEqual(0.15);
   });
 
@@ -197,18 +197,27 @@ describe('recommendRecipe()', () => {
     expect(recipe.noteKeys).not.toContain('noteDualBand');
   });
 
-  it('large diffuse nebula (RN/EN) at any aperture never exceeds 6 h', () => {
-    // NGC7023 (RN, diff 5, mag null) was hitting the absolute 12 h ceiling.
-    const rn = recommendRecipe(
+  it('makes the hardest targets multi-night projects, within the ceiling', () => {
+    // Outters 4 / WeDe 1 (PN, difficulty 5) on a C8 used to get 19 min.
+    const c8 = preset({ apertureMm: 203 });
+    const pn = recommendRecipe(dso({ type: 'PN', difficulty: 5, mag: null }), c8);
+    const en = recommendRecipe(dso({ type: 'EN', difficulty: 5, mag: null }), c8);
+    expect(pn.totalHours).toBeGreaterThanOrEqual(20);
+    expect(en.totalHours).toBeGreaterThanOrEqual(20);
+    const small = recommendRecipe(
       dso({ type: 'RN', difficulty: 5, mag: null }),
       preset({ apertureMm: 50 }),
     );
-    const en = recommendRecipe(
-      dso({ type: 'EN', difficulty: 4, mag: 8 }),
-      preset({ apertureMm: 50 }),
-    );
-    expect(rn.totalHours).toBeLessThanOrEqual(6);
-    expect(en.totalHours).toBeLessThanOrEqual(6);
+    expect(small.totalHours).toBeLessThanOrEqual(MAX_TOTAL_HOURS);
+  });
+
+  it('gives a difficulty-4 nebula more than one night but less than a difficulty 5', () => {
+    const at = (difficulty: number) =>
+      recommendRecipe(dso({ type: 'EN', difficulty, mag: null }), preset({ apertureMm: 200 }))
+        .totalHours;
+    expect(at(3)).toBeLessThan(at(4));
+    expect(at(4)).toBeGreaterThanOrEqual(6);
+    expect(at(4)).toBeLessThan(at(5));
   });
 
   it('PN at 50 mm stays within reasonable bounds (≤ 1.5 h)', () => {
