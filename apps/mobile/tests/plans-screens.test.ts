@@ -227,9 +227,10 @@ const PLANS = [
 ];
 
 beforeEach(() => {
-  // The evening of the plans' night: none of them has passed yet (only the clock is pinned, the timers run).
+  // The evening of the plans' night: none of them has passed yet (only the clock is pinned, the timers run). 21:00 in
+  // Strasbourg (UTC+2) whatever the machine's time zone: CI runs in UTC, where a local 21:00 is past the first plan.
   vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(new Date(2026, 9, 3, 21, 0));
+  vi.setSystemTime(new Date(Date.UTC(2026, 9, 3, 19, 0)));
   mounted.splice(0).forEach((w) => w.unmount());
   localStorage.setItem('lang', 'fr');
   configureStorage(createMemoryStore());
