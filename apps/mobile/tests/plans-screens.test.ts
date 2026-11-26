@@ -66,6 +66,11 @@ import { currentSkyMap } from '../src/sky-map-setup';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { invalidateGearCache } from '@myastrosky/core/gear-catalog';
 import { gearAdded } from '../src/pages/gear/gear-added';
+import { useLivePlanStore } from '@myastrosky/app-state/stores/live-plan';
+import { resolvePlanNight } from '@myastrosky/core/targets/plan';
+import { t } from '@myastrosky/core/i18n/index';
+import { targetsPrefs } from '../src/composables/useTargets';
+import { planLookups } from '../src/composables/usePlans';
 
 const GEAR = {
   telescope: [
@@ -334,7 +339,7 @@ describe('the plan detail page', () => {
     expect(text).toContain('Lune');
     expect(text).toMatch(/\d+ %/);
     expect(text).toContain('2 objets');
-    const rows = w.findAll('.mob-list .mob-row');
+    const rows = w.findAll('.mob-list .mob-row:not(.mob-toggle-row)');
     expect(rows).toHaveLength(2);
     const names = rows.map((r) => r.text());
     expect(names.some((n) => n.includes("Nébuleuse de l'Amérique du Nord"))).toBe(true);
@@ -357,7 +362,7 @@ describe('the plan detail page', () => {
 
   it('opens a target on a tap', async () => {
     const { w, router } = await show(PlanDetailPage, '/plans/p1');
-    await w.find('.mob-list .mob-row').trigger('click');
+    await w.find('.mob-list .mob-row:not(.mob-toggle-row)').trigger('click');
     await flushPromises();
     expect(router.currentRoute.value.path).toMatch(/^\/plans\/p1\/e[12]$/);
   });
@@ -391,7 +396,7 @@ describe('the plan detail page', () => {
   };
   const mosaicRow = (w: ReturnType<typeof mount>) =>
     w
-      .findAll('.mob-list .mob-row')
+      .findAll('.mob-list .mob-row:not(.mob-toggle-row)')
       .find((r) => r.text().includes("Nébuleuse de l'Amérique du Nord · Mosaïque"))!;
 
   it('lists a mosaic as an item like the targets, and opens its page on a tap', async () => {
@@ -400,7 +405,7 @@ describe('the plan detail page', () => {
     expect(w.text()).toContain('2 objets');
     expect(mosaicRow(w).text()).toContain("Pas encore de fenêtre d'observation · 2 tuiles");
     // one item for the mosaic, none for its tiles
-    expect(w.findAll('.mob-list .mob-row')).toHaveLength(2);
+    expect(w.findAll('.mob-list .mob-row:not(.mob-toggle-row)')).toHaveLength(2);
     await mosaicRow(w).trigger('click');
     await settle();
     expect(router.currentRoute.value.path).toBe('/plans/p1/mosaics/m1');
@@ -437,7 +442,9 @@ describe('the plan detail page', () => {
   it('says a target has no window yet instead of an empty line', async () => {
     backend.plans.list.mockImplementation(async () => [plan('p1', 'Nuit', [entry('e1', 'M31')])]);
     const { w } = await show(PlanDetailPage, '/plans/p1');
-    expect(w.find('.mob-list .mob-row').text()).toContain("Pas encore de fenêtre d'observation");
+    expect(w.find('.mob-list .mob-row:not(.mob-toggle-row)').text()).toContain(
+      "Pas encore de fenêtre d'observation",
+    );
   });
 
   describe("a mosaic's page", () => {
@@ -650,7 +657,7 @@ describe('the plan detail page', () => {
     ];
     backend.plans.list.mockResolvedValue(byWindow(0.5));
     const { w } = await show(PlanDetailPage, '/plans/p1');
-    const first = () => w.findAll('.mob-list .mob-row')[0].text();
+    const first = () => w.findAll('.mob-list .mob-row:not(.mob-toggle-row)')[0].text();
     expect(first()).toContain("Nébuleuse de l'Amérique du Nord");
     // the window of M31 moved before NGC 7000's on its own page, then back here
     backend.plans.list.mockResolvedValue(byWindow(0.05));
@@ -782,7 +789,7 @@ describe('the plan detail page', () => {
     backend.plans.list.mockResolvedValue([{ ...PLANS[0], lat: null, lon: null }]);
     const { w } = await show(PlanDetailPage, '/plans/p1');
     expect(w.text()).not.toContain('Début de nuit');
-    expect(w.findAll('.mob-list .mob-row')).toHaveLength(2);
+    expect(w.findAll('.mob-list .mob-row:not(.mob-toggle-row)')).toHaveLength(2);
   });
 });
 
@@ -803,7 +810,7 @@ describe('archived plans and plans whose night has passed', () => {
     backend.plans.list.mockImplementation(async () => structuredClone(ARCHIVE_PLANS));
     const { w } = await show(PlansPage, '/tabs/plans');
     expect(segButtons(w as never)).toEqual(['En cours (2)', 'Archivés (1)']);
-    const rows = w.findAll('.mob-list .mob-row');
+    const rows = w.findAll('.mob-list .mob-row:not(.mob-toggle-row)');
     expect(rows.map((r) => r.find('.mob-row-title').text())).toEqual([
       'Nuit du 2026-10-03',
       'Cygne et Céphée',
@@ -816,7 +823,7 @@ describe('archived plans and plans whose night has passed', () => {
     const { w } = await show(PlansPage, '/tabs/plans');
     await w.findAll('.mob-seg-btn')[1].trigger('click');
     await settle();
-    const rows = w.findAll('.mob-list .mob-row');
+    const rows = w.findAll('.mob-list .mob-row:not(.mob-toggle-row)');
     expect(rows).toHaveLength(1);
     expect(rows[0].text()).toContain('Nuit du 2026-09-19');
     expect(w.find('button[aria-label="Nouveau plan"]').exists()).toBe(false);
@@ -831,7 +838,7 @@ describe('archived plans and plans whose night has passed', () => {
     vi.setSystemTime(new Date(2026, 9, 4, 12, 0));
     const after = await show(PlansPage, '/tabs/plans');
     const marked = after.w
-      .findAll('.mob-list .mob-row')
+      .findAll('.mob-list .mob-row:not(.mob-toggle-row)')
       .filter((r) => r.find('.mob-badge--warn').exists());
     expect(marked.map((r) => r.find('.mob-row-title').text())).toEqual(['Nuit du 2026-10-03']);
     expect(marked[0].text()).toContain('Date passée');
@@ -1489,5 +1496,120 @@ describe('the target page of a plan ("Plan, ajouter une cible, détail")', () =>
       dec: DSOS.NGC7000.dec,
     });
     expect(showNotice).toHaveBeenCalledWith('Ajouté à « Cygne et Céphée »');
+  });
+});
+
+describe('the live plan ("Plan, détail, ce soir", "Plan, en direct")', () => {
+  const button = (w: Awaited<ReturnType<typeof show>>['w'], text: string) =>
+    w.findAll('button').find((b) => b.text().trim() === text);
+
+  /** The live plan as the app connects it, with its alerts kept here. */
+  function installLive() {
+    const live = useLivePlanStore();
+    const port = {
+      sync: vi.fn().mockResolvedValue(undefined),
+      clear: vi.fn().mockResolvedValue(undefined),
+    };
+    live.install({
+      resolveNight: (p) => resolvePlanNight(p, targetsPrefs, planLookups),
+      alerts: port,
+      t,
+      clock: (ms) => new Date(ms).toTimeString().slice(0, 5),
+    });
+    return { live, port };
+  }
+
+  it("offers to start tonight's plan, with its alerts; not a plan of another night", async () => {
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    expect(button(w, 'Démarrer le plan')).toBeTruthy();
+    expect(w.text()).toContain('Alertes');
+    expect(w.text()).toContain('Rappel 5 min avant la fin de l’objet');
+    expect(w.text()).toContain('Alerte avant le méridien');
+    const other = await show(PlanDetailPage, '/plans/p2');
+    expect(button(other.w, 'Démarrer le plan')).toBeUndefined();
+  });
+
+  it('starts at once: the live card leads, the night and the equipment are locked', async () => {
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    const { live, port } = installLive();
+    await button(w, 'Démarrer le plan')!.trigger('click');
+    await settle();
+    expect(live.state?.planId).toBe('p1');
+    expect(button(w, 'Démarrer le plan')).toBeUndefined();
+    expect(w.text()).toContain('En direct');
+    expect(button(w, 'Arrêter')).toBeTruthy();
+    expect(port.sync).toHaveBeenCalled();
+    const night = w.find('button[aria-label^="Nuit"]');
+    expect(night.classes()).toContain('mob-btn--unavailable');
+    await night.trigger('click');
+    expect(showNotice).toHaveBeenCalledWith('Arrêtez le plan pour changer la nuit ou l’équipement');
+    showNotice.mockClear();
+    await w.find('button[aria-label^="Équipement : "]').trigger('click');
+    expect(showNotice).toHaveBeenCalledWith('Arrêtez le plan pour changer la nuit ou l’équipement');
+  });
+
+  it('lights the target being imaged, with Passer and +10 min', async () => {
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    const { live } = installLive();
+    live.start('p1');
+    const slot = live.slots[0];
+    vi.setSystemTime(new Date((slot.startMs + slot.endMs) / 2));
+    live.refresh();
+    await settle();
+    const lit = w.find('.mob-row--current');
+    expect(lit.text()).toContain("Nébuleuse de l'Amérique du Nord");
+    expect(button(w, 'Passer')).toBeTruthy();
+    expect(button(w, '+10 min')).toBeTruthy();
+    expect(w.find('[role="progressbar"]').exists()).toBe(true);
+    await button(w, '+10 min')!.trigger('click');
+    expect(live.slots[0].endMs).toBe(slot.endMs + 10 * 60_000);
+  });
+
+  it('a change of the alerts applies at once', async () => {
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    const { live } = installLive();
+    live.start('p1');
+    await settle();
+    const meridian = w
+      .findAllComponents({ name: 'PhoneToggleRow' })
+      .find((c) => c.props('title') === 'Alerte avant le méridien')!;
+    meridian.vm.$emit('update:modelValue', true);
+    await settle();
+    expect(live.state?.options.meridianFlip).toBe(true);
+  });
+
+  it('Arrêter ends it: the start button comes back', async () => {
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    const { live, port } = installLive();
+    live.start('p1');
+    await settle();
+    await button(w, 'Arrêter')!.trigger('click');
+    await settle();
+    expect(live.isLive).toBe(false);
+    expect(port.clear).toHaveBeenCalled();
+    expect(button(w, 'Démarrer le plan')).toBeTruthy();
+  });
+
+  it('another live plan has to be stopped first', async () => {
+    const { w } = await show(PlanDetailPage, '/plans/p1');
+    const { live } = installLive();
+    // Another plan already live (started here directly, whatever its night).
+    live.start('p2');
+    await settle();
+    await button(w, 'Démarrer le plan')!.trigger('click');
+    expect(showNotice).toHaveBeenCalledWith('Arrêtez d’abord le plan « Cygne et Céphée »');
+    expect(live.state?.planId).toBe('p2');
+  });
+
+  it('the plans list marks the live plan', async () => {
+    storage().set(
+      'livePlan',
+      JSON.stringify({ planId: 'p1', startedAtMs: Date.now(), adjustments: [], options: {} }),
+    );
+    const { w } = await show(PlansPage, '/tabs/plans');
+    const row = w.findAll('.mob-row').find((r) => r.text().includes('Nuit du 2026-10-03'))!;
+    expect(row.text()).toContain('En direct');
+    const other = w.findAll('.mob-row').find((r) => r.text().includes('Cygne et Céphée'))!;
+    expect(other.text()).not.toContain('En direct');
   });
 });

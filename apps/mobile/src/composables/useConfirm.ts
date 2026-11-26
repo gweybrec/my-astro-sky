@@ -6,6 +6,8 @@ export interface ConfirmOptions {
   message: string;
   /** The label of the confirming button (the board "Plan, confirmer la suppression": "Supprimer le plan"). */
   confirmLabel: string;
+  /** The label of the other button, "Annuler" by default ("Non" in "Plan, en direct, terminé"). */
+  cancelLabel?: string;
   /** Red filled confirm button: the sole destructive choice of the dialog (every delete). */
   destructive?: boolean;
   /** A line under the message in the danger colour (board "Réglages, confirmer la suppression": cannot be undone). */
@@ -25,7 +27,11 @@ export function useConfirm() {
         : 'mob-dialog-alert',
       backdropDismiss: true,
       buttons: [
-        { text: t('modal.cancel'), role: 'cancel', cssClass: 'mob-btn mob-btn--lg m-body' },
+        {
+          text: options.cancelLabel ?? t('modal.cancel'),
+          role: 'cancel',
+          cssClass: 'mob-btn mob-btn--lg m-body',
+        },
         {
           text: options.confirmLabel,
           role: 'confirm',

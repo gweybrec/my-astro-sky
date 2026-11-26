@@ -12,6 +12,7 @@ import {
 } from '@myastrosky/core/targets/plan';
 import { createPlanAPI } from '@myastrosky/app-state/api';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
+import { useLivePlanStore } from '@myastrosky/app-state/stores/live-plan';
 import { reloadTargetsPrefs, targetsPrefs, updateTargetsPrefs } from '../composables/useTargets';
 import { useErrorToast } from '../composables/useErrorToast';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
@@ -31,6 +32,8 @@ import planIcon from '@icons/plan-list.svg?raw';
 // archived view has no plus: a new plan is a current one.
 const router = useRouter();
 const store = usePlansStore();
+// The plan being followed tonight carries "En direct" (board "Plans, plan en direct").
+const live = useLivePlanStore();
 const { showError } = useErrorToast();
 
 const search = ref('');
@@ -133,8 +136,13 @@ async function create() {
               chevron
               @click="router.push(`/plans/${row.id}`)"
             >
-              <template v-if="row.overdue" #badges>
-                <PhoneBadge kind="warn">{{ t('targets.plan.datePassed') }}</PhoneBadge>
+              <template v-if="row.overdue || live.state?.planId === row.id" #badges>
+                <PhoneBadge v-if="live.state?.planId === row.id" kind="success">{{
+                  t('live.badge')
+                }}</PhoneBadge>
+                <PhoneBadge v-if="row.overdue" kind="warn">{{
+                  t('targets.plan.datePassed')
+                }}</PhoneBadge>
               </template>
             </PhoneRow>
           </IonList>

@@ -6,6 +6,8 @@ function confirmDeleteDialog(
   actionLabel: string,
   /** `btn-confirm` for a choice that destroys nothing. */
   actionClass: 'btn-danger' | 'btn-confirm' = 'btn-danger',
+  /** The other button's label, "Annuler" by default. */
+  cancelLabel: string = t('gallery.cancelEdit'),
 ): Promise<boolean> {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
@@ -28,7 +30,7 @@ function confirmDeleteDialog(
     const cancelBtn = document.createElement('button');
     cancelBtn.type = 'button';
     cancelBtn.className = 'btn-cancel';
-    cancelBtn.textContent = t('gallery.cancelEdit');
+    cancelBtn.textContent = cancelLabel;
 
     const confirmBtn = document.createElement('button');
     confirmBtn.type = 'button';
@@ -144,6 +146,17 @@ export function confirmPlanDelete(planName: string): Promise<boolean> {
     t('targets.plan.delete'),
     t('targets.plan.confirmDelete', { name: planName }),
     t('targets.plan.delete'),
+  );
+}
+
+/** The live plan has finished: archive it? (the phone's board "Plan, en direct, terminé": Non / Archiver). */
+export function confirmPlanFinished(planName: string): Promise<boolean> {
+  return confirmDeleteDialog(
+    t('live.status.finished'),
+    t('live.archiveMessage', { name: planName }),
+    t('live.archiveYes'),
+    'btn-confirm',
+    t('live.archiveNo'),
   );
 }
 

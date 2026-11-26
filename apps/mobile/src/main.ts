@@ -20,6 +20,8 @@ import { catalogsReady } from './catalogs';
 import { checkAstrometryKey } from './key-check';
 import { repairStoredPhotoSizes } from './photo-sizes';
 import { resumeImport } from './composables/usePhotoImport';
+import { installLivePlan } from './composables/useLivePlan';
+import { reportError } from '@myastrosky/core/platform/error-hook';
 
 async function start(): Promise<void> {
   try {
@@ -49,6 +51,11 @@ async function start(): Promise<void> {
   void catalogsReady()
     .catch(() => undefined)
     .then(() => repairStoredPhotoSizes());
+  // The live plan resolves its targets against the catalogues: it is connected once they are loaded.
+  void catalogsReady()
+    .then(() => router.isReady())
+    .then(() => installLivePlan(router))
+    .catch((error) => reportError('live plan', error));
 }
 
 void start();

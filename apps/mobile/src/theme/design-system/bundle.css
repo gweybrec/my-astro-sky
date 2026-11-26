@@ -2126,3 +2126,31 @@ svg.mob-icon--sm,
 .mob-credit-links > .mob-badge.mob-link {
   color: var(--accent-color);
 }
+
+/* `.mob-live-card`: the live card of a started plan (what is imaged now, until when, what comes next, then its
+   buttons); `.mob-live-title` its title, in the bright text colour; `.mob-live-next` the line after the progress.
+   `.mob-progress`: a thin track with its filled part, `.mob-progress-bar`, as wide as `--progress` (0 to 1). */
+.mob-live-card {
+  background: var(--bg-panel);
+}
+.mob-live-title {
+  color: var(--text-bright);
+}
+.mob-live-next {
+  padding-top: var(--space-3);
+}
+.mob-progress {
+  display: block;
+  height: var(--space-2);
+  margin-top: var(--space-4);
+  border-radius: var(--space-1);
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+.mob-progress-bar {
+  display: block;
+  height: 100%;
+  background: var(--accent-color);
+  transform: scaleX(var(--progress, 0));
+  transform-origin: left center;
+}

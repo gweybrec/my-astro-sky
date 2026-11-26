@@ -26,6 +26,7 @@ import {
 import type { DSO } from '@myastrosky/core/types';
 import { usePlansStore } from '@myastrosky/app-state/stores/plans';
 import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
+import { useLivePlanStore } from '@myastrosky/app-state/stores/live-plan';
 import { catalogsReady } from '../catalogs';
 import { useConfirm } from '../composables/useConfirm';
 import { useErrorToast } from '../composables/useErrorToast';
@@ -34,6 +35,9 @@ import { withSkyMap } from '../sky-map-setup';
 import { saveFile } from '../platform-device';
 import { reloadTargetsPrefs, targetsPrefs } from '../composables/useTargets';
 import { usePlanOnMap } from '../composables/usePlanOnMap';
+import { startLivePlan } from '../composables/useLivePlan';
+import PlanLiveCard from './plans/PlanLiveCard.vue';
+import PlanLiveAlerts from './plans/PlanLiveAlerts.vue';
 import AppIcon from '../components/AppIcon.vue';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
@@ -73,6 +77,7 @@ const fov = useFovFramesStore();
 const { confirm } = useConfirm();
 const { showError, showNotice } = useErrorToast();
 const { showPlan } = usePlanOnMap();
+const live = useLivePlanStore();
 
 const planId = computed(() => String(route.params.id));
 const plan = computed<Plan | undefined>(() => store.plans.find((p) => p.id === planId.value));
@@ -88,6 +93,28 @@ const nightLabel = computed(() =>
     ? t('mobile.targets.tonight')
     : formatPlanDate(nightISO.value, getLang()),
 );
+// Tonight's plan can be started (board "Plan, détail, ce soir"); once started, the live card and the alerts lead the
+// page, the night and the equipment are locked (a tap says why) and the target being imaged is lit (board "Plan, en direct").
+const isLive = computed(() => live.state?.planId === planId.value);
+const canStart = computed(() => !!plan.value && !isLive.value && live.canStart(plan.value));
+const currentId = computed(() =>
+  isLive.value && live.status.kind === 'active' ? live.status.current.itemId : null,
+);
+
+function start() {
+  const other = live.plan;
+  if (live.isLive && other) {
+    void showNotice(t('live.otherLive', { name: other.name }));
+    return;
+  }
+  void startLivePlan(planId.value).catch((error) => void showError(error));
+}
+
+function openNight() {
+  if (isLive.value) void showNotice(t('live.locked'));
+  else nightOpen.value = true;
+}
+
 const overdue = computed(() => !!plan.value && isPlanOverdue(plan.value));
 
 function setNight(dateISO: string) {
@@ -320,6 +347,10 @@ async function remove() {
     </PhoneTopBar>
     <IonContent :scroll-y="false">
       <div v-if="plan" class="mob-scroll mob-page-fill mob-page-column mob-page-safe">
+        <template v-if="isLive">
+          <PlanLiveCard />
+          <PlanLiveAlerts />
+        </template>
         <template v-if="summary.length">
           <PhoneSectionHeader>{{ t('targets.plan.pdf.summary') }}</PhoneSectionHeader>
           <PhoneFacts :facts="summary" />
@@ -329,13 +360,14 @@ async function remove() {
             variant="field"
             block
             text-style="body"
+            :unavailable="isLive"
             :aria-label="
               t('mobile.targets.fieldAria', {
                 name: t('mobile.targets.fieldNight'),
                 value: nightLabel.toLowerCase(),
               })
             "
-            @click="nightOpen = true"
+            @click="openNight"
           >
             <span class="mob-btn-key">{{ t('mobile.targets.fieldNight') }}</span>
             <span class="mob-btn-value mob-btn-value--swatch">{{ nightLabel }}</span>
@@ -357,7 +389,20 @@ async function remove() {
             </template>
           </PhoneRow>
         </IonList>
-        <PlanSetupField :plan="plan" bare @new-setup="router.push('/settings/setups/new')" />
+        <PlanSetupField
+          :plan="plan"
+          bare
+          :locked="isLive"
+          @new-setup="router.push('/settings/setups/new')"
+        />
+        <template v-if="canStart">
+          <div class="mob-form-row" style="padding-bottom: var(--space-4)">
+            <PhoneButton variant="confirm" size="lg" block @click="start">{{
+              t('live.start')
+            }}</PhoneButton>
+          </div>
+          <PlanLiveAlerts />
+        </template>
         <PhoneSectionHeader>{{
           t('targets.plan.itemCount', { n: planItemCount(plan) })
         }}</PhoneSectionHeader>
@@ -368,6 +413,7 @@ async function remove() {
             :title="row.title"
             :subs="row.sub ? [row.sub] : []"
             :mono="row.mono"
+            :current="row.id === currentId"
             button
             chevron
             @click="openRow(row.id)"

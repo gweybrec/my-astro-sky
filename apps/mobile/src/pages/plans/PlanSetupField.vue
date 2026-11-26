@@ -23,9 +23,10 @@ import plusIcon from '@icons/plus.svg?raw';
 // choice of a setup; a setup that does not fit the plan's mosaics as they are asks per mosaic (board "Ciel, changer
 // d'équipement"). In "Ciel, contours de champ" the field shows its name beside the setup's; on "Détail du plan"
 // (`bare`) the setup's name alone. "Nouveau setup" is the page's to open (`newSetup`).
-const props = defineProps<{ plan: Plan; bare?: boolean }>();
+// `locked` while the plan is live: greyed out, a tap says why (board "Plan, en direct").
+const props = defineProps<{ plan: Plan; bare?: boolean; locked?: boolean }>();
 const emit = defineEmits<{ newSetup: [] }>();
-const { showError } = useErrorToast();
+const { showError, showNotice } = useErrorToast();
 const fov = useFovFramesStore();
 
 // The field's name: "Setup" beside the frames, "Équipement" on the plan's page (its board).
@@ -45,6 +46,10 @@ const name = computed(() => {
 load().catch((error) => void showError(error));
 
 function openPick() {
+  if (props.locked) {
+    void showNotice(t('live.locked'));
+    return;
+  }
   pickOpen.value = true;
   load().catch((error) => void showError(error));
 }
@@ -83,6 +88,7 @@ const chosen = computed({
       variant="field"
       block
       text-style="body"
+      :unavailable="locked"
       :aria-label="t('mobile.format.labelValue', { label: fieldName, value: name })"
       @click="openPick"
     >

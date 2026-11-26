@@ -41,6 +41,8 @@ withDefaults(
     /** The title may wrap onto a second line (a long desktop label). */
     wrap?: boolean;
     disabled?: boolean;
+    /** The plan's target being imaged now (board "Plan, en direct"): lit with an accent outline. */
+    current?: boolean;
     /** Waits for a screen that is not built yet: drawn as the board draws the row, without a tap. */
     inert?: boolean;
     /** A tap target (a button); without it the row is only text. */
@@ -60,6 +62,7 @@ const emit = defineEmits<{ click: [event: MouseEvent] }>();
       'mob-row--danger': danger,
       'mob-row--roomy': roomy,
       'mob-row--disabled': disabled,
+      'mob-row--current': current,
       'mob-row--inert': inert,
       'phone-row--expanded': expanded,
     }"

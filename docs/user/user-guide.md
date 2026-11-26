@@ -261,6 +261,17 @@ Entries cannot be reordered by hand: use the **Sort by** dropdown in the plan (t
 
 Click **Export as PDF** in the plan header to generate a printable observation sheet with the target list, "Highest at" times, and FOV sketches.
 
+### Following a plan live
+
+On the night of a plan, **Démarrer le plan** (Start the plan) follows it as you image. You can start it early: it then shows when the first target begins. Once started, a live card at the top of the plan shows the target being imaged, until when, how much time is left, and what comes next. The target's row is highlighted. The times come from the plan's observation windows.
+
+- **Passer** (Skip) ends the current target now. **+10 min** extends it, and the targets after it move by the same amount. Neither one changes the plan itself, and a skipped target never makes the next one start before its own window.
+- The **Alertes** section sets a reminder 5 minutes before the end of each target, and an alert a few minutes before the current target crosses the meridian (time to flip an equatorial mount). You can change both at any time, also while the plan runs. When two windows of the same target follow each other with different filters, the alert says which filter to put in.
+- While the plan runs, its night, gear setup and location are locked. Observation windows can still be edited, and the alerts follow.
+- **Arrêter** (Stop) ends it. When the last window ends, the app asks whether to archive the plan.
+
+On the phone app a notification shows the current target. It vibrates (without sound) at the end of each target, at the start of the next one, and for the alerts. It keeps working when the app is closed or the phone restarts. Its buttons skip, extend or stop. For the alerts to arrive at the exact minute, allow **Alarms & reminders** for MyAstroSky in Android's settings; the app offers to open that page. On the desktop app the alerts are system notifications, shown while the app is open.
+
 ### Archiving a plan
 
 Once a night is done, click the **archive** icon in the plan header to put the plan away. Archived plans leave the plans list, the "add to a plan" choices and the sky map; a **Current / Archived** switch above the list shows them again, and the same icon unarchives a plan. Plans are only archived by hand, never because of their date.

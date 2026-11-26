@@ -94,7 +94,7 @@ import listPlusSvg from './icons/list-plus.svg?raw';
 import targetSvg from './icons/target.svg?raw';
 import trajectorySvg from './icons/trajectory.svg?raw';
 import calendarSvg from './icons/calendar.svg?raw';
-import { createApp, h, type App } from 'vue';
+import { createApp, h, watch, type App } from 'vue';
 import DateTimePicker from './components/base/DateTimePicker.vue';
 import { buildSetupControls, buildFovFrameSpecs } from './fov-overlay';
 import { pinia } from './pinia-instance';
@@ -119,7 +119,14 @@ import { sortPlanTargets, firstWindowFracByEntry } from '@myastrosky/core/plan-s
 import { buildPlanPdfTargets } from '@myastrosky/core/targets/plan-pdf';
 import { downloadBlob } from './file-utils';
 import { reportUnknownRendererError } from './error-reporter';
-import { confirmPlanDelete, confirmPlanEntryDelete } from './photo-delete-confirm';
+import {
+  confirmPlanDelete,
+  confirmPlanEntryDelete,
+  confirmPlanFinished,
+} from './photo-delete-confirm';
+import { buildLivePlanPanel, type LivePlanPanel } from './live-plan-panel';
+import { useLivePlanStore } from '@myastrosky/app-state/stores/live-plan';
+import { createWebLiveAlerts } from '@myastrosky/render/live-alerts-web';
 import {
   loadTargetsPrefs as loadPrefs,
   saveTargetsPrefs as savePrefs,
@@ -134,6 +141,7 @@ import {
   todayISO,
   snapToObservationTime,
   NIGHT_TIME_OPTIONS,
+  formatClock24,
 } from '@myastrosky/core/targets/format';
 import { buildPageList, sortSuggestions, shuffleArray } from '@myastrosky/core/targets/sorting';
 import {
@@ -151,6 +159,7 @@ import {
   moonPhaseForWindow,
   moonSeparationRating,
   planItemCount,
+  resolvePlanNight,
   scorePlanEntry,
   tonightISO,
   type MoonOverlay,
@@ -1041,6 +1050,8 @@ export class TargetsView {
   /** Live per-entry position-angle value spans, keyed by entryId (rebuilt each render). */
   private paSpans = new Map<string, HTMLElement>();
   private planBadgeEl: HTMLElement | null = null;
+  /** The live panels of the plan sections shown (rebuilt each render). */
+  private livePanels: LivePlanPanel[] = [];
   private planPickerEl: HTMLElement | null = null;
   private planPickerOutside: ((ev: MouseEvent) => void) | null = null;
   private planPickerEsc: ((ev: KeyboardEvent) => void) | null = null;
@@ -1066,11 +1077,49 @@ export class TargetsView {
     this.plansStore.$subscribe(() => this.refreshPaReadouts());
     // Load plans in the background; refresh the plans view when ready.
     this.plansStore.ensureLoaded().then(() => this.render());
+    this.installLivePlan();
     // Sky regions: kick off the fetch early so it's already resolved by the time
     // the region dropdown is built (see buildForm, which owns its own refresh hook
     // since the recommend form — unlike the plans view — is built once and never
     // rebuilt by this.render()).
     this.skyRegionsStore.ensureLoaded();
+  }
+
+  /**
+   * The live plan on the desktop: its night from this view's settings, its alerts as the system's notifications while
+   * the app is open, the plan sections' live panels refreshed in place as time passes, and "Archiver le plan ?" once it
+   * has finished.
+   */
+  private installLivePlan(): void {
+    const live = useLivePlanStore(pinia);
+    live.install({
+      resolveNight: (p) =>
+        resolvePlanNight(p, this.prefs, {
+          getDsoById: getDSOById,
+          customLabel: customLocationLabel,
+        }),
+      alerts: createWebLiveAlerts(),
+      t,
+      clock: (ms) => formatClock24(new Date(ms)),
+    });
+    watch(
+      () => [live.now, live.status, live.state, live.lastOptions],
+      () => this.livePanels.forEach((p) => p.refresh()),
+    );
+    let asking = false;
+    watch(
+      () => live.askArchive,
+      async (ask) => {
+        if (!ask || asking) return;
+        asking = true;
+        const yes = await confirmPlanFinished(live.plan?.name ?? '');
+        asking = false;
+        live.answerArchive(yes);
+        this.updatePlanBadge();
+        this.render();
+      },
+      { immediate: true },
+    );
   }
 
   /** Update the live position-angle spans from current plan-entry values. */
@@ -1136,6 +1185,7 @@ export class TargetsView {
   private render(): void {
     this.container.innerHTML = '';
     this.paSpans.clear();
+    this.livePanels = [];
     this.container.className = 'targets-view';
     const inner = document.createElement('div');
     inner.className = 'targets-inner';
@@ -3539,6 +3589,14 @@ export class TargetsView {
     const trajWrap = document.createElement('div');
     trajWrap.className = 'flex flex-col gap-3';
     body.appendChild(trajWrap);
+
+    // Tonight's plan can be started; once started, its live card leads the plan and the night, setup and location are
+    // locked (live-plan-panel.ts). The rows are found again each refresh: the trajectories rebuild them.
+    const livePanel = buildLivePlanPanel(plan, controls, () => [
+      ...trajWrap.querySelectorAll<HTMLElement>('[data-item-id]'),
+    ]);
+    body.insertBefore(livePanel.el, controls);
+    this.livePanels.push(livePanel);
     details.appendChild(body);
 
     // The effective setup id (plan's own, else the global recommend default).
@@ -3611,6 +3669,7 @@ export class TargetsView {
             },
           );
           fillers.push(applyPreset);
+          row.dataset.itemId = info.entryId;
           list.appendChild(row);
           continue;
         }
@@ -3651,9 +3710,11 @@ export class TargetsView {
           },
         );
         fillers.push(applyPreset);
+        row.dataset.itemId = info.entryId;
         list.appendChild(row);
       }
       trajWrap.appendChild(list);
+      livePanel.refresh();
 
       // Score / FOV-fit / integration time need a gear preset (resolved async).
       this.planPreset(effectiveSetupId()).then((preset) => {

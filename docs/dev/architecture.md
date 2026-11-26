@@ -28,6 +28,7 @@
   - Sort bar: score, altitude, transit time, magnitude, size, FOV fit, name, rating, difficulty
   - Each result card shows: object name, type chip, constellation, magnitude, size, rating stars, difficulty dots, imaging recipe (filters + integration time estimate), max altitude, transit time
   - Each result card has an Edit button wired to `onEditDSO: ((dso: DSO) => void) | null` callback (opens the DSO editor modal)
+- **Live plan** (`live-plan-panel.ts`): tonight's plan followed in real time inside its plan section (start button, live card, alerts, locked night/setup/location, the target being imaged lit), refreshed in place by a watch on `useLivePlanStore` (rebuilding the plans view would fold every plan). The schedule, status, alerts and Skip / +10 min live in `packages/core/src/targets/live-plan.ts`; the desktop raises the alerts as system notifications on timers while the app is open (`packages/render/src/live-alerts-web.ts`).
 - **Projection** (`projection.ts`): Stereographic polar projection with North Celestial Pole at center, celestial equator at r=1. `project(ra°, dec°)` → `(x, y)` in projection space; viewport transform converts to canvas pixels.
 - **Affine** (`affine.ts`): Solves affine transforms from correspondences:
   - 3-point exact: 3×3 system for 6-DOF transform (rotation, scale, translation, shear)
