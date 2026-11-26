@@ -35,7 +35,9 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const ROOT = process.env.DEMO_SKY_DIR ? resolve(process.env.DEMO_SKY_DIR) : '';
 const VERSION = process.argv[2] ?? '';
 if (!ROOT || !VERSION) {
-  console.error('Usage: DEMO_SKY_DIR=<working folder> npx tsx build-package.mts <version label, e.g. v3>');
+  console.error(
+    'Usage: DEMO_SKY_DIR=<working folder> npx tsx build-package.mts <version label, e.g. v3>',
+  );
   process.exit(1);
 }
 
@@ -79,14 +81,17 @@ const readJson = async <T,>(name: string): Promise<T> =>
   JSON.parse(await readFile(join(ROOT, name), 'utf-8')) as T;
 
 const sky = await readJson<{ skyId: string; senderName: string }>('sky.json');
-if (!isValidSkyId(sky.skyId)) throw new Error('sky.json: skyId must be letters, digits and dashes (8 to 64)');
+if (!isValidSkyId(sky.skyId))
+  throw new Error('sky.json: skyId must be letters, digits and dashes (8 to 64)');
 const solved = (await readJson<{ solved: Record<string, Solved> }>('solved.json')).solved;
 const details = await readJson<Record<string, Detail>>('details.json');
 const entries = await readJson<Record<string, Entry>>('entries.json');
 
 const missing = Object.keys(solved).filter((id) => !entries[id] || !details[id]);
 if (missing.length) {
-  throw new Error(`No entry or no fetched page for: ${missing.join(', ')} (details.py fetch, then entries.json)`);
+  throw new Error(
+    `No entry or no fetched page for: ${missing.join(', ')} (details.py fetch, then entries.json)`,
+  );
 }
 
 setDsoCatalog(JSON.parse(await readFile(join(REPO, 'public/data/dso.json'), 'utf-8')), {}, 'en');
@@ -121,7 +126,11 @@ for (const [dsoId, s] of byWidestField) {
     'Resized and converted to JPEG for this demo sky; placed by a local astrometry.net (solve-field) plate solve.',
   ];
   if (entry.note) lines.push('', entry.note);
-  const date = entry.date ? (entry.date.length === 10 ? `${entry.date}T00:00:00.000Z` : entry.date) : null;
+  const date = entry.date
+    ? entry.date.length === 10
+      ? `${entry.date}T00:00:00.000Z`
+      : entry.date
+    : null;
 
   photos.push({
     id: randomUUID(),
@@ -148,7 +157,9 @@ for (const [dsoId, s] of byWidestField) {
   credits.push({ entry, detail, title: s.title });
 }
 
-const usedCategories = [...new Set(photos.flatMap((p) => p.pointsOfInterest.map((poi) => poi.categoryId)))];
+const usedCategories = [
+  ...new Set(photos.flatMap((p) => p.pointsOfInterest.map((poi) => poi.categoryId))),
+];
 const unknownCategory = usedCategories.find((id) => !POI_CATEGORIES[id]);
 if (unknownCategory) throw new Error(`Unknown POI category ${unknownCategory}`);
 
@@ -169,7 +180,8 @@ const keyboardName = `${sky.senderName} ${VERSION}`
   .replace(/[̀-ͯ]/g, '')
   .replace(/[^\x20-\x7e]+/g, '-');
 const out = join(ROOT, shareFileName(keyboardName));
-if (existsSync(out)) throw new Error(`${out} exists: a built version is never overwritten; pick another label`);
+if (existsSync(out))
+  throw new Error(`${out} exists: a built version is never overwritten; pick another label`);
 const fh = await open(out, 'wx');
 const { writer, finish } = createZipWriter({
   append: async (b) => {
@@ -185,10 +197,12 @@ await fh.close();
 const zip = unzipSync(new Uint8Array(await readFile(out)));
 const back = parseShareManifest(JSON.parse(new TextDecoder().decode(zip[SHARE_MANIFEST_NAME])));
 const problems: string[] = [];
-if (back.photos.length !== photos.length) problems.push(`${back.photos.length}/${photos.length} photos kept`);
+if (back.photos.length !== photos.length)
+  problems.push(`${back.photos.length}/${photos.length} photos kept`);
 for (const p of back.photos) {
   if (!p.author) problems.push(`${p.file}: no author`);
-  if (p.correspondences.length !== 9) problems.push(`${p.file}: ${p.correspondences.length} points`);
+  if (p.correspondences.length !== 9)
+    problems.push(`${p.file}: ${p.correspondences.length} points`);
   if (zip[`images/${p.file}`]?.length !== p.bytes) problems.push(`${p.file}: picture`);
 }
 if (problems.length) throw new Error(problems.join('\n'));
