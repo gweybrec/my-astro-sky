@@ -175,9 +175,7 @@ describe('drawing a sky region', () => {
   it('says the location is missing and gives up when the map cannot draw', async () => {
     const map = mockMap({ located: false });
     const w = mountDraw(map);
-    expect(showError).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "Définissez d'abord une position d'observation" }),
-    );
+    expect(showError).toHaveBeenCalledWith("Définissez d'abord une position d'observation");
     expect(w.emitted('cancel')).toHaveLength(1);
     w.unmount();
   });
@@ -191,6 +189,7 @@ describe('drawing a sky region', () => {
     await button(w, 'Terminer').trigger('click');
     await flushPromises();
     expect(showError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'disk full' }),
       expect.objectContaining({ message: "Échec de l'enregistrement de la région." }),
     );
     expect(w.emitted('saved')).toBeUndefined();

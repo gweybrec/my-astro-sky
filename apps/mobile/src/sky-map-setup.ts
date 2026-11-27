@@ -151,10 +151,10 @@ export function createPhoneSkyMap(
     photoUrl: photoFileUrl,
     onPlacementError: options.onPhotoPlacementError,
     onDimensionMismatch: (photo, expected, actual) =>
-      reportError(
-        'SkyPage.photoDimensions',
-        new Error(`${photo.originalName}: ${expected}, ${actual}`),
-      ),
+      // The photo's id, never its file name: the log holds nothing of the user's data.
+      reportError('SkyPage.photoDimensions', new Error(`Expected ${expected} but got ${actual}`), {
+        photoId: photo.id,
+      }),
   });
   port.overlay = layer;
   map.setPoiPinSource(() => layer.getPoiPins());

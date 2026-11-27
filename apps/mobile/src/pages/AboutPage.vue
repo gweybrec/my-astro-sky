@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { IonPage, IonContent } from '@ionic/vue';
 import { t } from '@myastrosky/core/i18n/index';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 import PhoneFacts from '../components/PhoneFacts.vue';
+import PhoneButton from '../components/PhoneButton.vue';
+import AppIcon from '../components/AppIcon.vue';
+import shareIcon from '@icons/share.svg?raw';
+import { useErrorToast } from '../composables/useErrorToast';
+import { shareErrorLog } from '../error-log-share';
 
 // The board "Réglages, à propos": what the desktop's "À propos" window shows. The version, the build, the author
-// (the name over the email address, which opens the mail app) and the licence, then the description and the features.
+// (the name over the email address, which opens the mail app) and the licence, the button that shares the error log
+// (for a bug report), then the description and the features.
 // The values are injected at build time; a test run has none.
 const version = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '';
 const build = typeof __APP_BUILD_TIMESTAMP__ === 'string' ? __APP_BUILD_TIMESTAMP__ : '';
@@ -25,6 +31,22 @@ const facts = computed(() => [
   },
   { label: t('settings.aboutLicenseLabel'), value: license },
 ]);
+
+const { showError, showNotice } = useErrorToast();
+const sharing = ref(false);
+
+/** Hands the error log to the share sheet; with nothing logged, says so. */
+async function shareLog() {
+  if (sharing.value) return;
+  sharing.value = true;
+  try {
+    if (!(await shareErrorLog())) await showNotice(t('mobile.settings.errorLogEmpty'));
+  } catch (error) {
+    void showError(error, { category: 'error_log_share_failed' });
+  } finally {
+    sharing.value = false;
+  }
+}
 
 // The desktop's features are one text, separated by middle dots.
 const features = computed(() =>
@@ -46,6 +68,11 @@ const features = computed(() =>
     <IonContent :scroll-y="false">
       <div class="mob-scroll mob-page-fill mob-page-column mob-page-safe mob-section-gap">
         <PhoneFacts :facts="facts" />
+        <div class="mob-form-row">
+          <PhoneButton block :busy="sharing" @click="shareLog">
+            <AppIcon :svg="shareIcon" />{{ t('mobile.settings.shareErrorLog') }}
+          </PhoneButton>
+        </div>
         <p class="mob-text m-body">{{ t('settings.aboutDesc') }}</p>
         <ul class="mob-bullets m-body">
           <li v-for="(item, i) in features" :key="i">{{ item }}</li>

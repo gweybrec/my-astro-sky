@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DomainError } from '@myastrosky/core/domain/errors';
 // Development builds only (route `/dev/components`, absent from the production build): every shared phone component
 // in every state, for the checks against the boards and for later reviews. Its texts are labels for the developer,
 // not screen texts, so they do not go through the dictionaries.
@@ -110,7 +111,11 @@ async function askDelete() {
   answer.value = yes ? 'oui' : 'non';
 }
 function raiseError() {
-  void showError(new Error("Impossible de calculer l'horizon à partir des données d'altitude"));
+  // The board "Lieu, horizon indisponible": a failure with its reference.
+  void showError(
+    new DomainError('upstream', 'Horizon failed', { code: 'HORIZON_COMPUTE_FAILED', ref: '7K3Q' }),
+    { message: "Impossible de calculer l'horizon à partir des données d'altitude" },
+  );
 }
 </script>
 

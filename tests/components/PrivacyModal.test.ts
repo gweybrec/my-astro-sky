@@ -29,7 +29,11 @@ describe('PrivacyModal', () => {
       t('settings.privacyHorizonTitle'),
       t('settings.privacyIdentifyTitle'),
       t('settings.privacySharedTitle'),
+      t('settings.privacyErrorLogTitle'),
     ]);
+    expect(document.body.textContent).toContain(t('settings.privacyErrorLog'));
+    // Crash dumps exist in the desktop app only.
+    expect(document.body.textContent).not.toContain(t('settings.privacyCrashDumps'));
     expect(document.body.textContent).toContain(t('settings.privacyHorizon'));
     expect(document.body.textContent).toContain(t('settings.privacyIdentify'));
     w.unmount();
@@ -40,6 +44,7 @@ describe('PrivacyModal', () => {
     const w = mount(PrivacyModal, { attachTo: document.body });
     expect(blockTitles()).toContain(t('settings.privacyGeolocTitle'));
     expect(document.body.textContent).toContain(t('settings.privacyGeoloc'));
+    expect(document.body.textContent).toContain(t('settings.privacyCrashDumps'));
     w.unmount();
   });
 });

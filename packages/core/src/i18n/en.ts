@@ -464,6 +464,11 @@ const en: Translations = {
     privacySharedTitle: 'Shared skies',
     privacyShared:
       '"Share my sky" creates a file on your device: the chosen photos at full size, their position on the sky and their information (targets, labels, notes, date, exposures and, if you tick it, gear and capture details). GPS coordinates stored in the images are removed from it, and the headers of FITS/TIFF files (which may give the shooting site) are not in it; your observing site, your horizon, your settings and your plans are never in it. The app sends this file nowhere: you choose whom to give it to, and anyone who gets it can see these photos.',
+    privacyErrorLogTitle: 'Error log',
+    privacyErrorLog:
+      "The app's errors are recorded in a log on your device: the technical message of the error, its code and reference, the date, the app version and the place in the code where it happened. No personal data is in it: not your photos, their file names or content, not your notes, targets, plans or settings, not your position, not the paths of your folders, not your API key; only random internal identifiers. It is sent nowhere: you choose to attach it to a bug report.",
+    privacyCrashDumps:
+      "If the desktop app crashes, the system also saves a crash diagnostic file in the app's folder. It may contain what the app had in memory at that moment, including personal data. It stays on your computer, is never sent, and is deleted after 30 days.",
     dataCreditsTitle: 'Data credits',
     dataCreditsCatalogsLabel: 'Catalogues',
     dataCreditsDocsLabel: 'Reference documents',
@@ -772,6 +777,9 @@ const en: Translations = {
     dropHere: 'Drop a .myastrosky file here',
   },
   errors: {
+    reference: 'Ref.',
+    copyDetails: 'Copy the error details',
+    detailsCopied: 'Details copied',
     catalogLoad: 'Failed to load {url} ({status} {statusText})',
     invalidResponse: 'Invalid server response',
     uploadFailed: 'Upload failed: {response}',
@@ -925,6 +933,7 @@ const en: Translations = {
     HTTP_504: 'The server took too long to answer.',
     HTTP_ERROR: 'The server answered with an error.',
     NETWORK_ERROR: 'Network error, check the connection.',
+    NETWORK_TIMEOUT: 'The server is not answering, try again later.',
     IDS_NOT_ARRAY: 'The list of photos is invalid.',
     INTERNAL_ERROR: 'Something went wrong in the app.',
     INVALID_DSO_DATA: 'The object data is invalid.',

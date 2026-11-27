@@ -466,6 +466,11 @@ const es: Translations = {
     privacySharedTitle: 'Cielos compartidos',
     privacyShared:
       '«Compartir mi cielo» crea un archivo en su dispositivo: las fotos elegidas a tamaño completo, su posición en el cielo y su información (objetivos, etiquetas, notas, fecha, exposiciones y, si lo marca, equipo y detalles de captura). Las coordenadas GPS guardadas en las imágenes se eliminan y los encabezados de los archivos FITS/TIFF (que pueden indicar el lugar de captura) no figuran en él; su lugar de observación, su horizonte, sus ajustes y sus planes nunca figuran en él. La aplicación no envía este archivo a ningún sitio: usted elige a quién dárselo, y cualquier persona que lo reciba puede ver estas fotos.',
+    privacyErrorLogTitle: 'Registro de errores',
+    privacyErrorLog:
+      'Los errores de la aplicación se guardan en un registro en su dispositivo: el mensaje técnico del error, su código y su referencia, la fecha, la versión de la aplicación y el lugar del código donde ocurrió. No contiene ningún dato personal: ni sus fotos, sus nombres de archivo o su contenido, ni sus notas, objetivos, planes o ajustes, ni su posición, ni la ruta de sus carpetas, ni su clave API; solo identificadores internos aleatorios. No se envía a ningún sitio: usted decide adjuntarlo a un informe de error.',
+    privacyCrashDumps:
+      'Si la aplicación de escritorio se bloquea, el sistema también guarda un archivo de diagnóstico del bloqueo en la carpeta de la aplicación. Puede contener lo que la aplicación tenía en memoria en ese momento, incluidos datos personales. Permanece en su ordenador, nunca se envía y se elimina al cabo de 30 días.',
     dataCreditsTitle: 'Créditos de datos',
     dataCreditsCatalogsLabel: 'Catálogos',
     dataCreditsDocsLabel: 'Documentos de referencia',
@@ -777,6 +782,9 @@ const es: Translations = {
     dropHere: 'Suelte aquí un archivo .myastrosky',
   },
   errors: {
+    reference: 'Ref.',
+    copyDetails: 'Copiar los detalles del error',
+    detailsCopied: 'Detalles copiados',
     catalogLoad: 'Error al cargar {url} ({status} {statusText})',
     invalidResponse: 'Respuesta del servidor no válida',
     uploadFailed: 'Error de subida: {response}',
@@ -934,6 +942,7 @@ const es: Translations = {
     HTTP_504: 'El servidor tardó demasiado en responder.',
     HTTP_ERROR: 'El servidor respondió con un error.',
     NETWORK_ERROR: 'Error de red, comprueba la conexión.',
+    NETWORK_TIMEOUT: 'El servidor no responde, inténtalo más tarde.',
     IDS_NOT_ARRAY: 'La lista de fotos no es válida.',
     INTERNAL_ERROR: 'La aplicación encontró un error.',
     INVALID_DSO_DATA: 'Los datos del objeto no son válidos.',

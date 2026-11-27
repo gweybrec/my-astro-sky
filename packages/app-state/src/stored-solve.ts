@@ -24,7 +24,7 @@ export const STORED_SOLVE_POLL_MS = 2000;
 const FOLLOWED: ReadonlySet<OnlineSolve['state']> = new Set(['solving', 'unfinished', 'offline']);
 
 /** The errors that mean astrometry.net is out of reach for now: no network, a bad answer, or no code at all. */
-const TRANSIENT_CODES = new Set([undefined, 'NETWORK_ERROR', 'HTTP_ERROR']);
+const TRANSIENT_CODES = new Set([undefined, 'NETWORK_ERROR', 'NETWORK_TIMEOUT', 'HTTP_ERROR']);
 
 const following = new Set<string>();
 

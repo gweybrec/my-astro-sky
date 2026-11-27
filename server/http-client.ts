@@ -1,4 +1,4 @@
-import type { HttpClient, HttpRequest } from '@myastrosky/core/ports/http-client';
+import { httpFailure, type HttpClient, type HttpRequest } from '@myastrosky/core/ports/http-client';
 
 function toBody(body: HttpRequest['body']): string | FormData | undefined {
   if (body === undefined || typeof body === 'string') return body;
@@ -27,12 +27,18 @@ export function createFetchHttpClient(): HttpClient {
         ? undefined
         : setTimeout(() => controller.abort(), request.timeoutMs);
     try {
-      const res = await globalThis.fetch(request.url, {
-        method: request.method,
-        ...(request.headers ? { headers: { ...request.headers } } : {}),
-        body: toBody(request.body),
-        signal: controller.signal,
-      });
+      let res: Response;
+      try {
+        res = await globalThis.fetch(request.url, {
+          method: request.method,
+          ...(request.headers ? { headers: { ...request.headers } } : {}),
+          body: toBody(request.body),
+          signal: controller.signal,
+        });
+      } catch (err) {
+        // The timer's abort, or no answer at all (no network, a refused connection).
+        throw httpFailure(err, controller.signal.aborted ? request.timeoutMs : undefined);
+      }
       const headers: Record<string, string> = {};
       res.headers.forEach((value, key) => {
         headers[key.toLowerCase()] = value;

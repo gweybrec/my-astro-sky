@@ -57,7 +57,7 @@ import {
   mergeFilteredOrder,
 } from '@myastrosky/core/photo-draw-order';
 import { updatePhotoOrder } from '../../api';
-import { showToast } from '../../toast';
+import { showErrorToast } from '../../toast';
 
 const props = defineProps<{ photoId: string }>();
 const emit = defineEmits<{ close: [] }>();
@@ -219,8 +219,8 @@ function onMouseUp() {
     photosStore.syncFromOverlay();
     // Only the user's own photos' order is saved; a visited sky's keeps its new place until the app is reloaded.
     const ids = overlay.getPlacedPhotos().map((p) => p.photo.id);
-    void updatePhotoOrder(ids).catch(() => {
-      showToast({ message: t('errors.updatePhoto'), type: 'error', duration: 3500 });
+    void updatePhotoOrder(ids).catch((err: unknown) => {
+      showErrorToast(err, 'errors.updatePhoto', { category: 'photo_order_save_failed' });
     });
   }
 }

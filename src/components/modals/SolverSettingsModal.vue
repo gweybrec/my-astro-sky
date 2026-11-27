@@ -185,7 +185,7 @@ import BaseModal from '../base/BaseModal.vue';
 import { useSettingsStore } from '@myastrosky/app-state/stores/settings';
 import { probeLocalSolver } from '../../api';
 import { useI18n } from '../../composables/useI18n';
-import { showToast } from '../../toast';
+import { showToast, showErrorToast } from '../../toast';
 import trashSvg from '../../icons/trash.svg?raw';
 
 defineEmits<{ close: [] }>();
@@ -407,7 +407,7 @@ async function onSave() {
       saveSuccess.value = false;
     }, 3000);
   } catch (err: any) {
-    showToast({ message: err.message ?? t('settings.importError'), type: 'error' });
+    showErrorToast(err, 'serverErrors.INTERNAL_ERROR', { category: 'solver_settings_save_failed' });
   } finally {
     saving.value = false;
   }
@@ -419,7 +419,7 @@ async function onClearApiKey() {
     apiKey.value = '';
     showToast({ message: t('settings.apiKeyCleared'), type: 'info', duration: 2500 });
   } catch (err: any) {
-    showToast({ message: err.message ?? t('settings.importError'), type: 'error' });
+    showErrorToast(err, 'serverErrors.INTERNAL_ERROR', { category: 'solver_api_key_clear_failed' });
   }
 }
 

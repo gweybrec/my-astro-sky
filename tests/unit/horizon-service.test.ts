@@ -257,7 +257,8 @@ describe.each(SQL_ADAPTERS)('HorizonService (%s)', (_adapter, wrap) => {
       ]);
       expect(sleeps).toEqual([800, 800, 800]);
       expect(logged).toEqual([
-        { event: 'overpass_fetch_failed', context: { lat: 30.5, lon: 30.5 } },
+        // Never the position: the log holds nothing of the user's data.
+        { event: 'overpass_fetch_failed', context: undefined },
       ]);
       expect(cacheRows()).toHaveLength(1);
     });

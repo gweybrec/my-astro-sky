@@ -1,3 +1,4 @@
+import { userFacingError } from './platform/error-report';
 /**
  * Where each pixel of a photo is on the sky: the one placement every part of the app uses (the sky map's drawing,
  * its outline and culling, the objects drawn on the photo, the identification of asteroids, comets and supernovae).
@@ -193,7 +194,8 @@ function leastSquares(rows: number[][], rhs: number[]): number[] {
   for (let c = 0; c < n; c++) {
     let p = c;
     for (let r = c + 1; r < n; r++) if (Math.abs(m[r][c]) > Math.abs(m[p][c])) p = r;
-    if (!(Math.abs(m[p][c]) > 1e-12 * scale)) throw new Error(t('errors.collinearPoints'));
+    if (!(Math.abs(m[p][c]) > 1e-12 * scale))
+      throw userFacingError(t('errors.collinearPoints'), { kind: 'invalid' });
     [m[c], m[p]] = [m[p], m[c]];
     for (let r = 0; r < n; r++) {
       if (r === c) continue;
@@ -235,7 +237,8 @@ function fitPlane(
   const s = Math.max(width, height) / 2 || 1;
   const uv = photoPoints.map((p) => ({ x: (p.x - width / 2) / s, y: (p.y - height / 2) / s }));
   const plane = sky.map((q) => skyToTangent(q.ra, q.dec, center.ra, center.dec));
-  if (plane.some((q) => q === null)) throw new Error(t('errors.invalidAffine'));
+  if (plane.some((q) => q === null))
+    throw userFacingError(t('errors.invalidAffine'), { kind: 'invalid' });
   const tp = plane as Point[];
   if (quadratic) {
     const rows = uv.map((p) => BIQUADRATIC_TERMS.map(([i, j]) => p.x ** i * p.y ** j));
@@ -275,7 +278,7 @@ export function fitPhotoSkyModel(
   height: number,
 ): PhotoSkyModel {
   if (photoPoints.length < 2 || photoPoints.length !== sky.length) {
-    throw new Error(t('errors.minPoints'));
+    throw userFacingError(t('errors.minPoints'), { kind: 'invalid' });
   }
   const quadratic = isReferenceGrid(photoPoints, width, height);
   // Tangent at the points' mean direction first, then at the centre of the photo that fit gives.

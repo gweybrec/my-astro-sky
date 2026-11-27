@@ -1,5 +1,4 @@
 import express from 'express';
-import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { PoiCategoryChanges, PoiCategoryInput } from '@myastrosky/core/domain/poi-categories';
 import { poiCategories } from '../services.js';
 import { sendError } from './http-errors.js';
@@ -34,8 +33,7 @@ poiCategoriesRouter.get('/api/poi-categories', async (_req, res) => {
   try {
     res.json(await poiCategories.list());
   } catch (err) {
-    if (!isDomainError(err)) console.error('[PoiCategories] Failed to list categories', err);
-    sendError(res, err);
+    sendError(res, err, 'poi_categories_list_categories_failed');
   }
 });
 
@@ -72,8 +70,7 @@ poiCategoriesRouter.post('/api/poi-categories', async (req, res) => {
   try {
     res.json(await poiCategories.create(req.body as PoiCategoryInput));
   } catch (err) {
-    if (!isDomainError(err)) console.error('[PoiCategories] Failed to create category', err);
-    sendError(res, err);
+    sendError(res, err, 'poi_categories_create_category_failed');
   }
 });
 
@@ -116,8 +113,7 @@ poiCategoriesRouter.patch('/api/poi-categories/:id', async (req, res) => {
     await poiCategories.update(req.params.id, req.body as PoiCategoryChanges);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[PoiCategories] Failed to update category', err);
-    sendError(res, err);
+    sendError(res, err, 'poi_categories_update_category_failed');
   }
 });
 
@@ -153,8 +149,7 @@ poiCategoriesRouter.delete('/api/poi-categories/:id', async (req, res) => {
     await poiCategories.remove(req.params.id);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[PoiCategories] Failed to delete category', err);
-    sendError(res, err);
+    sendError(res, err, 'poi_categories_delete_category_failed');
   }
 });
 
@@ -180,7 +175,6 @@ poiCategoriesRouter.delete('/api/poi-categories', async (_req, res) => {
   try {
     res.json({ ok: true, deleted: await poiCategories.removeAll() });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[PoiCategories] Failed to delete all categories', err);
-    sendError(res, err);
+    sendError(res, err, 'poi_categories_delete_all_categories_failed');
   }
 });

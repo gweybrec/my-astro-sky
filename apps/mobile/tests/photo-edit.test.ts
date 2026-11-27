@@ -420,7 +420,7 @@ describe("a photo's edit page", () => {
     await byText(w, 'button', 'Ajouter des poses').trigger('click');
     await save(w);
     expect(updatePhotoMetadata).not.toHaveBeenCalled();
-    expect(showError.mock.calls[0][0].message).toBe(
+    expect(showError.mock.calls[0][0]).toBe(
       'Saisissez un nombre de poses, une durée de pose ou un filtre avant de valider cette ligne.',
     );
     await byLabel(w, 'button', 'Choisir le filtre de la ligne 2').trigger('click');

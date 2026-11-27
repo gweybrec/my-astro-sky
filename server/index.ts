@@ -23,4 +23,14 @@ if (!isElectron) {
     logServerError('server_start_failed', err);
     process.exit(1);
   });
+  // The desktop app installs its own handlers (electron/error-logger.ts); a Docker or Node.js
+  // server logs a stray rejection and keeps serving, and stops on an uncaught exception, whose
+  // state can no longer be trusted (the container's restart policy brings it back).
+  process.on('unhandledRejection', (reason) =>
+    logServerError('server_unhandled_rejection', reason),
+  );
+  process.on('uncaughtException', (err) => {
+    logServerError('server_uncaught_exception', err);
+    process.exit(1);
+  });
 }

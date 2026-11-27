@@ -219,6 +219,12 @@ export default tseslint.config(
     ignores: REEXPORT_EXEMPT,
     rules: { 'no-restricted-syntax': ['error', noReexport] },
   },
+  // A route's error goes through sendError / logServerError, which reach the log file and give
+  // the user a reference; a bare console.error reaches neither.
+  {
+    files: ['server/routes/**/*.ts'],
+    rules: { 'no-console': ['error', { allow: ['warn'] }] },
+  },
 
   // @myastrosky/core must stay platform-neutral (browser, worker, Node, Electron, Capacitor):
   // no framework, no Node built-ins, and no imports back into the app. This block gets neither

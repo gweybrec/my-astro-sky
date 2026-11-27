@@ -1,3 +1,4 @@
+import { logServerError } from '../logger.js';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import multer from 'multer';
@@ -81,7 +82,7 @@ export const uploadSolve = multer({
 export async function removeUpload(file: { path: string } | undefined): Promise<void> {
   if (!file) return;
   await fs.promises.rm(file.path, { force: true }).catch((err) => {
-    console.warn('[upload] Failed to remove', file.path, err);
+    logServerError('upload_remove_failed', err);
   });
 }
 

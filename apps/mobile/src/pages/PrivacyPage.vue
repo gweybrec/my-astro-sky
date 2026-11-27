@@ -4,14 +4,15 @@ import { t } from '@myastrosky/core/i18n/index';
 import PhoneTopBar from '../components/PhoneTopBar.vue';
 import PhoneBackButton from '../components/PhoneBackButton.vue';
 
-// The board "Réglages, confidentialité": the desktop's privacy texts, a title and a paragraph for each feature that
-// reaches an outside server. The desktop's IP geolocation block is left out: the phone takes its position from the
+// The boards "Réglages, confidentialité" and "Confidentialité, ciels partagés": the desktop's privacy texts, a title
+// and a paragraph for each feature that reaches an outside server, then the shared skies and the error log. The desktop's IP geolocation block is left out: the phone takes its position from the
 // device.
 const blocks = [
   { title: 'settings.privacyAstrometryTitle', text: 'settings.privacyAstrometry' },
   { title: 'settings.privacyHorizonTitle', text: 'settings.privacyHorizon' },
   { title: 'settings.privacyIdentifyTitle', text: 'settings.privacyIdentify' },
   { title: 'settings.privacySharedTitle', text: 'settings.privacyShared' },
+  { title: 'settings.privacyErrorLogTitle', text: 'settings.privacyErrorLog' },
 ];
 </script>
 

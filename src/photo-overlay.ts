@@ -1,3 +1,4 @@
+import { userMessage } from '@myastrosky/core/platform/error-report';
 import type {
   PhotoCorrespondence,
   Star,
@@ -33,7 +34,7 @@ import { searchUnified } from '@myastrosky/core/search';
 
 /** A (possibly relative) address as an `<img>`'s `src` reports it. */
 const absoluteUrl = (url: string): string => new URL(url, document.baseURI).href;
-import { showToast } from './toast';
+import { showToast, showErrorToast } from './toast';
 import { findDSOsInImage } from './dso-catalog';
 
 import type { SkyMap } from '@myastrosky/render/sky-map';
@@ -325,7 +326,7 @@ export class PhotoOverlay extends PhotoLayer {
         reportUnknownRendererError(
           'photo_dimension_mismatch',
           new Error(`Expected ${expected} but got ${actual}`),
-          { photoName: photo.originalName, expected, actual },
+          { photoId: photo.id, expected, actual },
         ),
     });
   }
@@ -334,10 +335,11 @@ export class PhotoOverlay extends PhotoLayer {
     try {
       await deletePhotoAPI(photoId);
     } catch (err: any) {
-      showToast({
-        message: t('photos.deleteError', { message: err.message }),
-        type: 'error',
-        duration: 5000,
+      showErrorToast(err, 'serverErrors.INTERNAL_ERROR', {
+        category: 'photo_delete_failed',
+        message: t('photos.deleteError', {
+          message: userMessage(err, 'serverErrors.INTERNAL_ERROR'),
+        }),
       });
       return;
     }
@@ -977,14 +979,9 @@ export class PhotoOverlay extends PhotoLayer {
 
           suggestList.classList.remove('hidden');
         } catch (err: any) {
-          reportUnknownRendererError('suggest_stars_error', err);
           suggestBtn.textContent = t('lightSolve.suggestButton');
           suggestBtn.disabled = false;
-          showToast({
-            message: err.message || t('lightSolve.searchFailed'),
-            type: 'error',
-            duration: 3000,
-          });
+          showErrorToast(err, 'lightSolve.searchFailed', { category: 'suggest_stars_error' });
         }
       });
 
@@ -1966,7 +1963,7 @@ export class PhotoOverlay extends PhotoLayer {
           duration: 3000,
         });
       } catch (err: any) {
-        showToast({ message: t('errors.updatePhoto'), type: 'error', duration: 5000 });
+        showErrorToast(err, 'errors.updatePhoto', { category: 'photo_update_failed' });
         validateBtn.disabled = false;
         validateBtn.textContent = t('manual.validate');
       }

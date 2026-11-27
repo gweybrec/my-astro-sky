@@ -349,6 +349,17 @@ describe('solving a waiting photo online', () => {
     expect(pendingPhotos.value[1]).toMatchObject({ state: 'offline', submissionId: 42 });
   });
 
+  it('stops as offline, with no error shown, when the solver does not answer in time', async () => {
+    const photo = await addPendingPhoto(new Blob(['x']), 'a.jpg');
+    submitPlateSolve.mockResolvedValue({ jobId: 'j' });
+    pollPlateSolve.mockRejectedValue(
+      refused('Request timed out after 30000 ms', 'NETWORK_TIMEOUT'),
+    );
+    await solvePendingOnline(photo.id);
+    await nextPoll();
+    expect(pendingPhotos.value[0]).toMatchObject({ state: 'offline', jobId: 'j' });
+  });
+
   it('follows again an offline photo sent to the solver once more, without sending the picture again', async () => {
     const photo = await addPendingPhoto(new Blob(['x']), 'a.jpg');
     await setPendingState(photo.id, 'offline', { jobId: 'job-1', submissionId: 42 });

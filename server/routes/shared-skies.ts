@@ -11,8 +11,7 @@ import { sendError } from './http-errors.js';
 export const sharedSkiesRouter = express.Router();
 
 function fail(res: express.Response, event: string, err: unknown): void {
-  if (!isDomainError(err)) logServerError(event, err);
-  sendError(res, err);
+  sendError(res, err, event);
 }
 
 /** What a share asks for, read from a request body: a name, the photo ids and whether gear travels. */
@@ -145,9 +144,11 @@ sharedSkiesRouter.get('/api/shared-skies/export/:token', async (req, res) => {
     await zip.finalize();
   } catch (err) {
     zip?.abort();
-    if (!isDomainError(err)) logServerError('shared_sky_export_failure', err);
-    if (!res.headersSent) sendError(res, err);
-    else res.destroy();
+    if (!res.headersSent) sendError(res, err, 'shared_sky_export_failure');
+    else {
+      if (!isDomainError(err)) logServerError('shared_sky_export_failure', err);
+      res.destroy();
+    }
   }
 });
 
@@ -204,7 +205,7 @@ sharedSkiesRouter.post(
   async (req, res) => {
     const file = req.file;
     if (!file) {
-      res.status(400).json({ error: 'Aucun fichier fourni' });
+      res.status(400).json({ error: 'No file provided', code: 'NO_FILE' });
       return;
     }
     try {

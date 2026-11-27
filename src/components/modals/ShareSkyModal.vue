@@ -58,7 +58,7 @@ import PhotoPickList from '../base/PhotoPickList.vue';
 import { usePhotosStore } from '../../stores/photos';
 import { getShareSenderName } from '../../api';
 import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
-import { showToast } from '../../toast';
+import { showToast, showErrorToast } from '../../toast';
 import { reportUnknownRendererError } from '../../error-reporter';
 import { formatBytes } from '@myastrosky/core/format-utils';
 import { selectedPhotoBytes } from '@myastrosky/core/backup-selection';
@@ -123,11 +123,7 @@ async function onShare() {
     });
     emit('close');
   } catch (err) {
-    reportUnknownRendererError('shared_sky_share', err);
-    showToast({
-      message: err instanceof Error ? err.message : t('errors.shareSky'),
-      type: 'error',
-    });
+    showErrorToast(err, 'errors.shareSky', { category: 'shared_sky_share' });
     busy.value = false;
   }
 }

@@ -253,7 +253,7 @@ async function addPicked(pick: () => Promise<File[]>) {
     const files = await pick();
     if (files.length === 0) return;
     if (addImportFiles(files) === 0) {
-      void showError(new Error(t('errors.invalidPhotoFormat')));
+      void showError(t('errors.invalidPhotoFormat'));
       return;
     }
     adding.value = false;

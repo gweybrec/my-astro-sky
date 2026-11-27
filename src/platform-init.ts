@@ -50,9 +50,9 @@ configureI18n({
 });
 
 configureStorage(createLocalStorageStore());
-configureErrorReporter((context, error, details) =>
-  reportUnknownRendererError(context, error, details),
-);
+configureErrorReporter((context, error, details, ticket) => {
+  reportUnknownRendererError(context, error, details, ticket);
+});
 // Debug and info messages print in development builds only.
 configureLogSink(import.meta.env.DEV ? consoleLogSink : null);
 configureDeviceHints(() => (typeof navigator !== 'undefined' ? navigator : {}));

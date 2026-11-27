@@ -1,3 +1,4 @@
+import { installVueErrorHandler } from './vue-error-handler';
 import { createApp, reactive, h } from 'vue';
 import type { App } from 'vue';
 import type {
@@ -26,12 +27,11 @@ import { photoSkyModel } from '@myastrosky/core/photo-placement';
 import { showWcsConflicts } from './wcs-conflicts';
 import { showFitsHeaders } from './wcs-dialogs';
 import { noSolutionMessage, readWcsFileForPhoto } from './wcs-load-flow';
-import { showToast } from './toast';
+import { showToast, showErrorToast } from './toast';
 import { t } from './i18n';
 import MetadataEditorPanel from './components/modals/MetadataEditorPanel.vue';
 import MetadataSheet from './components/modals/MetadataSheet.vue';
 import type { PhotoMetadataDraft } from '@myastrosky/core/photo-metadata-draft';
-import { reportUnknownRendererError } from './error-reporter';
 import fileTextSvg from './icons/file-text.svg?raw';
 import uploadSvg from './icons/upload.svg?raw';
 import { pinia } from './pinia-instance';
@@ -113,11 +113,9 @@ export function buildMetadataEditorPanel(
         onSaved(current);
         return true;
       } catch (err) {
-        reportUnknownRendererError('photo_metadata_save', err, { photoId: current.id });
-        showToast({
-          message: err instanceof Error ? err.message : String(err),
-          type: 'error',
-          duration: 4000,
+        showErrorToast(err, 'errors.updatePhoto', {
+          category: 'photo_metadata_save',
+          context: { photoId: current.id },
         });
         return false;
       }
@@ -204,6 +202,7 @@ export function buildMetadataEditorPanel(
   // PoiEditor (inside MetadataEditorPanel) reads the POI-categories / ui Pinia stores,
   // so this imperatively-mounted app needs the shared pinia instance installed.
   app.use(pinia);
+  installVueErrorHandler(app, 'metadata-editor');
   app.mount(panelEl);
 
   // ── Load metadata from a WCS/FITS/TIFF file ───────────────────────────────────
@@ -330,9 +329,9 @@ export function buildMetadataEditorPanel(
         duration: solved ? 3500 : 8000,
       });
     } catch (err) {
-      showToast({
+      showErrorToast(err, 'serverErrors.INTERNAL_ERROR', {
+        category: 'wcs_file_read_failed',
         message: wcsThrownErrorMessage(err, file.name),
-        type: 'error',
         duration: 8000,
       });
     } finally {
@@ -404,7 +403,7 @@ export function buildMetadataEditorPanel(
       onClose();
       onSaved(updated);
     } catch (err: any) {
-      showToast({ message: err.message, type: 'error', duration: 4000 });
+      showErrorToast(err, 'errors.updatePhoto', { category: 'photo_metadata_save' });
       saveBtn.disabled = false;
       saveBtn.textContent = t('gallery.saveMetadata');
     }

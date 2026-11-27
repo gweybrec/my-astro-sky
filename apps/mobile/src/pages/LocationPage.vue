@@ -126,8 +126,14 @@ async function compute() {
   const loc = readObserverLocation();
   if (!(await horizon.computeFor(loc.lat, loc.lon)) && horizon.error) {
     // The board "Lieu, horizon indisponible" shows the desktop's text whatever the server answered.
-    const missing = horizon.error === t('horizon.error.noLocation');
-    void showError(new Error(missing ? horizon.error : t('horizon.error.compute')));
+    // A failed computation shows its reference; a missing position is the user's to give.
+    if (horizon.error === t('horizon.error.noLocation')) void showError(horizon.error);
+    else {
+      void showError(horizon.failure, {
+        message: t('horizon.error.compute'),
+        category: 'horizon_compute_failed',
+      });
+    }
   }
 }
 
@@ -147,7 +153,7 @@ async function importHorizon() {
     if (!file) return;
     const loc = readObserverLocation();
     if (!horizon.importFromText(await file.text(), loc.lat, loc.lon) && horizon.error) {
-      void showError(new Error(horizon.error));
+      void showError(horizon.error);
     }
   } catch (error) {
     void showError(error);

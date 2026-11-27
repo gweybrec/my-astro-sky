@@ -1,3 +1,4 @@
+import { userFacingError } from './platform/error-report';
 import type { AffineMatrix, Point } from './types';
 import { t } from './i18n/index';
 
@@ -38,7 +39,7 @@ export function computeAffineTransform(
   const det = p0.x * (p1.y - p2.y) - p0.y * (p1.x - p2.x) + (p1.x * p2.y - p2.x * p1.y);
 
   if (isCollinear(det, p0, p1, p2)) {
-    throw new Error(t('errors.collinearPoints'));
+    throw userFacingError(t('errors.collinearPoints'), { kind: 'invalid' });
   }
 
   const invDet = 1 / det;
@@ -73,7 +74,7 @@ export function computeAffineTransform(
     !isFinite(e) ||
     !isFinite(f)
   ) {
-    throw new Error(t('errors.invalidAffine'));
+    throw userFacingError(t('errors.invalidAffine'), { kind: 'invalid' });
   }
 
   return { a, b, c, d, e, f };
@@ -98,7 +99,7 @@ export function computeSimilarityTransform(
 
   const denom = dpx * dpx + dpy * dpy;
   if (denom < 1e-10) {
-    throw new Error(t('errors.collinearPoints'));
+    throw userFacingError(t('errors.collinearPoints'), { kind: 'invalid' });
   }
 
   // Solve for similarity: a = (dcx·dpx + dcy·dpy) / denom, b = (dcy·dpx - dcx·dpy) / denom
@@ -114,7 +115,7 @@ export function computeSimilarityTransform(
   const f = c0.y - b * p0.x - d * p0.y;
 
   if (!isFinite(a) || !isFinite(b) || !isFinite(e) || !isFinite(f)) {
-    throw new Error(t('errors.invalidAffine'));
+    throw userFacingError(t('errors.invalidAffine'), { kind: 'invalid' });
   }
 
   return { a, b, c, d, e, f };
@@ -181,7 +182,7 @@ export const IN_A_LINE_SPREAD = 1e-6;
  */
 export function computeAffineLSQ(photoPoints: Point[], canvasPoints: Point[]): AffineMatrix {
   const n = photoPoints.length;
-  if (n < 2) throw new Error(t('errors.minPoints'));
+  if (n < 2) throw userFacingError(t('errors.minPoints'), { kind: 'invalid' });
   if (n === 2) {
     return computeSimilarityTransform(
       photoPoints as [Point, Point],
@@ -263,7 +264,7 @@ export function computeAffineLSQ(photoPoints: Point[], canvasPoints: Point[]): A
     // If all points are coincident (or numerically too close), we cannot
     // compute a transform.
     if (maxDist2 < 1e-10) {
-      throw new Error(t('errors.collinearLSQ'));
+      throw userFacingError(t('errors.collinearLSQ'), { kind: 'invalid' });
     }
 
     return computeSimilarityTransform(
@@ -287,7 +288,7 @@ export function computeAffineLSQ(photoPoints: Point[], canvasPoints: Point[]): A
     !isFinite(e) ||
     !isFinite(f)
   ) {
-    throw new Error(t('errors.invalidAffine'));
+    throw userFacingError(t('errors.invalidAffine'), { kind: 'invalid' });
   }
 
   return { a, b, c, d, e, f };

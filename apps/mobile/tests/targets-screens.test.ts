@@ -1193,9 +1193,7 @@ describe('the regions page', () => {
     expect(skyRegionDraw.value).toBeNull();
     expect(skyRegionView.value).toBeNull();
     expect(replace).not.toHaveBeenCalled();
-    expect(showError).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "Définissez d'abord une position d'observation" }),
-    );
+    expect(showError).toHaveBeenCalledWith("Définissez d'abord une position d'observation");
   });
 
   it('asks before deleting, deletes after the yes, and keeps the region after the no', async () => {

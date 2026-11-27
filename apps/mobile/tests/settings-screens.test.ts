@@ -13,7 +13,12 @@ import { ionicStubs } from './helpers';
 const showError = vi.fn();
 const confirm = vi.fn();
 const showInfo = vi.fn();
-vi.mock('../src/composables/useErrorToast', () => ({ useErrorToast: () => ({ showError }) }));
+const showNotice = vi.fn();
+vi.mock('../src/composables/useErrorToast', () => ({
+  useErrorToast: () => ({ showError, showNotice }),
+}));
+const shareErrorLog = vi.fn();
+vi.mock('../src/error-log-share', () => ({ shareErrorLog: () => shareErrorLog() }));
 vi.mock('../src/composables/useConfirm', () => ({
   useConfirm: () => ({ confirm }),
   showInfo: (...a: unknown[]) => showInfo(...a),
@@ -619,6 +624,33 @@ describe('the about page', () => {
     }
   });
 
+  it('shares the error log, says when nothing was logged, and shows a failure', async () => {
+    const { global } = app();
+    const w = mount(AboutPage, { global });
+    await flushPromises();
+    const share = () =>
+      w
+        .findAll('button')
+        .find((b) => b.text() === 'Partager le journal des erreurs')!
+        .trigger('click');
+    shareErrorLog.mockResolvedValueOnce(true);
+    await share();
+    await flushPromises();
+    expect(shareErrorLog).toHaveBeenCalledOnce();
+    expect(showNotice).not.toHaveBeenCalled();
+
+    shareErrorLog.mockResolvedValueOnce(false);
+    await share();
+    await flushPromises();
+    expect(showNotice).toHaveBeenCalledWith("Aucune erreur n'a été enregistrée.");
+
+    const failure = new Error('share sheet failed');
+    shareErrorLog.mockRejectedValueOnce(failure);
+    await share();
+    await flushPromises();
+    expect(showError).toHaveBeenCalledWith(failure, { category: 'error_log_share_failed' });
+  });
+
   it('shows no mail link when the build carries no email', async () => {
     const { global } = app();
     const w = mount(AboutPage, { global });
@@ -828,7 +860,9 @@ describe('the location page', () => {
       .find((b) => b.text() === "Calculer l'horizon")!
       .trigger('click');
     await flushPromises();
+    // The failure itself (for its reference), shown with the board's text.
     expect(showError).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         message: "Impossible de calculer l'horizon à partir des données d'altitude",
       }),
@@ -1235,9 +1269,11 @@ describe('the privacy page', () => {
       "Calcul de l'horizon",
       'Identification des astéroïdes, comètes et supernovae',
       'Ciels partagés',
+      'Journal des erreurs',
     ]);
     const texts = w.findAll('.mob-text').map((p) => p.text());
-    expect(texts).toHaveLength(5);
+    expect(texts).toHaveLength(6);
+    expect(texts[5]).toContain('Aucune donnée personnelle');
     expect(texts[0]).toContain('stockées localement sur votre appareil');
     expect(texts[1]).toContain('nova.astrometry.net');
     expect(texts[2]).toContain('seule fonction qui envoie votre position');

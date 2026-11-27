@@ -100,3 +100,66 @@ export function cleanupOldLogsSafely(
 
   return { deletedCount };
 }
+
+const MINIDUMP_RE = /\.(dmp|dump)$/i;
+const MAX_DUMP_DEPTH = 4;
+
+/**
+ * Deletes the crash dumps (Crashpad's minidumps, which hold what the app had in memory) older than `retentionDays`,
+ * as the privacy page says. Only files ending in .dmp or .dump, inside `crashDumpsDir`, itself inside the app's
+ * folder; symbolic links are never followed.
+ */
+export function cleanupOldCrashDumpsSafely(
+  userDataDir: string,
+  crashDumpsDir: string,
+  nowMs = Date.now(),
+  retentionDays = DEFAULT_RETENTION_DAYS,
+): CleanupResult {
+  const userDataReal = resolveRealPathSafe(userDataDir);
+  const dumpsReal = resolveRealPathSafe(crashDumpsDir);
+  if (!userDataReal || !dumpsReal) return { deletedCount: 0, skippedReason: 'path_not_resolved' };
+  try {
+    const st = fs.lstatSync(crashDumpsDir);
+    if (st.isSymbolicLink()) return { deletedCount: 0, skippedReason: 'dumps_dir_is_symlink' };
+    if (!st.isDirectory()) return { deletedCount: 0, skippedReason: 'dumps_dir_not_directory' };
+  } catch {
+    return { deletedCount: 0, skippedReason: 'dumps_dir_not_accessible' };
+  }
+  if (!isWithin(userDataReal, dumpsReal)) {
+    return { deletedCount: 0, skippedReason: 'dumps_dir_outside_userdata' };
+  }
+
+  const cutoff = nowMs - retentionDays * 24 * 60 * 60 * 1000;
+  let deletedCount = 0;
+  const walk = (dir: string, depth: number) => {
+    if (depth > MAX_DUMP_DEPTH) return;
+    let entries: fs.Dirent[] = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full, depth + 1);
+        continue;
+      }
+      if (!entry.isFile() || !MINIDUMP_RE.test(entry.name)) continue;
+      const real = resolveRealPathSafe(full);
+      if (!real || !isWithin(dumpsReal, real)) continue;
+      try {
+        const st = fs.lstatSync(full);
+        if (st.isFile() && !st.isSymbolicLink() && st.mtimeMs < cutoff) {
+          fs.unlinkSync(full);
+          deletedCount += 1;
+        }
+      } catch {
+        // Best effort: ignore individual deletion failures.
+      }
+    }
+  };
+  walk(crashDumpsDir, 0);
+  return { deletedCount };
+}

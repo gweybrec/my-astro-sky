@@ -442,7 +442,7 @@ import { t } from '../../i18n';
 import { useCanvasStore } from '../../stores/canvas';
 import { searchUnified } from '@myastrosky/core/search';
 import { stripExtension, getFileDimensions } from '../../file-utils';
-import { showToast } from '../../toast';
+import { showToast, showErrorToast } from '../../toast';
 import { clearWcsSolution, isItemPlaced, markChanged } from '../../batch-utils';
 import { applyWcsResultToItem } from '../../batch-wcs';
 import { photoSkyModel } from '@myastrosky/core/photo-placement';
@@ -665,7 +665,7 @@ async function handleReuse() {
       showToast({ message: result.error || t('modal.reuseFailed'), type: 'error', duration: 3000 });
     }
   } catch (err: any) {
-    showToast({ message: err?.message || t('modal.reuseFailed'), type: 'error', duration: 3000 });
+    showErrorToast(err, 'modal.reuseFailed', { category: 'batch_reuse_failed' });
   } finally {
     reuseLoading.value = false;
   }

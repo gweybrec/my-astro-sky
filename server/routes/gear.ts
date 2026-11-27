@@ -1,5 +1,4 @@
 import express from 'express';
-import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { CustomGearInput, CustomGearType, GearSetupInput } from '@myastrosky/core/domain/gear';
 import { gear } from '../services.js';
 import { sendError } from './http-errors.js';
@@ -234,8 +233,7 @@ gearRouter.delete('/api/custom-gear', async (_req, res) => {
     const deleted = await gear.removeAllCustom();
     res.json({ ok: true, deleted });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[DeleteAll] Custom gear delete failed', err);
-    sendError(res, err);
+    sendError(res, err, 'delete_all_custom_gear_failed');
   }
 });
 
@@ -269,8 +267,7 @@ gearRouter.get('/api/gear-setups', async (_req, res) => {
   try {
     res.json(await gear.listSetups());
   } catch (err) {
-    if (!isDomainError(err)) console.error('[GearSetups] Failed to list setups', err);
-    sendError(res, err);
+    sendError(res, err, 'gear_setups_list_setups_failed');
   }
 });
 
@@ -325,8 +322,7 @@ gearRouter.post('/api/gear-setups', async (req, res) => {
   try {
     res.json(await gear.createSetup(req.body as GearSetupInput));
   } catch (err) {
-    if (!isDomainError(err)) console.error('[GearSetups] Failed to create setup', err);
-    sendError(res, err);
+    sendError(res, err, 'gear_setups_create_setup_failed');
   }
 });
 
@@ -379,8 +375,7 @@ gearRouter.put('/api/gear-setups/:id', async (req, res) => {
     await gear.replaceSetup(req.params.id, req.body as GearSetupInput);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[GearSetups] Failed to update setup', err);
-    sendError(res, err);
+    sendError(res, err, 'gear_setups_update_setup_failed');
   }
 });
 
@@ -438,8 +433,7 @@ gearRouter.patch('/api/gear-setups/:id/enabled', async (req, res) => {
     await gear.setSetupEnabled(req.params.id, enabled);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[GearSetups] Failed to update enabled state', err);
-    sendError(res, err);
+    sendError(res, err, 'gear_setups_update_enabled_state_failed');
   }
 });
 
@@ -479,8 +473,7 @@ gearRouter.delete('/api/gear-setups/:id', async (req, res) => {
     await gear.removeSetup(req.params.id);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[GearSetups] Failed to delete setup', err);
-    sendError(res, err);
+    sendError(res, err, 'gear_setups_delete_setup_failed');
   }
 });
 
@@ -507,7 +500,6 @@ gearRouter.delete('/api/gear-setups', async (_req, res) => {
     const deleted = await gear.removeAllSetups();
     res.json({ ok: true, deleted });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[GearSetups] Failed to delete all setups', err);
-    sendError(res, err);
+    sendError(res, err, 'gear_setups_delete_all_setups_failed');
   }
 });

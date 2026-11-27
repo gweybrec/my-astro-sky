@@ -40,7 +40,7 @@ Follow all steps from `[[frontend-feature]]` for any UI work. In brief:
 2. **CSS tokens only** — every token lives in `src/styles/tokens.css` (mirrored into the `uno.config.ts` theme); reference via UnoCSS utilities/shortcuts or `var(--…)`, never raw hex/rgba/px
 3. **Reuse component classes** — buttons (`btn-action`, `btn-confirm`, `btn-cancel`, `btn-danger`, `btn-icon` shortcuts), inputs (`input-base`, `.dialog-input`, `.star-search-input`), modals (`.modal-backdrop`, `.modal`, `.modal-header`, `.modal-body`), chips (`tag-chip`), collapsibles (`.sidebar-section`, `<details>`) — full inventory in `docs/dev/ui/components.md`
 4. **i18n** — every user-facing string via `t('key')`; add to all four files: `src/i18n/fr.ts`, `src/i18n/en.ts`, `src/i18n/de.ts`, `src/i18n/es.ts`
-5. **Frontend error logging** — all caught errors call `reportUnknownRendererError(category, err, context?)` from `src/error-reporter.ts`; never silently swallow
+5. **Frontend error logging** — a caught error shown to the user goes through `showErrorToast(err, fallbackKey, { category })` from `src/toast.ts`, one the user need not see through `reportUnknownRendererError(category, err, context?)` from `src/error-reporter.ts`; never silently swallow
 
 ---
 
@@ -127,22 +127,23 @@ app.post('/api/my-resource/:id', async (req, res) => { ... });
 
 ## Part C — Backend: error logging
 
-All caught errors in route handlers must log before responding with an HTTP error:
+A route answers every caught error through `sendError` (`server/routes/http-errors.ts`):
 
 ```typescript
-app.get('/api/my-resource/:id', async (req, res) => {
+myRouter.get('/api/my-resource/:id', async (req, res) => {
   try {
     // ...
   } catch (err) {
-    console.error('[MyResource] Failed to fetch resource', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, err, 'my_resource_read_failed');
   }
 });
 ```
 
-- Use the bracket prefix pattern `[Category]` consistent with existing handlers
-- Log the full error object (not just `err.message`) so stack traces appear in the console
-- Uncaught exceptions and unhandled rejections in the Electron main process are captured automatically by `setupErrorLogging()` in `electron/error-logger.ts` — do not add redundant top-level handlers
+- A `DomainError` becomes the status of its kind with `{ error, code }`; one of kind `upstream` (an outside service failed) is logged under the category and its `ref` goes in the reply
+- Anything else is a bug: logged with the method and path, answered 500 `{ error: 'Internal error', code: 'INTERNAL_ERROR', ref }`, never its raw message
+- A refusal the user can act on is a `DomainError` with a code of `ERROR_CODES` (translated in the four `serverErrors` blocks), not a hand-written text
+- Other backend errors go through `logServerError(category, err, context?)` from `server/logger.ts`; never a bare `console.error`
+- Uncaught exceptions and unhandled rejections are captured by `setupErrorLogging()` in `electron/error-logger.ts` (desktop) and `server/index.ts` (Docker, Node.js); do not add more top-level handlers
 
 ---
 

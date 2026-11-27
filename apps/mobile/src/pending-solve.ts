@@ -34,7 +34,7 @@ import {
 export const POLL_INTERVAL_MS = 2000;
 
 /** The codes of the errors that mean the solver is out of reach: no network, a server that answers badly, or no code. */
-const TRANSIENT_CODES = new Set([undefined, 'NETWORK_ERROR', 'HTTP_ERROR']);
+const TRANSIENT_CODES = new Set([undefined, 'NETWORK_ERROR', 'NETWORK_TIMEOUT', 'HTTP_ERROR']);
 
 /** Counts the photos stored after a solve: a screen that lists the photos reads them again when it changes. */
 export const solvedPhotoCount = ref(0);

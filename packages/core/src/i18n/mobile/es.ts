@@ -163,6 +163,8 @@ const es: Translations['mobile'] = {
     regionFinish: 'Terminar',
   },
   settings: {
+    shareErrorLog: 'Compartir el registro de errores',
+    errorLogEmpty: 'No se ha registrado ningún error.',
     observation: 'Observación',
     setups: 'Configuraciones',
     astrometryKey: 'Clave de astrometry.net',

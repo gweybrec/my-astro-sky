@@ -128,7 +128,8 @@ function parseJson(text: string): unknown {
 
 /** The error of a response that is not a success. */
 function failure(reply: UploadReply): DomainError {
-  const body = parseJson(reply.text) as { error?: unknown; code?: unknown } | undefined;
+  const body = parseJson(reply.text) as
+    { error?: unknown; code?: unknown; ref?: unknown } | undefined;
   const message =
     typeof body?.error === 'string' && body.error
       ? body.error
@@ -137,7 +138,8 @@ function failure(reply: UploadReply): DomainError {
     typeof body?.code === 'string' && body.code
       ? (body.code as ErrorCode)
       : (HTTP_CODES[reply.status] ?? 'HTTP_ERROR');
-  return new DomainError(KIND_BY_STATUS[reply.status] ?? 'upstream', message, { code });
+  const ref = typeof body?.ref === 'string' && body.ref ? body.ref : undefined;
+  return new DomainError(KIND_BY_STATUS[reply.status] ?? 'upstream', message, { code, ref });
 }
 
 /** The value of a successful response; a body that is not JSON is an `upstream` error. */

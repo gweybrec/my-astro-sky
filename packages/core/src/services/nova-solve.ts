@@ -455,7 +455,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
               }
             }
           } catch (err) {
-            log?.('astrometry_wcs_file_failed', err, { jobId: job.jobId });
+            log?.('astrometry_wcs_file_failed', err);
           }
 
           // Fallback: the calibration.
@@ -523,7 +523,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
           }
         } catch (wcsErr) {
           if (isRateLimited(wcsErr)) throw wcsErr;
-          log?.('astrometry_wcs_dimensions_failed', wcsErr, { jobId });
+          log?.('astrometry_wcs_dimensions_failed', wcsErr);
         }
       }
 
@@ -540,7 +540,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
       return submission;
     } catch (err) {
       if (isRateLimited(err)) throw err;
-      log?.('astrometry_job_info_failed', err, { jobId });
+      log?.('astrometry_job_info_failed', err);
       return unknown();
     }
   }
@@ -609,7 +609,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
         if (isOk(res)) fileName = (await readJson(res))?.original_filename;
       } catch (err) {
         if (isRateLimited(err)) throw err;
-        log?.('astrometry_job_info_failed', err, { jobId });
+        log?.('astrometry_job_info_failed', err);
       }
     }
     return typeof fileName === 'string' && fileName ? isFitsFile(fileName) : fallback;
@@ -671,7 +671,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
         }
       } catch (err) {
         if (isRateLimited(err)) throw err;
-        log?.('astrometry_reuse_wcs_failed', err, { jobId });
+        log?.('astrometry_reuse_wcs_failed', err);
       }
 
       // Fallback: the calibration.
@@ -687,7 +687,7 @@ export function createNovaSolveService(deps: NovaSolveServiceDeps): NovaSolveSer
       return { success: false, error: 'No correspondences found' };
     } catch (err) {
       if (isRateLimited(err)) throw err;
-      log?.('astrometry_reuse_failed', err, { jobId });
+      log?.('astrometry_reuse_failed', err);
       return { success: false, error: (err as Error).message || 'Failed to reuse submission' };
     }
   }

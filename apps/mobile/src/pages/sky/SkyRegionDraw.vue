@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import { t } from '@myastrosky/core/i18n/index';
-import { reportError } from '@myastrosky/core/platform/error-hook';
 import { DEFAULT_REGION_COLOR } from '@myastrosky/core/domain/regions';
 import type { AltAzPoint } from '@myastrosky/core/sky-map-types';
 import type { SkyMap } from '@myastrosky/render/sky-map';
@@ -55,7 +54,7 @@ function draw() {
     { onPress: () => props.map.setActiveRegionOverlay(null), onAbort: show },
   );
   if (!started) {
-    void showError(new Error(t('horizon.error.noLocation')));
+    void showError(t('horizon.error.noLocation'));
     emit('cancel');
   }
 }
@@ -75,8 +74,10 @@ async function finish() {
     await store.create(name.value.trim(), color.value, points.value);
     emit('saved');
   } catch (error) {
-    reportError('SkyRegionDraw.save', error);
-    void showError(new Error(t('targets.skyRegion.saveError')));
+    void showError(error, {
+      message: t('targets.skyRegion.saveError'),
+      category: 'SkyRegionDraw.save',
+    });
   } finally {
     saving.value = false;
   }

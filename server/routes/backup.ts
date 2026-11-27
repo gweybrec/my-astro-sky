@@ -9,15 +9,14 @@ import fsp from 'fs/promises';
 import { MAX_JSON_BUNDLE_BYTES, uploadBundle } from './shared.js';
 import { backup as backupService } from '../services.js';
 import { createZipResponseWriter, openZipFile, type ZipFileReader } from '../bundle-zip.js';
-import { DomainError, isDomainError } from '@myastrosky/core/domain/errors';
+import { DomainError } from '@myastrosky/core/domain/errors';
+import { logServerError } from '../logger.js';
 import { sendError } from './http-errors.js';
 
 export const backupRouter = express.Router();
 
-/** An error that is not a `DomainError` becomes a 500 with its message, as these routes always did. */
 function fail(res: express.Response, err: unknown): void {
-  if (isDomainError(err)) sendError(res, err);
-  else res.status(500).json({ error: (err as Error)?.message ?? String(err) });
+  sendError(res, err, 'backup_failed');
 }
 
 /**
@@ -85,9 +84,10 @@ backupRouter.post('/api/export', async (req, res) => {
       shortcuts: body.shortcuts,
     });
     await zip.finalize();
-  } catch (err: any) {
+  } catch (err) {
     zip?.abort();
-    if (!res.headersSent) res.status(500).json({ error: err.message });
+    if (!res.headersSent) sendError(res, err, 'backup_export_failed');
+    else logServerError('backup_export_failed', err);
   }
 });
 
@@ -155,7 +155,7 @@ backupRouter.post('/api/export', async (req, res) => {
 backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (req, res) => {
   const file = req.file;
   if (!file) {
-    res.status(400).json({ error: 'Aucun fichier fourni' });
+    res.status(400).json({ error: 'No file provided', code: 'NO_FILE' });
     return;
   }
   const bundle = backupFileOf(file);
@@ -249,7 +249,7 @@ backupRouter.post('/api/import/preview', uploadBundle.single('bundle'), async (r
 backupRouter.post('/api/import', uploadBundle.single('bundle'), async (req, res) => {
   const file = req.file;
   if (!file) {
-    res.status(400).json({ error: 'Aucun fichier fourni' });
+    res.status(400).json({ error: 'No file provided', code: 'NO_FILE' });
     return;
   }
   const bundle = backupFileOf(file);

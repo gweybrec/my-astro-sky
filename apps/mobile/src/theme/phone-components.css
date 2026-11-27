@@ -1066,6 +1066,19 @@ ion-toast.mob-toast::part(wrapper) {
   justify-content: center;
   pointer-events: none;
 }
+/* In landscape the toast is a box of the sheet's width at most, centred, as the board draws it; it keeps clear of the
+   system bar on either side (the three-button navigation is on a side in landscape). */
+@media (orientation: landscape) {
+  ion-toast.mob-toast::part(wrapper) {
+    --start: calc(var(--mobile-gutter) + var(--safe-left, 0px));
+    --end: calc(var(--mobile-gutter) + var(--safe-right, 0px));
+    left: calc(var(--mobile-gutter) + var(--safe-left, 0px));
+    right: calc(var(--mobile-gutter) + var(--safe-right, 0px));
+    width: fit-content;
+    max-width: var(--mobile-sheet-width);
+    margin-inline: auto;
+  }
+}
 /* While a tab is shown the toast stays off the tab bar: in portrait it sits 16 px above it, as the floating plus; in
    landscape it starts 16 px right of the rail. */
 @media (orientation: landscape) {
@@ -1104,6 +1117,42 @@ ion-toast.mob-toast::part(container) {
 ion-toast.mob-toast::part(content) {
   padding: 0;
   min-height: 0;
+}
+/* `.mob-toast--ref` (board "Lieu, horizon indisponible"): the error's text, then its reference in the caption size and
+   the same colour, and the compact copy button at the end of the reference's line (both centred on the same line:
+   the reference's bottom room minus the button's is half their heights' difference). */
+ion-toast.mob-toast.mob-toast--ref::part(container) {
+  align-items: flex-end;
+}
+ion-toast.mob-toast.mob-toast--ref::part(header) {
+  padding: var(--space-5) var(--space-7) 0;
+  font-size: var(--font-size-body);
+  font-weight: inherit;
+  line-height: normal;
+}
+ion-toast.mob-toast.mob-toast--ref::part(message) {
+  padding: var(--space-2) var(--space-7) var(--space-6);
+  font-size: var(--font-size-base);
+  line-height: var(--space-7);
+}
+ion-toast.mob-toast.mob-toast--ref::part(button) {
+  width: var(--space-11);
+  height: var(--space-11);
+  min-height: 0;
+  margin: 0 var(--space-7) var(--space-2) 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Ionic draws a button's icon at 1.4 times the button's font size: this one is 16 px, as the compact icon button's. */
+  font-size: calc(var(--space-7) / 1.4);
+  border: 1px solid var(--border-white-md);
+  border-radius: var(--mobile-card-radius);
+  color: var(--text-primary);
+}
+ion-toast.mob-toast.mob-toast--ref::part(button):active {
+  background: var(--accent-fill-lg);
+  border-color: var(--border-focus);
 }
 
 /* ── A group of rows on the panel ground. */

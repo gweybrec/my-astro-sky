@@ -96,7 +96,7 @@ describe('createFetchHttpClient()', () => {
     }
   });
 
-  it('aborts the request when the timeout passes', async () => {
+  it('aborts the request when the timeout passes, as a NETWORK_TIMEOUT', async () => {
     vi.stubGlobal(
       'fetch',
       (_url: string, init: RequestInit) =>
@@ -106,15 +106,18 @@ describe('createFetchHttpClient()', () => {
     );
     await expect(
       createFetchHttpClient()({ method: 'GET', url: 'https://example.test/', timeoutMs: 5 }),
-    ).rejects.toThrow('aborted');
+    ).rejects.toMatchObject({ code: 'NETWORK_TIMEOUT', kind: 'upstream' });
   });
 
-  it('lets a network failure through with its own message', async () => {
+  it('turns a network failure into a NETWORK_ERROR keeping its message', async () => {
     vi.stubGlobal('fetch', async () => {
       throw new Error('ECONNRESET');
     });
     await expect(
       createFetchHttpClient()({ method: 'GET', url: 'https://example.test/' }),
-    ).rejects.toThrow('ECONNRESET');
+    ).rejects.toMatchObject({
+      code: 'NETWORK_ERROR',
+      message: expect.stringContaining('ECONNRESET'),
+    });
   });
 });

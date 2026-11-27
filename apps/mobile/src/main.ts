@@ -23,11 +23,23 @@ import { resumeImport } from './composables/usePhotoImport';
 import { installLivePlan } from './composables/useLivePlan';
 import { reportError } from '@myastrosky/core/platform/error-hook';
 
+// An error nothing caught (a promise left unhandled, a component that throws) is still logged, as on the desktop.
+window.addEventListener('error', (event) => {
+  reportError('renderer_uncaught_error', event.error ?? event.message, {
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+  });
+});
+window.addEventListener('unhandledrejection', (event) => {
+  reportError('renderer_unhandled_rejection', event.reason);
+});
+
 async function start(): Promise<void> {
   try {
     await initPlatform();
   } catch (error) {
-    console.error('Start-up failed', error);
+    reportError('startup_failed', error);
     // A plain full-screen message with the error's text and a retry button, not a blank page; after a failed
     // database update, also the full backup of the data it left intact.
     const message = error instanceof Error ? error.message : String(error);
@@ -37,7 +49,14 @@ async function start(): Promise<void> {
   }
   // The Targets search keeps its filters across launches, but its night starts on today, as on the desktop.
   resetTargetsNightToToday();
-  createApp(App).use(IonicVue).use(createPinia()).use(router).mount('#app');
+  const app = createApp(App);
+  app.config.errorHandler = (err, instance, info) => {
+    reportError('vue_component_error', err, {
+      info,
+      component: (instance as { $options?: { name?: string } } | null)?.$options?.name ?? 'unknown',
+    });
+  };
+  app.use(IonicVue).use(createPinia()).use(router).mount('#app');
   installBackButton(router);
   // An import left unsaved when the app was closed opens again, then the files opened with MyAstroSky from another
   // app join it, then the astrometry.net key is checked.

@@ -52,7 +52,7 @@ import {
   confirmPlanEntryDelete,
   confirmSetupDelete,
 } from './photo-delete-confirm';
-import { showToast } from './toast';
+import { showErrorToast } from './toast';
 import { deleteFrameWithUndo } from './frame-delete';
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -253,10 +253,8 @@ function buildSetupModal(opts: {
         close();
         opts.onDeleted?.();
       } catch (err) {
-        showToast({
-          message: String((err as Error)?.message ?? err),
-          type: 'error',
-          duration: 3500,
+        showErrorToast(err, 'serverErrors.INTERNAL_ERROR', {
+          category: 'gear_setup_delete_failed',
         });
         deleteBtn!.disabled = false;
       }

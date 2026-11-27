@@ -394,10 +394,7 @@ export function createIdentifyService(deps: IdentifyServiceDeps): IdentifyServic
     });
     const text = await res.text();
     if (!isOk(res)) {
-      throw upstream(
-        'SKYBOT_FAILED',
-        `SkyBoT request failed (${res.status}): ${text.slice(0, 200)}`,
-      );
+      throw upstream('SKYBOT_FAILED', `SkyBoT request failed (${res.status})`);
     }
 
     // IMCCE reports errors as a "# Flag: -1" comment header, still with a 200
@@ -479,7 +476,7 @@ export function createIdentifyService(deps: IdentifyServiceDeps): IdentifyServic
       throw new TnsRateLimitError(Number.isFinite(reset) && reset > 0 ? reset : null);
     }
     if (!isOk(res)) {
-      throw upstream('TNS_FAILED', `TNS request failed (${res.status}): ${text.slice(0, 200)}`);
+      throw upstream('TNS_FAILED', `TNS request failed (${res.status})`);
     }
     const trimmed = text.trim();
     // A 200 with an HTML page or a JSON error object means TNS did not honour the
@@ -509,10 +506,7 @@ export function createIdentifyService(deps: IdentifyServiceDeps): IdentifyServic
       });
       const text = await res.text();
       if (!isOk(res)) {
-        throw upstream(
-          'COMET_ELEMENTS_FAILED',
-          `MPC request failed (${res.status}): ${text.slice(0, 200)}`,
-        );
+        throw upstream('COMET_ELEMENTS_FAILED', `MPC request failed (${res.status})`);
       }
       const comets = parseCometEls(text);
       if (comets.length === 0) {

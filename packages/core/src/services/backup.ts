@@ -1,3 +1,4 @@
+import { reportError } from '../platform/error-hook';
 /**
  * Backup: the export of the user's data to an archive, the preview of an archive, and its import.
  * The archive itself is a port (`BundleWriter`, `BundleReader`); every write goes through the service
@@ -344,7 +345,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
         }
         const origName: string = nameOfManifestPhoto(p);
         if (isRefused(p, sharing)) {
-          recordFailure('photo', origName, new Error(`Refused file name: ${String(p.filename)}`));
+          recordFailure('photo', origName, new Error('Refused file name'));
           continue;
         }
 
@@ -401,9 +402,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
           if (inUse.has(f)) continue;
           await blobs
             .remove(f)
-            .catch((err) =>
-              console.warn(`[Import] Could not remove ${f} of a replaced photo:`, err),
-            );
+            .catch((err) => reportError('backup_import_remove_replaced_failed', err));
         }
       }
     }
@@ -422,7 +421,7 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
       try {
         await photos.ensureThumbnail(filename, thumbFilename, writtenFiles !== null);
       } catch (thumbErr) {
-        console.warn(`[Import] Thumbnail regeneration failed for ${filename}:`, thumbErr);
+        reportError('backup_import_thumbnail_failed', thumbErr);
       }
     }
     return { imported, skipped };
@@ -431,7 +430,8 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
   const makeFailureRecorder = (failed: ImportFailure[]) => {
     return (kind: ImportFailure['kind'], name: string, err: unknown): void => {
       failed.push({ kind, name });
-      console.error(`[Import] Failed to import ${kind} "${name}"`, err);
+      // The name is shown to the user in the import's result, never written to the log.
+      reportError('backup_import_item_failed', err, { kind });
     };
   };
 
@@ -917,13 +917,16 @@ export function createBackupService(deps: BackupServiceDeps): BackupService {
           const bytes = await reader.read(entryName);
           if (!bytes) continue;
           if (!(await isStorablePicture(bytes))) {
-            console.warn(`[Import] ${baseName} is not a picture the apps can open: not written`);
+            reportError(
+              'backup_import_not_a_picture',
+              new Error('Not a picture the apps can open: not written'),
+            );
             continue;
           }
           await blobs.put(baseName, bytes);
           writtenFiles.add(baseName);
         } catch (writeErr) {
-          console.warn(`[Import] Failed to write ${baseName}:`, writeErr);
+          reportError('backup_import_write_failed', writeErr);
         }
       }
 

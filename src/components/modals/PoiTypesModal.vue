@@ -81,7 +81,7 @@ import {
   type PoiTypeDraft,
 } from '@myastrosky/core/poi';
 import { confirmUnsavedChanges } from '../../photo-delete-confirm';
-import { showToast } from '../../toast';
+import { showErrorToast } from '../../toast';
 import { isTopmostOverlay } from '../../popup-utils';
 import trashSvg from '../../icons/trash.svg?raw';
 
@@ -141,7 +141,7 @@ async function save() {
     await store.saveDraft(draft.value);
     emit('close');
   } catch (err: any) {
-    showToast({ message: err.message, type: 'error', duration: 4000 });
+    showErrorToast(err, 'serverErrors.INTERNAL_ERROR', { category: 'poi_types_save_failed' });
     saving.value = false;
   }
 }

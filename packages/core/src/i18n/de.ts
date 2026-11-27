@@ -468,6 +468,11 @@ const de: Translations = {
     privacySharedTitle: 'Geteilte Himmel',
     privacyShared:
       '„Meinen Himmel teilen“ erstellt eine Datei auf Ihrem Gerät: die gewählten Fotos in voller Größe, ihre Position am Himmel und ihre Angaben (Ziele, Etiketten, Notizen, Datum, Belichtungen und, wenn Sie es ankreuzen, Ausrüstung und Aufnahmedetails). In den Bildern gespeicherte GPS-Koordinaten werden daraus entfernt, und die Header von FITS/TIFF-Dateien (die den Aufnahmeort angeben können) sind nicht darin enthalten; Ihr Beobachtungsort, Ihr Horizont, Ihre Einstellungen und Ihre Pläne sind nie darin enthalten. Die App sendet diese Datei nirgendwohin: Sie entscheiden, wem Sie sie geben, und jede Person, die sie erhält, kann diese Fotos sehen.',
+    privacyErrorLogTitle: 'Fehlerprotokoll',
+    privacyErrorLog:
+      'Die Fehler der App werden in einem Protokoll auf Ihrem Gerät gespeichert: die technische Fehlermeldung, ihr Code und ihre Referenz, das Datum, die App-Version und die Stelle im Code, an der er auftrat. Es enthält keine personenbezogenen Daten: weder Ihre Fotos, deren Dateinamen oder Inhalt, noch Ihre Notizen, Ziele, Pläne oder Einstellungen, noch Ihre Position, die Pfade Ihrer Ordner oder Ihren API-Schlüssel; nur zufällige interne Kennungen. Es wird nirgendwohin gesendet: Sie entscheiden, ob Sie es einer Fehlermeldung beifügen.',
+    privacyCrashDumps:
+      'Wenn die Desktop-App abstürzt, speichert das System zusätzlich eine Absturzdiagnose-Datei im Ordner der App. Sie kann enthalten, was die App in diesem Moment im Speicher hatte, also auch personenbezogene Daten. Sie bleibt auf Ihrem Computer, wird nie gesendet und nach 30 Tagen gelöscht.',
     dataCreditsTitle: 'Datennachweise',
     dataCreditsCatalogsLabel: 'Kataloge',
     dataCreditsDocsLabel: 'Referenzdokumente',
@@ -780,6 +785,9 @@ const de: Translations = {
     dropHere: 'Eine .myastrosky-Datei hier ablegen',
   },
   errors: {
+    reference: 'Ref.',
+    copyDetails: 'Fehlerdetails kopieren',
+    detailsCopied: 'Details kopiert',
     catalogLoad: '{url} konnte nicht geladen werden ({status} {statusText})',
     invalidResponse: 'Ungültige Serverantwort',
     uploadFailed: 'Upload fehlgeschlagen: {response}',
@@ -936,6 +944,7 @@ const de: Translations = {
     HTTP_504: 'Der Server hat zu lange für die Antwort gebraucht.',
     HTTP_ERROR: 'Der Server hat mit einem Fehler geantwortet.',
     NETWORK_ERROR: 'Netzwerkfehler, bitte die Verbindung prüfen.',
+    NETWORK_TIMEOUT: 'Der Server antwortet nicht, bitte später erneut versuchen.',
     IDS_NOT_ARRAY: 'Die Fotoliste ist ungültig.',
     INTERNAL_ERROR: 'In der App ist ein Fehler aufgetreten.',
     INVALID_DSO_DATA: 'Die Objektdaten sind ungültig.',

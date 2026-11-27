@@ -165,6 +165,8 @@ const de: Translations['mobile'] = {
     regionFinish: 'Fertig',
   },
   settings: {
+    shareErrorLog: 'Fehlerprotokoll teilen',
+    errorLogEmpty: 'Es wurde kein Fehler aufgezeichnet.',
     observation: 'Beobachtung',
     setups: 'Setups',
     astrometryKey: 'astrometry.net-Schlüssel',

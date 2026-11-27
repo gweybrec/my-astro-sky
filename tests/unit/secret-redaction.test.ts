@@ -1,9 +1,5 @@
-import { describe, expect, it, vi, afterEach } from 'vitest';
-import { redactSecrets } from '../../electron/secret-redaction';
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
+import { describe, expect, it } from 'vitest';
+import { redactSecrets } from '@myastrosky/core/platform/log-sanitize';
 
 describe('redactSecrets', () => {
   it('redacts astrometry apikey in JSON snippets', () => {
@@ -27,9 +23,8 @@ describe('redactSecrets', () => {
     expect(out).not.toContain('topsecret');
   });
 
-  it('redacts configured env key value when present in free text', () => {
-    vi.stubEnv('ASTROMETRY_API_KEY', 'env-secret');
-    const out = redactSecrets('failed with token env-secret in payload');
+  it('redacts a known key when present in free text', () => {
+    const out = redactSecrets('failed with token env-secret in payload', ['env-secret']);
     expect(out).not.toContain('env-secret');
     expect(out).toContain('[redacted]');
   });

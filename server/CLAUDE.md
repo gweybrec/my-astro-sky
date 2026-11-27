@@ -17,7 +17,7 @@ conventions, the CI gate, architecture overview) stay in the root `CLAUDE.md`.
 - **Where a route goes:** in the router file of its domain under `server/routes/` (map in `docs/dev/architecture.md`). A new domain gets a new file exporting `<name>Router`, plus one `app.use(<name>Router)` line in the mount block of `server/app.ts`. `server/index.ts` only starts the app.
 - **`tests/unit/server-app.test.ts` lists every route** and must be updated when a route is added or removed.
 - **Every route needs Swagger JSDoc annotations**, kept in a `@swagger` comment right next to the route. Regenerate the spec with `npm run swagger:generate` (writes `public/swagger.json`).
-- **Log backend errors** through `server/logger.ts` — do not bare `console.error`.
+- **Errors:** a route answers a caught error with `sendError(res, err, category)` (`routes/http-errors.ts`), which logs what is not the user's doing and never sends a bug's raw message; other errors go through `logServerError` (`server/logger.ts`), never a bare `console.error`. A refusal the user can act on is a `DomainError` with a code of `ERROR_CODES`.
 - Full walkthrough for an API-route change (with the frontend side): the `fullstack-feature` skill.
 
 ## Tests

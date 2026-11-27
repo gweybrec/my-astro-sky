@@ -1,3 +1,5 @@
+import { DomainError } from '../domain/errors';
+
 /**
  * A file's content read only when needed (a `Blob` is one: the server's comes from `fs.openAsBlob`), so that a large
  * file sent on is not held in memory whole.
@@ -30,3 +32,20 @@ export interface HttpResponse {
   bytes(): Promise<Uint8Array>;
 }
 export type HttpClient = (request: HttpRequest) => Promise<HttpResponse>;
+
+/**
+ * What an `HttpClient` throws when no answer came: `NETWORK_TIMEOUT` when it waited `timeoutMs`,
+ * else `NETWORK_ERROR` (no network, a refused connection). The screens translate both, and a solve
+ * followed in the background takes them as "out of reach for now". The original error is the cause.
+ */
+export function httpFailure(cause: unknown, timedOutAfterMs?: number): DomainError {
+  const detail = cause instanceof Error ? cause.message : String(cause);
+  return timedOutAfterMs !== undefined
+    ? Object.assign(
+        new DomainError('upstream', `Request timed out after ${timedOutAfterMs} ms`, {
+          code: 'NETWORK_TIMEOUT',
+        }),
+        { cause },
+      )
+    : Object.assign(new DomainError('upstream', detail, { code: 'NETWORK_ERROR' }), { cause });
+}

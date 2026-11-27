@@ -2,8 +2,7 @@ import { t } from './i18n';
 import type { SkyMap } from '@myastrosky/render/sky-map';
 import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
 import { confirmSkyRegionDelete } from './photo-delete-confirm';
-import { showToast } from './toast';
-import { reportUnknownRendererError } from './error-reporter';
+import { showToast, showErrorToast } from './toast';
 import { DEFAULT_REGION_COLOR } from '@myastrosky/core/domain/regions';
 import trashSvg from './icons/trash.svg?raw';
 
@@ -103,8 +102,7 @@ function buildSaveRegionModal(
       backdrop.remove();
       onSaved();
     } catch (err) {
-      reportUnknownRendererError('sky_region_save', err);
-      showToast({ message: t('targets.skyRegion.saveError'), type: 'error' });
+      showErrorToast(err, 'targets.skyRegion.saveError', { category: 'sky_region_save' });
       saveBtn.disabled = false;
     }
   });
@@ -256,8 +254,7 @@ export function openManageRegionsModal(skyMap: SkyMap, onFullyClosed?: () => voi
           await store.remove(region.id);
           renderList();
         } catch (err) {
-          reportUnknownRendererError('sky_region_delete', err);
-          showToast({ message: t('targets.skyRegion.deleteError'), type: 'error' });
+          showErrorToast(err, 'targets.skyRegion.deleteError', { category: 'sky_region_delete' });
         }
       });
       row.appendChild(deleteBtn);

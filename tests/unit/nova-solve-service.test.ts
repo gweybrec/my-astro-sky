@@ -736,8 +736,7 @@ describe('reuse()', () => {
       },
     });
     expect(await t.service.reuse(t.file, 99)).toEqual({ success: false, error: 'timeout' });
-    expect(t.log).toHaveBeenCalledWith('astrometry_reuse_failed', expect.any(Error), {
-      jobId: 99,
-    });
+    // Never the astrometry.net job number: it leads to the user's photo.
+    expect(t.log).toHaveBeenCalledWith('astrometry_reuse_failed', expect.any(Error));
   });
 });

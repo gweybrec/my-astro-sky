@@ -101,23 +101,30 @@ Never pass a raw string literal to a UI element — always go through `t()`.
 
 ## Step 4 — Frontend error logging
 
-All caught errors **must** call `reportUnknownRendererError` from `src/error-reporter.ts`. Do not
-silently swallow errors or log only to `console.error`.
+A caught error the user must hear about goes to `showErrorToast` from `src/toast.ts`: it shows the
+error's text for the user (a translated code, never the raw message of a bug; `fallbackKey` then),
+logs it, and shows its reference with a copy button. A caught error the user need not hear about
+calls `reportUnknownRendererError` from `src/error-reporter.ts`. Never swallow an error silently,
+log it only to `console.error`, or show `err.message` yourself.
 
 ```typescript
-import { reportUnknownRendererError } from './error-reporter';
+import { showErrorToast } from './toast';
 
 try {
   await someApiCall();
 } catch (err) {
-  reportUnknownRendererError('my_feature_action', err, { photoId, dsoId });
-  // then handle the UI fallback
+  showErrorToast(err, 'errors.updatePhoto', {
+    category: 'my_feature_action',
+    context: { photoId },
+  });
 }
 ```
 
 - `category`: short snake_case identifying the operation (`'photo_upload'`, `'dso_load'`, …)
-- `context`: optional extra data to help diagnose
-- No-op outside Electron — safe in browser dev mode
+- `context`: optional extra data to help diagnose (never user data such as notes or positions)
+- A message about what the user entered is a `userFacingError(t('…'), { kind: 'invalid' })`
+  (`@myastrosky/core/platform/error-report`): shown as it is, with no reference
+- Outside Electron the log line goes to the browser console
 
 ---
 

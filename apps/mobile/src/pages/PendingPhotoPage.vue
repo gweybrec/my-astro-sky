@@ -280,7 +280,7 @@ async function save() {
   if (!current || saving.value) return;
   // An exposure row may leave any field empty, but not all three.
   if (draft.integrations.some((row) => !integrationRowHasData(row))) {
-    void showError(new Error(t('errors.integrationRowIncomplete')));
+    void showError(t('errors.integrationRowIncomplete'));
     return;
   }
   saving.value = true;

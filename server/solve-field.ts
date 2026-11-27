@@ -13,6 +13,7 @@ import { shouldUseWSL, wrapExecForWSL, wslPath } from './wsl-utils.js';
 import { msg } from './messages.js';
 import type { ServerLang } from './messages.js';
 import { logDebug, logInfo } from '@myastrosky/core/platform/log';
+import { logServerError } from './logger.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -439,7 +440,7 @@ ${fullOutput}`,
       (abortErr as any).code = 'SOLVE_CANCELED';
       throw abortErr;
     }
-    console.error('[solve-field] Unexpected error:', err);
+    logServerError('solve_field_unexpected_error', err);
     return {
       success: false,
       error: err.message || 'solve-field error',
@@ -449,7 +450,7 @@ ${fullOutput}`,
     try {
       await fsp.rm(tmpDir, { recursive: true, force: true });
     } catch (cleanupErr) {
-      console.warn('[solve-field] Failed to clean up temp directory:', cleanupErr);
+      logServerError('solve_field_cleanup_failed', cleanupErr);
     }
   }
 }

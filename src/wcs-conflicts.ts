@@ -1,3 +1,4 @@
+import { installVueErrorHandler } from './vue-error-handler';
 import { createApp, h } from 'vue';
 import type { WcsChange } from '@myastrosky/core/photo-metadata-draft';
 import WcsConflictDialog from './components/modals/WcsConflictDialog.vue';
@@ -18,6 +19,7 @@ export function showWcsConflicts(conflicts: WcsChange[]): Promise<WcsChange[] | 
           onCancel: () => close(null),
         }),
     });
+    installVueErrorHandler(app, 'wcs-conflicts');
     function close(value: WcsChange[] | null) {
       app.unmount();
       host.remove();

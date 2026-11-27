@@ -162,6 +162,8 @@ const fr = {
     regionFinish: 'Terminer',
   },
   settings: {
+    shareErrorLog: 'Partager le journal des erreurs',
+    errorLogEmpty: "Aucune erreur n'a été enregistrée.",
     observation: 'Observation',
     setups: 'Setups',
     astrometryKey: 'Clé astrometry.net',

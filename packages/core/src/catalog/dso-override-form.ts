@@ -1,3 +1,4 @@
+import { userFacingError } from '../platform/error-report';
 import { t } from '../i18n/index';
 import type { ConstellationInfo, DSOType, DSOUserOverride } from '../types';
 
@@ -97,11 +98,11 @@ export function buildDsoOverride(
   const ra = parseFloat(form.ra);
   const dec = parseFloat(form.dec);
   if (!isNaN(ra)) {
-    if (ra < 0 || ra >= 360) throw new Error(t('dso.editErrorRa'));
+    if (ra < 0 || ra >= 360) throw userFacingError(t('dso.editErrorRa'), { kind: 'invalid' });
     if (ra !== current.ra) override.ra = ra;
   }
   if (!isNaN(dec)) {
-    if (dec < -90 || dec > 90) throw new Error(t('dso.editErrorDec'));
+    if (dec < -90 || dec > 90) throw userFacingError(t('dso.editErrorDec'), { kind: 'invalid' });
     if (dec !== current.dec) override.dec = dec;
   }
   if (shouldOverrideConstellation(form.constellation, base?.constellation)) {

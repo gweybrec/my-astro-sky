@@ -1,3 +1,4 @@
+import { userFacingError } from '@myastrosky/core/platform/error-report';
 import type { DetectedSpot, StarDetectionResult } from '@myastrosky/core/types';
 import { t } from './i18n';
 
@@ -184,7 +185,7 @@ export function detectStarsFromFile(file: File): Promise<StarDetectionResult> {
 
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error(t('errors.imageLoadFailed')));
+      reject(userFacingError(t('errors.imageLoadFailed'), { kind: 'invalid' }));
     };
 
     img.src = url;

@@ -1,5 +1,5 @@
+import { logServerError } from '../logger.js';
 import express from 'express';
-import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { PhotoMetadataChanges } from '@myastrosky/core/domain/photos';
 import { isElectron, UPLOAD_LIMIT, checkRateLimit, upload } from './shared.js';
 import { photos } from '../services.js';
@@ -50,14 +50,13 @@ photosRouter.post('/api/photos', upload.single('photo'), async (req, res) => {
     logDebug('Upload', `File pixel dimensions: ${source.width} x ${source.height}`);
     logDebug('Upload', `EXIF orientation: ${source.orientation}`);
     logDebug('Upload', `Browser showed dimensions: ${photo.width} x ${photo.height}`);
-    for (const w of warnings) console.warn('[Upload] Thumbnail generation failed:', w.error);
+    for (const w of warnings) logServerError('upload_thumbnail_failed', w.error);
 
     // Answer with the row as GET /api/photos returns it, so the client's in-memory photo matches what a
     // reload would fetch and no metadata field is silently dropped.
     res.json(photo);
   } catch (err) {
-    if (!isDomainError(err)) console.error('Upload error:', err);
-    sendError(res, err);
+    sendError(res, err, 'photo_upload_failed');
   }
 });
 
@@ -198,8 +197,7 @@ photosRouter.delete('/api/photos', async (req, res) => {
     const deleted = await photos.removeMany(ids as string[]);
     res.json({ ok: true, deleted });
   } catch (err) {
-    console.error('[DeleteAll] Bulk photo delete failed', err);
-    sendError(res, err);
+    sendError(res, err, 'delete_all_photos_failed');
   }
 });
 
@@ -230,8 +228,7 @@ photosRouter.delete('/api/photo-metadata', async (_req, res) => {
     const deleted = await photos.removeAll();
     res.json({ ok: true, deleted });
   } catch (err) {
-    console.error('[DeleteAll] Photo metadata delete failed', err);
-    sendError(res, err);
+    sendError(res, err, 'delete_all_photo_metadata_failed');
   }
 });
 

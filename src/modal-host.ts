@@ -1,9 +1,9 @@
+import { installVueErrorHandler } from './vue-error-handler';
 import { createApp } from 'vue';
 import { pinia } from './pinia-instance';
 import MyAstroSkyApp from './MyAstroSkyApp.vue';
 import type { SkyMap } from '@myastrosky/render/sky-map';
 import type { PhotoOverlay } from './photo-overlay';
-import { reportUnknownRendererError } from './error-reporter';
 
 type ModalName =
   | 'about'
@@ -39,12 +39,7 @@ export function mountVueApp(_skyMap: SkyMap, _overlay: PhotoOverlay) {
 
   const app = createApp(MyAstroSkyApp);
   app.use(pinia);
-  app.config.errorHandler = (err, instance, info) => {
-    reportUnknownRendererError('vue_component_error', err, {
-      info,
-      component: (instance as any)?.$options?.name ?? 'unknown',
-    });
-  };
+  installVueErrorHandler(app, 'modal-host');
 
   _appRef = app.mount(container) as unknown as { openModal: (name: ModalName | null) => void };
 }

@@ -7,7 +7,7 @@
  * Difference: the patched `fetch` may ignore an abort, so the timeout is a race between the request and a
  * timer that rejects (the abort is still signalled, for a `fetch` that honours it).
  */
-import type { HttpClient, HttpRequest } from '@myastrosky/core/ports/http-client';
+import { httpFailure, type HttpClient, type HttpRequest } from '@myastrosky/core/ports/http-client';
 
 /** The part of a `fetch` response that the adapter reads. */
 export interface FetchResponseLike {
@@ -50,12 +50,18 @@ export function createFetchHttpClient(options: { fetch: FetchLike }): HttpClient
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const exchange = async () => {
-      const res = await options.fetch(request.url, {
-        method: request.method,
-        ...(request.headers ? { headers: { ...request.headers } } : {}),
-        body: toBody(request.body),
-        signal: controller.signal,
-      });
+      let res: FetchResponseLike;
+      try {
+        res = await options.fetch(request.url, {
+          method: request.method,
+          ...(request.headers ? { headers: { ...request.headers } } : {}),
+          body: toBody(request.body),
+          signal: controller.signal,
+        });
+      } catch (err) {
+        // No answer at all: no network, a refused connection, an address that does not resolve.
+        throw httpFailure(err);
+      }
       const headers: Record<string, string> = {};
       res.headers.forEach((value, key) => {
         headers[key.toLowerCase()] = value;
@@ -75,7 +81,7 @@ export function createFetchHttpClient(options: { fetch: FetchLike }): HttpClient
       const timeout = new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
           controller.abort();
-          reject(new Error(`Request timed out after ${request.timeoutMs} ms`));
+          reject(httpFailure(new Error('timeout'), request.timeoutMs));
         }, request.timeoutMs);
       });
       const pending = exchange();

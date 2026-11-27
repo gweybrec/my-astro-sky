@@ -29,6 +29,7 @@ import type {
   ShareRequest,
 } from '@myastrosky/core/domain/shared-sky';
 import { DomainError } from '@myastrosky/core/domain/errors';
+import { translateErrorCode, userFacingError } from '@myastrosky/core/platform/error-report';
 import type {
   LatestRelease,
   ServerSettings,
@@ -108,27 +109,23 @@ export function parseServerError(
   data: { error?: string; code?: string },
   fallbackKey: string,
 ): string {
-  if (data.code) {
-    const translated = t('serverErrors.' + data.code);
-    // A message with a {placeholder} needs details the response only carries in `error`.
-    const needsDetail = /\{\w+\}/.test(translated) && !!data.error;
-    if (!translated.startsWith('serverErrors.') && !needsDetail) return translated;
-  }
-  return data.error || t(fallbackKey);
+  return translateErrorCode(data.code, data.error, fallbackKey);
 }
 
 /**
- * What a function of this module throws: the backend's `DomainError` becomes a plain `Error` whose
- * message is its `code` translated, else its own message, else `fallbackKey`. Anything else (a
+ * What a function of this module throws: the backend's `DomainError` becomes an error written for
+ * the user, whose message is its `code` translated, else its own message, else `fallbackKey`. It
+ * keeps the code (for a caller that acts on it, `JOB_NOT_FOUND`) and the kind. Anything else (a
  * cancelled transfer, a bug) passes through as it is.
  */
 function toUserError(err: unknown, fallbackKey: string): Error {
   if (err instanceof DomainError) {
-    // The code stays on the error, for a caller that acts on it (`JOB_NOT_FOUND`).
-    return Object.assign(
-      new Error(parseServerError({ error: err.message, code: err.code }, fallbackKey)),
-      { code: err.code },
-    );
+    return userFacingError(parseServerError({ error: err.message, code: err.code }, fallbackKey), {
+      code: err.code,
+      kind: err.kind,
+      ref: err.ref,
+      cause: err,
+    });
   }
   return err instanceof Error ? err : new Error(String(err));
 }
@@ -517,7 +514,7 @@ export async function listAstrometrySubmissions(
     if (err instanceof DomainError && err.kind === 'rateLimited') {
       throw toUserError(err, 'errors.listSubmissionsFailed');
     }
-    throw new Error(t('errors.listSubmissionsFailed'), { cause: err });
+    throw userFacingError(t('errors.listSubmissionsFailed'), { cause: err });
   }
 }
 

@@ -163,7 +163,7 @@ describe('POST /api/skybot/conesearch', () => {
     expect(r).toEqual({
       status: 502,
       body: {
-        error: 'SkyBoT error: SkyBoT request failed (503): down for maintenance',
+        error: 'SkyBoT error: SkyBoT request failed (503)',
         code: 'SKYBOT_FAILED',
       },
     });
@@ -299,7 +299,7 @@ describe('POST /api/tns/conesearch', () => {
     const r = await call('POST', '/api/tns/conesearch', { ...GOOD, raDeg: 20 });
     expect(r).toEqual({
       status: 502,
-      body: { error: 'TNS error: TNS request failed (500): boom', code: 'TNS_FAILED' },
+      body: { error: 'TNS error: TNS request failed (500)', code: 'TNS_FAILED' },
     });
   });
 
@@ -374,7 +374,7 @@ describe('GET /api/comets/elements', () => {
     expect(r).toEqual({
       status: 502,
       body: {
-        error: 'Could not load comet orbits (MPC): MPC request failed (503): Service Unavailable',
+        error: 'Could not load comet orbits (MPC): MPC request failed (503)',
         code: 'COMET_ELEMENTS_FAILED',
       },
     });
@@ -576,6 +576,7 @@ describe('GET /api/horizon', () => {
       body: {
         error: 'Failed to compute horizon from elevation data',
         code: 'HORIZON_COMPUTE_FAILED',
+        ref: expect.stringMatching(/^[0-9A-Z]{4}$/),
       },
     });
     upstream = answer({ status: 200, body: '{"elements":[]}' });
@@ -591,6 +592,7 @@ describe('GET /api/horizon', () => {
       body: {
         error: 'Failed to compute horizon from elevation data',
         code: 'HORIZON_COMPUTE_FAILED',
+        ref: expect.stringMatching(/^[0-9A-Z]{4}$/),
       },
     });
   });
@@ -867,7 +869,7 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
       });
     });
 
-    it("answers 500 with the decoder's message when the file is not decodable at all", async () => {
+    it('answers 500 with INVALID_IMAGE and a reference when the file is not decodable at all', async () => {
       const r = await upload('/api/photos/convert', {
         name: 'x.tif',
         bytes: new Uint8Array([1, 2, 3, 4]),
@@ -875,7 +877,9 @@ describe('solved-file routes (POST /api/solve-wcs, POST /api/photos/convert)', a
       expect(r.status).toBe(500);
       expect(r.body).toEqual({
         success: false,
-        error: 'Buffer too small to be a TIFF file',
+        error: 'Invalid or corrupt image file',
+        code: 'INVALID_IMAGE',
+        ref: expect.stringMatching(/^[0-9A-Z]{4}$/),
       });
     });
 
@@ -1174,12 +1178,14 @@ describe('online solving routes (astrometry.net)', () => {
       );
     });
 
-    it('answers 500 with the message when the login is refused', async () => {
+    it('answers 502 with the code, the message and a reference when the login is refused', async () => {
       upstream = json({ status: 'error', errormessage: 'bad apikey' });
       const r = await post('/api/solve-plate', { name: 'a.png', bytes: png });
-      expect(r.status).toBe(500);
+      expect(r.status).toBe(502);
       expect(r.body).toEqual({
         error: "Échec de l'authentification astrometry.net: bad apikey",
+        code: 'ASTROMETRY_LOGIN_FAILED',
+        ref: expect.stringMatching(/^[0-9A-Z]{4}$/),
       });
       expect(recorded).toHaveLength(1);
       expect(recorded[0].url).toBe(`${API}/login`);

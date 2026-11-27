@@ -1,3 +1,4 @@
+import { configureErrorReporter } from '@myastrosky/core/platform/error-hook';
 // @vitest-environment node
 /**
  * The photo service, data part, on a private in-memory database, on both SQL adapters.
@@ -891,7 +892,8 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
       blobs.store.set('flat.jpg', new Uint8Array([1]));
       blobs.store.set('thin.jpg', new Uint8Array([1]));
       codec.info = { width: 100, height: 50, orientation: 8 };
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const reports = vi.fn();
+      configureErrorReporter(reports);
       expect(await svc.repairSizes()).toBe(2);
       const sizes = (await svc.list()).map((p) => [p.id, p.width, p.height]);
       expect(sizes).toEqual([
@@ -901,8 +903,15 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
         // its picture is not here: left as it is, and said in the log
         ['lost', 0, 0],
       ]);
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('lost.jpg'));
-      warn.mockRestore();
+      // Reported, never with the file's name.
+      expect(reports).toHaveBeenCalledWith(
+        'photo_size_unreadable',
+        expect.any(Error),
+        undefined,
+        expect.anything(),
+      );
+      expect(JSON.stringify(reports.mock.calls.map((c) => String(c[1])))).not.toContain('lost');
+      configureErrorReporter((c, e) => console.error(c, e));
     });
 
     it('costs one read when nothing needs it, and one write for every photo it repairs', async () => {
@@ -1024,12 +1033,18 @@ describe.each(SQL_ADAPTERS)('PhotoService (%s)', (_adapter, wrap) => {
         if (bytes[0] === 9) throw new Error('not an image');
         return original(bytes, maxSize, quality);
       };
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const reports = vi.fn();
+      configureErrorReporter(reports);
       expect(await svc.makeMissingMediums()).toBe(1);
       expect((await svc.get('bad'))!.mediumFilename).toBeNull();
       expect((await svc.get('good'))!.mediumFilename).toBe('good_medium.jpg');
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining('bad.jpg'), expect.any(Error));
-      warn.mockRestore();
+      expect(reports).toHaveBeenCalledWith(
+        'photo_medium_copy_failed',
+        expect.any(Error),
+        undefined,
+        expect.anything(),
+      );
+      configureErrorReporter((c, e) => console.error(c, e));
     });
 
     it('does not try again, at the next start, a picture it could not shrink', async () => {

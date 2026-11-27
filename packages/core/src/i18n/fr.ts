@@ -463,6 +463,11 @@ const fr = {
     privacySharedTitle: 'Ciels partagés',
     privacyShared:
       "« Partager mon ciel » crée un fichier sur votre appareil : les photos choisies en taille réelle, leur position sur le ciel et leurs informations (cibles, étiquettes, notes, date, poses et, si vous le cochez, matériel et détails de prise de vue). Les coordonnées GPS enregistrées dans les images en sont retirées et les en-têtes des fichiers FITS/TIFF (qui peuvent indiquer le lieu de prise de vue) n'y figurent pas ; votre lieu d'observation, votre horizon, vos réglages et vos plans n'y figurent jamais. L'application n'envoie ce fichier nulle part : vous choisissez à qui le donner, et toute personne qui le reçoit peut voir ces photos.",
+    privacyErrorLogTitle: 'Journal des erreurs',
+    privacyErrorLog:
+      "Les erreurs de l'application sont enregistrées dans un journal sur votre appareil : le message technique de l'erreur, son code et sa référence, la date, la version de l'application et l'endroit du code concerné. Aucune donnée personnelle n'y figure : ni vos photos, leurs noms de fichiers ou leur contenu, ni vos notes, cibles, plans ou réglages, ni votre position, ni le chemin de vos dossiers, ni votre clé API ; seulement des identifiants internes tirés au hasard. Il n'est envoyé nulle part : vous choisissez de le joindre à un signalement de bug.",
+    privacyCrashDumps:
+      "Si l'application de bureau plante, le système enregistre aussi un fichier de diagnostic du plantage dans le dossier de l'application. Ce fichier peut contenir ce que l'application avait en mémoire à ce moment-là, donc des données personnelles. Il reste sur votre ordinateur, n'est jamais envoyé et est supprimé après 30 jours.",
     dataCreditsTitle: 'Crédits des données',
     dataCreditsCatalogsLabel: 'Catalogues',
     dataCreditsDocsLabel: 'Documents de référence',
@@ -780,6 +785,9 @@ const fr = {
     dropHere: 'Déposez un fichier .myastrosky ici',
   },
   errors: {
+    reference: 'Réf.',
+    copyDetails: "Copier les détails de l'erreur",
+    detailsCopied: 'Détails copiés',
     catalogLoad: 'Impossible de charger {url} ({status} {statusText})',
     invalidResponse: 'Réponse serveur invalide',
     uploadFailed: "Échec de l'upload : {response}",
@@ -935,6 +943,7 @@ const fr = {
     HTTP_504: 'Le serveur a mis trop de temps à répondre.',
     HTTP_ERROR: 'Le serveur a répondu par une erreur.',
     NETWORK_ERROR: 'Erreur réseau, vérifiez la connexion.',
+    NETWORK_TIMEOUT: 'Le serveur ne répond pas, réessayez plus tard.',
     IDS_NOT_ARRAY: 'La liste des photos est invalide.',
     INTERNAL_ERROR: "L'application a rencontré une erreur.",
     INVALID_DSO_DATA: "Les données de l'objet sont invalides.",

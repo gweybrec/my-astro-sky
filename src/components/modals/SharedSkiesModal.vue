@@ -92,7 +92,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { getLang, t } from '../../i18n';
 import BaseModal from '../base/BaseModal.vue';
 import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
-import { showToast } from '../../toast';
+import { showToast, showErrorToast } from '../../toast';
 import { reportUnknownRendererError } from '../../error-reporter';
 import { confirmSharedSkyDelete } from '../../photo-delete-confirm';
 import { takeDroppedSharedSky } from '../../shared-sky-drop';
@@ -153,8 +153,7 @@ function reset() {
 
 function fail(category: string, err: unknown, fallbackKey: string) {
   if (isAbort(err)) return;
-  reportUnknownRendererError(category, err);
-  showToast({ message: err instanceof Error ? err.message : t(fallbackKey), type: 'error' });
+  showErrorToast(err, fallbackKey, { category });
 }
 
 async function readPackage(file: File) {

@@ -220,7 +220,7 @@ function pickOnMap(index: number) {
 function setCoordinates(index: number) {
   const p = raDecFromSexagesimal(points[index].coords);
   if (!p) {
-    void showError(new Error(t('modal.invalidCoordinates')));
+    void showError(t('modal.invalidCoordinates'));
     return;
   }
   points[index].star = {

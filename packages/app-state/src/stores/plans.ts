@@ -248,7 +248,7 @@ export const usePlansStore = defineStore('plans', () => {
       await addPlanEntryAPI(planId, dsoId);
       await load();
     } catch (err) {
-      reportError('plan_add_entry_failed', err, { planId, dsoId });
+      reportError('plan_add_entry_failed', err, { planId });
     }
   }
 

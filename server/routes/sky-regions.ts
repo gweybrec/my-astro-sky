@@ -1,5 +1,4 @@
 import express from 'express';
-import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { SkyRegionChanges, SkyRegionInput } from '@myastrosky/core/domain/regions';
 import { skyRegions } from '../services.js';
 import { sendError } from './http-errors.js';
@@ -44,8 +43,7 @@ skyRegionsRouter.get('/api/sky-regions', async (_req, res) => {
   try {
     res.json(await skyRegions.list());
   } catch (err) {
-    if (!isDomainError(err)) console.error('[SkyRegions] Failed to list regions', err);
-    sendError(res, err);
+    sendError(res, err, 'sky_regions_list_regions_failed');
   }
 });
 
@@ -89,8 +87,7 @@ skyRegionsRouter.post('/api/sky-regions', async (req, res) => {
   try {
     res.json(await skyRegions.create(req.body as SkyRegionInput));
   } catch (err) {
-    if (!isDomainError(err)) console.error('[SkyRegions] Failed to create region', err);
-    sendError(res, err);
+    sendError(res, err, 'sky_regions_create_region_failed');
   }
 });
 
@@ -140,8 +137,7 @@ skyRegionsRouter.patch('/api/sky-regions/:id', async (req, res) => {
     await skyRegions.update(req.params.id, req.body as SkyRegionChanges);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[SkyRegions] Failed to update region', err);
-    sendError(res, err);
+    sendError(res, err, 'sky_regions_update_region_failed');
   }
 });
 
@@ -174,7 +170,6 @@ skyRegionsRouter.delete('/api/sky-regions/:id', async (req, res) => {
     await skyRegions.remove(req.params.id);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[SkyRegions] Failed to delete region', err);
-    sendError(res, err);
+    sendError(res, err, 'sky_regions_delete_region_failed');
   }
 });

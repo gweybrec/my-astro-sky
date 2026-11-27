@@ -1,3 +1,4 @@
+import { configureErrorReporter } from '@myastrosky/core/platform/error-hook';
 import express from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -149,6 +150,10 @@ app.use(sharedSkiesRouter);
 // guaranteeing correct ordering regardless of dist/ presence. It does not listen: the
 // entry point (server/index.ts) does.
 export async function createApp(): Promise<express.Express> {
+  // The shared services' errors go to the server's log (the desktop's log file, else the console), cleaned.
+  configureErrorReporter((context, error, details, ticket) => {
+    logServerError(context, error, details, ticket);
+  });
   // Debug and info messages print outside production (the packaged desktop app sets NODE_ENV=production).
   configureLogSink(process.env.NODE_ENV === 'production' ? null : consoleLogSink);
 
@@ -195,14 +200,22 @@ export async function createApp(): Promise<express.Express> {
   }
 
   // Global error handler — ensures all errors (including multer) return JSON
-  app.use((err: any, _req: any, res: any, _next: any) => {
+  app.use((err: any, req: any, res: any, _next: any) => {
     const status = err.status ?? err.statusCode ?? 500;
-    const message = err?.message ?? String(err);
-    if (status >= 500) logServerError('server_unhandled_error', err);
+    if (status >= 500) {
+      // A bug: logged with its reference, and never answered with its raw message.
+      // The route's pattern only, never the path with its values.
+      const { code, ref } = logServerError('server_unhandled_error', err, {
+        method: req.method,
+        ...(req.route ? { route: req.baseUrl + String(req.route.path) } : {}),
+      });
+      if (!res.headersSent) res.status(status).json({ error: 'Internal error', code, ref });
+      return;
+    }
     if (!res.headersSent) {
       // A refusal that carries a code (the upload filter's INVALID_FILE_TYPE) keeps it.
-      const code = status < 500 && typeof err?.code === 'string' ? { code: err.code } : {};
-      res.status(status).json({ error: message, ...code });
+      const code = typeof err?.code === 'string' ? { code: err.code } : {};
+      res.status(status).json({ error: err?.message ?? String(err), ...code });
     }
   });
 

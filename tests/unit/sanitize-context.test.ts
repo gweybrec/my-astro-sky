@@ -3,7 +3,8 @@ import {
   sanitizeContext,
   MAX_SANITIZE_VALUE_LENGTH,
   MAX_SANITIZE_DEPTH,
-} from '../../electron/sanitize-context';
+  removeUserData,
+} from '@myastrosky/core/platform/log-sanitize';
 
 describe('sanitizeContext', () => {
   describe('primitive passthrough', () => {
@@ -179,6 +180,74 @@ describe('sanitizeContext', () => {
     it('converts a function to its string representation', () => {
       const result = sanitizeContext(() => {}) as string;
       expect(typeof result).toBe('string');
+    });
+  });
+});
+
+describe('removeUserData', () => {
+  it('removes absolute paths of the machine and the phone', () => {
+    expect(removeUserData(String.raw`ENOENT: open 'D:\Astro\2025\M31\stack.fits'`)).toBe(
+      "ENOENT: open '[file]'",
+    );
+    expect(removeUserData(String.raw`EPERM: 'D:\My Photos\M31 final.fits'`)).toBe(
+      "EPERM: '[file]'",
+    );
+    expect(removeUserData(String.raw`scan D:\Astro\2025 done`)).toBe('scan [path] done');
+    expect(removeUserData(String.raw`at /home/alice/astro/x on \\nas\photos\m42`)).toBe(
+      'at [path] on [path]',
+    );
+    expect(removeUserData('read content://media/external/images/1234 failed')).toBe(
+      'read [path] failed',
+    );
+    expect(removeUserData('cannot open /storage/emulated/0/DCIM/M42.jpg')).toBe(
+      'cannot open [path]',
+    );
+  });
+
+  it("removes the names of the user's files", () => {
+    expect(removeUserData(`Could not read 'Orion nebula final.TIF' (bad header)`)).toBe(
+      "Could not read '[file]' (bad header)",
+    );
+    expect(removeUserData('M31_LRGB_2025-10-03.xisf is not supported')).toBe(
+      '[file] is not supported',
+    );
+    expect(removeUserData('import of ciel de Paul.myastrosky failed')).toBe(
+      'import of ciel de Paul.myastrosky failed'.replace('Paul.myastrosky', '[file]'),
+    );
+  });
+
+  it('keeps the code locations of a stack trace and the paths already anonymised', () => {
+    const stack =
+      'TypeError: x\n    at save (http://localhost:5173/src/toast.ts:12:3)\n    at <app>/dist/index.js:4:1';
+    expect(removeUserData(stack)).toBe(stack);
+    expect(removeUserData('<home>/data.db')).toBe('<home>/data.db');
+  });
+
+  it("keeps only the host of an outside server, and the app's own addresses whole", () => {
+    expect(
+      removeUserData(
+        'GET https://ssp.imcce.fr/webservices/skybot/api/conesearch.php?RA=10.68&DEC=41.27&EPOCH=2460000.5 failed',
+      ),
+    ).toBe('GET https://ssp.imcce.fr/… failed');
+    expect(
+      removeUserData(
+        'tile https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/2100/1400.png',
+      ),
+    ).toBe('tile https://s3.amazonaws.com/…');
+    expect(removeUserData('at https://localhost/assets/index-a1b2.js:3:9')).toBe(
+      'at https://localhost/assets/index-a1b2.js:3:9',
+    );
+  });
+
+  it('drops the excerpt a JSON parse error quotes', () => {
+    expect(removeUserData(`Unexpected token 'M', "My notes on M31" is not valid JSON`)).toBe(
+      `Unexpected token 'M', "…" is not valid JSON`,
+    );
+  });
+
+  it('is applied to every string of a context', () => {
+    expect(sanitizeContext({ detail: String.raw`open E:\photos\m1.fits` })).toEqual({
+      detail: 'open [path]',
     });
   });
 });

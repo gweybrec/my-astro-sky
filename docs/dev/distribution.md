@@ -118,6 +118,10 @@ Error diagnostics logs are written to `<userData>/logs/` as JSON-lines (`.jsonl`
 - **`my-astro-sky-errors-YYYYMMDD-HHMMSS-mmm.jsonl`** — JavaScript errors: renderer uncaught errors/rejections, Vue component errors, error-toast-reported failures, and main-process `uncaughtException`/`unhandledRejection`.
 - **`my-astro-sky-crash-YYYYMMDD-HHMMSS-mmm.jsonl`** — crashes that JS handlers cannot represent in the errors stream: `renderer_process_gone`, `child_process_gone` (GPU/utility), `window_unresponsive`, and `native_crash_detected` breadcrumbs.
 
+Each record carries the error's `code` (one of `ERROR_CODES`, `INTERNAL_ERROR` for a bug) and its `ref`, four characters that the error toast shows as "Ref. CODE · ref" with a copy button: a user quoting the reference leads to the record. A server error answers with the same `ref` (`sendError` in `server/routes/http-errors.ts`), so the toast and the server's log line share it. The `message`, `stack` and `context` of a record pass through `packages/core/src/platform/log-sanitize.ts`: API keys are removed, then (after the path anonymiser) any remaining absolute path becomes `[path]` and any photo, data or backup file name `[file]`. A log line never carries the user's data: contexts hold ids, counts and kinds, never names, notes, targets or positions (the privacy page promises it).
+
+A server outside the desktop app (Docker, Node.js) has no log file: `logServerError` writes the same category, code and reference to the console, which `docker logs` keeps. The phone keeps its own error log (`apps/mobile/src/error-log.ts`): the last 300 errors in two JSON-lines files of its private folder, never sent anywhere.
+
 (Older single-event files named `my-astro-sky-error-…-xxxxxx.json` from previous versions are still recognized for cleanup.) Each stream rotates to a new file every 100 records and is independent — crashes never disturb the errors stream's rotation.
 
 #### Native crash capture (Crashlytics-style, local-only)
@@ -128,9 +132,9 @@ Because a native main-process crash kills the process before any JS runs, [elect
 
 When the **renderer** crashes (white screen), [electron/main.ts](../../electron/main.ts) logs `renderer_process_gone` and auto-reloads the window to recover. A loop-guard ([electron/crash-reload-guard.ts](../../electron/crash-reload-guard.ts)) caps this at 3 reloads per 60 s; beyond that it stops and shows a Reload/Quit dialog instead of looping.
 
-To diagnose a user's crash, have them use **Open logs folder** (Settings) and send the whole `logs/` folder; for native stacks, also collect `<userData>/Crashpad/`.
+To diagnose a user's crash, have them use **Open logs folder** (Settings) and send the `logs/` folder: the `native_crash_detected` line says a native crash happened. Never ask for `<userData>/Crashpad/`: a minidump holds what the app had in memory, personal data included, and the privacy page promises it is never sent.
 
-Log files older than 30 days (errors and crash streams alike) are automatically pruned at app startup.
+Log files older than 30 days (errors and crash streams alike) and minidumps older than 30 days (`cleanupOldCrashDumpsSafely` in `electron/log-retention.ts`, after their breadcrumb is written) are deleted at app startup.
 
 Important limitation (expected behavior):
 

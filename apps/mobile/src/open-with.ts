@@ -90,7 +90,9 @@ export async function startOpenWith(
         const { files } = await plugin.take();
         await handleOpenedFiles(await Promise.all(files.map(read)), router);
       })
-      .catch((error) => reportError('openWith', error));
+      .catch((error: unknown) => {
+        reportError('openWith', error);
+      });
     return queue;
   };
   await plugin.addListener('openedFiles', () => void takeAll());

@@ -76,8 +76,7 @@ export function useSharedSkyOpen() {
 
   function fail(category: string, err: unknown) {
     if (isAbort(err)) return;
-    reportError(category, err);
-    void showError(err instanceof Error ? err : new Error(t('errors.openSharedSky')));
+    void showError(err, { fallbackKey: 'errors.openSharedSky', category });
   }
 
   function discard(pending: string) {
@@ -106,7 +105,7 @@ export function useSharedSkyOpen() {
     const pending = ticket;
     step.value = 'confirm';
     if (sharedSkyLacksRoom(preview)) {
-      void showError(new Error(t('serverErrors.NOT_ENOUGH_SPACE')));
+      void showError(t('serverErrors.NOT_ENOUGH_SPACE'));
       discard(pending);
       reset();
       return;

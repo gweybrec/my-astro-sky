@@ -1,5 +1,4 @@
 import express from 'express';
-import { isDomainError } from '@myastrosky/core/domain/errors';
 import type {
   MosaicParams,
   ObservationWindow,
@@ -50,8 +49,7 @@ plansRouter.get('/api/plans', async (_req, res) => {
   try {
     res.json(await plans.list());
   } catch (err) {
-    if (!isDomainError(err)) console.error('[Plans] Failed to list plans', err);
-    sendError(res, err);
+    sendError(res, err, 'plans_list_plans_failed');
   }
 });
 
@@ -96,8 +94,7 @@ plansRouter.post('/api/plans', async (req, res) => {
     const { name } = (req.body ?? {}) as PlanInput;
     res.json(await plans.create({ name }));
   } catch (err) {
-    if (!isDomainError(err)) console.error('[Plans] Failed to create plan', err);
-    sendError(res, err);
+    sendError(res, err, 'plans_create_plan_failed');
   }
 });
 
@@ -144,8 +141,7 @@ plansRouter.put('/api/plans/order', async (req, res) => {
     await plans.reorder(ids);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[Plans] Failed to reorder plans', err);
-    sendError(res, err);
+    sendError(res, err, 'plans_reorder_plans_failed');
   }
 });
 
@@ -212,8 +208,7 @@ plansRouter.put('/api/plans/:id', async (req, res) => {
     await plans.update(req.params.id, (req.body ?? {}) as PlanChanges);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[Plans] Failed to update plan', err);
-    sendError(res, err);
+    sendError(res, err, 'plans_update_plan_failed');
   }
 });
 
@@ -253,8 +248,7 @@ plansRouter.delete('/api/plans/:id', async (req, res) => {
     await plans.remove(req.params.id);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[Plans] Failed to delete plan', err);
-    sendError(res, err);
+    sendError(res, err, 'plans_delete_plan_failed');
   }
 });
 
@@ -323,8 +317,7 @@ plansRouter.post('/api/plans/:id/entries', async (req, res) => {
     const { dsoId, ra, dec, paDeg } = (req.body ?? {}) as PlanEntryInput;
     res.json(await plans.addEntry(req.params.id, { dsoId, ra, dec, paDeg }));
   } catch (err) {
-    if (!isDomainError(err)) console.error('[Plans] Failed to add entry', err);
-    sendError(res, err);
+    sendError(res, err, 'plans_add_entry_failed');
   }
 });
 
@@ -377,8 +370,7 @@ plansRouter.put('/api/plans/:id/entries/order', async (req, res) => {
     await plans.reorderEntries(req.params.id, ids);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[Plans] Failed to reorder entries', err);
-    sendError(res, err);
+    sendError(res, err, 'plans_reorder_entries_failed');
   }
 });
 
@@ -423,8 +415,7 @@ plansRouter.delete('/api/plans/:id/entries/:entryId', async (req, res) => {
     await plans.removeEntry(req.params.entryId, req.params.id);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[Plans] Failed to remove entry', err);
-    sendError(res, err);
+    sendError(res, err, 'plans_remove_entry_failed');
   }
 });
 
@@ -516,8 +507,7 @@ plansRouter.patch('/api/plans/:id/entries/:entryId', async (req, res) => {
     );
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[Plans] Failed to update entry PA', err);
-    sendError(res, err);
+    sendError(res, err, 'plans_update_entry_pa_failed');
   }
 });
 
@@ -578,8 +568,7 @@ plansRouter.post('/api/plans/:id/mosaics', async (req, res) => {
   try {
     res.json(await plans.createMosaic(req.params.id, req.body as MosaicParams));
   } catch (err) {
-    if (!isDomainError(err)) console.error('[Plans] Failed to create mosaic', err);
-    sendError(res, err);
+    sendError(res, err, 'plans_create_mosaic_failed');
   }
 });
 
@@ -640,8 +629,7 @@ plansRouter.put('/api/plans/:id/mosaics/:mosaicId', async (req, res) => {
     await plans.updateMosaic(id, mosaicId, req.body as MosaicParams);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[Plans] Failed to update mosaic', err);
-    sendError(res, err);
+    sendError(res, err, 'plans_update_mosaic_failed');
   }
 });
 
@@ -672,8 +660,7 @@ plansRouter.delete('/api/plans/:id/mosaics/:mosaicId', async (req, res) => {
     await plans.removeMosaic(id, mosaicId);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[Plans] Failed to delete mosaic', err);
-    sendError(res, err);
+    sendError(res, err, 'plans_delete_mosaic_failed');
   }
 });
 
@@ -727,7 +714,6 @@ plansRouter.put('/api/plans/:id/mosaics/:mosaicId/windows', async (req, res) => 
     await plans.updateMosaicWindows(id, mosaicId, body.observationWindows as ObservationWindow[]);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) console.error('[Plans] Failed to save mosaic windows', err);
-    sendError(res, err);
+    sendError(res, err, 'plans_save_mosaic_windows_failed');
   }
 });

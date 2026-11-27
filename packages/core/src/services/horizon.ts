@@ -93,7 +93,7 @@ export function createHorizonService(deps: HorizonServiceDeps): HorizonService {
     // (503, 429…) fails the computation, so a flat profile is never cached for a passing outage.
     if (res.status === 404) return null;
     if (res.status < 200 || res.status > 299) {
-      throw new Error(`Elevation tile ${z}/${x}/${y} answered ${res.status}`);
+      throw new Error(`An elevation tile answered ${res.status}`);
     }
     const { data, channels } = await images.decode(await res.bytes());
     const out = new Float32Array(TILE_SIZE * TILE_SIZE);
@@ -211,7 +211,8 @@ export function createHorizonService(deps: HorizonServiceDeps): HorizonService {
       );
       summits = selectSkylineSummits(peaks, alts, { lat, lon, obsElev }, elevationAt, { radiusM });
     } catch (err) {
-      log?.('overpass_fetch_failed', err, { lat, lon });
+      // Never the position: the log holds nothing of the user's data.
+      log?.('overpass_fetch_failed', err);
     }
 
     return {

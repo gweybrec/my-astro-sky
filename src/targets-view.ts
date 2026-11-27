@@ -1,3 +1,4 @@
+import { installVueErrorHandler } from './vue-error-handler';
 /**
  * Targets view — "Propose targets for tonight" feature.
  * A full-screen panel with gear/location/date inputs and a ranked result grid.
@@ -61,7 +62,7 @@ import {
 } from './api';
 import { requestSetupSwitch } from './setup-switch';
 import { showKeyValueTooltip, showTextTooltip, showCustomTooltip } from './tooltip-utils';
-import { showToast } from './toast';
+import { showToast, showErrorToast } from './toast';
 import type { SkyMap } from '@myastrosky/render/sky-map';
 import type { TargetSuggestion } from '@myastrosky/core/target-recommender';
 import type { DSO } from '@myastrosky/core/types';
@@ -249,6 +250,7 @@ export function buildNightDateField(value: string, onPick: (dateISO: string) => 
           onCancel: close,
         }),
     });
+    installVueErrorHandler(app, 'targets-date-picker');
     app.mount(el);
     popup = { app, el };
     // On a short window the panel scrolls so the whole calendar, its buttons included, is in view.
@@ -437,7 +439,7 @@ export function openAddGearModal(gearType: CustomGearType, onSaved: () => void):
     } catch (err: any) {
       saveBtn.disabled = false;
       saveBtn.textContent = t('targets.gear.save');
-      alert(err.message);
+      showErrorToast(err, 'serverErrors.INTERNAL_ERROR', { category: 'custom_gear_create_failed' });
     }
   });
 
@@ -580,7 +582,12 @@ export function openManageGearModal(
             pendingDeletes.delete(gear.id);
             deleteCustomGear(gear.id)
               .then(() => invalidateGearCache(gearType))
-              .catch(() => {});
+              .catch((err: unknown) => {
+                // The row is already gone from the list: say so, it comes back on the next open.
+                showErrorToast(err, 'serverErrors.INTERNAL_ERROR', {
+                  category: 'custom_gear_delete_failed',
+                });
+              });
           },
         });
 
@@ -3820,8 +3827,10 @@ export class TargetsView {
         downloadBlob(blob, `myastrosky-plan-${ts}.pdf`);
         showToast({ message: t('settings.exportView.success'), type: 'info', duration: 2500 });
       } catch (err) {
-        reportUnknownRendererError('plan_pdf_failed', err, { planId: plan.id });
-        showToast({ message: t('settings.exportView.error'), type: 'error', duration: 4000 });
+        showErrorToast(err, 'settings.exportView.error', {
+          category: 'plan_pdf_failed',
+          context: { planId: plan.id },
+        });
       }
     });
 

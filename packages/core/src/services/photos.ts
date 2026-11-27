@@ -1,3 +1,4 @@
+import { reportError } from '../platform/error-hook';
 /**
  * Photos, the data part: the `photos` and `star_correspondences` rows, the checks of the upload form and of
  * the metadata, placement and order routes, and the rules that clean what is stored. Image and file work
@@ -694,7 +695,7 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
           mediumFilename = mediumNameOf(filename);
         } catch (error) {
           // The map shows the full picture meanwhile; makeMissingMediums tries again.
-          console.warn(`[Photos] The medium-sized copy of ${filename} could not be made`, error);
+          reportError('photo_medium_copy_failed', error);
         }
       }
 
@@ -1117,7 +1118,11 @@ export function createPhotoService(deps: PhotoServiceDeps): PhotoService {
       for (const r of await db.all<{ id: string; filename: string }>(SELECT_UNSIZED)) {
         const size = await measureStored(r.filename);
         if (size) statements.push({ sql: UPDATE_SIZE, params: [size.width, size.height, r.id] });
-        else console.warn(`[Photos] The size of ${r.filename} cannot be read from its picture`);
+        else
+          reportError(
+            'photo_size_unreadable',
+            new Error('The size cannot be read from the picture'),
+          );
       }
       if (statements.length > 0) await db.batch(statements);
       return statements.length;
@@ -1151,7 +1156,7 @@ export async function makeMissingMediumsIn(
     try {
       await blobs.put(name, await images.thumbnail(bytes, MEDIUM_SIZE, MEDIUM_QUALITY));
     } catch (error) {
-      console.warn(`[Photos] The medium-sized copy of ${r.filename} could not be made`, error);
+      reportError('photo_medium_copy_failed', error);
       await db.run(update, [NO_MEDIUM, r.id]);
       continue;
     }

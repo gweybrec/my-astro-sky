@@ -76,9 +76,21 @@ describe('error hook', () => {
     const fn = vi.fn();
     configureErrorReporter(fn);
     const err = new Error('x');
-    reportError('ctx', err);
-    expect(fn).toHaveBeenCalledWith('ctx', err);
+    const ticket = reportError('ctx', err);
+    expect(ticket).toMatchObject({
+      code: 'INTERNAL_ERROR',
+      ref: expect.stringMatching(/^[0-9A-Z]{4}$/),
+    });
+    expect(fn).toHaveBeenCalledWith('ctx', err, undefined, ticket);
     spy.mockRestore();
+  });
+
+  it('reuses the ticket it is given, and survives a reporter that throws', () => {
+    configureErrorReporter(() => {
+      throw new Error('broken');
+    });
+    const ticket = { code: 'NETWORK_ERROR' as const, ref: 'AB12' };
+    expect(reportError('ctx', new Error('x'), undefined, ticket)).toBe(ticket);
   });
 });
 

@@ -81,8 +81,9 @@ const fov = useFovFramesStore();
 let photosRead: Promise<void> = Promise.resolve();
 const reloadPhotos = () =>
   (photosRead =
-    sky?.reloadPhotos().catch((error) => reportError('SkyPage.photos', error)) ??
-    Promise.resolve());
+    sky?.reloadPhotos().catch((error: unknown) => {
+      reportError('SkyPage.photos', error);
+    }) ?? Promise.resolve());
 let sky: PhoneSkyMap | null = null;
 // The photo layer once the map exists (the sheet of a photo needs it).
 const photoLayer = shallowRef<PhotoLayer | null>(null);
@@ -95,7 +96,7 @@ onMounted(() => {
     photoContainer: photoBox.value!,
     overlayCanvas: overlayCanvas.value ?? undefined,
     onPhotoPlacementError: (photo) =>
-      void showError(new Error(t('photos.placementError', { name: photo.originalName }))),
+      void showError(t('photos.placementError', { name: photo.originalName })),
   });
   photoLayer.value = sky.photos;
   skyMap.value = sky.map;

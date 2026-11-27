@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   setPhotoFitsHeaders: vi.fn(() => Promise.resolve()),
 }));
 const showToast = vi.hoisted(() => vi.fn());
+const showErrorToast = vi.hoisted(() => vi.fn());
 const dialogs = vi.hoisted(() => ({
   confirmWcsWarnings: vi.fn(() => Promise.resolve(true)),
   showFitsHeaders: vi.fn(() => Promise.resolve()),
@@ -20,7 +21,7 @@ const confirmPhotoDelete = vi.hoisted(() => vi.fn());
 vi.mock('../../src/api', () => api);
 // The WCS reading flow is shared and calls the package's data functions.
 vi.mock('@myastrosky/app-state/api', () => api);
-vi.mock('../../src/toast', () => ({ showToast }));
+vi.mock('../../src/toast', () => ({ showToast, showErrorToast }));
 vi.mock('../../src/wcs-dialogs', () => dialogs);
 vi.mock('../../src/wcs-conflicts', () => ({ showWcsConflicts }));
 vi.mock('../../src/photo-delete-confirm', () => ({ confirmPhotoDelete }));
@@ -85,11 +86,16 @@ describe('buildMetadataEditorPanel, loading a WCS file', () => {
     expect(showToast.mock.calls[0][0].type).toBe('error');
   });
 
-  it('shows the thrown error text, not a generic one', async () => {
-    api.solveWCS.mockRejectedValue(new Error('Serveur injoignable'));
+  it('shows the thrown error text, not a generic one, with a reference', async () => {
+    const err = new Error('Serveur injoignable');
+    api.solveWCS.mockRejectedValue(err);
     buildMetadataEditorPanel(container, photo(), vi.fn(), vi.fn());
     await loadFile(container);
-    expect(showToast.mock.calls[0][0].message).toContain('Serveur injoignable');
+    expect(showErrorToast).toHaveBeenCalledWith(
+      err,
+      expect.any(String),
+      expect.objectContaining({ message: expect.stringContaining('Serveur injoignable') }),
+    );
   });
 
   it('takes nothing when the user cancels the size warning', async () => {
@@ -343,8 +349,12 @@ describe('buildMetadataEditorPanel, as the gallery sheet', () => {
     const panel = build(photo({ notes: 'old' }), onSaved);
     expect(await panel.saveFields({ notes: 'new' })).toBe(false);
     expect(onSaved).not.toHaveBeenCalled();
-    expect(showToast.mock.calls[0][0]).toMatchObject({ message: 'Disque plein', type: 'error' });
-    expect(reportError).toHaveBeenCalled();
+    // An unexpected failure: the toast logs it and shows the translated fallback with its reference.
+    expect(showErrorToast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Disque plein' }),
+      'errors.updatePhoto',
+      expect.objectContaining({ category: 'photo_metadata_save' }),
+    );
     // Not taken: the next save still has the old notes.
     await panel.saveFields({ labels: ['x'] });
     expect(api.updatePhotoMetadata.mock.calls[1][1].notes).toBe('old');

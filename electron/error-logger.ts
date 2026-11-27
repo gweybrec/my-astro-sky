@@ -2,9 +2,15 @@ import { app, ipcMain, shell } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { cleanupOldLogsSafely } from './log-retention.js';
+import { cleanupOldCrashDumpsSafely, cleanupOldLogsSafely } from './log-retention.js';
 import { buildPathAnonymizer } from './path-anonymizer.js';
-import { sanitizeContext, type Json } from './sanitize-context.js';
+import {
+  redactSecrets,
+  removeUserData,
+  sanitizeContext,
+  type Json,
+} from '@myastrosky/core/platform/log-sanitize';
+import type { ErrorTicket } from '@myastrosky/core/platform/error-report';
 import { diffSeenDumps } from './crash-seen.js';
 import { logDebug } from '@myastrosky/core/platform/log';
 
@@ -13,6 +19,9 @@ export interface RendererErrorPayload {
   message: string;
   stack?: string;
   context?: Record<string, unknown>;
+  /** The code and reference the user was shown, to find this record from a bug report. */
+  code?: string;
+  ref?: string;
 }
 
 interface ErrorLogRecord {
@@ -23,6 +32,8 @@ interface ErrorLogRecord {
   arch: string;
   processType: 'main' | 'renderer';
   category: string;
+  code?: string;
+  ref?: string;
   message: string;
   stack?: string;
   context?: Json;
@@ -176,8 +187,12 @@ function toRecord(
   message: string,
   stack?: string,
   context?: unknown,
+  ticket?: { code?: string; ref?: string },
 ): ErrorLogRecord {
   const anonymize = getAnonymizePaths();
+  // The configured astrometry.net key, wherever it appears.
+  const secrets = process.env.ASTROMETRY_API_KEY ? [process.env.ASTROMETRY_API_KEY] : [];
+  const clean = (text: string) => removeUserData(anonymize(redactSecrets(text, secrets)));
   return {
     timestamp: new Date().toISOString(),
     appVersion: app.getVersion(),
@@ -186,9 +201,11 @@ function toRecord(
     arch: process.arch,
     processType,
     category,
-    message: anonymize(message),
-    stack: stack ? anonymize(stack) : undefined,
-    context: context ? sanitizeContext(context, anonymize) : undefined,
+    code: ticket?.code,
+    ref: ticket?.ref,
+    message: clean(message),
+    stack: stack ? clean(stack) : undefined,
+    context: context ? sanitizeContext(context, anonymize, 0, secrets) : undefined,
   };
 }
 
@@ -196,6 +213,7 @@ export function logMainError(
   category: string,
   error: unknown,
   context?: Record<string, unknown>,
+  ticket?: ErrorTicket,
 ): void {
   const err = error instanceof Error ? error : new Error(String(error));
   const record = toRecord(
@@ -204,6 +222,7 @@ export function logMainError(
     err.message || 'Unknown main-process error',
     err.stack,
     context,
+    ticket,
   );
   writeRecord(record, errorStream);
 }
@@ -226,6 +245,7 @@ function logRendererPayload(payload: RendererErrorPayload): void {
     payload.message,
     payload.stack,
     payload.context,
+    { code: payload.code, ref: payload.ref },
   );
   writeRecord(record, errorStream);
 }
@@ -310,6 +330,15 @@ export function setupErrorLogging(): void {
 
   // Breadcrumb for native crashes that happened in a previous session.
   reportNewNativeCrashes();
+  // Then the dumps older than 30 days go: they may hold what the app had in memory (the privacy page says so).
+  try {
+    const dumps = cleanupOldCrashDumpsSafely(app.getPath('userData'), app.getPath('crashDumps'));
+    if (dumps.skippedReason) {
+      console.warn(`[Diagnostics] Crash dump cleanup skipped: ${dumps.skippedReason}`);
+    }
+  } catch {
+    // The crash reporter is not started: no dumps to clean.
+  }
 
   process.on('uncaughtException', (error) => {
     try {

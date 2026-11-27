@@ -323,10 +323,9 @@ import {
   poiSelectionsEqual,
   type PoiFilterGroup,
 } from '@myastrosky/core/poi';
-import { showToast } from '../../toast';
+import { showToast, showErrorToast } from '../../toast';
 import { getGearSetups } from '../../api';
 import { downloadBlob } from '../../file-utils';
-import { reportUnknownRendererError } from '../../error-reporter';
 import exportSvg from '../../icons/export.svg?raw';
 import {
   GALLERY_SORTS,
@@ -400,8 +399,10 @@ async function onExport() {
     downloadBlob(blob, `myastrosky-gallery-${ts}.pdf`);
     showToast({ message: t('settings.exportView.success'), type: 'info', duration: 2500 });
   } catch (e) {
-    reportUnknownRendererError('gallery_export_failed', e, { count: photos.length });
-    showToast({ message: t('settings.exportView.error'), type: 'error', duration: 4000 });
+    showErrorToast(e, 'settings.exportView.error', {
+      category: 'gallery_export_failed',
+      context: { count: photos.length },
+    });
   }
 }
 

@@ -17,7 +17,12 @@ describe('server/logger', () => {
     logServerError('server_unhandled_error', err, { route: '/api/photos' });
 
     expect(stub).toHaveBeenCalledOnce();
-    expect(stub).toHaveBeenCalledWith('server_unhandled_error', err, { route: '/api/photos' });
+    expect(stub).toHaveBeenCalledWith(
+      'server_unhandled_error',
+      err,
+      { route: '/api/photos' },
+      { code: 'INTERNAL_ERROR', ref: expect.stringMatching(/^[0-9A-Z]{4}$/) },
+    );
   });
 
   it('passes context as undefined when not provided', async () => {
@@ -28,7 +33,17 @@ describe('server/logger', () => {
     const err = new Error('oops');
     logServerError('some_category', err);
 
-    expect(stub).toHaveBeenCalledWith('some_category', err, undefined);
+    expect(stub).toHaveBeenCalledWith('some_category', err, undefined, expect.anything());
+  });
+
+  it('returns the ticket it logged, and never throws when the logger does', async () => {
+    const { installLogger, logServerError } = await import('../../server/logger');
+    installLogger(() => {
+      throw new Error('disk full');
+    });
+    const ticket = logServerError('cat', new Error('x'));
+    expect(ticket.code).toBe('INTERNAL_ERROR');
+    expect(ticket.ref).toMatch(/^[0-9A-Z]{4}$/);
   });
 
   it('falls back to console.error when no logger has been installed', async () => {

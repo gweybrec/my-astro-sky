@@ -148,8 +148,8 @@ solvedImportRouter.post('/api/solve-wcs', uploadWCS.single('photo'), async (req,
       ...captureFields(result),
     });
   } catch (err: any) {
-    console.error('WCS solve error:', err);
-    res.status(500).json({ success: false, error: err.message });
+    const { code, ref } = logServerError('wcs_solve_failed', err);
+    res.status(500).json({ success: false, error: 'Internal error', code, ref });
   }
 });
 
@@ -234,7 +234,13 @@ solvedImportRouter.post('/api/photos/convert', uploadRaw.single('photo'), async 
       ...captureFields(result),
     });
   } catch (err: any) {
-    logServerError('raw_convert_failed', err);
-    res.status(500).json({ success: false, error: err.message });
+    // The decoder throws on a file it cannot read: logged, so a reference reaches the user.
+    const { ref } = logServerError('raw_convert_failed', err);
+    res.status(500).json({
+      success: false,
+      error: 'Invalid or corrupt image file',
+      code: 'INVALID_IMAGE',
+      ref,
+    });
   }
 });

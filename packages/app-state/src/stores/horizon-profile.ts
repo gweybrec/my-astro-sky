@@ -20,6 +20,8 @@ export const useHorizonProfileStore = defineStore('horizon-profile', () => {
   const obsHeightM = ref<number | null>(s.obsHeightM);
   const loading = ref(false);
   const error = ref<string | null>(null);
+  /** The error behind `error` when a computation failed, for a message that shows its code and reference. */
+  const failure = ref<unknown>(null);
 
   function persist() {
     saveHorizonSettings({
@@ -54,11 +56,13 @@ export const useHorizonProfileStore = defineStore('horizon-profile', () => {
     }
     loading.value = true;
     error.value = null;
+    failure.value = null;
     try {
       applyProfile(await fetchHorizonProfile(lat, lon, { obsHeightM: obsHeightM.value }), true);
       return true;
     } catch (e) {
       error.value = e instanceof Error ? e.message : t('horizon.error.compute');
+      failure.value = e;
       return false;
     } finally {
       loading.value = false;
@@ -90,6 +94,7 @@ export const useHorizonProfileStore = defineStore('horizon-profile', () => {
     obsHeightM,
     loading,
     error,
+    failure,
     setEnabled,
     setObsHeight,
     applyProfile,

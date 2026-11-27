@@ -2,10 +2,8 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import express from 'express';
-import { isDomainError } from '@myastrosky/core/domain/errors';
 import type { SettingsChanges } from '@myastrosky/core/domain/settings';
 import { settings, version } from '../services.js';
-import { logServerError } from '../logger.js';
 import { sendError } from './http-errors.js';
 import { probeAstap, probeSolveField, probeDataDir } from '../probe-utils.js';
 
@@ -76,8 +74,7 @@ settingsRouter.get('/api/settings', async (_req, res) => {
   try {
     res.json(await settings.readPublic());
   } catch (err) {
-    if (!isDomainError(err)) logServerError('settings_read_failed', err);
-    sendError(res, err);
+    sendError(res, err, 'settings_read_failed');
   }
 });
 
@@ -95,8 +92,7 @@ settingsRouter.put('/api/settings', async (req, res) => {
     await settings.update(req.body as SettingsChanges);
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) logServerError('settings_update_failed', err);
-    sendError(res, err);
+    sendError(res, err, 'settings_update_failed');
   }
 });
 
@@ -114,8 +110,7 @@ settingsRouter.delete('/api/settings/astrometry-api-key', async (_req, res) => {
     await settings.removeApiKey();
     res.json({ ok: true });
   } catch (err) {
-    if (!isDomainError(err)) logServerError('settings_delete_key_failed', err);
-    sendError(res, err);
+    sendError(res, err, 'settings_delete_key_failed');
   }
 });
 

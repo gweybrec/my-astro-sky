@@ -3,6 +3,7 @@ import type { Writable } from 'stream';
 import { ZipArchive } from 'archiver';
 import type { BundleReader, BundleWriter } from '@myastrosky/core/ports/bundle';
 import { openZipRanges } from '@myastrosky/core/zip-ranges';
+import { logServerError } from './logger.js';
 
 export interface ZipResponseWriter extends BundleWriter {
   /** Ends the archive; the response ends when everything is flushed. */
@@ -25,7 +26,7 @@ export function createZipResponseWriter(output: Writable, onStart: () => void): 
     onStart();
     const created = new ZipArchive({ zlib: { level: 1 } });
     created.on('error', (err) => {
-      console.error('[Export] archiver error:', err);
+      logServerError('export_archiver_error', err);
       for (const reject of pending) reject(err);
     });
     // A client that goes away must not leave an export waiting for ever.

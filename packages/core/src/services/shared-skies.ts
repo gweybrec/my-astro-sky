@@ -1,3 +1,4 @@
+import { reportError } from '../platform/error-hook';
 /**
  * Sharing a sky by file. The sender's side writes a package (`exportTo`): the chosen photos with their full-size
  * pictures and what places and describes them, and nothing else of the user's data. The visitor's side reads one
@@ -314,9 +315,9 @@ export function createSharedSkyService(deps: SharedSkyServiceDeps): SharedSkySer
     let freed = 0;
     for (const name of names) {
       freed += (await blobs.size(name).catch(() => null)) ?? 0;
-      await blobs
-        .remove(name)
-        .catch((err) => console.warn(`[SharedSky] Could not remove ${name}:`, err));
+      await blobs.remove(name).catch((err: unknown) => {
+        reportError('shared_sky_remove_file_failed', err);
+      });
     }
     return freed;
   }
@@ -437,7 +438,7 @@ export function createSharedSkyService(deps: SharedSkyServiceDeps): SharedSkySer
               written.push(thumbFilename);
               bytes += thumb.length;
             } catch (err) {
-              console.warn(`[SharedSky] No thumbnail for ${photo.originalName}:`, err);
+              reportError('shared_sky_thumbnail_failed', err);
               thumbFilename = null;
             }
             rows.push({
@@ -468,7 +469,10 @@ export function createSharedSkyService(deps: SharedSkyServiceDeps): SharedSkySer
               ] as SqlValue[],
             });
           } else {
-            console.warn(`[SharedSky] ${photo.file} is not a picture the apps can open: left out`);
+            reportError(
+              'shared_sky_not_a_picture',
+              new Error('Not a picture the apps can open: left out'),
+            );
           }
           options.onProgress?.(index + 1, present.length);
         }

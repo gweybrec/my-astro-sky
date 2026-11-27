@@ -5,6 +5,8 @@ export interface RendererErrorPayload {
   message: string;
   stack?: string;
   context?: Record<string, unknown>;
+  code?: string;
+  ref?: string;
 }
 
 contextBridge.exposeInMainWorld('myAstroDiagnostics', {

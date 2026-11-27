@@ -9,17 +9,20 @@ export class DomainError extends Error {
   readonly code: ErrorCode;
   /** The exact response body to send, when it is not `{ error: message }`. */
   readonly body?: Readonly<Record<string, unknown>>;
+  /** The reference the server logged this error under, when it came from one. */
+  readonly ref?: string;
 
   constructor(
     kind: DomainErrorKind,
     message: string,
-    options: { code: ErrorCode; body?: Readonly<Record<string, unknown>> },
+    options: { code: ErrorCode; body?: Readonly<Record<string, unknown>>; ref?: string },
   ) {
     super(message);
     this.name = 'DomainError';
     this.kind = kind;
     this.code = options.code;
     this.body = options.body;
+    this.ref = options.ref;
   }
 }
 

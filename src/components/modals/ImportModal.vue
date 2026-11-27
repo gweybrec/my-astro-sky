@@ -322,7 +322,8 @@ import { importPreview, importData, exportData, getPhotos } from '../../api';
 import type { ImportPreviewResult, ImportPreviewSetup, SetupImportChoice } from '../../api';
 import { reloadUserOverrides } from '../../dso-catalog';
 import { followDesktopStoredSolves } from '../../follow-stored-solves';
-import { showToast } from '../../toast';
+import { showToast, showErrorToast } from '../../toast';
+import { reportUnknownRendererError } from '../../error-reporter';
 import { formatBytes } from '@myastrosky/core/format-utils';
 import {
   buildImportOptions,
@@ -529,7 +530,7 @@ async function onFilePicked(e: Event) {
     importShortcuts.value = true;
     phase.value = 'options';
   } catch (err: any) {
-    showToast({ message: err.message ?? t('settings.importError'), type: 'error' });
+    showErrorToast(err, 'settings.importError', { category: 'import_preview_failed' });
     storedFile.value = null;
   } finally {
     previewBusy.value = false;
@@ -543,7 +544,7 @@ async function doBackup() {
   try {
     await exportData({ includeImages: true, includeMetadata: true }, ids);
   } catch (err: any) {
-    showToast({ message: err.message ?? t('settings.importError'), type: 'error' });
+    showErrorToast(err, 'settings.importError', { category: 'import_backup_failed' });
   } finally {
     backingUp.value = false;
   }
@@ -587,16 +588,17 @@ async function onImport() {
       photosStore.syncFromOverlay();
       // A restored photo whose astrometry.net solve was still going on: its result is fetched now, not at the next start.
       if (overlay) void followDesktopStoredSolves(photos, overlay, skyMap, gallery);
-    } catch {
-      /* non-fatal — user can refresh manually */
+    } catch (err) {
+      // Non-fatal: the data is imported, a refresh shows it.
+      reportUnknownRendererError('import_reload_photos_failed', err);
     }
 
     // Refresh POI categories if they were part of the bundle.
     if (preview.value?.hasPoiCategories && importPoiCategories.value) {
       try {
         await poiCategoriesStore.load();
-      } catch {
-        /* ignore */
+      } catch (err) {
+        reportUnknownRendererError('import_reload_poi_categories_failed', err);
       }
     }
 
@@ -604,8 +606,8 @@ async function onImport() {
     if (preview.value?.hasSkyRegions && importSkyRegions.value) {
       try {
         await skyRegionsStore.load();
-      } catch {
-        /* ignore */
+      } catch (err) {
+        reportUnknownRendererError('import_reload_sky_regions_failed', err);
       }
     }
 
@@ -617,8 +619,8 @@ async function onImport() {
       showToast({ message: dsoMsg, type: 'info' });
       try {
         await reloadUserOverrides();
-      } catch {
-        /* ignore */
+      } catch (err) {
+        reportUnknownRendererError('import_reload_dso_overrides_failed', err);
       }
     }
 
@@ -628,7 +630,7 @@ async function onImport() {
       showToast({ message: t('settings.importedShortcuts'), type: 'info' });
     }
   } catch (err: any) {
-    showToast({ message: err.message ?? t('settings.importError'), type: 'error' });
+    showErrorToast(err, 'settings.importError', { category: 'import_failed' });
   } finally {
     importBusy.value = false;
   }

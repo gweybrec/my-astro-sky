@@ -38,7 +38,7 @@ const choose = (id: string | null) => updateTargetsPrefs({ skyRegionId: id ?? un
 function toMap(start: () => void) {
   const { lat, lon } = readObserverLocation();
   if (lat === null || lon === null) {
-    void showError(new Error(t('horizon.error.noLocation')));
+    void showError(t('horizon.error.noLocation'));
     return;
   }
   start();

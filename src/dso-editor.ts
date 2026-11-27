@@ -8,7 +8,7 @@ import {
   getUserOverride,
 } from './dso-catalog';
 import { t, getLang } from './i18n';
-import { showToast } from './toast';
+import { showToast, showErrorToast } from './toast';
 
 interface ConstellationOption {
   id: string;
@@ -293,7 +293,7 @@ export async function openDSOEditModal(dso: DSO, onSaved?: () => void): Promise<
       backdrop.remove();
       onSaved?.();
     } catch (err: any) {
-      showToast({ message: err.message ?? 'Error saving override', type: 'error' });
+      showErrorToast(err, 'serverErrors.INTERNAL_ERROR', { category: 'dso_override_save_failed' });
       saveBtn.disabled = false;
       cancelBtn.disabled = false;
       resetBtn.disabled = false;

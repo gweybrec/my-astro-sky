@@ -70,7 +70,7 @@ import { usePhotosStore } from '../../stores/photos';
 import { useShortcutsStore } from '../../stores/shortcuts';
 import { exportData } from '../../api';
 import type { ExportOptions } from '../../api';
-import { showToast } from '../../toast';
+import { showErrorToast } from '../../toast';
 import { formatBytes } from '@myastrosky/core/format-utils';
 import {
   buildExportOptions,
@@ -140,7 +140,7 @@ async function onExport() {
     );
     emit('close');
   } catch (err: any) {
-    showToast({ message: err.message ?? t('settings.importError'), type: 'error' });
+    showErrorToast(err, 'settings.importError', { category: 'export_failed' });
     busy.value = false;
   }
 }

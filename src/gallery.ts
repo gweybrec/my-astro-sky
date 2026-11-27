@@ -1,3 +1,4 @@
+import { installVueErrorHandler } from './vue-error-handler';
 import { createApp, reactive, h } from 'vue';
 import type { App } from 'vue';
 import type { Photo, PoiCategory, PointOfInterest } from '@myastrosky/core/types';
@@ -30,7 +31,7 @@ import { sortDsoIdsByImportance } from '@myastrosky/core/catalog/dso-registry';
 import { drawPhotoOverlay } from '@myastrosky/render/photo-dso-overlay-render';
 import { createImageZoomPan } from './image-zoom';
 import { setPictureTurn, turnedPictureFrame } from './photo-turn';
-import { showToast } from './toast';
+import { showErrorToast } from './toast';
 import { buildVisitPhotoInfo } from './visit-photo-info';
 import { buildPoiFilterGroups, resolveCategory, type PoiFilterGroup } from '@myastrosky/core/poi';
 import { poiPinsInImage, type PhotoPoiPin } from '@myastrosky/render/poi-pins';
@@ -796,7 +797,7 @@ export class Gallery {
         void this.openDetailModal(turned);
       } catch (err) {
         rotateBtn.disabled = false;
-        showToast({ message: err instanceof Error ? err.message : String(err), type: 'error' });
+        showErrorToast(err, 'serverErrors.INTERNAL_ERROR', { category: 'photo_rotate_failed' });
       }
     });
 
@@ -956,6 +957,7 @@ export class Gallery {
         }),
     });
     dsoFilterApp.use(pinia);
+    installVueErrorHandler(dsoFilterApp, 'gallery-dso-filter');
     dsoFilterApp.mount(dsoFilterEl);
 
     header.appendChild(nameRow);

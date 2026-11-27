@@ -137,7 +137,7 @@ function setCount(index: number, key: 'frames' | 'seconds', text: string) {
   }
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isInteger(parsed) || parsed < 0) {
-    void showError(new Error(t('errors.invalidIntegrationNumber')));
+    void showError(t('errors.invalidIntegrationNumber'));
     return;
   }
   draft.value.integrations[index][key] = parsed;

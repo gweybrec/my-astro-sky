@@ -132,7 +132,6 @@ dsoOverridesRouter.delete('/api/dso-overrides', async (_req, res) => {
     const deleted = await dsoOverrides.removeAll();
     res.json({ ok: true, deleted });
   } catch (err) {
-    console.error('[DeleteAll] DSO overrides delete failed', err);
-    sendError(res, err);
+    sendError(res, err, 'delete_all_dso_overrides_failed');
   }
 });

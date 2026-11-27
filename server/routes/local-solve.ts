@@ -10,6 +10,8 @@ import { rawToBrowserCoords } from '@myastrosky/core/exif-utils';
 import { fitsImageSize } from '@myastrosky/core/wcs';
 import { msg } from '../messages.js';
 import type { ServerLang } from '../messages.js';
+import { sendError } from './http-errors.js';
+import { logServerError } from '../logger.js';
 
 export const localSolveRouter = express.Router();
 
@@ -177,7 +179,7 @@ localSolveRouter.post('/api/solve-astap', uploadSolve.single('photo'), async (re
         if (err?.code === 'SOLVE_CANCELED') {
           updateJob(job.id, { status: 'canceled' });
         } else {
-          console.error('[SolveASTAP] Background solve error:', err);
+          logServerError('astap_background_solve_failed', err);
           updateJob(job.id, { status: 'failed', error: err.message || 'Unknown ASTAP error' });
         }
       } finally {
@@ -185,8 +187,8 @@ localSolveRouter.post('/api/solve-astap', uploadSolve.single('photo'), async (re
       }
     })();
   } catch (err: any) {
-    console.error('[SolveASTAP] Request handling error:', err);
-    if (!res.writableEnded) res.status(500).json({ error: err.message || 'Server error' });
+    if (!res.writableEnded) sendError(res, err, 'astap_request_failed');
+    else logServerError('astap_request_failed', err);
   } finally {
     if (!handedOff) await removeUpload(req.file);
   }
@@ -247,8 +249,7 @@ localSolveRouter.get('/api/solve-astap/:jobId', (req, res) => {
     }
     res.json({ jobId: job.id, status: job.status, result: job.result, error: job.error });
   } catch (err) {
-    console.error('[SolveASTAP] Failed to get job status:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, err, 'astap_job_status_failed');
   }
 });
 
@@ -299,8 +300,7 @@ localSolveRouter.delete('/api/solve-astap/:jobId', (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    console.error('[SolveASTAP] Failed to cancel job:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, err, 'astap_cancel_failed');
   }
 });
 
@@ -424,7 +424,7 @@ localSolveRouter.post('/api/solve-field', uploadSolve.single('photo'), async (re
         if (err?.code === 'SOLVE_CANCELED') {
           updateJob(job.id, { status: 'canceled' });
         } else {
-          console.error('[SolveField] Background solve error:', err);
+          logServerError('solve_field_background_solve_failed', err);
           updateJob(job.id, {
             status: 'failed',
             error: err.message || 'Unknown solve-field error',
@@ -435,8 +435,8 @@ localSolveRouter.post('/api/solve-field', uploadSolve.single('photo'), async (re
       }
     })();
   } catch (err: any) {
-    console.error('[SolveField] Request handling error:', err);
-    if (!res.writableEnded) res.status(500).json({ error: err.message || 'Server error' });
+    if (!res.writableEnded) sendError(res, err, 'solve_field_request_failed');
+    else logServerError('solve_field_request_failed', err);
   } finally {
     if (!handedOff) await removeUpload(req.file);
   }
@@ -497,8 +497,7 @@ localSolveRouter.get('/api/solve-field/:jobId', (req, res) => {
     }
     res.json({ jobId: job.id, status: job.status, result: job.result, error: job.error });
   } catch (err) {
-    console.error('[SolveField] Failed to get job status:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, err, 'solve_field_job_status_failed');
   }
 });
 
@@ -549,7 +548,6 @@ localSolveRouter.delete('/api/solve-field/:jobId', (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    console.error('[SolveField] Failed to cancel job:', err);
-    res.status(500).json({ error: 'Server error' });
+    sendError(res, err, 'solve_field_cancel_failed');
   }
 });

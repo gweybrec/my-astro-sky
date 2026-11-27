@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { describe, it, expect } from 'vitest';
-import { cleanupOldLogsSafely } from '../../electron/log-retention';
+import { cleanupOldCrashDumpsSafely, cleanupOldLogsSafely } from '../../electron/log-retention';
 
 function makeTempDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -191,5 +191,62 @@ describe('cleanupOldLogsSafely', () => {
     expect(fs.existsSync(linkInLogs)).toBe(true);
 
     fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+describe('cleanupOldCrashDumpsSafely', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = Date.UTC(2026, 10, 27);
+
+  function dumpsTree() {
+    const userData = makeTempDir('mas-dumps-');
+    const dumps = path.join(userData, 'Crashpad');
+    const reports = path.join(dumps, 'reports');
+    fs.mkdirSync(reports, { recursive: true });
+    const write = (name: string, ageDays: number) => {
+      const p = path.join(reports, name);
+      fs.writeFileSync(p, 'x');
+      const t = (now - ageDays * DAY) / 1000;
+      fs.utimesSync(p, t, t);
+      return p;
+    };
+    return { userData, dumps, write };
+  }
+
+  it('deletes the dumps older than 30 days, in sub-folders too, and keeps the recent ones', () => {
+    const { userData, dumps, write } = dumpsTree();
+    const old = write('a.dmp', 40);
+    const recent = write('b.dmp', 5);
+    const notADump = write('settings.dat', 40);
+    expect(cleanupOldCrashDumpsSafely(userData, dumps, now)).toEqual({ deletedCount: 1 });
+    expect(fs.existsSync(old)).toBe(false);
+    expect(fs.existsSync(recent)).toBe(true);
+    expect(fs.existsSync(notADump)).toBe(true);
+    fs.rmSync(userData, { recursive: true, force: true });
+  });
+
+  it('touches nothing when the dumps folder is outside the app folder', () => {
+    const { userData, write } = dumpsTree();
+    const elsewhere = makeTempDir('mas-elsewhere-');
+    fs.writeFileSync(path.join(elsewhere, 'x.dmp'), 'x');
+    const t = (now - 40 * DAY) / 1000;
+    fs.utimesSync(path.join(elsewhere, 'x.dmp'), t, t);
+    write('a.dmp', 40);
+    expect(cleanupOldCrashDumpsSafely(userData, elsewhere, now)).toEqual({
+      deletedCount: 0,
+      skippedReason: 'dumps_dir_outside_userdata',
+    });
+    expect(fs.existsSync(path.join(elsewhere, 'x.dmp'))).toBe(true);
+    fs.rmSync(userData, { recursive: true, force: true });
+    fs.rmSync(elsewhere, { recursive: true, force: true });
+  });
+
+  it('says so when there is no dumps folder', () => {
+    const userData = makeTempDir('mas-nodumps-');
+    expect(cleanupOldCrashDumpsSafely(userData, path.join(userData, 'Crashpad'), now)).toEqual({
+      deletedCount: 0,
+      skippedReason: 'path_not_resolved',
+    });
+    fs.rmSync(userData, { recursive: true, force: true });
   });
 });

@@ -1,3 +1,4 @@
+import { userMessage } from '@myastrosky/core/platform/error-report';
 import './platform-init';
 import { loadCatalog } from './star-catalog';
 import { loadDSOCatalog } from './dso-catalog';
@@ -31,7 +32,7 @@ import { useFovFramesStore } from '@myastrosky/app-state/stores/fov-frames';
 import { createTargetPreview } from './target-preview';
 import { usePoiCategoriesStore } from '@myastrosky/app-state/stores/poi-categories';
 import { useSharedSkiesStore } from '@myastrosky/app-state/stores/shared-skies';
-import { showToast } from './toast';
+import { showErrorToast } from './toast';
 import { getLang, t } from './i18n';
 import { reportRendererError, reportUnknownRendererError } from './error-reporter';
 import { openDSOEditModal } from './dso-editor';
@@ -80,10 +81,17 @@ async function init() {
   try {
     await Promise.all([loadCatalog(), loadDSOCatalog()]);
   } catch (err: any) {
-    reportUnknownRendererError('catalog_load_failure', err);
-    // Show error in loading overlay instead of spinner
+    const { code, ref } = reportUnknownRendererError('catalog_load_failure', err);
+    // Show error in loading overlay instead of spinner (as text: the message is never markup).
     if (loadingOverlay) {
-      loadingOverlay.innerHTML = `<div class="loading-error">${err.message || t('app.catalogError')}</div>`;
+      const box = document.createElement('div');
+      box.className = 'loading-error';
+      box.textContent = userMessage(err, 'app.catalogError');
+      const refLine = document.createElement('div');
+      refLine.className = 'text-small text-dim';
+      refLine.textContent = `${t('errors.reference')} ${code} · ${ref}`;
+      box.appendChild(refLine);
+      loadingOverlay.replaceChildren(box);
     }
     return;
   }
@@ -282,8 +290,8 @@ async function init() {
     skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));
     skyMap.render();
     void followDesktopStoredSolves(photos, overlay, skyMap, gallery);
-  } catch {
-    showToast({ message: t('app.photosLoadError'), type: 'error' });
+  } catch (err) {
+    showErrorToast(err, 'app.photosLoadError', { category: 'photos_load_failed' });
   }
 }
 

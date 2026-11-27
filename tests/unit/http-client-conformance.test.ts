@@ -43,7 +43,20 @@ describe('phone HttpClient timeout', () => {
     const started = Date.now();
     await expect(
       client({ method: 'GET', url: 'http://x.invalid/', timeoutMs: 50 }),
-    ).rejects.toThrow(/timed out/);
+    ).rejects.toMatchObject({
+      code: 'NETWORK_TIMEOUT',
+      message: expect.stringMatching(/timed out/),
+    });
     expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it('turns a request that gets no answer into a NETWORK_ERROR', async () => {
+    const client = createPhoneHttpClient({
+      fetch: () => Promise.reject(new TypeError('Failed to fetch')),
+    });
+    await expect(client({ method: 'GET', url: 'http://x.invalid/' })).rejects.toMatchObject({
+      code: 'NETWORK_ERROR',
+      kind: 'upstream',
+    });
   });
 });

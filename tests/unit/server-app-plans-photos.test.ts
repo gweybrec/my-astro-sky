@@ -1413,7 +1413,12 @@ describe('POST /api/photos', () => {
     const r = await call('POST', '/api/photos', await photoForm({ corr: [null, null] }));
     // KNOWN GAP: a null item throws a TypeError (500) instead of an INVALID_POINT_INDEX 400.
     expect(r.status).toBe(500);
-    expect(r.body).toEqual({ error: expect.stringContaining('null') });
+    // A bug answers with a code and the reference of its log line, never its raw message.
+    expect(r.body).toEqual({
+      error: 'Internal error',
+      code: 'INTERNAL_ERROR',
+      ref: expect.stringMatching(/^[0-9A-Z]{4}$/),
+    });
     expect(uploadsList()).toEqual([]);
   });
 

@@ -82,14 +82,22 @@ Display settings and theme preference are stored in your browser's local storage
 
 This is expected behavior. The **Open logs folder** button only works in the Electron desktop app. In browser mode (hosted URL, Docker, Node.js), use the browser developer console (**F12**) for diagnostics instead.
 
+### Error messages and their reference
+
+When something fails in the app itself, on a server or on the network, the red message at the bottom of the screen ends with a grey line such as **Ref. NETWORK_ERROR · 7K3Q**: the kind of error, then a short reference for this one occurrence. The copy button next to it copies that line with the app version, the system and the time, ready to paste into a bug report. A message about something you entered (an invalid number, a missing field) has no reference: correcting the entry is enough.
+
+### Finding the phone app's error log
+
+The phone app keeps its own error log, with the same references as its messages. **Réglages → À propos → Partager le journal des erreurs** opens the phone's share menu to save it or send it. The log holds no personal data and never leaves the phone unless you share it.
+
 ### Finding Electron error logs
 
-If the desktop app shows an error toast, MyAstroSky writes a diagnostics file automatically:
+The desktop app records every error in a log, with the same reference as the message on screen:
 
 - **Linux:** `~/.config/MyAstroSky/logs/`
 - **Windows:** `%APPDATA%\MyAstroSky\logs\`
 
-Each file is named `my-astro-sky-error-<timestamp>.json`. Attach the most recent file when reporting a bug.
+**Settings → Open logs folder** opens it. The errors are in the `my-astro-sky-errors-<timestamp>.jsonl` files, crashes in `my-astro-sky-crash-<timestamp>.jsonl`. They hold no personal data: no photo, file name or file content, no notes, targets or plans, no position, no folder paths and no API key, only the technical message of each error and random internal identifiers. They are never sent anywhere.
 
 ---
 
@@ -99,5 +107,7 @@ Open an issue on [GitHub](https://github.com/gweybrec/my-astro-sky/issues) and i
 
 - What you were doing when the problem occurred
 - The browser and OS you are using
+- The reference of the error message, copied with its copy button
 - Any error messages from the browser console (F12 → Console)
-- For desktop app errors: the latest `my-astro-sky-error-*.json` log file
+- For desktop app errors: the latest `my-astro-sky-errors-*.jsonl` log file
+- For phone app errors: the error log, from **Réglages → À propos → Partager le journal des erreurs** (save it, or send it by email)

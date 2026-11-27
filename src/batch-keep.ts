@@ -212,7 +212,9 @@ let queue: Promise<void> = Promise.resolve();
 
 /** Runs the writes one after the other; a failure is reported, and the window goes on as it was. */
 function enqueue(task: () => Promise<void>): Promise<void> {
-  queue = queue.then(task).catch((error) => reportUnknownRendererError('batch-keep', error));
+  queue = queue.then(task).catch((error: unknown) => {
+    reportUnknownRendererError('batch-keep', error);
+  });
   return queue;
 }
 

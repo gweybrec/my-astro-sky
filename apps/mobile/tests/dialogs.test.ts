@@ -1,3 +1,5 @@
+import { flushPromises } from '@vue/test-utils';
+import { DomainError } from '@myastrosky/core/domain/errors';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const present = vi.fn();
@@ -101,14 +103,51 @@ describe('the error toast', () => {
     present.mockReset();
   });
 
-  it('shows the error message in a red toast at the bottom', async () => {
-    await useErrorToast().showError(new Error('Impossible de calculer'));
+  it('shows a translated text in a red toast at the bottom, with no reference', async () => {
+    await useErrorToast().showError('Impossible de calculer');
     const arg = toastCreate.mock.calls[0][0];
     expect(arg.message).toBe('Impossible de calculer');
+    expect(arg.header).toBeUndefined();
     expect(arg.position).toBe('bottom');
     expect(arg.cssClass).toEqual(['mob-toast', 'mob-toast-error']);
     expect(arg.htmlAttributes.role).toBe('alert');
     expect(present).toHaveBeenCalledOnce();
+  });
+
+  it('shows a failure with its text, its reference under it and the copy button', async () => {
+    await useErrorToast().showError(
+      new DomainError('upstream', 'Horizon failed', {
+        code: 'HORIZON_COMPUTE_FAILED',
+        ref: '7K3Q',
+      }),
+      { message: "Impossible de calculer l'horizon à partir des données d'altitude" },
+    );
+    const arg = toastCreate.mock.calls[0][0];
+    expect(arg.header).toBe("Impossible de calculer l'horizon à partir des données d'altitude");
+    expect(arg.message).toBe('Réf. HORIZON_COMPUTE_FAILED · 7K3Q');
+    expect(arg.cssClass).toEqual(['mob-toast', 'mob-toast-error', 'mob-toast--ref']);
+    expect(arg.buttons).toHaveLength(1);
+    expect(arg.buttons[0].htmlAttributes['aria-label']).toBe("Copier les détails de l'erreur");
+  });
+
+  it('never shows the raw message of a bug: the generic text and a reference', async () => {
+    await useErrorToast().showError(
+      new TypeError("Cannot read properties of undefined (reading 'x')"),
+    );
+    const arg = toastCreate.mock.calls[0][0];
+    expect(arg.header).toBe("L'application a rencontré une erreur.");
+    expect(arg.message).toMatch(/^Réf\. INTERNAL_ERROR · [0-9A-Z]{4}$/);
+  });
+
+  it('copies the version, the platform, the code and the reference', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    await useErrorToast().showError(
+      new DomainError('upstream', 'x', { code: 'NETWORK_ERROR', ref: 'AB12' }),
+    );
+    expect(toastCreate.mock.calls[0][0].buttons[0].handler()).toBe(false);
+    await flushPromises();
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('NETWORK_ERROR · AB12'));
   });
 
   it('shows a notice in the plain toast', async () => {

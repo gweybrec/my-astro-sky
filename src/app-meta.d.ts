@@ -13,6 +13,8 @@ interface Window {
       message: string;
       stack?: string;
       context?: Record<string, unknown>;
+      code?: string;
+      ref?: string;
     }) => Promise<{ ok: boolean; message?: string }>;
     getLogsDir: () => Promise<string>;
     getLogsPathHint: () => Promise<string>;

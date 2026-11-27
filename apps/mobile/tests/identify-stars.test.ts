@@ -200,7 +200,7 @@ describe('identifying the stars of a waiting photo', () => {
     const { w } = await mountPage();
     await tap(w, 300, 300);
     await nameByCoordinates(w, ['20', '41', '25.9', '45', '16', '99']);
-    expect(showError.mock.calls[0][0].message).toBe('Coordonnées invalides');
+    expect(showError.mock.calls[0][0]).toBe('Coordonnées invalides');
     await w.findAll('.mob-coord input')[5].setValue('49');
     await w
       .findAll('.mob-coord button')

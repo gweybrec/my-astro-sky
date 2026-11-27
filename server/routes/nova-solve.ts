@@ -95,8 +95,7 @@ novaSolveRouter.post('/api/solve-plate', uploadSolve.single('photo'), async (req
     }
     res.json({ jobId });
   } catch (err: any) {
-    console.error('Plate solve submit error:', err);
-    res.status(500).json({ error: err.message });
+    sendError(res, err, 'astrometry_submit_failed');
   } finally {
     // `submit` returns once the upload to astrometry.net is over: the file on disk is no longer needed.
     await removeUpload(req.file);
@@ -176,8 +175,7 @@ novaSolveRouter.post('/api/solve-plate/resume', async (req, res) => {
     ) {
       return;
     }
-    console.error('Plate solve resume error:', err);
-    res.status(500).json({ error: (err as Error).message });
+    sendError(res, err, 'astrometry_resume_failed');
   }
 });
 
@@ -244,7 +242,7 @@ novaSolveRouter.get('/api/solve-plate/:id', async (req, res) => {
       res.status(404).json(err.body ?? { error: err.message });
       return;
     }
-    res.status(500).json({ error: (err as Error).message });
+    sendError(res, err, 'astrometry_job_failed');
   }
 });
 
@@ -299,8 +297,7 @@ novaSolveRouter.get('/api/astrometry/submissions', async (req, res) => {
     if (sendRule(res, err, { ASTROMETRY_NOT_CONFIGURED: 'ASTROMETRY_API_KEY not configured' })) {
       return;
     }
-    logServerError('astrometry_list_submissions_failed', err);
-    sendError(res, err);
+    sendError(res, err, 'astrometry_list_submissions_failed');
   }
 });
 
@@ -367,7 +364,6 @@ novaSolveRouter.post('/api/astrometry/reuse', upload.single('photo'), async (req
       res.json({ success: false, error: result.error });
     }
   } catch (err: any) {
-    logServerError('astrometry_reuse_failed', err);
-    sendError(res, err);
+    sendError(res, err, 'astrometry_reuse_failed');
   }
 });

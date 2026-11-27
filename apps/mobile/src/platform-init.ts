@@ -1,3 +1,4 @@
+import { removeUserData } from '@myastrosky/core/platform/log-sanitize';
 /**
  * What the phone app sets up before its first screen, in this order: the device storage, the language, the
  * backend, then the hooks the shared code calls (error reporter, log sink, device hints, gear catalogue, star search, constellation lines).
@@ -11,6 +12,8 @@ import { configureI18n, getLang } from '@myastrosky/core/i18n/index';
 import { configureStorage, storage } from '@myastrosky/core/platform/storage';
 import { configureErrorReporter, reportError } from '@myastrosky/core/platform/error-hook';
 import { configureLogSink, consoleLogSink } from '@myastrosky/core/platform/log';
+import { Directory, Filesystem } from '@capacitor/filesystem';
+import { createErrorLog, type ErrorLog, type ErrorLogFilesystem } from './error-log';
 import { configureDeviceHints } from '@myastrosky/core/platform/device-hints';
 import { configureGearCatalogLoader } from '@myastrosky/core/platform/gear-loader';
 import { configureStarSearch } from '@myastrosky/core/platform/star-search';
@@ -21,6 +24,14 @@ import { setBackend } from '@myastrosky/app-state/backend';
 import { createHttpBackend } from '@myastrosky/backend-http/http-backend';
 import { createPreferencesStore } from '@myastrosky/backend-local/preferences-store';
 import { applySavedTheme } from './app-theme';
+
+/** The phone's error log; none in a browser, where errors go to the console only. */
+let errorLog: ErrorLog | null = null;
+
+/** The error log to share with a bug report, when there is one. */
+export function phoneErrorLog(): ErrorLog | null {
+  return errorLog;
+}
 
 /** The one place that decides which platform the app runs on. */
 export const isNativePlatform = (): boolean => Capacitor.isNativePlatform();
@@ -161,10 +172,21 @@ export async function initPlatform(): Promise<void> {
   // 3. The backend.
   setBackend(await createBackend());
 
-  // 4. The hooks of the shared code, as the desktop's start-up sets them (the error reporter writes to the console).
-  configureErrorReporter((context, error, details) => {
-    if (details === undefined) console.error(context, error);
-    else console.error(context, error, details);
+  // 4. The hooks of the shared code, as the desktop's start-up sets them. An error goes to the console and, on the
+  // phone, to its error log (`error-log.ts`), which the user shares from À propos.
+  errorLog = isNativePlatform()
+    ? createErrorLog({
+        fs: Filesystem as unknown as ErrorLogFilesystem,
+        directory: Directory.Data,
+        version: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '',
+        platform: Capacitor.getPlatform(),
+      })
+    : null;
+  configureErrorReporter((context, error, details, ticket) => {
+    // The phone's system log keeps the console: the same cleaned text as the error log.
+    const text = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    console.error(`${context} [${ticket.code} ${ticket.ref}]`, removeUserData(text));
+    void errorLog?.record(context, error, details, ticket);
   });
   // Debug and info messages print in development builds only.
   configureLogSink(import.meta.env.DEV ? consoleLogSink : null);

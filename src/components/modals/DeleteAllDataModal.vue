@@ -109,7 +109,8 @@ import {
 import { reloadUserOverrides } from '../../dso-catalog';
 import { buildDeleteSummaryLines } from '@myastrosky/core/delete-utils';
 import { FULL_BACKUP_OPTIONS } from '@myastrosky/core/backup-selection';
-import { showToast } from '../../toast';
+import { showToast, showErrorToast } from '../../toast';
+import { reportUnknownRendererError } from '../../error-reporter';
 import { formatBytes } from '@myastrosky/core/format-utils';
 import BulkDeleteConfirmDialog from './BulkDeleteConfirmDialog.vue';
 
@@ -172,7 +173,7 @@ async function doBackup() {
     // Everything this window can delete: the photos, the setups, the gear and the DSO changes.
     await exportData(FULL_BACKUP_OPTIONS, ids);
   } catch (err: any) {
-    showToast({ message: err.message ?? t('settings.importError'), type: 'error' });
+    showErrorToast(err, 'settings.importError', { category: 'delete_all_backup_failed' });
   } finally {
     backingUp.value = false;
   }
@@ -211,7 +212,9 @@ async function onConfirmed() {
     }
     if (deleteDso.value) {
       await deleteAllDsoOverrides();
-      await reloadUserOverrides().catch(() => {});
+      await reloadUserOverrides().catch((err: unknown) =>
+        reportUnknownRendererError('delete_all_reload_dso_overrides_failed', err),
+      );
     }
     if (deleteGear.value) {
       await deleteAllCustomGear();
@@ -225,7 +228,7 @@ async function onConfirmed() {
     emit('close');
     showToast({ message: t('settings.deleteSuccess'), type: 'info' });
   } catch (err: any) {
-    showToast({ message: err.message ?? t('settings.deleteError'), type: 'error' });
+    showErrorToast(err, 'settings.deleteError', { category: 'delete_all_failed' });
     busy.value = false;
   }
 }

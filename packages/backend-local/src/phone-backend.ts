@@ -1,3 +1,4 @@
+import { reportError } from '@myastrosky/core/platform/error-hook';
 /**
  * Assembles the whole backend of the phone: the adapters over the plugin objects the shell passes in, the
  * schema and the default categories (as `server/app.ts` does at start-up), the services, and the local
@@ -187,6 +188,10 @@ export async function createPhoneBackend(
     stars: catalogs.stars,
     http: createFetchHttpClient({ fetch: platform.fetch }),
     now,
+    // Failures the services recover from (a poll, a fallback): kept in the phone's log, as the server's.
+    log: (event, error, context) => {
+      reportError(event, error, context);
+    },
   });
   // First run: the default POI categories, before anything can list them.
   if (!options.withoutUpdates) await services.poiCategories.ensureDefaults();

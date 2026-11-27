@@ -1,8 +1,6 @@
 import express from 'express';
-import { isDomainError } from '@myastrosky/core/domain/errors';
 import { horizon } from '../services.js';
 import { sendError } from './http-errors.js';
-import { logServerError } from '../logger.js';
 
 export const horizonRouter = express.Router();
 
@@ -54,10 +52,7 @@ horizonRouter.get('/api/horizon', async (req, res) => {
     });
     res.json(profile);
   } catch (err) {
-    // The compute failure carries the original error as its cause, which is what the log wants.
-    if (isDomainError(err) && err.code === 'HORIZON_COMPUTE_FAILED') {
-      logServerError('horizon_compute_failed', err.cause ?? err);
-    }
-    sendError(res, err);
+    // The compute failure is an upstream error: sendError logs its cause, the original error.
+    sendError(res, err, 'horizon_compute_failed');
   }
 });

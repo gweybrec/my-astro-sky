@@ -22,6 +22,12 @@
       <div class="privacy-warning-title">{{ t('settings.privacySharedTitle') }}</div>
       <p class="text-para">{{ t('settings.privacyShared') }}</p>
     </div>
+    <div class="privacy-warning-block">
+      <div class="privacy-warning-title">{{ t('settings.privacyErrorLogTitle') }}</div>
+      <p class="text-para">{{ t('settings.privacyErrorLog') }}</p>
+      <!-- Crash dumps exist in the desktop app only (Electron's crash reporter). -->
+      <p v-if="isElectron" class="text-para !mt-1.5">{{ t('settings.privacyCrashDumps') }}</p>
+    </div>
     <div v-if="isElectron" class="privacy-warning-block">
       <div class="privacy-warning-title">{{ t('settings.privacyGeolocTitle') }}</div>
       <p class="text-para">{{ t('settings.privacyGeoloc') }}</p>

@@ -58,10 +58,9 @@ import { ref } from 'vue';
 import { t } from '../../i18n';
 import { useUiStore } from '../../stores/ui';
 import { useCanvasStore } from '../../stores/canvas';
-import { showToast } from '../../toast';
+import { showToast, showErrorToast } from '../../toast';
 import { downloadBlob } from '../../file-utils';
 import type { MapExportScope } from '../../export-render';
-import { reportUnknownRendererError } from '../../error-reporter';
 import DropdownPanel from '../base/DropdownPanel.vue';
 import exportSvg from '../../icons/export.svg?raw';
 
@@ -93,8 +92,10 @@ async function run(scope: MapExportScope, format: 'png' | 'pdf') {
     downloadBlob(blob, `myastrosky-${part}-${ts}.${format}`);
     showToast({ message: t('settings.exportView.success'), type: 'info', duration: 2500 });
   } catch (e) {
-    reportUnknownRendererError('map_export_failed', e, { scope, format });
-    showToast({ message: t('settings.exportView.error'), type: 'error', duration: 4000 });
+    showErrorToast(e, 'settings.exportView.error', {
+      category: 'map_export_failed',
+      context: { scope, format },
+    });
   }
 }
 </script>

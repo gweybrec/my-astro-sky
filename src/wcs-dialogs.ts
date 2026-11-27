@@ -1,3 +1,4 @@
+import { installVueErrorHandler } from './vue-error-handler';
 import { createApp, h } from 'vue';
 import type { FitsCard } from '@myastrosky/core/fits-header';
 import WcsWarningsDialog from './components/modals/WcsWarningsDialog.vue';
@@ -9,6 +10,7 @@ function mountDialog<T>(render: (done: (value: T) => void) => ReturnType<typeof 
     const host = document.createElement('div');
     document.body.appendChild(host);
     const app = createApp({ render: () => render(close) });
+    installVueErrorHandler(app, 'wcs-dialog');
     function close(value: T) {
       app.unmount();
       host.remove();
