@@ -1468,6 +1468,10 @@ const fr = {
       eastTooltip: 'Est — objets atteignant leur sommet en 2e moitié de nuit',
       westTooltip: 'Ouest — objets atteignant leur sommet en 1re moitié de nuit',
     },
+    skyArea: {
+      directions: 'Directions',
+      region: 'Région',
+    },
     skyRegion: {
       label: 'Région du ciel',
       tooltip:

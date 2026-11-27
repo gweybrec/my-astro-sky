@@ -337,7 +337,7 @@ export async function seed({ ports }) {
     observationDate: '2025-11-07T18:42:00.000Z',
   });
 
-  await api(base, 'POST', '/api/sky-regions', {
+  const region = await api(base, 'POST', '/api/sky-regions', {
     name: 'Zone dégagée',
     color: '#4aa3ff',
     points: [
@@ -351,9 +351,12 @@ export async function seed({ ports }) {
   const visit = await visitSharedSky(base, 'Marie Dupont');
 
   const prefs = { setupId: setup1.id, lastDateISO: null, lat, lon };
+  // The search settings on the Région side of the sky switch, with the region above chosen.
+  const regionPrefs = { ...prefs, skyAreaMode: 'region', skyRegionId: region.id };
   return {
     ids: {
       setup: setup1.id,
+      regionPrefs: JSON.stringify(regionPrefs),
       photo: photoId,
       cometPhoto: cometPhotoId,
       visitSky: visit.sky,
@@ -726,6 +729,14 @@ export const views = [
   },
   {
     name: 'targets-settings',
+    path: '/tabs/targets',
+    ready: '.mob-row--roomy',
+    open: [{ click: '.mob-topbar ion-button.mob-icon-btn:last-of-type' }, { wait: '.mob-sheet' }],
+    ...SHEET,
+  },
+  {
+    name: 'targets-settings-region',
+    storage: (ids) => ({ 'targets-prefs-v3': ids.regionPrefs }),
     path: '/tabs/targets',
     ready: '.mob-row--roomy',
     open: [{ click: '.mob-topbar ion-button.mob-icon-btn:last-of-type' }, { wait: '.mob-sheet' }],

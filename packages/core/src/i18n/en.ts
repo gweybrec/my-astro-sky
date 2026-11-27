@@ -1452,6 +1452,10 @@ const en: Translations = {
       eastTooltip: 'East — objects peaking in the 2nd half of the night',
       westTooltip: 'West — objects peaking in the 1st half of the night',
     },
+    skyArea: {
+      directions: 'Directions',
+      region: 'Region',
+    },
     skyRegion: {
       label: 'Sky region',
       tooltip: 'Filter to a hand-drawn patch of sky (e.g. what you can see from your garden).',

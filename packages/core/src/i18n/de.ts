@@ -1469,6 +1469,10 @@ const de: Translations = {
       eastTooltip: 'Ost — Objekte, die in der zweiten Nachthälfte ihr Maximum erreichen',
       westTooltip: 'West — Objekte, die in der ersten Nachthälfte ihr Maximum erreichen',
     },
+    skyArea: {
+      directions: 'Richtungen',
+      region: 'Region',
+    },
     skyRegion: {
       label: 'Himmelsregion',
       tooltip:

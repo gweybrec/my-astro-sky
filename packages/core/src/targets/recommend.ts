@@ -16,7 +16,7 @@ import { todayISO } from './format';
 import { buildMultipleStarTargets } from './multiple-stars';
 import { nightWindow, timeWindowFor, visualNightWindow } from './night';
 import { presetForSetupId, type GearLists } from './plan-setup';
-import type { TargetsPrefs } from './prefs';
+import { skyAreaModeOf, type TargetsPrefs } from './prefs';
 
 /** What the recommendation reads: the preferences and everything they refer to. */
 export interface RecommendationInput {
@@ -28,7 +28,7 @@ export interface RecommendationInput {
   photographedIds?: Set<string> | null;
   /** The terrain horizon, used when `prefs.respectHorizon` is on. */
   horizonProfile?: HorizonProfile | null;
-  /** The saved sky regions; the one named by `prefs.skyRegionId` filters the result. */
+  /** The saved sky regions; in region mode, the one named by `prefs.skyRegionId` filters the result. */
   regions?: readonly { id: string; points: { azDeg: number; altDeg: number }[] }[];
   /** The objects to choose among; the catalogue by default. */
   dsos?: DSO[];
@@ -152,14 +152,14 @@ function prepare(
   });
 
   const midnightUTC = dateNight.getTime() + (12 - lon / 15) * 3600 * 1000;
-  // Sky region filter: composes as AND with the N/S/E/W chips — a precise
-  // "what I can actually see from my garden" cut on top of the coarse quadrant one.
-  const activeRegion = prefs.skyRegionId
-    ? input.regions?.find((r) => r.id === prefs.skyRegionId)
-    : null;
-  /** The sky-direction and sky-region filters, applied to both lists. */
+  // The sky area is either the N/S/E/W directions or one drawn region, as the mode says; never both.
+  // Region mode with no region chosen (or a deleted one) leaves the sky unfiltered.
+  const regionMode = skyAreaModeOf(prefs) === 'region';
+  const activeRegion =
+    regionMode && prefs.skyRegionId ? input.regions?.find((r) => r.id === prefs.skyRegionId) : null;
+  /** The sky-area filter, applied to both lists. */
   const inSkyArea = (s: TargetSuggestion): boolean => {
-    if (dirFilterActive) {
+    if (!regionMode && dirFilterActive) {
       const isNorth = s.dso.dec > lat;
       if (!enabledDirs.has('N') && isNorth) return false;
       if (!enabledDirs.has('S') && !isNorth) return false;

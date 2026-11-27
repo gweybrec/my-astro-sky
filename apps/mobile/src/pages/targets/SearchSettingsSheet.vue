@@ -7,7 +7,7 @@ import { getConstellationInfos } from '@myastrosky/core/catalog/star-registry';
 import { formatLatLon } from '@myastrosky/core/observer-location';
 import { todayISO } from '@myastrosky/core/targets/format';
 import { formatPlanDate } from '@myastrosky/core/targets/plan';
-import type { SortKey } from '@myastrosky/core/targets/prefs';
+import { skyAreaModeOf, type SkyAreaMode, type SortKey } from '@myastrosky/core/targets/prefs';
 import { useSkyRegionsStore } from '@myastrosky/app-state/stores/sky-regions';
 import PhoneSheet from '../../components/PhoneSheet.vue';
 import PhoneSectionHeader from '../../components/PhoneSectionHeader.vue';
@@ -15,6 +15,7 @@ import PhoneButton from '../../components/PhoneButton.vue';
 import PhoneRow from '../../components/PhoneRow.vue';
 import PhoneRadioSheet from '../../components/PhoneRadioSheet.vue';
 import PhoneSliderRow from '../../components/PhoneSliderRow.vue';
+import PhoneSegmented from '../../components/PhoneSegmented.vue';
 import PhoneToggleRow from '../../components/PhoneToggleRow.vue';
 import PhoneField from '../../components/PhoneField.vue';
 import PhoneNativePicker from '../../components/PhoneNativePicker.vue';
@@ -38,8 +39,8 @@ import {
 } from '../../composables/useTargets';
 
 // The board "Cibles, paramètres de recherche": everything the targets list is searched and ordered by. The sort, the
-// night (the calendar sheet, PhoneDateSheet) and the location (the "Lieu d'observation" page), then the sky (directions, region,
-// altitude), the observation window (the phone's time picker), the filters (interest, difficulty, and the catalogues
+// night (the calendar sheet, PhoneDateSheet) and the location (the "Lieu d'observation" page), then the sky (a switch
+// between the directions and a region, only the chosen side shown; altitude), the observation window (the phone's time picker), the filters (interest, difficulty, and the catalogues
 // and constellations, each a list of tick boxes: "Cibles, catalogues" / "Cibles, constellations") and the three
 // switches. Each change is stored at once; "Réinitialiser" puts the sky, the window, the filters and the switches back
 // to the desktop's defaults and keeps the sort, the night and the location; "Appliquer" closes the sheet (the list is
@@ -127,6 +128,21 @@ const place = computed(() =>
   formatLatLon({ lat: targetsPrefs.lat ?? null, lon: targetsPrefs.lon ?? null }),
 );
 const dirs = computed(() => new Set(targetsPrefs.horizonDirs ?? ['N', 'S', 'E', 'W']));
+/** The sky filter in use: the directions or the region, never both (the switch above them). */
+const skyModes = computed(() => [
+  { value: 'directions' as const, label: t('targets.skyArea.directions') },
+  { value: 'region' as const, label: t('targets.skyArea.region') },
+]);
+const skyMode = computed<SkyAreaMode | undefined>({
+  get: () => skyAreaModeOf(targetsPrefs),
+  set: (mode) => {
+    if (!mode) return;
+    updateTargetsPrefs({ skyAreaMode: mode });
+    // Région with no region chosen goes straight to the list of regions: no second press on the field.
+    // (Read from the preferences, not the region list, which may not be loaded yet.)
+    if (mode === 'region' && !targetsPrefs.skyRegionId) leaveTo('/targets/regions');
+  },
+});
 const region = computed(() => regionsStore.regions.find((r) => r.id === targetsPrefs.skyRegionId));
 const minAlt = computed({
   get: () => targetsPrefs.minAltDeg ?? 20,
@@ -203,7 +219,8 @@ const aria = (name: string, value: string) => t('mobile.targets.fieldAria', { na
     <div class="mob-form-row mob-form-row--title">
       <span class="mob-form-label m-secondary">{{ t('targets.horizon.label') }}</span>
     </div>
-    <div class="mob-btn-row">
+    <PhoneSegmented v-model="skyMode" :options="skyModes" :label="t('targets.horizon.label')" />
+    <div v-if="skyMode === 'directions'" class="mob-btn-row">
       <PhoneButton
         v-for="dir in DIRECTIONS"
         :key="dir.key"
@@ -214,7 +231,7 @@ const aria = (name: string, value: string) => t('mobile.targets.fieldAria', { na
         <AppIcon :svg="dir.icon" cls="mob-icon--sm mob-icon--dir" />{{ t(dir.label) }}
       </PhoneButton>
     </div>
-    <div class="mob-form-row" style="padding-bottom: var(--space-4)">
+    <div v-else class="mob-form-row" style="padding-bottom: var(--space-4)">
       <PhoneButton
         variant="field"
         block

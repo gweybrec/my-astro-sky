@@ -1464,6 +1464,10 @@ const es: Translations = {
       eastTooltip: 'Este — objetos que alcanzan su punto máximo en la 2.ª mitad de la noche',
       westTooltip: 'Oeste — objetos que alcanzan su punto máximo en la 1.ª mitad de la noche',
     },
+    skyArea: {
+      directions: 'Direcciones',
+      region: 'Región',
+    },
     skyRegion: {
       label: 'Región del cielo',
       tooltip:

@@ -40,6 +40,7 @@ export function updateTargetsPrefs(patch: Partial<TargetsPrefs>): void {
  * kept.
  */
 export const SEARCH_PREF_KEYS = [
+  'skyAreaMode',
   'horizonDirs',
   'skyRegionId',
   'minAltDeg',

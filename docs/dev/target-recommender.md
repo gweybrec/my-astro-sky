@@ -125,9 +125,12 @@ brightnessScore = min(1, (magLimit − mag) / 4)      (0 below the limit)
 
 ---
 
-### Stage 5 — Horizon direction filter
+### Stage 5 — Sky area: directions or region
 
-Applied **after** `recommendTargets` returns, in `runRecommendation` (targets-view.ts:1658). Only active when `enabledDirs.size < 4`.
+Applied in `finish` (`inSkyArea`, `packages/core/src/targets/recommend.ts`). `prefs.skyAreaMode` picks one filter, never both (`skyAreaModeOf`: a record without the mode is in `'region'` mode when it names a region).
+
+- `'region'`: keeps the objects whose Alt/Az at their best time lies inside the region `prefs.skyRegionId`. No region, or a deleted one, filters nothing.
+- `'directions'`: the N/S/E/W cut below, active only when `enabledDirs.size < 4`.
 
 | Filter        | Condition                                                            |
 | ------------- | -------------------------------------------------------------------- |
@@ -166,7 +169,7 @@ With `includeOutside` (both Targets tabs ask for it), objects that miss **only**
 
 - `too-low` / `too-high` for an object that does not spend an hour in the altitude range: `too-high` when its peak is above the maximum, else `too-low`, and only when its peak is still above 0°. An object that never rises stays out.
 - `too-big` when `includeOversized` is off, or when the object needs more than a 3×3 mosaic; and `photographed` only when `excludePhotographed` is on.
-- `finish` ranks only the objects inside the criteria. The direction and sky-region filters apply to both lists.
+- `finish` ranks only the objects inside the criteria. The sky-area filter (directions or region) applies to both lists.
 
 The other criteria still leave objects out as before: type, catalogue, rating, difficulty, constellation, magnitude limit and terrain horizon.
 

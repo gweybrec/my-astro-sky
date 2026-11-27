@@ -32,7 +32,9 @@ function load() {
 load();
 onIonViewWillEnter(load);
 
-const choose = (id: string | null) => updateTargetsPrefs({ skyRegionId: id ?? undefined });
+/** Choosing a region makes the search use it (Région side of the sky switch); "Tout le ciel" keeps the side. */
+const choose = (id: string | null) =>
+  updateTargetsPrefs(id ? { skyRegionId: id, skyAreaMode: 'region' } : { skyRegionId: undefined });
 
 // The map replaces this page and opens it again when the mode ends.
 function toMap(start: () => void) {

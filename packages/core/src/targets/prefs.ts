@@ -14,6 +14,13 @@ export type SortKey =
   | 'rating'
   | 'difficulty';
 
+export type SkyAreaMode = 'directions' | 'region';
+
+/** The sky filter in use: the stored mode, else 'region' for a record saved before the mode existed that names a region. */
+export function skyAreaModeOf(p: Pick<TargetsPrefs, 'skyAreaMode' | 'skyRegionId'>): SkyAreaMode {
+  return p.skyAreaMode ?? (p.skyRegionId ? 'region' : 'directions');
+}
+
 /** The Targets tab's preferences, stored under {@link TARGETS_PREFS_KEY}; the desktop and the phone read and write the same record. */
 export interface TargetsPrefs {
   setupId: string | null;
@@ -24,8 +31,11 @@ export interface TargetsPrefs {
   enabledTypes?: string[];
   resultLimit?: number;
   sortBy?: SortKey;
+  /** Which sky filter the search uses: the N/S/E/W directions or the chosen region, never both (default 'directions'). */
+  skyAreaMode?: SkyAreaMode;
+  /** The directions kept in 'directions' mode (all four, or unset, = the whole sky). */
   horizonDirs?: string[];
-  /** Selected saved sky-region id, or null/undefined for "no region filter". */
+  /** The saved sky region used in 'region' mode; kept when the mode switches back to directions. */
   skyRegionId?: string | null;
   enabledRatings?: number[];
   enabledDifficulties?: number[];

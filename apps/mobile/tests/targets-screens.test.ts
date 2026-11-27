@@ -896,10 +896,10 @@ describe('the search settings sheet', () => {
       'Lieu',
       '48.58, 7.75',
       'Ciel observable',
+      'Directions',
+      'Région',
       'Nord',
       'Ouest',
-      'Région du ciel',
-      'Tout le ciel',
       'Altitude',
       'Min',
       'Max',
@@ -994,6 +994,71 @@ describe('the search settings sheet', () => {
     expect(prefsOf().horizonDirs).toEqual(['N', 'S', 'E']);
   });
 
+  const skySwitch = (w: ReturnType<typeof mountSheet>['w'], label: string) =>
+    w
+      .find('[role="radiogroup"][aria-label="Ciel observable"]')
+      .findAll('[role="radio"]')
+      .find((b) => b.text() === label)!;
+
+  it('shows the directions by default, and the region field only on the Région side', async () => {
+    storage().set(
+      'targets-prefs-v3',
+      JSON.stringify({
+        setupId: 's1',
+        lat: 1,
+        lon: 1,
+        lastDateISO: null,
+        skyRegionId: 'r1',
+        skyAreaMode: 'directions',
+      }),
+    );
+    reloadTargetsPrefs();
+    const { w } = mountSheet();
+    await settle();
+    expect(skySwitch(w, 'Directions').attributes('aria-checked')).toBe('true');
+    expect(w.find('button[aria-label="Nord"]').exists()).toBe(true);
+    expect(w.find('button[aria-label^="Région du ciel"]').exists()).toBe(false);
+    await skySwitch(w, 'Région').trigger('click');
+    await settle();
+    expect(prefsOf()).toMatchObject({ skyAreaMode: 'region', skyRegionId: 'r1' });
+    expect(w.find('button[aria-label="Nord"]').exists()).toBe(false);
+    // A region is chosen already: the switch only changes the side, it does not leave for the regions page.
+    expect(w.find('button[aria-label^="Région du ciel"]').exists()).toBe(true);
+    expect(w.emitted('update:open')).toBeUndefined();
+    await skySwitch(w, 'Directions').trigger('click');
+    await settle();
+    expect(prefsOf().skyAreaMode).toBe('directions');
+    expect(w.find('button[aria-label="Nord"]').exists()).toBe(true);
+  });
+
+  it('opens the regions at once when Région is chosen with no region', async () => {
+    const { w, router } = mountSheet();
+    await settle();
+    await skySwitch(w, 'Région').trigger('click');
+    await settle();
+    expect(prefsOf().skyAreaMode).toBe('region');
+    expect(router.currentRoute.value.path).toBe('/targets/regions');
+    expect(w.emitted('update:open')?.at(-1)).toEqual([false]);
+  });
+
+  it('opens an older record that names a region on the Région side', async () => {
+    storage().set(
+      'targets-prefs-v3',
+      JSON.stringify({
+        setupId: 's1',
+        lat: 1,
+        lon: 1,
+        lastDateISO: null,
+        skyRegionId: 'r1',
+        horizonDirs: ['N'],
+      }),
+    );
+    reloadTargetsPrefs();
+    const { w } = mountSheet();
+    await settle();
+    expect(skySwitch(w, 'Région').attributes('aria-checked')).toBe('true');
+  });
+
   it("stores the two times of the observation window chosen in the phone's time picker", async () => {
     const { w } = mountSheet();
     await settle();
@@ -1024,6 +1089,7 @@ describe('the search settings sheet', () => {
         obsStartTime: '22:00',
         respectHorizon: true,
         skyRegionId: 'r1',
+        skyAreaMode: 'region',
         enabledRatings: [5],
         enabledDifficulties: [1],
         enabledCatalogs: ['M'],
@@ -1047,6 +1113,7 @@ describe('the search settings sheet', () => {
       sortBy: 'name',
     });
     for (const key of [
+      'skyAreaMode',
       'horizonDirs',
       'minAltDeg',
       'obsStartTime',
@@ -1162,9 +1229,10 @@ describe('the regions page', () => {
     const w = show(RegionsPage, { global: app().global });
     await settle();
     await w.findAll('[role="radio"]')[2].trigger('click');
-    expect(prefsOf().skyRegionId).toBe('r2');
+    expect(prefsOf()).toMatchObject({ skyRegionId: 'r2', skyAreaMode: 'region' });
     await w.findAll('[role="radio"]')[0].trigger('click');
     expect(prefsOf()).not.toHaveProperty('skyRegionId');
+    expect(prefsOf().skyAreaMode).toBe('region');
   });
 
   it('opens the map to draw a region, or to show one, and comes back here when it ends', async () => {

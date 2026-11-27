@@ -7,6 +7,7 @@ import {
   loadTargetsPrefs,
   resetTargetsNightToToday,
   saveTargetsPrefs,
+  skyAreaModeOf,
 } from '@myastrosky/core/targets/prefs';
 import {
   formatArcmin,
@@ -426,6 +427,63 @@ describe('runTargetRecommendation', () => {
       ],
     });
     expect(emptyRegion).toMatchObject({ kind: 'ok', suggestions: [] });
+  });
+
+  describe('sky area: directions or a region, never both', () => {
+    const base = {
+      prefs: { ...prefs, enabledTypes: ['GC'], minAltDeg: 0, maxAltDeg: 90 },
+      dateStr: '2026-06-12',
+      gear,
+      dsos: pool,
+    };
+    const tinyRegion = [
+      {
+        id: 'r1',
+        points: [
+          { azDeg: 0, altDeg: 1 },
+          { azDeg: 1, altDeg: 1 },
+          { azDeg: 1, altDeg: 2 },
+        ],
+      },
+    ];
+    const count = (r: ReturnType<typeof runTargetRecommendation>) =>
+      r.kind === 'ok' ? r.suggestions.length : -1;
+    const all = count(runTargetRecommendation(base));
+
+    it('region mode ignores the directions', () => {
+      const r = runTargetRecommendation({
+        ...base,
+        prefs: { ...base.prefs, skyAreaMode: 'region', skyRegionId: null, horizonDirs: ['N'] },
+      });
+      expect(count(r)).toBe(all);
+    });
+
+    it('region mode without a known region leaves the sky unfiltered', () => {
+      const r = runTargetRecommendation({
+        ...base,
+        prefs: { ...base.prefs, skyAreaMode: 'region', skyRegionId: 'gone' },
+        regions: tinyRegion,
+      });
+      expect(count(r)).toBe(all);
+    });
+
+    it('directions mode ignores a remembered region', () => {
+      const r = runTargetRecommendation({
+        ...base,
+        prefs: { ...base.prefs, skyAreaMode: 'directions', skyRegionId: 'r1' },
+        regions: tinyRegion,
+      });
+      expect(count(r)).toBe(all);
+    });
+  });
+});
+
+describe('skyAreaModeOf', () => {
+  it('reads the stored mode, else region for an older record naming a region', () => {
+    expect(skyAreaModeOf({})).toBe('directions');
+    expect(skyAreaModeOf({ skyRegionId: 'r1' })).toBe('region');
+    expect(skyAreaModeOf({ skyAreaMode: 'directions', skyRegionId: 'r1' })).toBe('directions');
+    expect(skyAreaModeOf({ skyAreaMode: 'region' })).toBe('region');
   });
 });
 

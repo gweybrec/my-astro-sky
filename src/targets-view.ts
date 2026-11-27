@@ -131,6 +131,8 @@ import { createWebLiveAlerts } from '@myastrosky/render/live-alerts-web';
 import {
   loadTargetsPrefs as loadPrefs,
   saveTargetsPrefs as savePrefs,
+  skyAreaModeOf,
+  type SkyAreaMode,
   type SortKey,
   type TargetsPrefs,
 } from '@myastrosky/core/targets/prefs';
@@ -1664,13 +1666,38 @@ export class TargetsView {
     constRow.appendChild(constCountEl);
     filterColR.appendChild(constRow);
 
-    // ── Horizon direction filter ─────────────────────────────────────────────
-    const horizonRow = document.createElement('div');
-    horizonRow.className = 'targets-form-row targets-type-filter-row';
-    const horizonLabel = document.createElement('div');
-    horizonLabel.className = 'targets-label';
-    horizonLabel.textContent = t('targets.horizon.label');
-    horizonLabel.title = t('targets.horizon.tooltip') ?? '';
+    // ── Sky area: the N/S/E/W directions or one drawn region, never both ────
+    // A two-way switch picks which filter the search uses (prefs.skyAreaMode); only
+    // that side's controls are shown, and each side keeps its value when hidden.
+    const skyRow = document.createElement('div');
+    skyRow.className = 'targets-form-row targets-type-filter-row';
+    const skyLabel = document.createElement('div');
+    skyLabel.className = 'targets-label';
+    skyLabel.textContent = t('targets.horizon.label');
+    const skyBody = document.createElement('div');
+    skyBody.className = 'flex flex-col items-start gap-3 min-w-0';
+
+    const modeSwitch = document.createElement('div');
+    modeSwitch.className = 'flex flex-wrap gap-2';
+    modeSwitch.setAttribute('role', 'group');
+    modeSwitch.setAttribute('aria-label', t('targets.horizon.label'));
+    const modeBtns = new Map<SkyAreaMode, HTMLButtonElement>();
+    const MODE_DEFS = [
+      ['directions', 'targets.skyArea.directions', 'targets.horizon.tooltip'],
+      ['region', 'targets.skyArea.region', 'targets.skyRegion.tooltip'],
+    ] as const;
+    for (const [mode, labelKey, tipKey] of MODE_DEFS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = t(labelKey);
+      btn.title = t(tipKey) ?? '';
+      btn.dataset.skyMode = mode;
+      btn.addEventListener('click', () => setSkyMode(mode, true));
+      modeBtns.set(mode, btn);
+      modeSwitch.appendChild(btn);
+    }
+
+    // Directions side
     const compassEl = document.createElement('div');
     compassEl.className = 'targets-type-filters';
     const enabledDirSet = new Set(this.prefs.horizonDirs ?? ['N', 'S', 'E', 'W']);
@@ -1694,25 +1721,16 @@ export class TargetsView {
       });
       compassEl.appendChild(chip);
     }
-    horizonRow.appendChild(horizonLabel);
-    horizonRow.appendChild(compassEl);
-    filterColR.appendChild(horizonRow);
 
-    // ── Sky region filter ─────────────────────────────────────────────────────
-    // A user-drawn Alt/Az polygon ("what I can see from my garden"), much more
-    // precise than the N/S/E/W chips above — the two compose as AND, not either/or.
-    const regionRow = document.createElement('div');
-    regionRow.className = 'targets-form-row';
-    const regionLabel = document.createElement('div');
-    regionLabel.className = 'targets-label';
-    regionLabel.textContent = t('targets.skyRegion.label');
-    regionLabel.title = t('targets.skyRegion.tooltip') ?? '';
-
+    // Region side: the select of saved regions (or, with none saved, a line saying so) + Manage.
     const regionControls = document.createElement('div');
     regionControls.className = 'flex items-stretch gap-2';
 
     const regionSelect = document.createElement('select');
     regionSelect.className = 'targets-select !max-w-sm';
+    const noRegionEl = document.createElement('span');
+    noRegionEl.className = 'self-center text-small text-secondary';
+    noRegionEl.textContent = t('targets.skyRegion.noneSaved');
     const renderRegionOptions = (): void => {
       const selected = this.prefs.skyRegionId ?? '';
       regionSelect.innerHTML = '';
@@ -1729,6 +1747,9 @@ export class TargetsView {
       regionSelect.value = this.skyRegionsStore.regions.some((r) => r.id === selected)
         ? selected
         : '';
+      const anySaved = this.skyRegionsStore.regions.length > 0;
+      regionSelect.classList.toggle('hidden', !anySaved);
+      noRegionEl.classList.toggle('hidden', anySaved);
     };
     renderRegionOptions();
     // The recommend form is built once and never rebuilt (see getRecommendElement),
@@ -1760,10 +1781,38 @@ export class TargetsView {
     });
 
     regionControls.appendChild(regionSelect);
+    regionControls.appendChild(noRegionEl);
     regionControls.appendChild(manageRegionsBtn);
-    regionRow.appendChild(regionLabel);
-    regionRow.appendChild(regionControls);
-    filterColR.appendChild(regionRow);
+
+    /** Shows one side; a click on Region with no region chosen opens the list at once. */
+    const setSkyMode = (mode: SkyAreaMode, fromClick: boolean): void => {
+      for (const [m, btn] of modeBtns) {
+        const on = m === mode;
+        btn.className = on ? 'bw-filter--on' : 'bw-filter';
+        btn.setAttribute('aria-pressed', String(on));
+      }
+      compassEl.classList.toggle('hidden', mode !== 'directions');
+      regionControls.classList.toggle('hidden', mode !== 'region');
+      if (!fromClick) return;
+      this.prefs.skyAreaMode = mode;
+      savePrefs(this.prefs);
+      if (mode === 'region' && !regionSelect.value && !regionSelect.classList.contains('hidden')) {
+        regionSelect.focus();
+        try {
+          regionSelect.showPicker();
+        } catch {
+          // showPicker needs a user gesture and a recent browser; the focus is enough otherwise
+        }
+      }
+    };
+    setSkyMode(skyAreaModeOf(this.prefs), false);
+
+    skyBody.appendChild(modeSwitch);
+    skyBody.appendChild(compassEl);
+    skyBody.appendChild(regionControls);
+    skyRow.appendChild(skyLabel);
+    skyRow.appendChild(skyBody);
+    filterColR.appendChild(skyRow);
 
     // ── Altitude range filter ─────────────────────────────────────────────────
     const altRow = document.createElement('div');
