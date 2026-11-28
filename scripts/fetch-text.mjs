@@ -2,6 +2,8 @@
 // fetch() only says "fetch failed"; the reason (refused, timed out, DNS, certificate…) is
 // in error.cause, sometimes an AggregateError holding one error per address tried.
 
+import { gunzipSync } from 'zlib';
+
 const TIMEOUT_MS = 60_000;
 
 /**
@@ -78,8 +80,11 @@ export function describeFetchError(error) {
   return String(error?.message ?? error);
 }
 
-/** The text at `url`; throws an error naming `what`, the URL and the reason. */
-export async function fetchText(url, what) {
+/**
+ * The text at `url`; throws an error naming `what`, the URL and the reason.
+ * `{ gzip: true }` unpacks a gzipped file (CDS serves some catalogues only as .gz).
+ */
+export async function fetchText(url, what, { gzip = false } = {}) {
   let res;
   try {
     res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
@@ -92,7 +97,8 @@ export async function fetchText(url, what) {
     throw new Error(
       `Could not download ${what} from ${url}: the server answered HTTP ${res.status} ${res.statusText}`.trim(),
     );
-  return await res.text();
+  if (!gzip) return await res.text();
+  return gunzipSync(Buffer.from(await res.arrayBuffer())).toString('latin1');
 }
 
 /** Per mirror list, the one that answered last: later calls start there (a down server costs one time-out, not one per call). */
@@ -102,13 +108,13 @@ const workingMirror = new WeakMap();
  * The text at `base + suffix`, trying each base of `mirrors` in turn until one answers.
  * Each failure is logged; when every mirror fails, the error lists all of them.
  */
-export async function fetchFromMirrors(mirrors, suffix, what) {
+export async function fetchFromMirrors(mirrors, suffix, what, options) {
   const start = workingMirror.get(mirrors) ?? 0;
   const order = [...mirrors.slice(start), ...mirrors.slice(0, start)];
   const failures = [];
   for (const base of order) {
     try {
-      const text = await fetchText(base + suffix, what);
+      const text = await fetchText(base + suffix, what, options);
       if (base !== mirrors[0] && workingMirror.get(mirrors) !== mirrors.indexOf(base))
         console.warn(`  (${what}: using the mirror ${new URL(base).host})`);
       workingMirror.set(mirrors, mirrors.indexOf(base));
@@ -122,6 +128,6 @@ export async function fetchFromMirrors(mirrors, suffix, what) {
 }
 
 /** A CDS catalogue file, e.g. cdsFile('VII/9/catalog.dat', 'the LBN catalogue'), from CDS or a mirror. */
-export function cdsFile(path, what) {
-  return fetchFromMirrors(CDS_FILE_MIRRORS, path, what);
+export function cdsFile(path, what, options) {
+  return fetchFromMirrors(CDS_FILE_MIRRORS, path, what, options);
 }

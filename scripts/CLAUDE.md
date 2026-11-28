@@ -31,6 +31,13 @@ changing its rating/difficulty/containment/priority logic, without a manual rese
 
 To correct a DSO's name, type, coordinates, or rating, edit
 `scripts/dso-metadata-overrides.json` — the `override-dso-metadata` skill walks through it.
+One entry per object: before adding, search the object's id and all its other catalogue names
+(in `id` and `catalogs`) and edit the match; the generator applies only one entry per object.
+`tests/unit/dso-metadata-overrides.test.ts` fails on duplicates and entries matching no object.
+
+Galaxy V magnitudes missing or wrong in OpenNGC come from `scripts/galaxy-magnitudes.json`;
+rebuild it with `node scripts/fetch-galaxy-magnitudes.mjs` after an OpenNGC update
+(sources: `docs/dev/dso-catalog.md`, "Galaxy magnitudes").
 
 ## Filter catalog colours
 

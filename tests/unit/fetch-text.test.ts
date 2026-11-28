@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { gzipSync } from 'zlib';
 // @ts-expect-error -- plain .mjs build script, no type declarations
 import { describeFetchError, fetchFromMirrors, fetchText } from '../../scripts/fetch-text.mjs';
 
@@ -72,6 +73,13 @@ describe('fetchText', () => {
   it('returns the text on success', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('hello')));
     await expect(fetchText('https://example.org/x.dat', 'the X catalogue')).resolves.toBe('hello');
+  });
+
+  it('unpacks a gzipped file when asked', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(gzipSync('NGC 2606'))));
+    await expect(
+      fetchText('https://example.org/x.gz', 'the X catalogue', { gzip: true }),
+    ).resolves.toBe('NGC 2606');
   });
 });
 

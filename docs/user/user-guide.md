@@ -147,17 +147,17 @@ For integrated (smart) telescopes such as the Seestar S50 or Vespera, the camera
 
 Below the gear section you can narrow down which objects are recommended:
 
-| Filter                        | Description                                                                                                                                                                                          |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Observing location**        | Latitude and longitude. Click _Use my location_ for automatic geolocation, or type coordinates manually (decimal or DMS).                                                                            |
-| **Date**                      | Night to plan for. Defaults to today.                                                                                                                                                                |
-| **Object types**              | Toggle which DSO categories are included (spiral galaxy, elliptical galaxy, open cluster, globular cluster, emission nebula, reflection nebula, planetary nebula, supernova remnant, dark nebula).   |
-| **Observable sky**            | Choose _Directions_ or _Region_. Directions: untick the N/S/E/W directions a wall or tree blocks. Region: keep only objects inside a sky region you drew (_Manage regions…_). One applies at a time. |
-| **Respect horizon**           | When enabled, excludes objects that stay hidden behind your computed/imported terrain horizon even at their highest point. See [Terrain horizon (mountains)](#terrain-horizon-mountains).            |
-| **DSO interest**              | Filter by interest rating (1–5 stars, as assigned in the catalog).                                                                                                                                   |
-| **Difficulty**                | Filter by imaging difficulty (1–5 diamonds).                                                                                                                                                         |
-| **Catalogs**                  | Limit results to specific catalogs (Messier, NGC, IC, Sharpless 2, …).                                                                                                                               |
-| **Include oversized objects** | When enabled, objects whose angular size significantly exceeds the FOV are included in results (they score lower by default).                                                                        |
+| Filter                        | Description                                                                                                                                                                                                           |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Observing location**        | Latitude and longitude. Click _Use my location_ for automatic geolocation, or type coordinates manually (decimal or DMS).                                                                                             |
+| **Date**                      | Night to plan for. Defaults to today.                                                                                                                                                                                 |
+| **Object types**              | Toggle which DSO categories are included (spiral galaxy, elliptical galaxy, lenticular galaxy, open cluster, globular cluster, emission nebula, reflection nebula, planetary nebula, supernova remnant, dark nebula). |
+| **Observable sky**            | Choose _Directions_ or _Region_. Directions: untick the N/S/E/W directions a wall or tree blocks. Region: keep only objects inside a sky region you drew (_Manage regions…_). One applies at a time.                  |
+| **Respect horizon**           | When enabled, excludes objects that stay hidden behind your computed/imported terrain horizon even at their highest point. See [Terrain horizon (mountains)](#terrain-horizon-mountains).                             |
+| **DSO interest**              | Filter by interest rating (1–5 stars, as assigned in the catalog).                                                                                                                                                    |
+| **Difficulty**                | Filter by imaging difficulty (1–5 diamonds).                                                                                                                                                                          |
+| **Catalogs**                  | Limit results to specific catalogs (Messier, NGC, IC, Sharpless 2, …).                                                                                                                                                |
+| **Include oversized objects** | When enabled, objects whose angular size significantly exceeds the FOV are included in results (they score lower by default).                                                                                         |
 
 ### Generating recommendations
 

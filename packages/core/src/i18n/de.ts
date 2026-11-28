@@ -118,6 +118,7 @@ const de: Translations = {
     typeLabels: {
       GxS: 'Spiralgalaxien',
       GxE: 'Elliptische Galaxien',
+      GxL: 'Linsenförmige Galaxien',
       GxI: 'Irreguläre Galaxien',
       Gx: 'Galaxien (unbekannter Typ)',
       OC: 'Offene Sternhaufen',
@@ -135,6 +136,7 @@ const de: Translations = {
     types: {
       GxS: 'Spiralgalaxie',
       GxE: 'Elliptische Galaxie',
+      GxL: 'Linsenförmige Galaxie',
       GxI: 'Irreguläre Galaxie',
       Gx: 'Galaxie (unbekannter Typ)',
       OC: 'Offener Sternhaufen',

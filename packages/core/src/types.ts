@@ -232,6 +232,7 @@ export interface AstrometrySolveStatus {
 export type DSOType =
   | 'GxS'
   | 'GxE'
+  | 'GxL'
   | 'GxI'
   | 'Gx'
   | 'OC'

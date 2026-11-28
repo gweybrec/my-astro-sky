@@ -118,6 +118,7 @@ const en: Translations = {
     typeLabels: {
       GxS: 'Spiral galaxies',
       GxE: 'Elliptical galaxies',
+      GxL: 'Lenticular galaxies',
       GxI: 'Irregular galaxies',
       Gx: 'Galaxies (unknown type)',
       OC: 'Open clusters',
@@ -135,6 +136,7 @@ const en: Translations = {
     types: {
       GxS: 'Spiral galaxy',
       GxE: 'Elliptical galaxy',
+      GxL: 'Lenticular galaxy',
       GxI: 'Irregular galaxy',
       Gx: 'Galaxy (unknown type)',
       OC: 'Open cluster',

@@ -5,6 +5,7 @@ import { getDSOCatalogFamily } from '../catalog/dso-registry';
 export const ALL_DSO_TYPES = [
   'GxS',
   'GxE',
+  'GxL',
   'GxI',
   'Gx',
   'OC',

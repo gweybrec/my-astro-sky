@@ -104,6 +104,35 @@ describe('targets preferences', () => {
     expect(loadTargetsPrefs()).not.toHaveProperty('ppnTypeAdded');
   });
 
+  it('ticks the lenticular galaxies beside the elliptical ones in a filter saved before they existed', () => {
+    const store = createMemoryStore();
+    store.set(
+      'targets-prefs-v3',
+      JSON.stringify({
+        setupId: null,
+        lat: null,
+        lon: null,
+        lastDateISO: null,
+        enabledTypes: ['GxE', 'PN', 'PPN'],
+        ppnTypeAdded: true,
+      }),
+    );
+    configureStorage(store);
+    expect(loadTargetsPrefs().enabledTypes).toEqual(['GxE', 'GxL', 'PN', 'PPN']);
+  });
+
+  it('keeps the lenticular galaxies unticked once the filter was saved after the update', () => {
+    saveTargetsPrefs({
+      setupId: null,
+      lat: null,
+      lon: null,
+      lastDateISO: null,
+      enabledTypes: ['GxE'],
+    });
+    expect(loadTargetsPrefs().enabledTypes).toEqual(['GxE']);
+    expect(loadTargetsPrefs()).not.toHaveProperty('gxlTypeAdded');
+  });
+
   it('puts the night back to today at start, keeping the filters', () => {
     saveTargetsPrefs({ setupId: 's1', lat: 1, lon: 2, lastDateISO: '2020-01-01', minAltDeg: 30 });
     resetTargetsNightToToday();

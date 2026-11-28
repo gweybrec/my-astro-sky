@@ -33,6 +33,8 @@ This skill modifies only static data files (`dso-metadata-overrides.json`) and r
 
 The file is an array of objects. Find the entry by `id` (case-insensitive, e.g. `"NGC5907"`). If none exists, append a new one.
 
+**One entry per object: search before adding.** Look for the object's id _and_ each of its other names (M, NGC/IC, vdB, LBN, LDN, Sh2, Barnard…) in both `id` and `catalogs`, and in the object's `catalogs` in `public/data/dso.json`. If any matches, edit that entry; never add a second one. The generator applies a single entry per object and silently ignores the rest. File the entry under the id the app uses (the first column of `dso.json`) and list the other names in `catalogs`. An object the catalogue folds into a neighbour (e.g. one galaxy of a pair) has no row of its own, so an entry for it does nothing. `tests/unit/dso-metadata-overrides.test.ts` fails on a duplicate or an entry matching no object.
+
 **Lookup by catalog alias:** The generator also indexes entries by each element of `catalogs`. If `M42` and `NGC1976` are in the same `catalogs` array, either id resolves to the same override. Always include all known catalog IDs in the `catalogs` array.
 
 ---
@@ -65,6 +67,7 @@ The file is an array of objects. Find the entry by `id` (case-insensitive, e.g. 
 | ----- | --------------------- |
 | `GxS` | Spiral galaxy         |
 | `GxE` | Elliptical galaxy     |
+| `GxL` | Lenticular galaxy     |
 | `GxI` | Irregular galaxy      |
 | `Gx`  | Galaxy (type unknown) |
 | `OC`  | Open cluster          |

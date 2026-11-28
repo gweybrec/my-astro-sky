@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { configureStorage, createMemoryStore } from '@myastrosky/core/platform/storage';
 import {
+  addLenticularType,
   addProtoplanetaryType,
   DEFAULT_SETTINGS,
   DSO_TYPES_ALL,
@@ -41,5 +42,37 @@ describe('protoplanetary nebulae in the saved display settings', () => {
     saveSettings({ ...DEFAULT_SETTINGS, dsoTypes: ['EN', 'PN', '?'] });
     expect(loadSettings().dsoTypes).toEqual(['EN', 'PN', '?']);
     expect(loadSettings()).not.toHaveProperty('ppnTypeAdded');
+  });
+});
+
+describe('addLenticularType', () => {
+  it('ticks GxL right after GxE', () => {
+    expect(addLenticularType(['GxS', 'GxE', 'GxI'])).toEqual(['GxS', 'GxE', 'GxL', 'GxI']);
+  });
+
+  it('leaves a selection without GxE, or already with GxL, as it is', () => {
+    expect(addLenticularType(['GxS', 'GxI'])).toEqual(['GxS', 'GxI']);
+    expect(addLenticularType(['GxL', 'GxE'])).toEqual(['GxL', 'GxE']);
+  });
+});
+
+describe('lenticular galaxies in the saved display settings', () => {
+  it('are among the default types, after the elliptical galaxies', () => {
+    expect(DSO_TYPES_ALL.indexOf('GxL')).toBe(DSO_TYPES_ALL.indexOf('GxE') + 1);
+  });
+
+  it('are ticked once in a selection saved before they existed', () => {
+    const { dsoTypes: _all, ...rest } = DEFAULT_SETTINGS;
+    store.set(
+      SETTINGS_KEY,
+      JSON.stringify({ ...rest, ppnTypeAdded: true, dsoTypes: ['GxS', 'GxE', '?'] }),
+    );
+    expect(loadSettings().dsoTypes).toEqual(['GxS', 'GxE', 'GxL', '?']);
+  });
+
+  it('stay unticked when the user unticked them after the update', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, dsoTypes: ['GxS', 'GxE', '?'] });
+    expect(loadSettings().dsoTypes).toEqual(['GxS', 'GxE', '?']);
+    expect(loadSettings()).not.toHaveProperty('gxlTypeAdded');
   });
 });

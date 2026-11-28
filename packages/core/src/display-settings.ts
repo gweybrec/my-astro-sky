@@ -8,6 +8,7 @@ export const SETTINGS_KEY = 'display-settings';
 export const DSO_TYPES_ALL = [
   'GxS',
   'GxE',
+  'GxL',
   'GxI',
   'Gx',
   'OC',
@@ -121,6 +122,17 @@ export function addProtoplanetaryType(types: string[]): string[] {
   return next;
 }
 
+/**
+ * A saved type selection with 'GxL' (lenticular galaxies, formerly counted as elliptical) ticked after 'GxE' when the
+ * user had elliptical galaxies ticked. Callers run it only on a record saved without the `gxlTypeAdded` mark.
+ */
+export function addLenticularType(types: string[]): string[] {
+  if (types.includes('GxL') || !types.includes('GxE')) return types;
+  const next = [...types];
+  next.splice(next.indexOf('GxE') + 1, 0, 'GxL');
+  return next;
+}
+
 export function loadSettings(): DisplaySettings {
   try {
     const raw = storage().get(SETTINGS_KEY);
@@ -153,6 +165,9 @@ export function loadSettings(): DisplaySettings {
       // Migration: tick the protoplanetary nebulae once for users who see planetary nebulae
       if (!parsed.ppnTypeAdded) settings.dsoTypes = addProtoplanetaryType(settings.dsoTypes);
       delete settings.ppnTypeAdded;
+      // Migration: tick the lenticular galaxies once for users who see elliptical galaxies
+      if (!parsed.gxlTypeAdded) settings.dsoTypes = addLenticularType(settings.dsoTypes);
+      delete settings.gxlTypeAdded;
       // Migration: the former 'LPN' family is now part of 'Other'
       settings.dsoCatalogs = renameLegacyCatalogs(settings.dsoCatalogs);
       settings.mapRotationDeg = normalizeRotationDeg(Number(settings.mapRotationDeg) || 0);
@@ -175,6 +190,9 @@ function pinAutoStarBudget(settings: DisplaySettings): DisplaySettings {
 }
 
 export function saveSettings(settings: DisplaySettings): void {
-  // The mark tells loadSettings this record already knows the 'PPN' type, so it is not ticked again.
-  storage().set(SETTINGS_KEY, JSON.stringify({ ...settings, ppnTypeAdded: true }));
+  // The marks tell loadSettings this record already knows the 'PPN' and 'GxL' types, so they are not ticked again.
+  storage().set(
+    SETTINGS_KEY,
+    JSON.stringify({ ...settings, ppnTypeAdded: true, gxlTypeAdded: true }),
+  );
 }

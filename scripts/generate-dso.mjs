@@ -15,6 +15,12 @@ const OUT_PATH = join(__dirname, '../public/data/dso.json');
 //   constellation, rating, difficulty
 const METADATA_OVERRIDES_PATH = join(__dirname, 'dso-metadata-overrides.json');
 
+// V magnitudes for galaxies whose OpenNGC V is missing or wrong: id → [V, source].
+// Rebuilt by scripts/fetch-galaxy-magnitudes.mjs.
+const GALAXY_MAGNITUDES = JSON.parse(
+  readFileSync(join(__dirname, 'galaxy-magnitudes.json'), 'utf8'),
+).magnitudes;
+
 function loadMetadataOverrides() {
   if (!existsSync(METADATA_OVERRIDES_PATH)) return new Map();
   const raw = JSON.parse(readFileSync(METADATA_OVERRIDES_PATH, 'utf8'));
@@ -361,6 +367,7 @@ const SH2_DATA = [
   ['SH2-261', 103.52, 9.71, 30.0, 'Nébuleuse du Poulpe'],
   ['SH2-263', 85.71, 7.0, 30.0, null],
   ['SH2-264', 85.26, 1.02, 600.0, 'Nébuleuse de Lambda Orionis'],
+  ['SH2-271', 93.802, 12.367, 2.1, null], // SIMBAD position and size
   ['SH2-273', 100.0, 22.5, 20.0, null],
   ['SH2-274', 111.25, 0.74, 90.0, null],
   ['SH2-275', 98.33, 8.79, 10.0, null],
@@ -402,6 +409,22 @@ const SH2_DATA = [
   ['SH2-312', 131.72, -32.38, 30.0, null],
   ['SH2-313', 193.387, -22.873, 10, null],
 ];
+
+// ─── Galaxy subtype from OpenNGC's Hubble column ─────────────────────────────
+// GxS spiral (incl. Magellanic Sm), GxL lenticular (E-S0, S0, S0/a: T-type −3 to −1),
+// GxE elliptical, GxI irregular, Gx no usable Hubble type. A `type` in
+// dso-metadata-overrides.json still wins.
+function classifyHubble(hubble) {
+  const h = (hubble || '').trim();
+  if (!h) return 'Gx';
+  if (/^E[0-9]?(-[0-9])?$/.test(h) || h === 'cD' || h === 'lE' || h === 'E?') return 'GxE';
+  if (h.startsWith('E-S')) return 'GxL';
+  if (/^S(A|B|AB)?0/.test(h)) return 'GxL';
+  if (/^Irr|^Im$|^BCD$|^dIrr|^I0|^IB$|^IAB$|^IA$|^I$/.test(h)) return 'GxI';
+  // "S?" (uncertain spiral) counts as spiral: an unsure spiral beats "unknown".
+  if (/^S[AB]?[abcdem]|^SAB[abcdem]?|^S[AB]$|^S\?$/.test(h)) return 'GxS';
+  return 'Gx';
+}
 
 // ─── OpenNGC type mapping ────────────────────────────────────────────────────
 const TYPE_MAP = {
@@ -720,20 +743,18 @@ const SH2_ALIASES = {
 // rows exist (see the merge step after the SH2_ALIASES suppression below).
 // A pair deliberately NOT here despite superficial similarity (e.g. NGC 6590
 // vs the SH2-37/IC1283/IC1284 emission cloud, or M8 vs its embedded cluster
-// NGC 6530) means the two are related but physically distinct objects.
+// NGC 6530) means the two are related but physically distinct objects; the two
+// galaxies of an interacting pair (one Arp/VV number) stay separate too.
+// The target keeps its own type, size and magnitude and only gains the source's
+// names, so the target must be the record with the real data (NGC3184, not its
+// HII region NGC3180).
 const DUPLICATE_MERGE_ALIASES = {
   NGC6526: 'M8',
   IC4703: 'M16',
-  NGC72: 'NGC70',
-  NGC547: 'NGC545',
-  NGC601: 'NGC599',
-  NGC756: 'NGC734',
-  NGC751: 'NGC750',
-  NGC895: 'NGC894',
-  NGC932: 'NGC930',
+  NGC894: 'NGC895',
+  NGC930: 'NGC932',
   IC240: 'NGC999',
   IC254: 'NGC1065',
-  NGC1295: 'NGC1290',
   IC1988: 'NGC1425',
   IC2111: 'NGC1722',
   NGC1855: 'NGC1854',
@@ -742,52 +763,34 @@ const DUPLICATE_MERGE_ALIASES = {
   NGC1973: 'NGC1977',
   NGC1975: 'NGC1977',
   'SH2-279': 'NGC1977',
-  IC2137: 'NGC1979',
   NGC2069: 'NGC2070',
   IC2145: 'NGC2086',
   NGC2238: 'NGC2237',
   NGC2246: 'NGC2237',
   'SH2-273': 'NGC2264',
   NGC2361: 'NGC2359',
-  NGC2445: 'NGC2444',
-  NGC2530: 'NGC2529',
-  NGC2531: 'NGC2529',
-  NGC2606: 'NGC2603',
+  NGC2529: 'NGC2530',
+  NGC2531: 'NGC2530',
   NGC2631: 'NGC2630',
   NGC2875: 'NGC2874',
   IC543: 'NGC2902',
-  NGC3184: 'NGC3180',
-  NGC3193: 'NGC3187',
+  NGC3180: 'NGC3184',
   IC2599: 'NGC3324',
   NGC3387: 'NGC3386',
-  NGC3396: 'NGC3395',
-  NGC3500: 'NGC3465',
   NGC3579: 'NGC3576',
   NGC3581: 'NGC3576',
   NGC3582: 'NGC3576',
   NGC3584: 'NGC3576',
   NGC3586: 'NGC3576',
-  IC738: 'NGC3915',
   IC2983: 'NGC4006',
   IC2997: 'NGC4090',
   IC3329: 'NGC4393',
   IC3708: 'NGC4654',
-  IC3834: 'NGC4726',
   NGC4776: 'NGC4759',
   NGC4778: 'NGC4761',
-  IC839: 'NGC4851',
-  NGC4896: 'NGC4895',
-  NGC4914: 'NGC4912',
-  NGC5545: 'NGC5544',
-  NGC5869: 'NGC5865',
-  IC1122: 'NGC5931',
   IC4588: 'NGC6051',
-  IC1190: 'NGC6061',
-  NGC6147: 'NGC6141',
   NGC6165: 'NGC6164',
-  NGC6248: 'NGC6237',
-  NGC6286: 'NGC6285',
-  NGC6474: 'NGC6473',
+  NGC6237: 'NGC6248',
   IC4677: 'NGC6543',
   IC1283: 'IC1284',
   'SH2-37': 'IC1284',
@@ -795,11 +798,8 @@ const DUPLICATE_MERGE_ALIASES = {
   IC1316: 'NGC6901',
   LBN280: 'NGC6914',
   vdB146: 'NGC7129',
-  NGC7237: 'NGC7236',
   NGC7304: 'NGC7303',
   'SH2-158': 'NGC7538',
-  NGC7551: 'NGC7540',
-  NGC7753: 'NGC7752',
   LBN582: 'NGC7822',
   LBN583: 'NGC7822',
   LBN591: 'IC10',
@@ -818,10 +818,7 @@ const DUPLICATE_MERGE_ALIASES = {
   'SH2-201': 'IC1871',
   'SH2-255': 'IC2162',
   IC2948: 'IC2944',
-  IC3719: 'IC3716',
-  IC3881: 'IC3877',
-  IC4068: 'IC4067',
-  IC4462: 'IC4461',
+  IC3716: 'IC3719',
   vdB100: 'IC4592',
   LBN1107: 'IC4606',
   'SH2-44': 'IC4701',
@@ -1195,12 +1192,17 @@ async function main() {
     const majAxis = parseNum(row['MajAx'] || row['Maj.Ax.'] || row['SizeMax']);
     const minAxis = parseNum(row['MinAx'] || row['Min.Ax.'] || row['SizeMin']);
     const pa = parseNum(row['PA'] || row['PosAng']) || 0;
-    const mag = parseNum(row['V-Mag'] || row['Mag'] || row['Bmag'] || row['Vmag']);
+    let mag = parseNum(row['V-Mag'] || row['Mag'] || row['Bmag'] || row['Vmag']);
+    // A galaxy V that is missing or fainter than its B (a central-aperture value) is
+    // replaced from galaxy-magnitudes.json (RC3, SDSS or an estimate from B).
+    const bMag = parseNum(row['B-Mag']);
+    if (dsoType === 'Gx' && (mag === null || (bMag !== null && mag > bMag)))
+      mag = GALAXY_MAGNITUDES[id]?.[0] ?? null;
 
     // French / English / Spanish / German names and type corrections come from
     // dso-metadata-overrides.json (applied by applyMetadataOverrides at the end).
 
-    const finalType = dsoType;
+    const finalType = dsoType === 'Gx' ? classifyHubble(row['Hubble']) : dsoType;
 
     // ── Extract LBN cross-refs from Identifiers field ─────────────────────
     const identifiers = row['Identifiers'] || '';

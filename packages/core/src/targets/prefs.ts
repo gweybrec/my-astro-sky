@@ -1,6 +1,10 @@
 import { storage } from '../platform/storage';
 import { TARGETS_PREFS_KEY } from '../observer-location';
-import { addProtoplanetaryType, renameLegacyCatalogs } from '../display-settings';
+import {
+  addLenticularType,
+  addProtoplanetaryType,
+  renameLegacyCatalogs,
+} from '../display-settings';
 import { todayISO } from './format';
 
 export type SortKey =
@@ -66,9 +70,15 @@ export function loadTargetsPrefs(): TargetsPrefs {
           parsed.enabledCatalogs = renameLegacyCatalogs(parsed.enabledCatalogs);
         // A record saved before the 'PPN' type existed: tick it once beside the planetary nebulae
         // (the mark is storage only: kept out of the preferences, which are compared to tell a new search)
-        const { ppnTypeAdded, ...prefs } = parsed as TargetsPrefs & { ppnTypeAdded?: boolean };
+        const { ppnTypeAdded, gxlTypeAdded, ...prefs } = parsed as TargetsPrefs & {
+          ppnTypeAdded?: boolean;
+          gxlTypeAdded?: boolean;
+        };
         if (prefs.enabledTypes && !ppnTypeAdded)
           prefs.enabledTypes = addProtoplanetaryType(prefs.enabledTypes);
+        // Same for the 'GxL' type (lenticular galaxies), beside the elliptical ones
+        if (prefs.enabledTypes && !gxlTypeAdded)
+          prefs.enabledTypes = addLenticularType(prefs.enabledTypes);
         return prefs;
       }
     }
@@ -82,7 +92,8 @@ export function loadTargetsPrefs(): TargetsPrefs {
         lon: old.lon ?? null,
         lastDateISO: old.lastDateISO ?? null,
         coordFormat: old.coordFormat,
-        enabledTypes: old.enabledTypes && addProtoplanetaryType(old.enabledTypes),
+        enabledTypes:
+          old.enabledTypes && addLenticularType(addProtoplanetaryType(old.enabledTypes)),
         sortBy: old.sortBy,
         horizonDirs: old.horizonDirs,
         enabledRatings: old.enabledRatings,
@@ -99,8 +110,11 @@ export function loadTargetsPrefs(): TargetsPrefs {
 }
 
 export function saveTargetsPrefs(p: TargetsPrefs): void {
-  // The mark tells loadTargetsPrefs this record already knows the 'PPN' type, so it is not ticked again.
-  storage().set(TARGETS_PREFS_KEY, JSON.stringify({ ...p, ppnTypeAdded: true }));
+  // The marks tell loadTargetsPrefs this record already knows the 'PPN' and 'GxL' types, so they are not ticked again.
+  storage().set(
+    TARGETS_PREFS_KEY,
+    JSON.stringify({ ...p, ppnTypeAdded: true, gxlTypeAdded: true }),
+  );
 }
 
 /**

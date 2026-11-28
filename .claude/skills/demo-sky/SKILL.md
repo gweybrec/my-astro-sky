@@ -78,7 +78,7 @@ Scripts live in `.claude/skills/demo-sky/scripts/`; run the Python ones with `py
    sky", "only planetary nebulae", "the southern sky") or, when nothing is said, a varied mix (nebulae of
    each kind, planetary nebulae, SNRs, open and globular clusters, galaxies of each shape, both
    hemispheres). The `type` field of `public/data/dso.json` picks objects of a kind: `GxS` spiral, `GxE`
-   elliptical, `GxI` irregular, `Gx` other galaxy, `EN` emission, `RN` reflection, `DN` dark nebula, `PN`
+   elliptical, `GxL` lenticular, `GxI` irregular, `Gx` other galaxy, `EN` emission, `RN` reflection, `DN` dark nebula, `PN`
    planetary nebula, `SNR`, `OC` open cluster, `GC` globular cluster; its `rating` favours well-known
    objects. Check every id exists there (its `id` or one of its `catalogs`; use the `id`). **List the
    objects in the order they are wanted**: `solve.py` tries them in that order and stops at the total, so

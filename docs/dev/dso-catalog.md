@@ -67,6 +67,14 @@ node scripts/add-constellations.mjs
 5. **After any coordinate edit**: run `node scripts/add-constellations.mjs` to recompute the `constellation` field.
 6. **Protoplanetary nebulae** (Step 11b of `generate-dso.mjs`, type `PPN`): the 16 objects of the fr.wikipedia list, in the `Other` family under IRAS-style ids. Their names are each language's Wikipedia name (English where that Wikipedia has none). Coordinates come from SIMBAD; V magnitude and size from SIMBAD, else the en.wikipedia infobox. Alias `M 1-92` keeps its space so it never reads as a Messier number.
 
+### Galaxy types
+
+`generate-dso.mjs` sets a galaxy's type from OpenNGC's Hubble column (`classifyHubble`): spiral `GxS` (Sa–Sd, Magellanic Sm, and "S?"), lenticular `GxL` (E-S0, S0, S0/a: T-type −3 to −1), elliptical `GxE` (E, cD), irregular `GxI` (Im, I0, BCD). Where OpenNGC has none, the `type` in `dso-metadata-overrides.json` comes from RC3's T-type, else NED's classification, else SIMBAD's morphology, with the same borders. A `type` override on a galaxy OpenNGC classifies is kept only when verified against those sources (M82, NGC 3077, NGC 3448: irregular). A galaxy none of them classifies, often a pair or group, stays `Gx` (unknown).
+
+### Galaxy magnitudes
+
+OpenNGC's galaxy V magnitude is often missing, and sometimes a central-aperture value fainter than the galaxy's B (NGC 2606: V 17.02 against B 14.90); SIMBAD carries the same values. Where OpenNGC's V is missing or fainter than its B, `generate-dso.mjs` takes the V from `scripts/galaxy-magnitudes.json`, built by `node scripts/fetch-galaxy-magnitudes.mjs` (rerun it after an OpenNGC update). Sources, best first: RC3 (VII/155) total `BT − (B−V)T`; SDSS DR18 cModel g, r of the nearest galaxy within 0.5′, converted with Jester et al. (2005) and rejected when more than 1 mag from a catalogue B; else a catalogue B minus the median B − V of its kind (about 0.95 elliptical/S0, 0.68 spiral, 0.4 irregular). HyperLEDA refuses automated queries. A `mag` override still wins, so an override must be a V value.
+
 ---
 
 ## Rating, Difficulty, Priority, and Containment Fields

@@ -99,6 +99,19 @@ export const DSO_MARKER_STYLES: Record<DSOType, DsoMarkerStyle> = {
     },
     stroke: { color: 'rgba(180, 180, 240, 0.5)', lineWidth: 0.8 },
   },
+  // Lenticular galaxy (S0): a disk like a spiral's, in a pale warm white between the
+  // spiral's gold and the elliptical's blue-white (old stars, no arms).
+  GxL: {
+    shape: 'ellipse',
+    fill: {
+      stops: [
+        [0, 'rgba(240, 225, 195, 0.8)'],
+        [0.5, 'rgba(200, 185, 155, 0.45)'],
+        [1, 'rgba(160, 140, 110, 0)'],
+      ],
+    },
+    stroke: { color: 'rgba(230, 215, 185, 0.55)', lineWidth: 0.8 },
+  },
   // Irregular galaxy: greenish/teal, amorphous (circular, no rotation).
   GxI: {
     shape: 'circle',
@@ -203,7 +216,7 @@ export const DSO_MARKER_STYLES: Record<DSOType, DsoMarkerStyle> = {
   },
 };
 
-/** DSO label text color per type. Galaxy subtypes (GxS/GxE/GxI) intentionally fall
+/** DSO label text color per type. Galaxy subtypes (GxS/GxE/GxL/GxI) intentionally fall
  * back to {@link DEFAULT_DSO_LABEL_COLOR} — matching the original `TYPE_COLORS` map. */
 export const DSO_LABEL_COLORS: Partial<Record<DSOType, string>> = {
   Gx: 'rgba(220, 180, 100, 0.8)',

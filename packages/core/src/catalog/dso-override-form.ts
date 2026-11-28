@@ -13,6 +13,7 @@ export const DSO_EDIT_TYPES: DSOType[] = [
   'Gx',
   'GxS',
   'GxE',
+  'GxL',
   'GxI',
   'OC',
   'GC',

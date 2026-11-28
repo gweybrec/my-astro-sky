@@ -118,6 +118,7 @@ const es: Translations = {
     typeLabels: {
       GxS: 'Galaxias espirales',
       GxE: 'Galaxias elípticas',
+      GxL: 'Galaxias lenticulares',
       GxI: 'Galaxias irregulares',
       Gx: 'Galaxias (tipo desconocido)',
       OC: 'Cúmulos abiertos',
@@ -135,6 +136,7 @@ const es: Translations = {
     types: {
       GxS: 'Galaxia espiral',
       GxE: 'Galaxia elíptica',
+      GxL: 'Galaxia lenticular',
       GxI: 'Galaxia irregular',
       Gx: 'Galaxia (tipo desconocido)',
       OC: 'Cúmulo abierto',

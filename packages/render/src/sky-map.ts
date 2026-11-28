@@ -216,6 +216,7 @@ export class SkyMap {
   private visibleDSOTypes: Set<string> = new Set([
     'GxS',
     'GxE',
+    'GxL',
     'GxI',
     'Gx',
     'OC',

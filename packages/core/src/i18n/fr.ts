@@ -117,6 +117,7 @@ const fr = {
     typeLabels: {
       GxS: 'Galaxies spirales',
       GxE: 'Galaxies elliptiques',
+      GxL: 'Galaxies lenticulaires',
       GxI: 'Galaxies irrégulières',
       Gx: 'Galaxies (type inconnu)',
       OC: 'Amas ouverts',
@@ -134,6 +135,7 @@ const fr = {
     types: {
       GxS: 'Galaxie spirale',
       GxE: 'Galaxie elliptique',
+      GxL: 'Galaxie lenticulaire',
       GxI: 'Galaxie irrégulière',
       Gx: 'Galaxie (type inconnu)',
       OC: 'Amas ouvert',
